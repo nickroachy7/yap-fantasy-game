@@ -49,3 +49,38 @@ export function injuryWeight(status: string | null | undefined): InjuryWeight {
   // silence is the worst failure mode for an injury warning.
   return 'advisory';
 }
+
+/**
+ * Short form of a designation, for places too narrow to print it in full.
+ *
+ * The compact inventory card is 106pt wide, which leaves ~92px for the flag —
+ * `○ QUESTIONABLE` measures 102px there and was rendering as `○ QUESTIONA…`,
+ * ellipsising the one word that carries the meaning. Abbreviating is better
+ * than truncating because the cut point is chosen rather than incidental.
+ *
+ * Prefix-matched against the same vocabulary as `injuryWeight`, and kept in
+ * this file for the same reason: two screens must never disagree about what a
+ * designation is called. Callers keep the FULL status in the accessibility
+ * label — this is a visual abbreviation, not a data one.
+ */
+export function injuryAbbr(status: string): string {
+  const s = status.trim().toLowerCase();
+
+  if (s.startsWith('questionable')) return 'QUES';
+  if (s.startsWith('doubtful')) return 'DOUB';
+  if (s.startsWith('probable')) return 'PROB';
+  if (s.startsWith('limited')) return 'LTD';
+  if (s.startsWith('day')) return 'DTD';
+  if (s.startsWith('out')) return 'OUT';
+  if (s === 'ir' || s.startsWith('injured reserve')) return 'IR';
+  if (s.startsWith('suspend')) return 'SUSP';
+  if (s.startsWith('reserve-sus')) return 'SUSP';
+  if (s.startsWith('reserve')) return 'RES';
+
+  // PUP-P, PUP-R, NFI-A, NFI-R are already at their short form.
+  const upper = status.trim().toUpperCase();
+
+  // An unrecognised designation is clipped rather than dropped: silence is the
+  // worst failure mode for an injury warning, and the a11y label still has it.
+  return upper.length <= 6 ? upper : upper.slice(0, 5);
+}

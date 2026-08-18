@@ -47,6 +47,20 @@ export function TierProgress({
   const ratio = maxed ? 1 : Math.min(1, gained / span);
   const remaining = maxed ? 0 : Math.max(0, nextTierAt - careerFp);
 
+  /* The `current / target` fraction does not fit beside the "NEXT TIER" label
+   * at compact width — measured at 106pt, `1,285 / 2,500` overflows its box by
+   * 21px and renders as `1,285 ...`, cutting the number that is the entire
+   * point of the row. It is also the one line here that is pure duplication:
+   * `current` is already printed as CAREER FP directly above, and the caption
+   * below states the remainder in words. So it is dropped at compact rather
+   * than shrunk, which would only push the clipping onto a smaller font. The
+   * MAX TIER diamonds are four glyphs and always fit. */
+  const headValue = maxed
+    ? '◆◆◆◆'
+    : size === 'compact'
+      ? null
+      : `${fmt(careerFp)} / ${fmt(nextTierAt)}`;
+
   const caption = maxed
     ? 'Top tier reached'
     : `${fmt(remaining)} FP to ${nextLabel ?? 'next tier'}`;
@@ -68,11 +82,13 @@ export function TierProgress({
           style={[styles.head, { color: theme.colors.textMuted, fontSize: dims.labelSize }]}>
           {maxed ? 'MAX TIER' : 'NEXT TIER'}
         </Text>
-        <Text
-          numberOfLines={1}
-          style={[styles.headValue, { color: theme.colors.text, fontSize: dims.labelSize }]}>
-          {maxed ? '◆◆◆◆' : `${fmt(careerFp)} / ${fmt(nextTierAt)}`}
-        </Text>
+        {headValue ? (
+          <Text
+            numberOfLines={1}
+            style={[styles.headValue, { color: theme.colors.text, fontSize: dims.labelSize }]}>
+            {headValue}
+          </Text>
+        ) : null}
       </View>
 
       <View

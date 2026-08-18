@@ -14,7 +14,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { PlayerCard } from '@/components/cards';
 import { Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { injuryWeight, type InjuryWeight } from '@/lib/injury';
+import { injuryAbbr, injuryWeight, type InjuryWeight } from '@/lib/injury';
 import { toCardModel, type CollectionCard } from './types';
 
 /**
@@ -52,7 +52,7 @@ function InjuryFlag({ weight, status }: { weight: Exclude<InjuryWeight, null>; s
       <Text
         numberOfLines={1}
         style={[styles.flagText, { color: blocking ? palette.onBlocking : tone }]}>
-        {blocking ? '✕' : '○'} {status.toUpperCase()}
+        {blocking ? '✕' : '○'} {injuryAbbr(status)}
       </Text>
     </View>
   );
