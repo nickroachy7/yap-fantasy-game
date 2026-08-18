@@ -1,15 +1,16 @@
 import { Redirect, Tabs } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
+import { StyleSheet, useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
+import { PlayerProvider } from '@/context/PlayerContext';
 
 export default function AppLayout() {
   const { session, initialising } = useAuth();
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
 
   useEffect(() => {
     if (!initialising) void SplashScreen.hideAsync();
@@ -20,18 +21,33 @@ export default function AppLayout() {
   if (!session) return <Redirect href="/login" />;
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.text,
-        tabBarInactiveTintColor: colors.textSecondary,
-        tabBarStyle: { backgroundColor: colors.background, borderTopColor: colors.backgroundElement },
-      }}>
-      <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="packs" options={{ title: 'Packs' }} />
-      <Tabs.Screen name="collection" options={{ title: 'Collection' }} />
-      <Tabs.Screen name="lineup" options={{ title: 'Lineup' }} />
-      <Tabs.Screen name="leaderboard" options={{ title: 'Board' }} />
-    </Tabs>
+    <PlayerProvider>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: c.text,
+          tabBarInactiveTintColor: c.textSecondary,
+          tabBarLabelStyle: styles.tabLabel,
+          tabBarStyle: {
+            backgroundColor: c.background,
+            borderTopColor: c.backgroundElement,
+          },
+        }}>
+        {/* Order is deliberate: the weekly decision comes first, standings
+            second, acquisition third, what you own fourth, identity last. */}
+        <Tabs.Screen name="lineup" options={{ title: 'Lineup' }} />
+        <Tabs.Screen name="leaderboard" options={{ title: 'Board' }} />
+        <Tabs.Screen name="cards" options={{ title: 'Cards' }} />
+        <Tabs.Screen name="collection" options={{ title: 'Collection' }} />
+        <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+
+        {/* Detail routes live in the stack but never appear as tabs. */}
+        <Tabs.Screen name="player/[id]" options={{ href: null }} />
+      </Tabs>
+    </PlayerProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  tabLabel: { fontSize: 11, fontWeight: '600' },
+});

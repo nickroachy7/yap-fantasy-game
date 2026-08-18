@@ -82,6 +82,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "card_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["card_id"]
+          },
+          {
             foreignKeyName: "card_instances_pack_opening_fkey"
             columns: ["pack_opening_id"]
             isOneToOne: false
@@ -122,6 +129,13 @@ export type Database = {
           season?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "cards_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["player_id"]
+          },
           {
             foreignKeyName: "cards_player_id_fkey"
             columns: ["player_id"]
@@ -169,6 +183,13 @@ export type Database = {
           week?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "dfs_salary_snapshots_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["player_id"]
+          },
           {
             foreignKeyName: "dfs_salary_snapshots_player_id_fkey"
             columns: ["player_id"]
@@ -668,6 +689,13 @@ export type Database = {
             foreignKeyName: "stat_lines_player_id_fkey"
             columns: ["player_id"]
             isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["player_id"]
+          },
+          {
+            foreignKeyName: "stat_lines_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
             referencedRelation: "players"
             referencedColumns: ["id"]
           },
@@ -762,7 +790,30 @@ export type Database = {
             referencedRelation: "cards"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "card_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["card_id"]
+          },
         ]
+      }
+      player_directory: {
+        Row: {
+          card_id: string | null
+          fp_per_game: number | null
+          games_played: number | null
+          injury_status: string | null
+          player_id: string | null
+          player_name: string | null
+          position_abbreviation: string | null
+          rarity: Database["public"]["Enums"]["rarity"] | null
+          season: number | null
+          season_fp: number | null
+          team_abbreviation: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {
