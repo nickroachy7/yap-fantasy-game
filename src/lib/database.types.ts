@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.15"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       card_instances: {
@@ -521,6 +496,48 @@ export type Database = {
         }
         Relationships: []
       }
+      player_season_stats: {
+        Row: {
+          games_played: number | null
+          player_id: string
+          postseason: boolean
+          raw: Json
+          season: number
+          synced_at: string
+        }
+        Insert: {
+          games_played?: number | null
+          player_id: string
+          postseason?: boolean
+          raw?: Json
+          season: number
+          synced_at?: string
+        }
+        Update: {
+          games_played?: number | null
+          player_id?: string
+          postseason?: boolean
+          raw?: Json
+          season?: number
+          synced_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_season_stats_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["player_id"]
+          },
+          {
+            foreignKeyName: "player_season_stats_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       players: {
         Row: {
           age: number | null
@@ -708,6 +725,71 @@ export type Database = {
           },
         ]
       }
+      team_standings: {
+        Row: {
+          conference_record: string | null
+          division_record: string | null
+          home_record: string | null
+          losses: number | null
+          overall_record: string | null
+          playoff_seed: number | null
+          point_differential: number | null
+          points_against: number | null
+          points_for: number | null
+          road_record: string | null
+          season: number
+          synced_at: string
+          team_id: string
+          ties: number | null
+          win_streak: number | null
+          wins: number | null
+        }
+        Insert: {
+          conference_record?: string | null
+          division_record?: string | null
+          home_record?: string | null
+          losses?: number | null
+          overall_record?: string | null
+          playoff_seed?: number | null
+          point_differential?: number | null
+          points_against?: number | null
+          points_for?: number | null
+          road_record?: string | null
+          season: number
+          synced_at?: string
+          team_id: string
+          ties?: number | null
+          win_streak?: number | null
+          wins?: number | null
+        }
+        Update: {
+          conference_record?: string | null
+          division_record?: string | null
+          home_record?: string | null
+          losses?: number | null
+          overall_record?: string | null
+          playoff_seed?: number | null
+          point_differential?: number | null
+          points_against?: number | null
+          points_for?: number | null
+          road_record?: string | null
+          season?: number
+          synced_at?: string
+          team_id?: string
+          ties?: number | null
+          win_streak?: number | null
+          wins?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_standings_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teams: {
         Row: {
           abbreviation: string
@@ -830,6 +912,33 @@ export type Database = {
         }
         Relationships: []
       }
+      player_season_ranks: {
+        Row: {
+          base_fp: number | null
+          games_played: number | null
+          player_id: string | null
+          pos: string | null
+          pos_rank: number | null
+          rank_pool: number | null
+          season: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_season_stats_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["player_id"]
+          },
+          {
+            foreignKeyName: "player_season_stats_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       apply_injuries: { Args: { payload: Json }; Returns: number }
@@ -885,9 +994,15 @@ export type Database = {
           team_abbreviation: string
         }[]
       }
+      player_profile: { Args: { p_player_id: string }; Returns: Json }
+      refresh_player_season_ranks: { Args: never; Returns: undefined }
       score_week: {
         Args: { p_season: number; p_season_type: number; p_week: number }
         Returns: Json
+      }
+      season_base_points: {
+        Args: { p_raw: Json; p_rules_version?: number }
+        Returns: number
       }
       set_lineup: {
         Args: {
@@ -1048,9 +1163,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       acquisition_source: ["pack", "grant", "admin"],

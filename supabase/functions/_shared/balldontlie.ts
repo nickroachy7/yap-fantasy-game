@@ -17,6 +17,8 @@ import type {
   ProviderInjury,
   ProviderPlayer,
   ProviderSalary,
+  ProviderSeasonStat,
+  ProviderStanding,
   ProviderStatLine,
   ProviderTeam,
   SalaryQuery,
@@ -197,6 +199,58 @@ export class BalldontlieProvider implements StatsProvider {
       }
     }
     return out;
+  }
+
+  async listSeasonStats(season: number): Promise<ProviderSeasonStat[]> {
+    const params = new URLSearchParams();
+    // Required and singular upstream: omitting it is a 400, and there is no
+    // seasons[] variant, so a career is one call per season.
+    params.set('season', String(season));
+
+    const rows = await this.#paginate<Record<string, any>>('/season_stats', params);
+    const out: ProviderSeasonStat[] = [];
+    for (const row of rows) {
+      // Strip the nested player; keep every stat key verbatim. `season` and
+      // `postseason` are lifted to columns but deliberately left in raw too, so
+      // a row is still self-describing if it is read on its own.
+      const { player, ...stats } = row;
+      if (!player?.id) continue;
+
+      out.push({
+        playerExternalId: player.id,
+        season: toNumber(row.season) ?? season,
+        postseason: row.postseason === true,
+        gamesPlayed: toNumber(row.games_played),
+        raw: stats,
+      });
+    }
+    return out;
+  }
+
+  async listStandings(season: number): Promise<ProviderStanding[]> {
+    const params = new URLSearchParams();
+    params.set('season', String(season));
+
+    const rows = await this.#paginate<Record<string, any>>('/standings', params);
+    return rows
+      .filter((r) => r.team?.id)
+      .map((r) => ({
+        teamExternalId: r.team.id,
+        season: toNumber(r.season) ?? season,
+        wins: toNumber(r.wins),
+        losses: toNumber(r.losses),
+        ties: toNumber(r.ties),
+        pointsFor: toNumber(r.points_for),
+        pointsAgainst: toNumber(r.points_against),
+        pointDifferential: toNumber(r.point_differential),
+        playoffSeed: toNumber(r.playoff_seed),
+        winStreak: toNumber(r.win_streak),
+        overallRecord: r.overall_record ?? null,
+        conferenceRecord: r.conference_record ?? null,
+        divisionRecord: r.division_record ?? null,
+        homeRecord: r.home_record ?? null,
+        roadRecord: r.road_record ?? null,
+      }));
   }
 
   async listInjuries(): Promise<ProviderInjury[]> {

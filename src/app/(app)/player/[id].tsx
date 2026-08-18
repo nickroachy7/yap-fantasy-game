@@ -1,6 +1,15 @@
 /**
- * Player detail: who this player is, what they have produced this season, and
- * the week-by-week game log behind that total.
+ * Player profile: who this player is, what he has produced across his career
+ * and this season, how his team uses him, and the game log behind the total.
+ *
+ * Most of this comes from one RPC (`player_profile`) rather than four client
+ * round trips, because the ranking has to happen server-side against every
+ * player-season anyway.
+ *
+ * Three things the provider does not sell, and which are therefore NOT here:
+ * projections, depth charts, and news. Rather than invent them, the usage
+ * panel shows measured share of the team's work and says plainly that it is a
+ * measurement. See UsagePanel.
  *
  * The route param is the PLAYER id (not the card id) — a player is one row in
  * the directory but potentially many owned card instances.
@@ -18,6 +27,11 @@ import {
   normalise,
   type DirectoryPlayer,
 } from '@/components/cards/player-directory';
+import { BioStrip } from '@/components/players/BioStrip';
+import { CareerTable } from '@/components/players/CareerTable';
+import { TeamContext } from '@/components/players/TeamContext';
+import { UsagePanel } from '@/components/players/UsagePanel';
+import { parseProfile, type PlayerProfile } from '@/components/players/profile';
 import { Screen } from '@/components/shell/Screen';
 import { BottomTabInset, Colors, Spacing } from '@/constants/theme';
 import type { Json } from '@/lib/database.types';
@@ -137,6 +151,7 @@ export default function PlayerDetailScreen() {
   const c = Colors[scheme];
 
   const [player, setPlayer] = useState<DirectoryPlayer | null>(null);
+  const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [log, setLog] = useState<GameLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -149,7 +164,7 @@ export default function PlayerDetailScreen() {
       else setLoading(true);
       setError(null);
 
-      const [directoryRes, rulesRes, teamsRes, linesRes] = await Promise.all([
+      const [directoryRes, profileRes, rulesRes, teamsRes, linesRes] = await Promise.all([
         supabase
           .from('player_directory')
           .select(DIRECTORY_COLUMNS)
@@ -157,6 +172,7 @@ export default function PlayerDetailScreen() {
           .order('season', { ascending: false })
           .limit(1)
           .maybeSingle(),
+        supabase.rpc('player_profile', { p_player_id: id }),
         supabase.from('scoring_rules').select('version').eq('is_active', true).limit(1).maybeSingle(),
         supabase.from('teams').select('id, abbreviation'),
         supabase
@@ -179,6 +195,9 @@ export default function PlayerDetailScreen() {
       }
 
       setPlayer(directoryRes.data ? normalise(directoryRes.data) : null);
+      // A profile failure is non-fatal on purpose: the directory row and the
+      // game log stand on their own, and half a page beats an error page.
+      setProfile(profileRes.error || !profileRes.data ? null : parseProfile(profileRes.data));
 
       // Only the ACTIVE ruleset is shown. Older versions stay in the table for
       // audit, and mixing them would silently double-count a rescored week.
@@ -273,11 +292,44 @@ export default function PlayerDetailScreen() {
           </View>
         </View>
 
+        {profile ? <BioStrip bio={profile.player} /> : null}
+
+        {/* This season, scored from per-game rows — so unlike the career table
+            these DO include the per-game bonuses. The two are not the same
+            kind of number and are deliberately not shown side by side. */}
         <View style={styles.statRow}>
           <StatTile label="SEASON FP" value={oneDp(player.seasonFp)} emphasis />
           <StatTile label="GAMES" value={String(player.gamesPlayed)} />
           <StatTile label="FP / GAME" value={oneDp(player.fpPerGame)} />
         </View>
+
+        {profile?.player.injuryComment ? (
+          <View style={[styles.note, { backgroundColor: c.backgroundElement }]}>
+            <Text style={[styles.noteBody, { color: c.textSecondary }]}>
+              {profile.player.injuryComment}
+            </Text>
+          </View>
+        ) : null}
+
+        {profile ? (
+          <>
+            <Text style={[styles.sectionTitle, { color: c.text }]}>Career</Text>
+            <CareerTable
+              career={profile.career}
+              position={profile.player.positionAbbreviation}
+            />
+
+            <Text style={[styles.sectionTitle, { color: c.text }]}>Usage</Text>
+            <UsagePanel
+              usage={profile.usage}
+              position={profile.player.positionAbbreviation}
+              teamAbbreviation={profile.player.teamAbbreviation}
+            />
+
+            <Text style={[styles.sectionTitle, { color: c.text }]}>Team</Text>
+            <TeamContext bio={profile.player} standings={profile.standings} />
+          </>
+        ) : null}
 
         <Text style={[styles.sectionTitle, { color: c.text }]}>Game log</Text>
 
@@ -399,6 +451,8 @@ const styles = StyleSheet.create({
   tile: { flex: 1, minWidth: 0, borderRadius: 12, padding: Spacing.three, gap: 2 },
   tileLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8 },
   tileValue: { fontWeight: '800' },
+  note: { borderRadius: 12, padding: Spacing.two + 4 },
+  noteBody: { fontSize: 12, lineHeight: 17 },
   sectionTitle: { fontSize: 18, fontWeight: '700', marginTop: Spacing.two },
   logRow: {
     flexDirection: 'row',

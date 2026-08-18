@@ -80,6 +80,38 @@ export interface ProviderSalary {
   position: string | null;
 }
 
+export interface ProviderSeasonStat {
+  playerExternalId: number;
+  season: number;
+  /** The vendor returns regular season and postseason as separate rows. */
+  postseason: boolean;
+  gamesPlayed: number | null;
+  /**
+   * The complete season aggregate, vendor keys intact and minus the nested
+   * player object. 63 fields as of 2026 — far more than the profile reads
+   * today, which is the reason to keep it whole.
+   */
+  raw: Record<string, unknown>;
+}
+
+export interface ProviderStanding {
+  teamExternalId: number;
+  season: number;
+  wins: number | null;
+  losses: number | null;
+  ties: number | null;
+  pointsFor: number | null;
+  pointsAgainst: number | null;
+  pointDifferential: number | null;
+  playoffSeed: number | null;
+  winStreak: number | null;
+  overallRecord: string | null;
+  conferenceRecord: string | null;
+  divisionRecord: string | null;
+  homeRecord: string | null;
+  roadRecord: string | null;
+}
+
 export interface GameQuery {
   season: number;
   seasonType: SeasonType;
@@ -104,4 +136,14 @@ export interface StatsProvider {
   listStatLines(gameExternalIds: number[], seasonType: SeasonType): Promise<ProviderStatLine[]>;
   listInjuries(): Promise<ProviderInjury[]>;
   listSalaries(query: SalaryQuery): Promise<ProviderSalary[]>;
+  /**
+   * Season aggregates for EVERY player in one season.
+   *
+   * `season` is required and singular upstream — there is no seasons[] filter —
+   * so a career is one request per season, not one per player. The signature
+   * says so, to stop a caller reaching for a career-shaped call that does not
+   * exist.
+   */
+  listSeasonStats(season: number): Promise<ProviderSeasonStat[]>;
+  listStandings(season: number): Promise<ProviderStanding[]>;
 }

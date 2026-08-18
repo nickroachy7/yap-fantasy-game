@@ -23,7 +23,13 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View, useColorScheme, useWindowDimensions } from 'react-native';
 
 import { InventoryCard } from '@/components/collection/InventoryCard';
+import { MCCAFFREY_PROFILE, USAGE_SAMPLE } from '@/components/dev/profile-fixture';
 import { OWNED_MANY } from '@/components/dev/fixtures';
+import { BioStrip } from '@/components/players/BioStrip';
+import { CareerTable } from '@/components/players/CareerTable';
+import { TeamContext } from '@/components/players/TeamContext';
+import { UsagePanel } from '@/components/players/UsagePanel';
+import { parseProfile } from '@/components/players/profile';
 import { Screen } from '@/components/shell/Screen';
 import { SegmentedControl, type Segment } from '@/components/shell/SegmentedControl';
 import { Sidebar } from '@/components/shell/Sidebar';
@@ -40,11 +46,12 @@ const FIXTURE_PLAYER: PlayerState = {
   refresh: async () => {},
 };
 
-type View_ = 'inventory' | 'leaderboard' | 'lineup';
+type View_ = 'inventory' | 'leaderboard' | 'lineup' | 'profile';
 const VIEWS: Segment<View_>[] = [
   { value: 'inventory', label: 'Inventory' },
-  { value: 'leaderboard', label: 'Leaderboard' },
+  { value: 'leaderboard', label: 'Board' },
   { value: 'lineup', label: 'Lineup' },
+  { value: 'profile', label: 'Profile' },
 ];
 
 /** Each view previews the measure its real screen asks for, not a single one. */
@@ -52,11 +59,13 @@ const VIEW_MEASURE: Record<View_, Measure> = {
   inventory: 'grid',
   leaderboard: 'table',
   lineup: 'form',
+  profile: 'table',
 };
 const VIEW_TITLE: Record<View_, string> = {
   inventory: 'Inventory',
   leaderboard: 'Leaderboard',
   lineup: 'Lineup',
+  profile: 'Christian McCaffrey',
 };
 
 /** Drives the rail's active/nested state, which is otherwise unreachable here. */
@@ -64,6 +73,7 @@ const VIEW_PATH: Record<View_, string> = {
   inventory: '/collection/inventory',
   leaderboard: '/leaderboard',
   lineup: '/lineup',
+  profile: '/cards',
 };
 
 /* ---- fixture content ---------------------------------------------------- */
@@ -155,6 +165,40 @@ function LineupFixture() {
   );
 }
 
+/**
+ * The profile sections against a REAL captured payload, including its awkward
+ * parts: a season the provider never reported, and no usage data at all. Both
+ * populated and empty usage are shown, because the empty one is what every
+ * starter looks like until the regular season begins.
+ */
+function ProfileFixture() {
+  const profile = parseProfile(MCCAFFREY_PROFILE);
+  if (!profile) return null;
+
+  const withUsage = parseProfile({
+    ...(MCCAFFREY_PROFILE as object),
+    usage: USAGE_SAMPLE,
+  } as typeof MCCAFFREY_PROFILE);
+
+  return (
+    <View style={styles.profile}>
+      <BioStrip bio={profile.player} />
+      <CareerTable career={profile.career} position={profile.player.positionAbbreviation} />
+      <UsagePanel
+        usage={withUsage?.usage ?? null}
+        position={profile.player.positionAbbreviation}
+        teamAbbreviation={profile.player.teamAbbreviation}
+      />
+      <UsagePanel
+        usage={profile.usage}
+        position={profile.player.positionAbbreviation}
+        teamAbbreviation={profile.player.teamAbbreviation}
+      />
+      <TeamContext bio={profile.player} standings={profile.standings} />
+    </View>
+  );
+}
+
 /* ---- the gallery -------------------------------------------------------- */
 
 export default function GalleryScreen() {
@@ -197,6 +241,7 @@ function GalleryBody() {
           {view === 'inventory' ? <InventoryFixture /> : null}
           {view === 'leaderboard' ? <LeaderboardFixture /> : null}
           {view === 'lineup' ? <LineupFixture /> : null}
+          {view === 'profile' ? <ProfileFixture /> : null}
         </Screen>
       </View>
     </View>
@@ -209,6 +254,7 @@ const styles = StyleSheet.create({
   content: { flex: 1 },
   banner: { fontSize: 11, letterSpacing: 0.3, fontVariant: ['tabular-nums'] },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, alignItems: 'flex-start' },
+  profile: { gap: Spacing.three },
   rows: { gap: 1 },
   row: {
     flexDirection: 'row',
