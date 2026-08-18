@@ -4,12 +4,12 @@
  *
  * A brand-new player owns nothing, and a blank grid tells them nothing about
  * why or what to do — so that state names the free Starter Pack and sends them
- * to the Cards tab. A filtered-to-nothing grid is the player's own doing, so it
- * just offers to undo it.
+ * to the Shop. A filtered-to-nothing grid is the player's own doing, so it just
+ * offers to undo it.
  */
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 function useScheme(): 'light' | 'dark' {
@@ -37,7 +37,7 @@ function Action({
         { backgroundColor: primary ? c.text : c.backgroundElement },
         pressed && styles.pressed,
       ]}>
-      <Text style={[styles.actionLabel, { color: primary ? c.background : c.text }]}>{label}</Text>
+      <Text style={[Type.strong, { color: primary ? c.background : c.text }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -47,21 +47,23 @@ export function EmptyCollection({ onGetCards }: { onGetCards: () => void }) {
   const c = Colors[useScheme()];
 
   return (
-    <View style={[styles.panel, { borderColor: c.backgroundElement }]}>
-      <Text style={[styles.eyebrow, { color: c.textSecondary }]}>NO CARDS YET</Text>
-      <Text style={[styles.title, { color: c.text }]}>Your collection is empty</Text>
-      <Text style={[styles.body, { color: c.textSecondary }]}>
-        Cards arrive from packs. The free Starter Pack is eight cards and guarantees one at every
+    <View style={[styles.panel, { borderColor: c.border, backgroundColor: c.surface }]}>
+      <Text style={[Type.micro, { color: c.textTertiary }]}>NO CARDS YET</Text>
+      <Text style={[Type.figure, { color: c.text }]}>Your collection is empty</Text>
+      <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
+        Cards arrive from packs. The free Starter Pack is eight cards with at least one at every
         lineup position, so it is enough to field a full lineup straight away.
       </Text>
-      <Text style={[styles.body, { color: c.textSecondary }]}>
+      <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
         Every card starts at bronze and climbs a tier by scoring fantasy points in your lineup —
         the cards you own are the cards you level up.
       </Text>
       <View style={styles.actions}>
         <Action label="Open the Starter Pack" onPress={onGetCards} primary />
       </View>
-      <Text style={[styles.footnote, { color: c.textSecondary }]}>Packs live in the Cards tab.</Text>
+      <Text style={[Type.fine, { color: c.textTertiary }]}>
+        Packs live in Collection · Shop.
+      </Text>
     </View>
   );
 }
@@ -78,8 +80,8 @@ export function EmptyFilterResult({
 
   return (
     <View style={styles.inline}>
-      <Text style={[styles.title, { color: c.text }]}>Nothing matches</Text>
-      <Text style={[styles.body, styles.centred, { color: c.textSecondary }]}>
+      <Text style={[Type.section, { color: c.text }]}>Nothing matches</Text>
+      <Text style={[Type.body, styles.centred, { color: c.textSecondary }]}>
         You own cards, just none that fit these filters.
       </Text>
       {hasFilters ? (
@@ -93,10 +95,13 @@ export function EmptyFilterResult({
 
 const styles = StyleSheet.create({
   panel: {
-    borderWidth: 1,
-    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
     padding: Spacing.four,
-    gap: Spacing.two + 2,
+    gap: Spacing.two,
+    // A measure, not the full grid width: this block is sentences, and 1180pt
+    // of prose on a monitor is unreadable however dense the type is.
+    maxWidth: 560,
   },
   inline: {
     alignItems: 'center',
@@ -104,17 +109,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     gap: Spacing.two,
   },
-  eyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1.6 },
-  title: { fontSize: 22, fontWeight: '700', lineHeight: 28 },
-  body: { fontSize: 14, lineHeight: 21, fontWeight: '500' },
   centred: { textAlign: 'center' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, paddingTop: Spacing.one },
   action: {
-    borderRadius: 12,
+    borderRadius: 8,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 2,
+    paddingVertical: Spacing.two,
   },
-  actionLabel: { fontSize: 14, fontWeight: '700' },
   pressed: { opacity: 0.75 },
-  footnote: { fontSize: 12, fontWeight: '500' },
 });

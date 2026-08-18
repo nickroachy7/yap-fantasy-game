@@ -12,7 +12,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PlayerCard } from '@/components/cards';
-import { Spacing } from '@/constants/theme';
+import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { injuryAbbr, injuryWeight, type InjuryWeight } from '@/lib/injury';
 import { toCardModel, type CollectionCard } from './types';
@@ -20,17 +20,18 @@ import { toCardModel, type CollectionCard } from './types';
 /**
  * The two weights are separated by fill, border style, marker glyph and text —
  * not by hue. A greyscale screenshot still reads "solid = out, dashed = maybe".
+ *
+ * The colours are the theme's `negative` and `warning` rather than a local pair.
+ * They were local because the theme had no status palette; it does now, and one
+ * app-wide red is worth more than a locally tuned one — the flag sits on the
+ * page background here, not on the card's tier surface, so the theme's own
+ * contrast pairings apply.
  */
-const INJURY_COLORS = {
-  light: { blocking: '#B3261E', advisory: '#7A5B00', onBlocking: '#FFFFFF' },
-  dark: { blocking: '#FF9A8F', advisory: '#E0C46A', onBlocking: '#2A0806' },
-} as const;
-
 function InjuryFlag({ weight, status }: { weight: Exclude<InjuryWeight, null>; status: string }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const palette = INJURY_COLORS[scheme];
+  const c = Colors[scheme];
   const blocking = weight === 'blocking';
-  const tone = blocking ? palette.blocking : palette.advisory;
+  const tone = blocking ? c.negative : c.warning;
 
   return (
     <View
@@ -51,7 +52,7 @@ function InjuryFlag({ weight, status }: { weight: Exclude<InjuryWeight, null>; s
       ]}>
       <Text
         numberOfLines={1}
-        style={[styles.flagText, { color: blocking ? palette.onBlocking : tone }]}>
+        style={[Type.micro, styles.flagText, { color: blocking ? c.background : tone }]}>
         {blocking ? '✕' : '○'} {injuryAbbr(status)}
       </Text>
     </View>
@@ -81,13 +82,13 @@ export function InventoryCard({
 }
 
 const styles = StyleSheet.create({
-  cell: { gap: Spacing.one + 2 },
+  cell: { gap: Spacing.one },
   flag: {
     alignSelf: 'stretch',
     borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: Spacing.one + 2,
-    paddingVertical: 2,
+    borderRadius: 4,
+    paddingHorizontal: Spacing.one,
+    paddingVertical: 1,
   },
-  flagText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5, textAlign: 'center' },
+  flagText: { textAlign: 'center' },
 });

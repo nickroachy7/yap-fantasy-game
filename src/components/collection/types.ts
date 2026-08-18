@@ -9,6 +9,7 @@
 import type { PlayerCardModel } from '@/components/cards';
 import { TierOrder, type CardTier } from '@/constants/theme';
 import type { Database } from '@/lib/database.types';
+import { injuryWeight } from '@/lib/injury';
 
 /** Exactly the columns the screen selects, straight off the generated types. */
 export type CollectionViewRow = Pick<
@@ -56,12 +57,31 @@ export type Position = (typeof PositionOrder)[number];
 
 export type PositionFilter = 'ALL' | Position;
 export type TierFilter = 'ALL' | CardTier;
-export type SortKey = 'fp' | 'name' | 'recent';
+/** Whether cards their designation rules out this week are shown at all. */
+export type AvailabilityFilter = 'ALL' | 'AVAILABLE';
+export type SortKey = 'fp' | 'tier' | 'starts' | 'name' | 'recent';
+export type SortDir = 'asc' | 'desc';
 
 export const SortLabels: Record<SortKey, string> = {
   fp: 'Career FP',
+  tier: 'Tier',
+  starts: 'Starts',
   name: 'Name',
-  recent: 'Recent',
+  recent: 'Acquired',
+};
+
+/**
+ * The direction each key is worth reading FIRST. Pressing "Name" and getting
+ * Z–A, or "Career FP" and getting your worst card, reads as a broken control
+ * rather than a choice — so the direction follows the key and the toggle then
+ * flips it from there.
+ */
+export const SortDefaultDir: Record<SortKey, SortDir> = {
+  fp: 'desc',
+  tier: 'desc',
+  starts: 'desc',
+  name: 'asc',
+  recent: 'desc',
 };
 
 const isTier = (v: string | null): v is CardTier =>
@@ -121,25 +141,56 @@ export function matchesTier(c: CollectionCard, filter: TierFilter): boolean {
 }
 
 /**
- * Sorting is done client-side even though the query is already ordered: the
- * order must not silently change meaning when the query changes, and `name` /
- * `recent` would otherwise each cost a round trip.
+ * "Blocking" is the only weight that hides a card, and it comes from
+ * `injuryWeight()` rather than a status list written here — Questionable is the
+ * most common designation in the feed, and filtering it out would silently
+ * empty a lot of people's grids.
  */
-export function sortCards(cards: CollectionCard[], key: SortKey): CollectionCard[] {
-  const out = [...cards];
+export function isAvailable(c: CollectionCard): boolean {
+  return injuryWeight(c.injuryStatus) !== 'blocking';
+}
 
-  out.sort((a, b) => {
-    if (key === 'name') {
-      return a.playerName.localeCompare(b.playerName) || b.careerFp - a.careerFp;
-    }
-    if (key === 'recent') {
-      return b.acquiredAt - a.acquiredAt || b.careerFp - a.careerFp;
-    }
+export function matchesAvailability(c: CollectionCard, filter: AvailabilityFilter): boolean {
+  return filter === 'ALL' || isAvailable(c);
+}
 
-    return b.careerFp - a.careerFp || a.playerName.localeCompare(b.playerName);
-  });
+/** Lower-cased once by the caller, so a keystroke does not re-lower every row. */
+export function matchesQuery(c: CollectionCard, needle: string): boolean {
+  if (!needle) return true;
 
-  return out;
+  return (
+    c.playerName.toLowerCase().includes(needle) ||
+    (c.team?.toLowerCase().includes(needle) ?? false) ||
+    (c.position?.toLowerCase().includes(needle) ?? false)
+  );
+}
+
+const byName = (a: CollectionCard, b: CollectionCard) =>
+  a.playerName.localeCompare(b.playerName) || a.id.localeCompare(b.id);
+
+const ascending: Record<SortKey, (a: CollectionCard, b: CollectionCard) => number> = {
+  fp: (a, b) => a.careerFp - b.careerFp,
+  tier: (a, b) => TierOrder.indexOf(a.tier) - TierOrder.indexOf(b.tier),
+  starts: (a, b) => a.lineupStarts - b.lineupStarts,
+  name: (a, b) => a.playerName.localeCompare(b.playerName),
+  recent: (a, b) => a.acquiredAt - b.acquiredAt,
+};
+
+/**
+ * Sorting is done client-side even though the query is already ordered: the
+ * order must not silently change meaning when the query changes, and every key
+ * other than career FP would otherwise cost a round trip.
+ *
+ * The tiebreak is applied AFTER the direction flip and is always ascending by
+ * name then instance id. Negating it too would reshuffle every tied block on a
+ * direction toggle — and with `tier` there are only four distinct values, so
+ * almost everything is a tie.
+ */
+export function sortCards(cards: CollectionCard[], key: SortKey, dir: SortDir): CollectionCard[] {
+  const cmp = ascending[key];
+  const sign = dir === 'desc' ? -1 : 1;
+
+  return [...cards].sort((a, b) => sign * cmp(a, b) || byName(a, b));
 }
 
 export function countByTier(cards: CollectionCard[]): Record<CardTier, number> {
@@ -156,4 +207,49 @@ export function countByPosition(cards: CollectionCard[]): Record<Position, numbe
   }
 
   return counts;
+}
+
+export type CollectionStats = {
+  cards: number;
+  /** Distinct catalogue entries — see the caveat in `summarise`. */
+  players: number;
+  duplicates: number;
+  teams: number;
+  /** Designation rules them out this week. */
+  unavailable: number;
+  /** Designation makes them a question mark — Questionable, DTD, limited. */
+  uncertain: number;
+};
+
+/**
+ * The one-line collection summary.
+ *
+ * "Players" counts distinct card_ids, not distinct people: a card is one player
+ * in one season, so the same player from two seasons is two entries. That is
+ * the same unit the duplicate count uses, which is what makes "13 cards, 11
+ * players, 2 duplicates" add up. Falls back to the name only when the view gave
+ * us no card_id at all.
+ */
+export function summarise(cards: CollectionCard[]): CollectionStats {
+  const players = new Set<string>();
+  const teams = new Set<string>();
+  let unavailable = 0;
+  let uncertain = 0;
+
+  for (const c of cards) {
+    players.add(c.cardId ?? c.playerName);
+    if (c.team) teams.add(c.team);
+    const weight = injuryWeight(c.injuryStatus);
+    if (weight === 'blocking') unavailable += 1;
+    else if (weight === 'advisory') uncertain += 1;
+  }
+
+  return {
+    cards: cards.length,
+    players: players.size,
+    duplicates: cards.length - players.size,
+    teams: teams.size,
+    unavailable,
+    uncertain,
+  };
 }

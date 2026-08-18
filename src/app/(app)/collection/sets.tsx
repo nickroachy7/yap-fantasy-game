@@ -8,7 +8,7 @@ import { COLLECTION_SEGMENTS } from '@/components/shell/sections';
 export default function SetsScreen() {
   const router = useRouter();
   return (
-    <Screen title="Sets" measure="form" context="Sets · not built yet" scroll={false}>
+    <Screen title="Sets" measure="form" context="Deferred to Week 3 · nothing tracked" scroll={false}>
       <SubNav segments={COLLECTION_SEGMENTS} />
       <SetsPanel onBackToInventory={() => router.replace('/collection/inventory')} />
     </Screen>

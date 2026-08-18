@@ -1,9 +1,15 @@
 /**
- * Collection — what you own (Inventory) and what you are chasing (Sets).
+ * Collection · Inventory — the cards you own.
  *
- * Inventory is virtualised from the first render: a collection has no upper
- * bound, so mapping over an array here would be a cliff rather than a slowdown.
- * Sets is deliberately an empty state — see SetsPanel for why.
+ * Virtualised from the first render: a collection has no upper bound, so
+ * mapping over an array here would be a cliff rather than a slowdown.
+ *
+ * The screen is three bands: a search field that never scrolls away, a facet
+ * block that does, and the grid. The split is not cosmetic — a TextInput used
+ * as a ListHeaderComponent is remounted on every keystroke and loses focus
+ * after one character (the same bug is documented in PlayersPanel), so the
+ * field has to live outside the list. The facets have no such constraint and
+ * are worth ~120pt of screen once you have stopped using them.
  */
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -20,19 +26,28 @@ import {
 
 import {
   PositionFilterRow,
+  ResultLine,
+  SearchField,
   SortRow,
   TierFilterRow,
 } from '@/components/collection/CollectionFilters';
+import { CollectionSummary } from '@/components/collection/CollectionSummary';
 import { EmptyCollection, EmptyFilterResult } from '@/components/collection/EmptyInventory';
 import { InventoryCard } from '@/components/collection/InventoryCard';
 import {
+  SortDefaultDir,
   countByPosition,
   countByTier,
+  matchesAvailability,
   matchesPosition,
+  matchesQuery,
   matchesTier,
   sortCards,
+  summarise,
+  type AvailabilityFilter,
   type CollectionCard,
   type PositionFilter,
+  type SortDir,
   type SortKey,
   type TierFilter,
 } from '@/components/collection/types';
@@ -40,11 +55,9 @@ import { useCollection } from '@/components/collection/use-collection';
 import { Screen } from '@/components/shell/Screen';
 import { SubNav } from '@/components/shell/SubNav';
 import { COLLECTION_SEGMENTS } from '@/components/shell/sections';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { injuryWeight } from '@/lib/injury';
-
 
 const GUTTER = Spacing.three;
 const GAP = Spacing.two + 4;
@@ -58,6 +71,12 @@ const MIN_COLUMNS = 3;
  * size.
  */
 const MAX_COLUMNS = 7;
+/**
+ * Below this a collection fits on a screen or two and the facets alone find
+ * anything, so a search field is a permanent 40pt tax on the answer to a
+ * question nobody has. A starter pack is 8 cards; this is roughly three packs.
+ */
+const SEARCH_FROM = 24;
 
 export default function InventoryScreen() {
   const router = useRouter();
@@ -69,9 +88,12 @@ export default function InventoryScreen() {
   const { cards, playerIds, error, loading, refreshing, refresh } = useCollection();
   const { cardCount, refresh: refreshPlayer } = usePlayer();
 
+  const [query, setQuery] = useState('');
   const [position, setPosition] = useState<PositionFilter>('ALL');
   const [tier, setTier] = useState<TierFilter>('ALL');
+  const [availability, setAvailability] = useState<AvailabilityFilter>('ALL');
   const [sort, setSort] = useState<SortKey>('fp');
+  const [dir, setDir] = useState<SortDir>(SortDefaultDir.fp);
 
   /* ---- grid geometry ------------------------------------------------- *
    * MEASURED, not recomputed. This used to derive the column width from the
@@ -83,7 +105,11 @@ export default function InventoryScreen() {
    * onLayout reports what the list actually got, so the grid cannot disagree
    * with the frame no matter what the frame later decides to do. Cards are
    * given an exact width rather than flex: 1 so a short final row does not
-   * stretch its cards wider than the rows above it.                       */
+   * stretch its cards wider than the rows above it.
+   *
+   * The measured box is UNPADDED because Screen renders `scroll={false}` as a
+   * bare flex container — the FlatList applies the gutter itself, so it has to
+   * come off here. Under a scrolling Screen the box already includes it.     */
   const contentWidth = listWidth - GUTTER * 2;
   // Three across is the floor, not a derived result: at two columns the cards
   // read as a list rather than a collection, and browsing what you own is the
@@ -94,17 +120,31 @@ export default function InventoryScreen() {
   );
   const itemWidth = Math.floor((contentWidth - GAP * (columns - 1)) / columns);
 
+  const all = useMemo(() => cards ?? [], [cards]);
+  const stats = useMemo(() => summarise(all), [all]);
+
+  // Hiding the field must also drop whatever was typed into it, or a collection
+  // that shrinks past the threshold filters itself by an invisible control.
+  const searchable = all.length >= SEARCH_FROM;
+  const needle = searchable ? query.trim().toLowerCase() : '';
+
   /* ---- faceting ------------------------------------------------------ *
-   * Each row's counts are computed with its OWN filter lifted, which is
-   * what makes the numbers mean "how many would I get if I pressed this".  */
-  const all = cards ?? [];
+   * Each row's counts are computed with its OWN filter lifted, which is what
+   * makes the numbers mean "how many would I get if I pressed this". The
+   * search and availability filters are NOT lifted: they narrow the pool that
+   * every facet counts against, so typing a team name reflows the tier and
+   * position counts to that team.                                          */
+  const pool = useMemo(
+    () => all.filter((card) => matchesQuery(card, needle) && matchesAvailability(card, availability)),
+    [all, needle, availability],
+  );
   const forTierCounts = useMemo(
-    () => all.filter((card) => matchesPosition(card, position)),
-    [all, position],
+    () => pool.filter((card) => matchesPosition(card, position)),
+    [pool, position],
   );
   const forPositionCounts = useMemo(
-    () => all.filter((card) => matchesTier(card, tier)),
-    [all, tier],
+    () => pool.filter((card) => matchesTier(card, tier)),
+    [pool, tier],
   );
   const tierCounts = useMemo(() => countByTier(forTierCounts), [forTierCounts]);
   const positionCounts = useMemo(() => countByPosition(forPositionCounts), [forPositionCounts]);
@@ -112,22 +152,30 @@ export default function InventoryScreen() {
   const visible = useMemo(
     () =>
       sortCards(
-        all.filter((card) => matchesPosition(card, position) && matchesTier(card, tier)),
+        pool.filter((card) => matchesPosition(card, position) && matchesTier(card, tier)),
         sort,
+        dir,
       ),
-    [all, position, tier, sort],
+    [pool, position, tier, sort, dir],
   );
 
-  const unavailable = useMemo(
-    () => all.filter((card) => injuryWeight(card.injuryStatus) === 'blocking').length,
-    [all],
-  );
-
-  const filtered = position !== 'ALL' || tier !== 'ALL';
+  const filtered =
+    position !== 'ALL' || tier !== 'ALL' || availability !== 'ALL' || needle.length > 0;
   const clearFilters = useCallback(() => {
     setPosition('ALL');
     setTier('ALL');
+    setAvailability('ALL');
+    setQuery('');
   }, []);
+
+  // Changing the key resets the direction to that key's natural one. Carrying
+  // the previous direction across means pressing "Name" after "Career FP"
+  // silently answers Z–A, which reads as a bug rather than a choice.
+  const changeSort = useCallback((next: SortKey) => {
+    setSort(next);
+    setDir(SortDefaultDir[next]);
+  }, []);
+  const toggleDir = useCallback(() => setDir((d) => (d === 'desc' ? 'asc' : 'desc')), []);
 
   const onRefresh = useCallback(async () => {
     await Promise.all([refresh(), refreshPlayer()]);
@@ -148,84 +196,105 @@ export default function InventoryScreen() {
     [playerIds, router],
   );
 
+  // cardCount is the header's count and lands before the grid does, so it is
+  // the right stand-in only until the rows themselves arrive.
   const total = cards?.length ?? cardCount;
-  const context =
-    `${total.toLocaleString()} card${total === 1 ? '' : 's'}` +
-    (unavailable > 0 ? ` · ${unavailable} unavailable` : '');
+  const context = filtered ? `${visible.length} of ${total} cards` : `${total} cards`;
 
   return (
     <Screen title="Inventory" context={context} scroll={false}>
       <SubNav segments={COLLECTION_SEGMENTS} />
 
-      <View
-        style={styles.fill}
-        onLayout={(e) => setListWidth(e.nativeEvent.layout.width)}>
-      {loading ? (
-        <View style={styles.centred}>
-          <ActivityIndicator />
-        </View>
-      ) : error ? (
-        <View style={styles.centred}>
-          <Text style={[styles.errorTitle, { color: c.text }]}>Could not load your cards</Text>
-          <Text style={[styles.errorBody, { color: c.textSecondary }]}>{error}</Text>
-          <Pressable
-            onPress={() => void onRefresh()}
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              styles.retry,
-              { backgroundColor: c.backgroundElement },
-              pressed && styles.pressed,
-            ]}>
-            <Text style={[styles.retryLabel, { color: c.text }]}>Try again</Text>
-          </Pressable>
-        </View>
-      ) : all.length === 0 ? (
-        <ScrollView
-          style={styles.fill}
-          contentContainerStyle={styles.emptyContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-          <EmptyCollection onGetCards={() => router.push('/cards')} />
-        </ScrollView>
-      ) : listWidth === 0 ? null : (
-        <FlatList
-          // numColumns cannot change on a live list, so a width change that
-          // changes the column count remounts it. Holding the first render
-          // until the measurement lands avoids one guaranteed remount.
-          key={`cols-${columns}`}
-          style={styles.fill}
-          data={visible}
-          keyExtractor={(card) => card.id}
-          numColumns={columns}
-          columnWrapperStyle={styles.row}
-          contentContainerStyle={styles.list}
-          initialNumToRender={columns * 4}
-          maxToRenderPerBatch={columns * 4}
-          windowSize={7}
-          removeClippedSubviews
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListHeaderComponent={
-            <View style={styles.header}>
-              <TierFilterRow
-                value={tier}
-                onChange={setTier}
-                total={forTierCounts.length}
-                counts={tierCounts}
-              />
-              <PositionFilterRow
-                value={position}
-                onChange={setPosition}
-                total={forPositionCounts.length}
-                counts={positionCounts}
-              />
-              <SortRow value={sort} onChange={setSort} />
-            </View>
-          }
-          ListEmptyComponent={<EmptyFilterResult onClear={clearFilters} hasFilters={filtered} />}
-          renderItem={({ item }) => (
-            <InventoryCard card={item} width={itemWidth} onPress={openPlayer(item)} />
-          )}
-        />
-      )}
+      <View style={styles.fill} onLayout={(e) => setListWidth(e.nativeEvent.layout.width)}>
+        {loading ? (
+          <View style={styles.centred}>
+            <ActivityIndicator />
+          </View>
+        ) : error ? (
+          <View style={styles.centred}>
+            <Text style={[Type.section, { color: c.text }]}>Could not load your cards</Text>
+            <Text style={[Type.body, styles.centredText, { color: c.textSecondary }]}>{error}</Text>
+            <Pressable
+              onPress={() => void onRefresh()}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.retry,
+                { backgroundColor: c.backgroundElement },
+                pressed && styles.pressed,
+              ]}>
+              <Text style={[Type.strong, { color: c.text }]}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : all.length === 0 ? (
+          <ScrollView
+            style={styles.fill}
+            contentContainerStyle={styles.emptyContent}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+            <EmptyCollection onGetCards={() => router.push('/collection/shop')} />
+          </ScrollView>
+        ) : listWidth === 0 ? null : (
+          <>
+            {searchable ? (
+              <View style={styles.toolbar}>
+                <SearchField value={query} onChange={setQuery} hint={`${total} OWNED`} />
+              </View>
+            ) : null}
+
+            <FlatList
+              // numColumns cannot change on a live list, so a width change that
+              // changes the column count remounts it. Holding the first render
+              // until the measurement lands avoids one guaranteed remount.
+              key={`cols-${columns}`}
+              style={styles.fill}
+              data={visible}
+              keyExtractor={(card) => card.id}
+              numColumns={columns}
+              columnWrapperStyle={styles.row}
+              contentContainerStyle={styles.list}
+              initialNumToRender={columns * 4}
+              maxToRenderPerBatch={columns * 4}
+              windowSize={7}
+              removeClippedSubviews
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+              ListHeaderComponent={
+                <View style={styles.header}>
+                  <CollectionSummary stats={stats} />
+                  <TierFilterRow
+                    value={tier}
+                    onChange={setTier}
+                    total={forTierCounts.length}
+                    counts={tierCounts}
+                  />
+                  <PositionFilterRow
+                    value={position}
+                    onChange={setPosition}
+                    total={forPositionCounts.length}
+                    counts={positionCounts}
+                  />
+                  <SortRow value={sort} dir={dir} onChange={changeSort} onToggleDir={toggleDir} />
+                  <ResultLine
+                    shown={visible.length}
+                    total={all.length}
+                    // Counted over the whole collection, not the filtered pool:
+                    // once they are hidden the pool contains none of them, and
+                    // a chip that says "hide 0" cannot be pressed back off.
+                    unavailable={stats.unavailable}
+                    availability={availability}
+                    onToggleAvailability={() =>
+                      setAvailability((a) => (a === 'ALL' ? 'AVAILABLE' : 'ALL'))
+                    }
+                  />
+                </View>
+              }
+              ListEmptyComponent={<EmptyFilterResult onClear={clearFilters} hasFilters={filtered} />}
+              renderItem={({ item }) => (
+                <InventoryCard card={item} width={itemWidth} onPress={openPlayer(item)} />
+              )}
+            />
+          </>
+        )}
       </View>
     </Screen>
   );
@@ -233,15 +302,19 @@ export default function InventoryScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  subnav: { paddingHorizontal: GUTTER, paddingTop: Spacing.two + 2, paddingBottom: Spacing.two },
+  toolbar: { paddingHorizontal: GUTTER, paddingBottom: Spacing.two },
   list: { paddingHorizontal: GUTTER, paddingBottom: Spacing.six, gap: GAP },
   row: { gap: GAP },
-  header: { gap: Spacing.two + 2, paddingBottom: Spacing.one },
+  header: { gap: Spacing.two, paddingBottom: Spacing.two },
   emptyContent: { padding: GUTTER, paddingBottom: Spacing.six },
-  centred: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.four },
-  errorTitle: { fontSize: 18, fontWeight: '700' },
-  errorBody: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
-  retry: { borderRadius: 12, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two + 2 },
-  retryLabel: { fontSize: 14, fontWeight: '700' },
+  centred: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.two,
+    padding: Spacing.four,
+  },
+  centredText: { textAlign: 'center' },
+  retry: { borderRadius: 8, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
   pressed: { opacity: 0.75 },
 });
