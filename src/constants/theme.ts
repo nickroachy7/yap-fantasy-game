@@ -14,6 +14,19 @@ export const Colors = {
     backgroundElement: '#F0F0F3',
     backgroundSelected: '#E0E1E6',
     textSecondary: '#60646C',
+    /** Third rank of text: units, footnotes, the quiet half of a stat pair. */
+    textTertiary: '#8B8D98',
+    /** Hairline between rows in a dense table. Must not read as a box. */
+    border: '#E4E4E9',
+    /** Around a panel, where the edge is doing real work. */
+    borderStrong: '#D0D1D9',
+    /** A panel sitting on the page background. */
+    surface: '#FFFFFF',
+    /** A row inside a panel that needs to separate from it. */
+    surfaceSunken: '#F7F7F9',
+    positive: '#1A7F49',
+    negative: '#C4283C',
+    warning: '#8A6100',
   },
   dark: {
     text: '#ffffff',
@@ -21,6 +34,14 @@ export const Colors = {
     backgroundElement: '#212225',
     backgroundSelected: '#2E3135',
     textSecondary: '#B0B4BA',
+    textTertiary: '#7E8289',
+    border: '#26282C',
+    borderStrong: '#34373C',
+    surface: '#121316',
+    surfaceSunken: '#0B0C0E',
+    positive: '#4CC38A',
+    negative: '#FF6369',
+    warning: '#E0C46A',
   },
 } as const;
 
@@ -50,6 +71,46 @@ export const Fonts = Platform.select({
     mono: 'var(--font-mono)',
   },
 });
+
+/**
+ * Type scale, built for density.
+ *
+ * A fantasy app is a table of numbers with a name attached, and the reader is
+ * scanning rather than reading. Bigger type here does not mean clearer — it
+ * means fewer rows on screen and more scrolling to compare two players, which
+ * is the actual job. So the scale starts small and every step is deliberate:
+ * a row of stats at 12 with 9pt labels shows twice what 16/13 does, and reads
+ * better because the eye is comparing columns rather than travelling.
+ *
+ * `micro` and `label` are uppercase with letter-spacing, which is what keeps
+ * them legible at 9-10pt. Do not use them for sentences.
+ *
+ * Line heights are tight on purpose. Where prose appears — a caveat, an injury
+ * note — use `body` or `bodyRelaxed`, which are set for reading.
+ */
+export const Type = {
+  /** 9pt uppercase column headers and stat labels. Always with letterSpacing. */
+  micro: { fontSize: 9, lineHeight: 12, fontWeight: '700' as const, letterSpacing: 0.8 },
+  /** 10pt uppercase, for chips and badges. */
+  label: { fontSize: 10, lineHeight: 13, fontWeight: '700' as const, letterSpacing: 0.6 },
+  /** 11pt secondary values, footnotes, meta lines. */
+  fine: { fontSize: 11, lineHeight: 15, fontWeight: '500' as const },
+  /** 12pt — the default for a dense table cell. */
+  body: { fontSize: 12, lineHeight: 16, fontWeight: '500' as const },
+  /** 12pt set for reading rather than scanning. */
+  bodyRelaxed: { fontSize: 12, lineHeight: 18, fontWeight: '400' as const },
+  /** 13pt — a name in a list, the primary value in a row. */
+  strong: { fontSize: 13, lineHeight: 17, fontWeight: '600' as const },
+  /** 15pt section headings inside a page. */
+  section: { fontSize: 15, lineHeight: 20, fontWeight: '700' as const },
+  /** 18pt the one number a panel exists to show. */
+  figure: { fontSize: 18, lineHeight: 22, fontWeight: '700' as const },
+  /** 26pt page heading. */
+  page: { fontSize: 26, lineHeight: 30, fontWeight: '800' as const, letterSpacing: -0.4 },
+} as const;
+
+/** Tabular figures. Columns of numbers must not jitter as values change. */
+export const NUMERIC = { fontVariant: ['tabular-nums' as const] };
 
 export const Spacing = {
   half: 2,
