@@ -1,81 +1,61 @@
+/**
+ * The weekly decision.
+ *
+ * A lineup screen that shows eight names is a form. What makes it a decision is
+ * the context beside each name — who the team plays, when that game starts, what
+ * the player has actually produced, and whether he is trending up — so the row
+ * carries all of it and the bench is drawn in the same columns for comparison.
+ *
+ * Nothing here is a projection. Every number is either a clock or something
+ * that has already happened.
+ */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { BenchBoard } from '@/components/lineup/BenchBoard';
+import { LineupSummary } from '@/components/lineup/LineupSummary';
+import { SlotBoard } from '@/components/lineup/SlotBoard';
+import {
+  firstOpenSlotFor,
+  isEligible,
+  lockCaption,
+  sortCards,
+  type Alert,
+  type LineupCard,
+  type SortKey,
+} from '@/components/lineup/model';
+import { useLineupData } from '@/components/lineup/use-lineup-data';
 import { Screen } from '@/components/shell/Screen';
-import { fetchAllPages } from '@/lib/paged';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { useIsWide } from '@/components/shell/useResponsive';
+import { Tabs } from '@/components/ui/Tabs';
+import { Colors, Spacing, Type } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { injuryWeight } from '@/lib/injury';
 import { supabase } from '@/lib/supabase';
 
-type Slate = { season: number; season_type: number; week: number };
-type SlotConfig = { slot: string; eligible_positions: string[]; display_order: number };
-type Card = {
-  id: string;
-  player_name: string | null;
-  position_abbreviation: string | null;
-  team_abbreviation: string | null;
-  injury_status: string | null;
-  career_fp: number;
-  tier: string;
-};
-
-/**
- * Injury statuses come in two weights, and collapsing them was a mistake worth
- * not repeating: `Questionable` is by far the most common status in the NFL, so
- * flagging it with the same alarm as `Out` trains people to ignore the alarm.
- *
- * BLOCKING  — the player is very unlikely to play. Loud.
- * ADVISORY  — genuinely uncertain. Worth knowing, not worth shouting.
- */
-
-/**
- * The picker needs the whole collection, and PostgREST silently caps select()
- * at 1000 rows — a large collection would lose its tail with no error at all.
- *
- * career_fp is not unique, so `id` is the tiebreak: paging over a non-unique
- * sort key can repeat or drop rows between requests.
- */
-async function loadCollection(): Promise<{ data: Card[]; error: string | null }> {
-  try {
-    const rows = await fetchAllPages((from, to) =>
-      supabase
-        .from('my_collection')
-        .select('id, player_name, position_abbreviation, team_abbreviation, injury_status, career_fp, tier')
-        .order('career_fp', { ascending: false })
-        .order('id', { ascending: true })
-        .range(from, to),
-    );
-    const cards: Card[] = rows.flatMap((r) =>
-      r.id
-        ? [{
-            id: r.id,
-            player_name: r.player_name,
-            position_abbreviation: r.position_abbreviation,
-            team_abbreviation: r.team_abbreviation,
-            injury_status: r.injury_status,
-            career_fp: Number(r.career_fp ?? 0),
-            tier: (r.tier ?? 'bronze') as Card['tier'],
-          }]
-        : [],
-    );
-    return { data: cards, error: null };
-  } catch (err) {
-    return { data: [], error: err instanceof Error ? err.message : 'Could not load your cards.' };
-  }
-}
+type Pane = 'lineup' | 'bench';
 
 export default function LineupScreen() {
-  const [slate, setSlate] = useState<Slate | null>(null);
-  const [lockAt, setLockAt] = useState<string | null>(null);
-  const [slots, setSlots] = useState<SlotConfig[]>([]);
-  const [cards, setCards] = useState<Card[]>([]);
-  const [picks, setPicks] = useState<Record<string, string>>({});
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const wide = useIsWide();
+
+  const { slate, lockAt, slots, cards, savedPicks, loading, error: loadError, reload } = useLineupData();
+
+  /**
+   * Edits are an overlay on the saved lineup rather than a copy of it. Copying
+   * would need an effect to re-seed local state whenever the fetch lands, which
+   * is both a render loop waiting to happen and the reason a slow network used
+   * to blank out changes you had already made. `null` means "cleared".
+   */
+  const [edits, setEdits] = useState<Record<string, string | null>>({});
   const [openSlot, setOpenSlot] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<Pane>('lineup');
+  const [sort, setSort] = useState<SortKey>('fp');
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   // Tick so the lock state flips on its own rather than on a re-render by luck.
@@ -84,80 +64,127 @@ export default function LineupScreen() {
     return () => clearInterval(t);
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    // upcoming_slate(), not current_slate(): the latter returns the week already
-    // in progress, whose lock time is by definition in the past — which made this
-    // screen render as permanently locked.
-    const slateRes = await supabase.rpc('upcoming_slate');
-    if (slateRes.error) {
-      setError(slateRes.error.message);
-      setLoading(false);
-      return;
+  const picks = useMemo(() => {
+    const out: Record<string, string> = { ...savedPicks };
+    for (const [slot, id] of Object.entries(edits)) {
+      if (id === null) delete out[slot];
+      else out[slot] = id;
     }
-    const s = (slateRes.data as Slate[] | null)?.[0] ?? null;
-    setSlate(s);
-
-    const [cfg, coll, lock, existing] = await Promise.all([
-      supabase.from('lineup_slot_config').select('slot, eligible_positions, display_order').order('display_order'),
-      loadCollection(),
-      s
-        ? supabase.rpc('week_lock_time', {
-            p_season: s.season,
-            p_season_type: s.season_type,
-            p_week: s.week,
-          })
-        : Promise.resolve({ data: null, error: null }),
-      s
-        ? supabase
-            .from('lineups')
-            .select('id, lineup_slots(slot, card_instance_id)')
-            .eq('season', s.season)
-            .eq('season_type', s.season_type)
-            .eq('week', s.week)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-    ]);
-
-    if (cfg.error) setError(cfg.error.message);
-    else setSlots((cfg.data ?? []) as SlotConfig[]);
-    if (coll.error) setError(coll.error); else setCards(coll.data);
-    if (!lock.error && lock.data) setLockAt(String(lock.data));
-
-    // Re-hydrate a lineup already submitted for this week.
-    const prior = existing.data as { lineup_slots?: { slot: string; card_instance_id: string }[] } | null;
-    if (prior?.lineup_slots) {
-      setPicks(Object.fromEntries(prior.lineup_slots.map((r) => [r.slot, r.card_instance_id])));
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+    return out;
+  }, [savedPicks, edits]);
 
   const locked = lockAt ? now >= new Date(lockAt).getTime() : false;
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const usedIds = useMemo(() => new Set(Object.values(picks)), [picks]);
 
-  const picked = useMemo(
-    () => Object.values(picks).map((id) => byId.get(id)).filter((c): c is Card => Boolean(c)),
-    [picks, byId],
+  /**
+   * `set_lineup` rejects any card whose season differs from the slate's, so
+   * offering one is offering a guaranteed server error. Filtering here is a
+   * convenience — the check that matters is still the one in the database.
+   */
+  const seasonCards = useMemo(
+    () => (slate ? cards.filter((card) => card.season === slate.season) : cards),
+    [cards, slate],
   );
-  const blockingPicks = useMemo(
-    () => picked.filter((c) => injuryWeight(c.injury_status) === 'blocking'),
-    [picked],
-  );
-  const advisoryPicks = useMemo(
-    () => picked.filter((c) => injuryWeight(c.injury_status) === 'advisory'),
-    [picked],
+  const offSeasonCount = cards.length - seasonCards.length;
+
+  const eligibleBySlot = useMemo(() => {
+    const map = new Map<string, LineupCard[]>();
+    for (const cfg of slots) {
+      const list = seasonCards.filter(
+        (card) => isEligible(card, cfg) && (!usedIds.has(card.id) || picks[cfg.slot] === card.id),
+      );
+      map.set(cfg.slot, sortCards(list, sort));
+    }
+    return map;
+  }, [slots, seasonCards, usedIds, picks, sort]);
+
+  const bench = useMemo(
+    () => sortCards(seasonCards.filter((card) => !usedIds.has(card.id)), sort),
+    [seasonCards, usedIds, sort],
   );
 
-  async function submit() {
+  const starters = useMemo(
+    () =>
+      slots
+        .map((cfg) => ({ slot: cfg.slot, card: picks[cfg.slot] ? byId.get(picks[cfg.slot]) : undefined }))
+        .filter((s): s is { slot: string; card: LineupCard } => Boolean(s.card)),
+    [slots, picks, byId],
+  );
+
+  /**
+   * The lineup's weekly worth: the starters' FP per game added up. Not a
+   * forecast — it is what these eight have averaged, which is the only honest
+   * single number this screen can put next to the clock.
+   */
+  const lineupFpPerGame = useMemo(() => {
+    const scored = starters.filter((s) => s.card.form !== null);
+    if (scored.length === 0) return null;
+    return scored.reduce((sum, s) => sum + (s.card.form?.fpPerGame ?? 0), 0);
+  }, [starters]);
+
+  const alerts = useMemo<Alert[]>(
+    () =>
+      starters.flatMap<Alert>(({ slot, card }) => {
+        // A team with no game this week is the failure people actually lose
+        // weeks to, and no injury feed ever mentions it.
+        if (!card.game?.opponent) return [{ slot, card, kind: 'no-game' as const }];
+        const weight = injuryWeight(card.injuryStatus);
+        return weight ? [{ slot, card, kind: weight }] : [];
+      }),
+    [starters],
+  );
+
+  const dirty = useMemo(() => {
+    const a = Object.entries(picks).sort();
+    const b = Object.entries(savedPicks).sort();
+    return JSON.stringify(a) !== JSON.stringify(b);
+  }, [picks, savedPicks]);
+
+  const setPick = useCallback((slot: string, cardId: string) => {
+    setEdits((e) => ({ ...e, [slot]: cardId }));
+    setOpenSlot(null);
+    setSaved(null);
+  }, []);
+
+  const clearPick = useCallback((slot: string) => {
+    setEdits((e) => ({ ...e, [slot]: null }));
+    setOpenSlot(null);
+    setSaved(null);
+  }, []);
+
+  // Stable identities so the memoised boards below are not defeated by a new
+  // arrow function on every countdown tick.
+  const toggleSlot = useCallback(
+    (slot: string) => setOpenSlot((cur) => (cur === slot ? null : slot)),
+    [],
+  );
+
+  const placeFromBench = useCallback(
+    (slot: string, cardId: string) => {
+      setPick(slot, cardId);
+      // Jump back so the change is visible where it happened; leaving the user
+      // on the bench makes a successful tap look like a no-op.
+      setView('lineup');
+    },
+    [setPick],
+  );
+
+  const targetSlotFor = useCallback(
+    (card: LineupCard) => firstOpenSlotFor(card, slots, picks),
+    [slots, picks],
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await reload();
+    setRefreshing(false);
+  }, [reload]);
+
+  const submit = useCallback(async () => {
     if (!slate) return;
     setSaving(true);
-    setError(null);
+    setSubmitError(null);
     setSaved(null);
     const payload = Object.entries(picks).map(([slot, card_instance_id]) => ({ slot, card_instance_id }));
     // The server re-checks ownership, eligibility and the lock. This is a
@@ -168,186 +195,189 @@ export default function LineupScreen() {
       p_week: slate.week,
       p_slots: payload,
     });
-    if (err) setError(err.message);
-    else setSaved(`Lineup saved for week ${slate.week}.`);
+    if (err) {
+      setSubmitError(err.message);
+      setSaving(false);
+      return;
+    }
+    setSaved(`Lineup saved for week ${slate.week}.`);
     setSaving(false);
-  }
+    // Re-read rather than trusting the payload: the server is the only thing
+    // that knows what actually stuck, and clearing the edit overlay against a
+    // stale saved lineup would show the change as unsaved forever.
+    setEdits({});
+    await reload();
+  }, [slate, picks, reload]);
 
   if (loading) {
     return (
-      <Screen title="Lineup" measure="form">
+      <Screen title="Lineup" measure="table">
         <ActivityIndicator style={styles.pad} />
       </Screen>
     );
   }
 
-  const headerContext = slate
-    ? `${slate.season_type === 1 ? 'Preseason' : 'Season'} · Week ${slate.week}${
-        locked ? ' · Locked' : ''
-      }`
+  const filled = starters.length;
+  const canSubmit = !locked && !saving && filled > 0 && dirty;
+  const context = slate
+    ? `${slate.season_type === 1 ? 'Preseason' : 'Season'} · Week ${slate.week}${locked ? ' · Locked' : ''}`
     : 'No slate scheduled';
 
   return (
-    <Screen title="Lineup" measure="form" context={headerContext}>
+    <Screen
+      title="Lineup"
+      measure="table"
+      context={context}
+      refreshing={refreshing}
+      onRefresh={() => void onRefresh()}>
+      <LineupSummary
+        lockAt={lockAt}
+        locked={locked}
+        now={now}
+        filled={filled}
+        slotCount={slots.length}
+        fpPerGame={lineupFpPerGame}
+        alerts={alerts.length}
+      />
 
-          {lockAt ? (
-            <ThemedView type="backgroundElement" style={styles.lockBanner}>
-              <ThemedText type="small">
-                {locked
-                  ? `Locked at ${new Date(lockAt).toLocaleString()}`
-                  : `Locks ${new Date(lockAt).toLocaleString()}`}
-              </ThemedText>
-            </ThemedView>
-          ) : null}
+      {lockCaption(lockAt, locked) ? (
+        <Text style={[Type.fine, { color: c.textTertiary }]}>{lockCaption(lockAt, locked)}</Text>
+      ) : null}
 
-          {blockingPicks.length > 0 && !locked ? (
-            <ThemedView type="backgroundElement" style={styles.warn}>
-              <ThemedText type="small">
-                ⚠︎ Unlikely to play:{' '}
-                {blockingPicks.map((c) => `${c.player_name} (${c.injury_status})`).join(', ')}
-              </ThemedText>
-            </ThemedView>
-          ) : null}
+      {alerts.length > 0 && !locked ? (
+        <View style={[styles.alerts, { backgroundColor: c.surface, borderColor: c.border }]}>
+          {alerts.map(({ slot, card, kind }) => (
+            <View key={slot} style={styles.alertRow}>
+              <Text style={[Type.micro, styles.alertSlot, { color: c.textTertiary }]}>{slot}</Text>
+              <Text numberOfLines={1} style={[Type.fine, styles.alertText, { color: c.text }]}>
+                {card.name}
+              </Text>
+              {/* Blocking and "no game" are the same practical outcome — no
+                  points — so they get the same weight. Questionable does not:
+                  it is the most common designation in the feed, and shouting
+                  about it teaches people to ignore the shouting. */}
+              <Text
+                numberOfLines={1}
+                style={[
+                  Type.fine,
+                  { color: kind === 'advisory' ? c.textSecondary : c.negative },
+                ]}>
+                {kind === 'no-game'
+                  ? 'no game this week'
+                  : (card.injuryStatus ?? 'unavailable').toLowerCase()}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
-          {advisoryPicks.length > 0 && !locked ? (
-            <ThemedView type="backgroundElement" style={styles.warn}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Check before kickoff:{' '}
-                {advisoryPicks.map((c) => `${c.player_name} (${c.injury_status})`).join(', ')}
-              </ThemedText>
-            </ThemedView>
-          ) : null}
+      {cards.length === 0 ? (
+        <Text style={[Type.body, { color: c.textSecondary }]}>
+          You have no cards yet — open a pack first.
+        </Text>
+      ) : (
+        <>
+          <Tabs<Pane>
+            value={view}
+            onChange={setView}
+            tabs={[
+              { value: 'lineup', label: 'Lineup', hint: `${filled}/${slots.length}` },
+              { value: 'bench', label: 'Bench', hint: String(bench.length) },
+            ]}
+          />
 
-          {cards.length === 0 ? (
-            <ThemedText themeColor="textSecondary">
-              You have no cards yet — open a pack first.
-            </ThemedText>
-          ) : null}
+          {view === 'lineup' ? (
+            <SlotBoard
+              slots={slots}
+              byId={byId}
+              picks={picks}
+              eligibleBySlot={eligibleBySlot}
+              openSlot={openSlot}
+              locked={locked}
+              wide={wide}
+              sort={sort}
+              onSort={setSort}
+              onToggleSlot={toggleSlot}
+              onPick={setPick}
+              onClear={clearPick}
+            />
+          ) : (
+            <BenchBoard
+              cards={bench}
+              targetSlotFor={targetSlotFor}
+              locked={locked}
+              wide={wide}
+              sort={sort}
+              onSort={setSort}
+              onPlace={placeFromBench}
+              offSeasonCount={offSeasonCount}
+            />
+          )}
+        </>
+      )}
 
-          {slots.map((cfg) => {
-            const pickedId = picks[cfg.slot];
-            const picked = pickedId ? byId.get(pickedId) : undefined;
-            const isOpen = openSlot === cfg.slot;
-            const eligible = cards.filter(
-              (c) =>
-                c.position_abbreviation != null &&
-                cfg.eligible_positions.includes(c.position_abbreviation) &&
-                (!usedIds.has(c.id) || c.id === pickedId),
-            );
+      <Pressable
+        onPress={() => void submit()}
+        disabled={!canSubmit}
+        accessibilityRole="button"
+        accessibilityLabel={locked ? 'Lineup locked' : 'Save lineup'}
+        accessibilityState={{ disabled: !canSubmit, busy: saving }}
+        style={({ pressed }) => [
+          styles.submit,
+          { backgroundColor: canSubmit ? c.text : c.backgroundElement },
+          pressed && styles.pressed,
+        ]}>
+        {saving ? (
+          <ActivityIndicator color={c.background} />
+        ) : (
+          <Text style={[Type.strong, { color: canSubmit ? c.background : c.textTertiary }]}>
+            {locked ? 'Locked' : dirty ? 'Save lineup' : 'Lineup saved'}
+          </Text>
+        )}
+      </Pressable>
 
-            return (
-              <View key={cfg.slot}>
-                <Pressable
-                  disabled={locked}
-                  onPress={() => setOpenSlot(isOpen ? null : cfg.slot)}
-                  accessibilityRole="button">
-                  <ThemedView
-                    type={isOpen ? 'backgroundSelected' : 'backgroundElement'}
-                    style={[styles.slotRow, locked && styles.dim]}>
-                    <ThemedText style={styles.slotLabel}>{cfg.slot}</ThemedText>
-                    <View style={styles.slotBody}>
-                      {picked ? (
-                        <>
-                          <ThemedText numberOfLines={1}>
-                            {picked.player_name}
-                            {injuryWeight(picked.injury_status) === 'blocking' ? ' ⚠︎' : ''}
-                          </ThemedText>
-                          <ThemedText type="small" themeColor="textSecondary">
-                            {picked.position_abbreviation} · {picked.team_abbreviation ?? '—'} ·{' '}
-                            {Number(picked.career_fp).toFixed(1)} FP
-                            {injuryWeight(picked.injury_status) === 'advisory'
-                              ? ` · ${picked.injury_status}`
-                              : ''}
-                          </ThemedText>
-                        </>
-                      ) : (
-                        <ThemedText themeColor="textSecondary">Empty</ThemedText>
-                      )}
-                    </View>
-                  </ThemedView>
-                </Pressable>
+      {!locked && filled < slots.length ? (
+        <Text style={[Type.fine, styles.centreText, { color: c.textTertiary }]}>
+          {slots.length - filled} slot{slots.length - filled === 1 ? '' : 's'} still empty. A partial
+          lineup is allowed — an empty slot simply scores nothing.
+        </Text>
+      ) : null}
 
-                {isOpen && !locked ? (
-                  <View style={styles.options}>
-                    {pickedId ? (
-                      <Pressable
-                        onPress={() => {
-                          setPicks((p) => {
-                            const next = { ...p };
-                            delete next[cfg.slot];
-                            return next;
-                          });
-                          setOpenSlot(null);
-                        }}>
-                        <ThemedText type="link" style={styles.clear}>
-                          Clear slot
-                        </ThemedText>
-                      </Pressable>
-                    ) : null}
-                    {eligible.length === 0 ? (
-                      <ThemedText type="small" themeColor="textSecondary" style={styles.clear}>
-                        No eligible {cfg.eligible_positions.join('/')} cards
-                      </ThemedText>
-                    ) : (
-                      eligible.map((c) => (
-                        <Pressable
-                          key={c.id}
-                          onPress={() => {
-                            setPicks((p) => ({ ...p, [cfg.slot]: c.id }));
-                            setOpenSlot(null);
-                          }}>
-                          <ThemedView type="backgroundElement" style={styles.option}>
-                            <ThemedText numberOfLines={1} style={styles.optionName}>
-                              {c.player_name}
-                              {injuryWeight(c.injury_status) === 'blocking' ? ` ⚠︎ ${c.injury_status}` : ''}
-                            </ThemedText>
-                            <ThemedText type="small" themeColor="textSecondary">
-                              {c.position_abbreviation} · {Number(c.career_fp).toFixed(1)}
-                              {injuryWeight(c.injury_status) === 'advisory'
-                                ? ` · ${c.injury_status}`
-                                : ''}
-                            </ThemedText>
-                          </ThemedView>
-                        </Pressable>
-                      ))
-                    )}
-                  </View>
-                ) : null}
-              </View>
-            );
-          })}
-
-          <Pressable
-            onPress={() => void submit()}
-            disabled={locked || saving || Object.keys(picks).length === 0}
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              styles.submit,
-              (locked || saving || Object.keys(picks).length === 0) && styles.dim,
-              pressed && styles.pressed,
-            ]}>
-            {saving ? <ActivityIndicator /> : <ThemedText>{locked ? 'Locked' : 'Save lineup'}</ThemedText>}
-          </Pressable>
-
-          {saved ? <ThemedText style={styles.centreText}>{saved}</ThemedText> : null}
-          {error ? <ThemedText style={styles.centreText}>{error}</ThemedText> : null}
+      {saved ? (
+        <Text style={[Type.fine, styles.centreText, { color: c.positive }]}>{saved}</Text>
+      ) : null}
+      {submitError ?? loadError ? (
+        <Text style={[Type.fine, styles.centreText, { color: c.negative }]}>
+          {submitError ?? loadError}
+        </Text>
+      ) : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  pad: { paddingVertical: 24 },
-  lockBanner: { padding: 12, borderRadius: 12 },
-  warn: { padding: 12, borderRadius: 12 },
-  slotRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12 },
-  slotLabel: { width: 52 },
-  slotBody: { flex: 1, gap: 2 },
-  options: { paddingLeft: 12, paddingTop: 6, gap: 6 },
-  option: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 10 },
-  optionName: { flex: 1 },
-  clear: { paddingVertical: 6 },
-  submit: { padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 8, minHeight: 52, justifyContent: 'center' },
-  dim: { opacity: 0.45 },
-  pressed: { opacity: 0.8 },
+  pad: { paddingVertical: Spacing.four },
+  alerts: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
+    paddingVertical: Spacing.one,
+  },
+  alertRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+  },
+  alertSlot: { width: 30 },
+  alertText: { flex: 1 },
+  submit: {
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 44,
+    marginTop: Spacing.one,
+  },
+  pressed: { opacity: 0.75 },
   centreText: { textAlign: 'center' },
 });

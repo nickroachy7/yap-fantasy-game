@@ -1,0 +1,299 @@
+/**
+ * Everything the lineup screen needs, in two round trips.
+ *
+ * The old screen asked one question — "what do I own?" — and rendered a name.
+ * Setting a lineup actually needs four more: who is my player playing, when
+ * does that game start, what has he produced this season, and how has he looked
+ * lately. All four come from tables the client can already read, so this is a
+ * wider query rather than a new RPC.
+ */
+import { useCallback, useEffect, useState } from 'react';
+
+import type { CardTier } from '@/constants/theme';
+import { fetchAllPages } from '@/lib/paged';
+import { supabase } from '@/lib/supabase';
+
+import {
+  FORM_GAMES,
+  type GameContext,
+  type LineupCard,
+  type SeasonForm,
+  type Slate,
+  type SlotConfig,
+} from './model';
+
+type CollectionRow = {
+  id: string | null;
+  player_id: string | null;
+  player_name: string | null;
+  position_abbreviation: string | null;
+  team_abbreviation: string | null;
+  injury_status: string | null;
+  career_fp: number | null;
+  tier: CardTier | null;
+  season: number | null;
+};
+
+type StatRow = {
+  player_id: string;
+  week: number | null;
+  season_type: number;
+  fantasy_points: { points: number; rules_version: number }[];
+};
+
+/**
+ * `.in()` is a query string, so a 300-card collection would build a 11kB URL
+ * and get truncated by an intermediary with no error anyone could read. Chunked
+ * and run in parallel instead — the round trips overlap, so this costs latency
+ * only for collections large enough to have been broken before.
+ */
+const PLAYER_CHUNK = 100;
+
+/**
+ * The picker needs the whole collection, and PostgREST silently caps select()
+ * at 1000 rows — a large collection would lose its tail with no error at all.
+ *
+ * career_fp is not unique, so `id` is the tiebreak: paging over a non-unique
+ * sort key can repeat or drop rows between requests.
+ */
+async function loadCollection(): Promise<CollectionRow[]> {
+  return fetchAllPages<CollectionRow>((from, to) =>
+    supabase
+      .from('my_collection')
+      .select(
+        'id, player_id, player_name, position_abbreviation, team_abbreviation, injury_status, career_fp, tier, season',
+      )
+      .order('career_fp', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to),
+  );
+}
+
+async function loadStatLines(season: number, playerIds: string[]): Promise<StatRow[]> {
+  const chunks: string[][] = [];
+  for (let i = 0; i < playerIds.length; i += PLAYER_CHUNK) {
+    chunks.push(playerIds.slice(i, i + PLAYER_CHUNK));
+  }
+  const batches = await Promise.all(
+    chunks.map((ids) =>
+      fetchAllPages<StatRow>((from, to) =>
+        supabase
+          .from('stat_lines')
+          .select('id, player_id, week, season_type, fantasy_points(points, rules_version)')
+          .eq('season', season)
+          .in('player_id', ids)
+          .order('id', { ascending: true })
+          .range(from, to)
+          // The generated types describe the embed as a nested relation whose
+          // shape depends on the select string; asserting it keeps the rest of
+          // this file honestly typed instead of `any` leaking outward.
+          .returns<StatRow[]>(),
+      ),
+    ),
+  );
+  return batches.flat();
+}
+
+/**
+ * Season production per player.
+ *
+ * Two decisions worth naming:
+ *
+ * 1. Every season_type counts. Hardcoding regular season would render the whole
+ *    screen as zeroes through the preseason validation window, which is exactly
+ *    the bug the leaderboard already shipped once and reads as "the app is
+ *    broken" rather than "no games yet".
+ *
+ * 2. A stat line with no fantasy_points row has not been scored under ANY
+ *    ruleset, so it is dropped from the numerator AND the denominator. Counting
+ *    it as a nought-point game would understate FP/G for exactly the players
+ *    whose most recent game has not been swept yet.
+ *
+ * Which ruleset: the highest rules_version present. The active version lives in
+ * `scoring_rules`, which this screen does not read — versions only ever go up,
+ * so the newest computed row is the current one. A mismatch would move a
+ * displayed average, never what gets submitted.
+ */
+function aggregate(rows: StatRow[]): Map<string, SeasonForm> {
+  const byPlayer = new Map<string, { order: number; points: number }[]>();
+
+  for (const row of rows) {
+    const best = row.fantasy_points.reduce<{ points: number; rules_version: number } | null>(
+      (acc, fp) => (acc === null || fp.rules_version > acc.rules_version ? fp : acc),
+      null,
+    );
+    if (!best) continue;
+    // season_type sorts chronologically as a number (1 pre, 2 regular, 3 post),
+    // so one key orders a whole season without a date lookup.
+    const order = row.season_type * 1000 + (row.week ?? 0);
+    const list = byPlayer.get(row.player_id) ?? [];
+    list.push({ order, points: Number(best.points) });
+    byPlayer.set(row.player_id, list);
+  }
+
+  const out = new Map<string, SeasonForm>();
+  for (const [playerId, games] of byPlayer) {
+    games.sort((a, b) => a.order - b.order);
+    const seasonFp = games.reduce((sum, g) => sum + g.points, 0);
+    out.set(playerId, {
+      seasonFp,
+      gamesPlayed: games.length,
+      fpPerGame: seasonFp / games.length,
+      recent: games.slice(-FORM_GAMES).map((g) => g.points),
+    });
+  }
+  return out;
+}
+
+/** Team abbreviation -> this week's game. Absent means the team is idle. */
+function buildSchedule(
+  teams: { id: string; abbreviation: string }[],
+  games: { home_team_id: string | null; visitor_team_id: string | null; starts_at: string | null }[],
+): Map<string, GameContext> {
+  const abbrOf = new Map(teams.map((t) => [t.id, t.abbreviation]));
+  const out = new Map<string, GameContext>();
+  for (const g of games) {
+    const home = g.home_team_id ? abbrOf.get(g.home_team_id) : undefined;
+    const away = g.visitor_team_id ? abbrOf.get(g.visitor_team_id) : undefined;
+    if (home) out.set(home, { opponent: away ?? null, home: true, startsAt: g.starts_at });
+    if (away) out.set(away, { opponent: home ?? null, home: false, startsAt: g.starts_at });
+  }
+  return out;
+}
+
+export type LineupData = {
+  slate: Slate | null;
+  lockAt: string | null;
+  slots: SlotConfig[];
+  cards: LineupCard[];
+  /** Whatever was already submitted for this week, so an edit starts from it. */
+  savedPicks: Record<string, string>;
+  loading: boolean;
+  error: string | null;
+  reload: () => Promise<void>;
+};
+
+export function useLineupData(): LineupData {
+  const [slate, setSlate] = useState<Slate | null>(null);
+  const [lockAt, setLockAt] = useState<string | null>(null);
+  const [slots, setSlots] = useState<SlotConfig[]>([]);
+  const [cards, setCards] = useState<LineupCard[]>([]);
+  const [savedPicks, setSavedPicks] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setError(null);
+
+    // upcoming_slate(), not current_slate(): the latter returns the week already
+    // in progress, whose lock time is by definition in the past — which made this
+    // screen render as permanently locked.
+    //
+    // The collection, slot config and team list do not depend on the slate, so
+    // they ride along rather than waiting a round trip for it.
+    const [slateRes, cfg, coll, teamsRes] = await Promise.all([
+      supabase.rpc('upcoming_slate'),
+      supabase
+        .from('lineup_slot_config')
+        .select('slot, eligible_positions, display_order')
+        .order('display_order'),
+      loadCollection().then(
+        (data) => ({ data, error: null as string | null }),
+        (err: unknown) => ({
+          data: [] as CollectionRow[],
+          error: err instanceof Error ? err.message : 'Could not load your cards.',
+        }),
+      ),
+      supabase.from('teams').select('id, abbreviation'),
+    ]);
+
+    if (slateRes.error) {
+      setError(slateRes.error.message);
+      setLoading(false);
+      return;
+    }
+    const s = (slateRes.data as Slate[] | null)?.[0] ?? null;
+    setSlate(s);
+    if (cfg.error) setError(cfg.error.message);
+    else setSlots((cfg.data ?? []) as SlotConfig[]);
+    if (coll.error) setError(coll.error);
+
+    const owned = coll.data.filter((r): r is CollectionRow & { id: string } => Boolean(r.id));
+    const playerIds = [...new Set(owned.map((r) => r.player_id).filter((id): id is string => Boolean(id)))];
+
+    const [lock, existing, gamesRes, stats] = await Promise.all([
+      s
+        ? supabase.rpc('week_lock_time', {
+            p_season: s.season,
+            p_season_type: s.season_type,
+            p_week: s.week,
+          })
+        : Promise.resolve({ data: null, error: null }),
+      s
+        ? supabase
+            .from('lineups')
+            .select('id, lineup_slots(slot, card_instance_id)')
+            .eq('season', s.season)
+            .eq('season_type', s.season_type)
+            .eq('week', s.week)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      s
+        ? supabase
+            .from('games')
+            .select('home_team_id, visitor_team_id, starts_at')
+            .eq('season', s.season)
+            .eq('season_type', s.season_type)
+            .eq('week', s.week)
+        : Promise.resolve({ data: null, error: null }),
+      s && playerIds.length > 0
+        ? loadStatLines(s.season, playerIds).catch(() => [] as StatRow[])
+        : Promise.resolve([] as StatRow[]),
+    ]);
+
+    if (!lock.error && lock.data) setLockAt(String(lock.data));
+
+    const schedule = buildSchedule(
+      (teamsRes.data ?? []) as { id: string; abbreviation: string }[],
+      (gamesRes.data ?? []) as {
+        home_team_id: string | null;
+        visitor_team_id: string | null;
+        starts_at: string | null;
+      }[],
+    );
+    const form = aggregate(stats);
+
+    setCards(
+      owned.map((r) => ({
+        id: r.id,
+        playerId: r.player_id,
+        name: r.player_name ?? 'Unknown player',
+        position: r.position_abbreviation,
+        team: r.team_abbreviation,
+        injuryStatus: r.injury_status,
+        tier: (r.tier ?? 'bronze') as CardTier,
+        careerFp: Number(r.career_fp ?? 0),
+        season: r.season,
+        form: r.player_id ? (form.get(r.player_id) ?? null) : null,
+        // A team missing from the week's schedule is on a bye, which is a real
+        // and distinct fact — not the same as "we failed to load a game".
+        game: r.team_abbreviation ? (schedule.get(r.team_abbreviation) ?? null) : null,
+      })),
+    );
+
+    // Re-hydrate a lineup already submitted for this week.
+    const prior = existing.data as { lineup_slots?: { slot: string; card_instance_id: string }[] } | null;
+    setSavedPicks(
+      prior?.lineup_slots
+        ? Object.fromEntries(prior.lineup_slots.map((r) => [r.slot, r.card_instance_id]))
+        : {},
+    );
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return { slate, lockAt, slots, cards, savedPicks, loading, error, reload: load };
+}
