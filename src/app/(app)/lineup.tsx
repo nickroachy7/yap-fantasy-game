@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { injuryWeight } from '@/lib/injury';
 import { supabase } from '@/lib/supabase';
 
 type Slate = { season: number; season_type: number; week: number };
@@ -18,12 +19,14 @@ type Card = {
   tier: string;
 };
 
-/** Statuses that should stop a manager before kickoff, not after. */
-const RISKY = new Set(['out', 'doubtful', 'injured reserve', 'ir', 'suspended', 'pup']);
-
-function isRisky(status: string | null): boolean {
-  return status ? RISKY.has(status.trim().toLowerCase()) : false;
-}
+/**
+ * Injury statuses come in two weights, and collapsing them was a mistake worth
+ * not repeating: `Questionable` is by far the most common status in the NFL, so
+ * flagging it with the same alarm as `Out` trains people to ignore the alarm.
+ *
+ * BLOCKING  — the player is very unlikely to play. Loud.
+ * ADVISORY  — genuinely uncertain. Worth knowing, not worth shouting.
+ */
 
 export default function LineupScreen() {
   const [slate, setSlate] = useState<Slate | null>(null);
@@ -104,9 +107,17 @@ export default function LineupScreen() {
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const usedIds = useMemo(() => new Set(Object.values(picks)), [picks]);
 
-  const riskyPicks = useMemo(
-    () => Object.values(picks).map((id) => byId.get(id)).filter((c) => c && isRisky(c.injury_status)),
+  const picked = useMemo(
+    () => Object.values(picks).map((id) => byId.get(id)).filter((c): c is Card => Boolean(c)),
     [picks, byId],
+  );
+  const blockingPicks = useMemo(
+    () => picked.filter((c) => injuryWeight(c.injury_status) === 'blocking'),
+    [picked],
+  );
+  const advisoryPicks = useMemo(
+    () => picked.filter((c) => injuryWeight(c.injury_status) === 'advisory'),
+    [picked],
   );
 
   async function submit() {
@@ -159,10 +170,20 @@ export default function LineupScreen() {
             </ThemedView>
           ) : null}
 
-          {riskyPicks.length > 0 && !locked ? (
+          {blockingPicks.length > 0 && !locked ? (
             <ThemedView type="backgroundElement" style={styles.warn}>
               <ThemedText type="small">
-                ⚠︎ {riskyPicks.map((c) => `${c!.player_name} (${c!.injury_status})`).join(', ')}
+                ⚠︎ Unlikely to play:{' '}
+                {blockingPicks.map((c) => `${c.player_name} (${c.injury_status})`).join(', ')}
+              </ThemedText>
+            </ThemedView>
+          ) : null}
+
+          {advisoryPicks.length > 0 && !locked ? (
+            <ThemedView type="backgroundElement" style={styles.warn}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Check before kickoff:{' '}
+                {advisoryPicks.map((c) => `${c.player_name} (${c.injury_status})`).join(', ')}
               </ThemedText>
             </ThemedView>
           ) : null}
@@ -199,11 +220,14 @@ export default function LineupScreen() {
                         <>
                           <ThemedText numberOfLines={1}>
                             {picked.player_name}
-                            {isRisky(picked.injury_status) ? ' ⚠︎' : ''}
+                            {injuryWeight(picked.injury_status) === 'blocking' ? ' ⚠︎' : ''}
                           </ThemedText>
                           <ThemedText type="small" themeColor="textSecondary">
                             {picked.position_abbreviation} · {picked.team_abbreviation ?? '—'} ·{' '}
                             {Number(picked.career_fp).toFixed(1)} FP
+                            {injuryWeight(picked.injury_status) === 'advisory'
+                              ? ` · ${picked.injury_status}`
+                              : ''}
                           </ThemedText>
                         </>
                       ) : (
@@ -245,10 +269,13 @@ export default function LineupScreen() {
                           <ThemedView type="backgroundElement" style={styles.option}>
                             <ThemedText numberOfLines={1} style={styles.optionName}>
                               {c.player_name}
-                              {isRisky(c.injury_status) ? ` ⚠︎ ${c.injury_status}` : ''}
+                              {injuryWeight(c.injury_status) === 'blocking' ? ` ⚠︎ ${c.injury_status}` : ''}
                             </ThemedText>
                             <ThemedText type="small" themeColor="textSecondary">
                               {c.position_abbreviation} · {Number(c.career_fp).toFixed(1)}
+                              {injuryWeight(c.injury_status) === 'advisory'
+                                ? ` · ${c.injury_status}`
+                                : ''}
                             </ThemedText>
                           </ThemedView>
                         </Pressable>
