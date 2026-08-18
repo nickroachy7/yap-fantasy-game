@@ -79,3 +79,45 @@ export const USAGE_SAMPLE = {
   rank_on_team: 1,
   position_group_size: 6,
 };
+
+/**
+ * A real `player_game_log` payload, trimmed to the interesting parts: three
+ * 2026 fixtures that have NOT been played, the 2025 postseason, and the start
+ * of the 2025 regular season. Captured rather than invented so the "upcoming"
+ * rows carry genuine kickoff times and the played rows genuine results.
+ */
+export const MCCAFFREY_GAME_LOG: Json = [
+  { week: 1, played: false, points: null, season: 2026, game_id: 'aa4a651a', is_home: false,
+    opponent: 'LAR', opp_score: null, starts_at: '2026-09-11T00:35:00+00:00', team_score: null,
+    season_type: 2, status_state: 'scheduled', stats: {} },
+  { week: 2, played: false, points: null, season: 2026, game_id: '9d28e3f0', is_home: true,
+    opponent: 'MIA', opp_score: null, starts_at: '2026-09-20T20:25:00+00:00', team_score: null,
+    season_type: 2, status_state: 'scheduled', stats: {} },
+  { week: 3, played: false, points: null, season: 2026, game_id: 'a6ad208b', is_home: true,
+    opponent: 'ARI', opp_score: null, starts_at: '2026-09-27T20:05:00+00:00', team_score: null,
+    season_type: 2, status_state: 'scheduled', stats: {} },
+  { week: 1, played: true, points: 29.4, season: 2025, game_id: 'a43468c5', is_home: false,
+    opponent: 'PHI', opp_score: 19, starts_at: '2026-01-11T21:30:00+00:00', team_score: 23,
+    season_type: 3, status_state: 'final',
+    stats: { rushing_attempts: 15, rushing_yards: 48, rushing_touchdowns: 0, receptions: 6, receiving_yards: 66 } },
+  { week: 2, played: true, points: 12.4, season: 2025, game_id: '9632f4b3', is_home: false,
+    opponent: 'SEA', opp_score: 41, starts_at: '2026-01-18T01:00:00+00:00', team_score: 6,
+    season_type: 3, status_state: 'final',
+    stats: { rushing_attempts: 11, rushing_yards: 35, rushing_touchdowns: 0, receptions: 5, receiving_yards: 39 } },
+  { week: 1, played: true, points: 23.2, season: 2025, game_id: '61eeec3a', is_home: false,
+    opponent: 'SEA', opp_score: 13, starts_at: '2025-09-07T20:05:00+00:00', team_score: 17,
+    season_type: 2, status_state: 'final',
+    stats: { rushing_attempts: 22, rushing_yards: 69, rushing_touchdowns: 0, receptions: 9, receiving_yards: 73 } },
+  { week: 2, played: true, points: 22.7, season: 2025, game_id: 'adc9920d', is_home: false,
+    opponent: 'NO', opp_score: 21, starts_at: '2025-09-14T17:00:00+00:00', team_score: 26,
+    season_type: 2, status_state: 'final',
+    stats: { rushing_attempts: 13, rushing_yards: 55, rushing_touchdowns: 0, receptions: 6, receiving_yards: 52 } },
+  { week: 3, played: true, points: 24.0, season: 2025, game_id: '55d75f94', is_home: true,
+    opponent: 'ARI', opp_score: 15, starts_at: '2025-09-21T20:25:00+00:00', team_score: 16,
+    season_type: 2, status_state: 'final',
+    stats: { rushing_attempts: 17, rushing_yards: 52, rushing_touchdowns: 0, receptions: 10, receiving_yards: 88 } },
+  { week: 4, played: true, points: 26.1, season: 2025, game_id: '853aa237', is_home: true,
+    opponent: 'JAX', opp_score: 26, starts_at: '2025-09-28T20:05:00+00:00', team_score: 21,
+    season_type: 2, status_state: 'final',
+    stats: { rushing_attempts: 17, rushing_yards: 49, rushing_touchdowns: 0, receptions: 6, receiving_yards: 92 } },
+];

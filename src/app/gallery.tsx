@@ -23,10 +23,12 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View, useColorScheme, useWindowDimensions } from 'react-native';
 
 import { InventoryCard } from '@/components/collection/InventoryCard';
-import { MCCAFFREY_PROFILE, USAGE_SAMPLE } from '@/components/dev/profile-fixture';
+import { MCCAFFREY_GAME_LOG, MCCAFFREY_PROFILE, USAGE_SAMPLE } from '@/components/dev/profile-fixture';
 import { OWNED_MANY } from '@/components/dev/fixtures';
 import { BioStrip } from '@/components/players/BioStrip';
 import { CareerTable } from '@/components/players/CareerTable';
+import { GameLog } from '@/components/players/GameLog';
+import { parseGameLog } from '@/components/players/game-log';
 import { TeamContext } from '@/components/players/TeamContext';
 import { UsagePanel } from '@/components/players/UsagePanel';
 import { parseProfile } from '@/components/players/profile';
@@ -195,6 +197,10 @@ function ProfileFixture() {
         teamAbbreviation={profile.player.teamAbbreviation}
       />
       <TeamContext bio={profile.player} standings={profile.standings} />
+      <GameLog
+        sections={parseGameLog(MCCAFFREY_GAME_LOG)}
+        position={profile.player.positionAbbreviation}
+      />
     </View>
   );
 }

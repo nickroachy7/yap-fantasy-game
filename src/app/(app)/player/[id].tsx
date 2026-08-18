@@ -31,116 +31,14 @@ import { BioStrip } from '@/components/players/BioStrip';
 import { CareerTable } from '@/components/players/CareerTable';
 import { TeamContext } from '@/components/players/TeamContext';
 import { UsagePanel } from '@/components/players/UsagePanel';
+import { GameLog } from '@/components/players/GameLog';
+import { parseGameLog, type GameLogSection } from '@/components/players/game-log';
 import { parseProfile, type PlayerProfile } from '@/components/players/profile';
 import { Screen } from '@/components/shell/Screen';
 import { BottomTabInset, Colors, Spacing } from '@/constants/theme';
-import type { Json } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
 
 const NUMERIC = { fontVariant: ['tabular-nums' as const] };
-
-type GameLogEntry = {
-  id: string;
-  season: number;
-  seasonType: number;
-  week: number | null;
-  /** Null when the active ruleset has not scored this line yet. */
-  points: number | null;
-  startsAt: string | null;
-  statusState: string | null;
-  /** 'vs SEA' / '@ SEA' — text only, never a club mark. */
-  opponent: string | null;
-  headline: { label: string; value: string }[];
-};
-
-/**
- * The stats worth printing under a fantasy score, in reading order. A row only
- * shows the ones it actually has: nulls are normal and expected — a running
- * back has no passing line.
- */
-const HEADLINE_STATS: { key: string; label: string }[] = [
-  { key: 'passing_yards', label: 'PASS YD' },
-  { key: 'passing_touchdowns', label: 'PASS TD' },
-  { key: 'passing_interceptions', label: 'INT' },
-  { key: 'rushing_yards', label: 'RUSH YD' },
-  { key: 'rushing_touchdowns', label: 'RUSH TD' },
-  { key: 'receptions', label: 'REC' },
-  { key: 'receiving_yards', label: 'REC YD' },
-  { key: 'receiving_touchdowns', label: 'REC TD' },
-  { key: 'field_goals_made', label: 'FG' },
-  { key: 'extra_points_made', label: 'XP' },
-  { key: 'fumbles_lost', label: 'FUM' },
-];
-
-const MAX_HEADLINE = 5;
-
-/**
- * The FK relationships exist, so PostgREST embeds these in one round trip.
- * `fantasy_points` comes back as an ARRAY, not an object: its primary key is
- * (stat_line_id, rules_version), so one stat line can carry a score per
- * ruleset version.
- */
-const GAME_LOG_SELECT =
-  'id, season, season_type, week, team_id, raw, fantasy_points(points, rules_version), games(starts_at, status_state, home_team_id, visitor_team_id)';
-
-function rawNumber(raw: Json, key: string): number | null {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const value = (raw as { [k: string]: Json | undefined })[key];
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function headlineFor(raw: Json): { label: string; value: string }[] {
-  const out: { label: string; value: string }[] = [];
-  for (const stat of HEADLINE_STATS) {
-    if (out.length === MAX_HEADLINE) break;
-    const n = rawNumber(raw, stat.key);
-    if (n === null || n === 0) continue;
-    out.push({ label: stat.label, value: String(Math.round(n * 10) / 10) });
-  }
-  return out;
-}
-
-/** 1 = preseason, 2 = regular, 3 = post. */
-function weekLabel(seasonType: number, week: number | null): string {
-  const w = week === null ? '—' : String(week);
-  if (seasonType === 1) return `PRE ${w}`;
-  if (seasonType === 3) return `POST ${w}`;
-  return `WK ${w}`;
-}
-
-/**
- * Opponent as TEXT — three letters, never a club mark.
- *
- * Home/away is only asserted when the stat line records which side the player
- * was on; otherwise the fixture is shown neutrally rather than guessed.
- */
-function opponentLabel(
-  teamId: string | null,
-  homeId: string | null,
-  visitorId: string | null,
-  abbrevOf: Map<string, string>,
-): string | null {
-  if (!homeId || !visitorId) return null;
-  const home = abbrevOf.get(homeId);
-  const visitor = abbrevOf.get(visitorId);
-  if (!home || !visitor) return null;
-  if (teamId === homeId) return `vs ${visitor}`;
-  if (teamId === visitorId) return `@ ${home}`;
-  return `${visitor} @ ${home}`;
-}
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-/**
- * Formatted by hand rather than via `Intl`: Hermes ships without the full ICU
- * data on some builds, and a game log is not worth a locale gamble.
- */
-function shortDate(iso: string | null): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
-}
 
 const oneDp = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
@@ -152,7 +50,7 @@ export default function PlayerDetailScreen() {
 
   const [player, setPlayer] = useState<DirectoryPlayer | null>(null);
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
-  const [log, setLog] = useState<GameLogEntry[]>([]);
+  const [sections, setSections] = useState<GameLogSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -164,7 +62,7 @@ export default function PlayerDetailScreen() {
       else setLoading(true);
       setError(null);
 
-      const [directoryRes, profileRes, rulesRes, teamsRes, linesRes] = await Promise.all([
+      const [directoryRes, profileRes, gameLogRes] = await Promise.all([
         supabase
           .from('player_directory')
           .select(DIRECTORY_COLUMNS)
@@ -173,20 +71,10 @@ export default function PlayerDetailScreen() {
           .limit(1)
           .maybeSingle(),
         supabase.rpc('player_profile', { p_player_id: id }),
-        supabase.from('scoring_rules').select('version').eq('is_active', true).limit(1).maybeSingle(),
-        supabase.from('teams').select('id, abbreviation'),
-        supabase
-          .from('stat_lines')
-          // One string literal, not a concatenation: supabase-js infers the row
-          // type from the literal, and a `+` join collapses it to `any`.
-          .select(GAME_LOG_SELECT)
-          .eq('player_id', id)
-          .order('season', { ascending: false })
-          .order('season_type', { ascending: false })
-          .order('week', { ascending: false, nullsFirst: false }),
+        supabase.rpc('player_game_log', { p_player_id: id }),
       ]);
 
-      const failure = directoryRes.error ?? teamsRes.error ?? linesRes.error;
+      const failure = directoryRes.error;
       if (failure) {
         setError(failure.message);
         setLoading(false);
@@ -199,33 +87,9 @@ export default function PlayerDetailScreen() {
       // game log stand on their own, and half a page beats an error page.
       setProfile(profileRes.error || !profileRes.data ? null : parseProfile(profileRes.data));
 
-      // Only the ACTIVE ruleset is shown. Older versions stay in the table for
-      // audit, and mixing them would silently double-count a rescored week.
-      const activeVersion = rulesRes.data?.version ?? null;
-      const abbrevOf = new Map((teamsRes.data ?? []).map((t) => [t.id, t.abbreviation]));
-
-      setLog(
-        (linesRes.data ?? []).map((line): GameLogEntry => {
-          const scored = (line.fantasy_points ?? []).find(
-            (fp) => activeVersion !== null && fp.rules_version === activeVersion,
-          );
-          const game = line.games;
-          const home = game?.home_team_id ?? null;
-          const visitor = game?.visitor_team_id ?? null;
-
-          return {
-            id: line.id,
-            season: line.season,
-            seasonType: line.season_type,
-            week: line.week,
-            points: scored ? Number(scored.points) : null,
-            startsAt: game?.starts_at ?? null,
-            statusState: game?.status_state ?? null,
-            opponent: opponentLabel(line.team_id, home, visitor, abbrevOf),
-            headline: headlineFor(line.raw),
-          };
-        }),
-      );
+      // The game log RPC spans every season we hold AND the fixtures still to
+      // come, so there is no client-side merging left to do here.
+      setSections(gameLogRes.error || !gameLogRes.data ? [] : parseGameLog(gameLogRes.data));
 
       setLoading(false);
       setRefreshing(false);
@@ -332,14 +196,7 @@ export default function PlayerDetailScreen() {
         ) : null}
 
         <Text style={[styles.sectionTitle, { color: c.text }]}>Game log</Text>
-
-        {log.length === 0 ? (
-          <Text style={[styles.emptyBody, { color: c.textSecondary }]}>
-            No games recorded for this player yet.
-          </Text>
-        ) : (
-          log.map((entry) => <GameLogRow key={entry.id} entry={entry} />)
-        )}
+        <GameLog sections={sections} position={profile?.player.positionAbbreviation ?? null} />
 
         <View style={styles.tailSpace} />
       </>
@@ -379,52 +236,6 @@ function StatTile({ label, value, emphasis }: { label: string; value: string; em
         numberOfLines={1}
         style={[styles.tileValue, NUMERIC, { color: c.text, fontSize: emphasis ? 24 : 20 }]}>
         {value}
-      </Text>
-    </View>
-  );
-}
-
-function GameLogRow({ entry }: { entry: GameLogEntry }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  const final = entry.statusState === 'final' || entry.statusState === 'post';
-  const date = shortDate(entry.startsAt);
-
-  return (
-    <View style={[styles.logRow, { borderBottomColor: c.backgroundElement }]}>
-      <View style={styles.logWeek}>
-        <Text numberOfLines={1} style={[styles.logWeekText, { color: c.text }]}>
-          {weekLabel(entry.seasonType, entry.week)}
-        </Text>
-        <Text numberOfLines={1} style={[styles.logOpponent, { color: c.textSecondary }]}>
-          {entry.opponent ?? '—'}
-        </Text>
-        {date ? (
-          <Text numberOfLines={1} style={[styles.logDate, { color: c.textSecondary }]}>
-            {date}
-          </Text>
-        ) : null}
-      </View>
-
-      <View style={styles.logStats}>
-        {entry.headline.length === 0 ? (
-          <Text numberOfLines={1} style={[styles.logStatText, { color: c.textSecondary }]}>
-            No recorded stats
-          </Text>
-        ) : (
-          <Text numberOfLines={2} style={[styles.logStatText, { color: c.textSecondary }]}>
-            {entry.headline.map((s) => `${s.value} ${s.label}`).join(' · ')}
-          </Text>
-        )}
-        {!final && entry.statusState ? (
-          <Text numberOfLines={1} style={[styles.logStatus, { color: c.textSecondary }]}>
-            {entry.statusState.toUpperCase()}
-          </Text>
-        ) : null}
-      </View>
-
-      <Text numberOfLines={1} style={[styles.logPoints, NUMERIC, { color: c.text }]}>
-        {entry.points === null ? '—' : oneDp(entry.points)}
       </Text>
     </View>
   );
