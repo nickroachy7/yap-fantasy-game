@@ -14,9 +14,15 @@ export default function CardsScreen() {
     [router],
   );
 
-  const context = directory?.season ? `${directory.season} player directory` : 'Player directory';
+  // The panel's own count line moves with the filter; this one does not, so it
+  // is the answer to "how big is the pool" rather than "what am I looking at".
+  const context = directory?.season
+    ? `${directory.season} season · ${directory.expected} cards`
+    : 'Player directory';
 
   return (
+    /* 'table' rather than 'grid': this is nine columns of rows being read, and
+       the wider measure only buys empty space between a name and its points. */
     <Screen title="Cards" measure="table" context={context} scroll={false}>
       <PlayersPanel onOpenPlayer={openPlayer} onLoaded={setDirectory} />
     </Screen>

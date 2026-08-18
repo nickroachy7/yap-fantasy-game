@@ -1,10 +1,11 @@
 /**
- * Data access for the Cards > Players scouting browser.
+ * Data access for the Cards player directory.
  *
  * Kept out of the screen so the one genuinely dangerous part of this feature —
  * paging past PostgREST's silent row cap — is in one readable place.
  */
 import type { Database } from '@/lib/database.types';
+import { fetchAllPages } from '@/lib/paged';
 import { supabase } from '@/lib/supabase';
 
 type DirectoryRow = Database['public']['Views']['player_directory']['Row'];
@@ -23,6 +24,13 @@ export type DirectoryPlayer = {
   seasonFp: number;
   gamesPlayed: number;
   fpPerGame: number;
+  /* --- from `players`, merged in by `fetchPlayerDirectory` --- */
+  age: number | null;
+  college: string | null;
+  /** Seasons of NFL service. 0 is a rookie. Null when the feed omits it. */
+  experience: number | null;
+  /* --- derived, see `assignPositionRanks` --- */
+  posRank: number | null;
 };
 
 export const DIRECTORY_COLUMNS =
@@ -46,7 +54,14 @@ const num = (v: number | null | undefined): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export function normalise(row: DirectoryRow): DirectoryPlayer {
+/** The subset of `players` the directory table actually renders. */
+export type PlayerBio = {
+  age: number | null;
+  college: string | null;
+  experience: number | null;
+};
+
+export function normalise(row: DirectoryRow, bio?: PlayerBio): DirectoryPlayer {
   return {
     cardId: row.card_id ?? '',
     playerId: row.player_id ?? '',
@@ -59,6 +74,10 @@ export function normalise(row: DirectoryRow): DirectoryPlayer {
     seasonFp: num(row.season_fp),
     gamesPlayed: num(row.games_played),
     fpPerGame: num(row.fp_per_game),
+    age: bio?.age ?? null,
+    college: bio?.college ?? null,
+    experience: bio?.experience ?? null,
+    posRank: null,
   };
 }
 
@@ -76,6 +95,8 @@ export type DirectoryFetch = {
   complete: boolean;
   /** The season the directory was read for, or null if the view is empty. */
   season: number | null;
+  /** False when the bio read failed. The table still renders; AGE/YR go blank. */
+  bios: boolean;
 };
 
 /** The newest season present in the directory. */
@@ -91,9 +112,82 @@ async function latestSeason(): Promise<number | null> {
 }
 
 /**
- * Read the whole directory for the current season, in pages, and prove the read
- * was complete by comparing against an exact server-side count.
+ * `experience` arrives as prose — 'Rookie', '1st Season', '11th Season'. Stored
+ * as a number so the column can sort and so 'R' is a rendering choice rather
+ * than a special case buried in a comparator.
  */
+export function parseExperience(raw: string | null | undefined): number | null {
+  if (!raw) return null;
+  const s = raw.trim().toLowerCase();
+  if (s.startsWith('rookie')) return 0;
+  const n = /^(\d+)/.exec(s);
+  return n ? Number(n[1]) : null;
+}
+
+/**
+ * Bios for the fantasy-relevant positions only.
+ *
+ * `players` holds 3,010 rows against the directory's 968, and every one of the
+ * extra 2,042 is an offensive lineman or a defender we will never show. The
+ * position filter cuts the read to two pages; without it this is seven, and
+ * three of them are over PostgREST's cap where a silent truncation would look
+ * like "some players have no age".
+ */
+const BIO_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'PK'];
+
+async function fetchPlayerBios(): Promise<Map<string, PlayerBio>> {
+  const rows = await fetchAllPages<{
+    id: string;
+    age: number | null;
+    college: string | null;
+    experience: string | null;
+  }>((from, to) =>
+    supabase
+      .from('players')
+      .select('id, age, college, experience')
+      .in('position_abbreviation', BIO_POSITIONS)
+      // `id` is the primary key, so this is the unique order paging requires.
+      .order('id', { ascending: true })
+      .range(from, to),
+  );
+
+  const byId = new Map<string, PlayerBio>();
+  for (const r of rows) {
+    byId.set(r.id, {
+      age: r.age,
+      college: r.college,
+      experience: parseExperience(r.experience),
+    });
+  }
+  return byId;
+}
+
+/**
+ * Rank within position, computed over the whole season rather than the current
+ * filter, so 'WR12' means the same thing whatever is typed in the search box.
+ *
+ * Players with no games are left unranked instead of tied at the bottom: a
+ * rank of 380 for someone who has not taken a snap reads as information and is
+ * not, and it would make the RK column mostly noise in preseason, where 354 of
+ * 968 players have not played.
+ */
+function assignPositionRanks(players: DirectoryPlayer[]): void {
+  const byPos = new Map<string, DirectoryPlayer[]>();
+  for (const p of players) {
+    if (p.gamesPlayed <= 0) continue;
+    const key = (p.position ?? '—').toUpperCase();
+    const list = byPos.get(key);
+    if (list) list.push(p);
+    else byPos.set(key, [p]);
+  }
+  for (const list of byPos.values()) {
+    list.sort((a, b) => b.seasonFp - a.seasonFp || a.name.localeCompare(b.name));
+    list.forEach((p, i) => {
+      p.posRank = i + 1;
+    });
+  }
+}
+
 /**
  * Players and Shop are separate routes now, so switching between them unmounts
  * the panel. Without a cache that means re-reading ~1,000 rows across three
@@ -120,7 +214,21 @@ export function loadPlayerDirectory(): Promise<DirectoryFetch> {
   return cached;
 }
 
+/**
+ * Read the whole directory for the current season, in pages, and prove the read
+ * was complete by comparing against an exact server-side count.
+ */
 export async function fetchPlayerDirectory(): Promise<DirectoryFetch> {
+  // Bios do not depend on the season, so this is started before the season
+  // probe rather than after the pages: the two reads then overlap instead of
+  // adding. A bio failure degrades the AGE/YR columns and nothing else, so it
+  // must not take the directory down with it.
+  let bioOk = true;
+  const biosPromise = fetchPlayerBios().catch(() => {
+    bioOk = false;
+    return new Map<string, PlayerBio>();
+  });
+
   const season = await latestSeason();
 
   const countQuery = supabase
@@ -130,10 +238,10 @@ export async function fetchPlayerDirectory(): Promise<DirectoryFetch> {
   if (countRes.error) throw new Error(countRes.error.message);
   const expected = countRes.count ?? 0;
 
-  const players: DirectoryPlayer[] = [];
+  const rows: DirectoryRow[] = [];
 
-  for (let request = 0; request < MAX_REQUESTS && players.length < expected; request += 1) {
-    const from = players.length;
+  for (let request = 0; request < MAX_REQUESTS && rows.length < expected; request += 1) {
+    const from = rows.length;
     // A PostgREST builder is a thenable that resolves once, so each page needs
     // its own builder rather than a shared, re-awaited one.
     const pageQuery = supabase
@@ -147,21 +255,64 @@ export async function fetchPlayerDirectory(): Promise<DirectoryFetch> {
     const { data, error } = await (season === null ? pageQuery : pageQuery.eq('season', season));
     if (error) throw new Error(error.message);
 
-    const rows = (data ?? []) as DirectoryRow[];
+    const page = (data ?? []) as DirectoryRow[];
     // Advance by what the server actually returned, not by the page size we
     // asked for: if `db-max-rows` is lower than DIRECTORY_PAGE_SIZE this still
     // walks the whole set instead of stopping a page in.
-    if (rows.length === 0) break;
-    for (const row of rows) players.push(normalise(row));
+    if (page.length === 0) break;
+    for (const row of page) rows.push(row);
   }
 
-  return { players, expected, complete: players.length === expected, season };
+  const bios = await biosPromise;
+  const players = rows.map((row) => normalise(row, bios.get(row.player_id ?? '')));
+  assignPositionRanks(players);
+
+  return { players, expected, complete: players.length === expected, season, bios: bioOk };
 }
 
 export type PositionFilter = 'ALL' | 'QB' | 'RB' | 'WR' | 'TE' | 'PK';
 export const POSITION_FILTERS: PositionFilter[] = ['ALL', 'QB', 'RB', 'WR', 'TE', 'PK'];
 
-export type SortKey = 'fp' | 'name';
+/** Counts for the filter tabs, over the unfiltered set so they never move. */
+export function positionCounts(players: DirectoryPlayer[]): Record<PositionFilter, number> {
+  const counts = { ALL: players.length, QB: 0, RB: 0, WR: 0, TE: 0, PK: 0 };
+  for (const p of players) {
+    const pos = (p.position ?? '').toUpperCase() as PositionFilter;
+    if (pos !== 'ALL' && pos in counts) counts[pos] += 1;
+  }
+  return counts;
+}
+
+export type SortKey =
+  | 'name'
+  | 'pos'
+  | 'team'
+  | 'college'
+  | 'exp'
+  | 'age'
+  | 'games'
+  | 'fp'
+  | 'fpg';
+export type SortDir = 'asc' | 'desc';
+
+/**
+ * The direction a column takes the first time you press it. Descending for a
+ * stat — nobody opens a leaderboard to see who scored least — and ascending
+ * for text, where A-Z is the only order anyone means.
+ */
+export const DEFAULT_SORT_DIR: Record<SortKey, SortDir> = {
+  name: 'asc',
+  pos: 'asc',
+  team: 'asc',
+  college: 'asc',
+  exp: 'asc',
+  age: 'asc',
+  games: 'desc',
+  fp: 'desc',
+  fpg: 'desc',
+};
+
+export type SortState = { key: SortKey; dir: SortDir };
 
 /** Diacritic-insensitive, case-insensitive contains. */
 function normaliseForSearch(s: string): string {
@@ -171,22 +322,86 @@ function normaliseForSearch(s: string): string {
     .toLowerCase();
 }
 
+/**
+ * Missing values sort last in BOTH directions rather than flipping to the top
+ * when you reverse a column. A blank is not a small number, and a table that
+ * opens with forty em dashes has buried the thing you pressed the header for.
+ */
+function compareNullable(a: number | null, b: number | null, dir: SortDir): number {
+  if (a === null && b === null) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return dir === 'asc' ? a - b : b - a;
+}
+
+/** Same rule for text: an absent college is not a college that sorts before A. */
+function compareText(a: string | null, b: string | null, dir: SortDir): number {
+  const x = a?.trim() || null;
+  const y = b?.trim() || null;
+  if (x === null && y === null) return 0;
+  if (x === null) return 1;
+  if (y === null) return -1;
+  const r = x.localeCompare(y);
+  return dir === 'asc' ? r : -r;
+}
+
 export function filterAndSort(
   players: DirectoryPlayer[],
-  { position, query, sort }: { position: PositionFilter; query: string; sort: SortKey },
+  {
+    position,
+    query,
+    sort,
+  }: { position: PositionFilter; query: string; sort: SortState },
 ): DirectoryPlayer[] {
   const q = normaliseForSearch(query.trim());
   const filtered = players.filter((p) => {
     if (position !== 'ALL' && (p.position ?? '').toUpperCase() !== position) return false;
     if (!q) return true;
-    return normaliseForSearch(p.name).includes(q) || normaliseForSearch(p.team ?? '').includes(q);
+    // College is searchable at every width, including the two where the column
+    // is not drawn: 'every Georgia receiver' is a real thing people look for,
+    // and on a phone typing it is the only way to ask.
+    return (
+      normaliseForSearch(p.name).includes(q) ||
+      normaliseForSearch(p.team ?? '').includes(q) ||
+      normaliseForSearch(p.college ?? '').includes(q)
+    );
   });
 
+  const { key, dir } = sort;
   return filtered.sort((a, b) => {
-    if (sort === 'name') return a.name.localeCompare(b.name);
-    // Points descending, with name as the tiebreak so the order is stable
-    // across the very many players sitting on exactly 0.
-    if (b.seasonFp !== a.seasonFp) return b.seasonFp - a.seasonFp;
-    return a.name.localeCompare(b.name);
+    const r = compareBy(a, b, key, dir);
+    // Name is the tiebreak everywhere, because a preseason table has hundreds
+    // of players on exactly 0.0 and an arbitrary order among them makes the
+    // list appear to reshuffle whenever it re-renders.
+    return r !== 0 ? r : a.name.localeCompare(b.name);
   });
+}
+
+function compareBy(a: DirectoryPlayer, b: DirectoryPlayer, key: SortKey, dir: SortDir): number {
+  switch (key) {
+    case 'name':
+      return compareText(a.name, b.name, dir);
+    case 'pos':
+      return compareText(a.position, b.position, dir);
+    case 'team':
+      return compareText(a.team, b.team, dir);
+    case 'college':
+      return compareText(a.college, b.college, dir);
+    case 'exp':
+      return compareNullable(a.experience, b.experience, dir);
+    case 'age':
+      return compareNullable(a.age, b.age, dir);
+    case 'games':
+      return compareNullable(a.gamesPlayed, b.gamesPlayed, dir);
+    case 'fp':
+      return compareNullable(a.seasonFp, b.seasonFp, dir);
+    case 'fpg':
+      // Per-game off zero games is 0/0, not 0. Ranking a player who has not
+      // played above one averaging 4.0 is the classic rate-stat bug.
+      return compareNullable(
+        a.gamesPlayed > 0 ? a.fpPerGame : null,
+        b.gamesPlayed > 0 ? b.fpPerGame : null,
+        dir,
+      );
+  }
 }
