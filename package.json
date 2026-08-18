@@ -44,6 +44,7 @@
     "build:web": "expo export --platform web",
     "check:functions": "deno check supabase/functions/**/index.ts supabase/tests/*.ts",
     "test:rls": "echo \"psql \\\"$DATABASE_URL\\\" -v ON_ERROR_STOP=1 -f supabase/tests/rls_isolation.test.sql\"",
+    "test:slate": "echo \"psql \\\"$DATABASE_URL\\\" -v ON_ERROR_STOP=1 -f supabase/tests/slate_transition.test.sql\"",
     "smoke:provider": "deno run --allow-net --allow-env --allow-read supabase/tests/provider_smoke.ts",
     "gen:types": "supabase gen types typescript --linked > src/lib/database.types.ts"
   },
