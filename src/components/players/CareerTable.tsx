@@ -50,6 +50,10 @@ export function CareerTable({
   }
 
   const anyUnreported = career.some((s) => s.baseFp === null);
+  // True only while some seasons still fall back to season totals. Once every
+  // season has per-game rows ingested, the caveat stops being printed rather
+  // than lingering as a warning about a problem that no longer exists.
+  const anyApproximate = career.some((s) => s.exactFp === null && s.baseFp !== null);
 
   return (
     <View style={styles.wrap}>
@@ -60,7 +64,9 @@ export function CareerTable({
           <View style={[styles.row, styles.headRow, { borderColor: c.backgroundElement }]}>
             <Text style={[styles.season, styles.head, { color: c.textSecondary }]}>SEASON</Text>
             <Text style={[styles.narrow, styles.head, { color: c.textSecondary }]}>GP</Text>
-            <Text style={[styles.fp, styles.head, { color: c.textSecondary }]}>FP*</Text>
+            <Text style={[styles.fp, styles.head, { color: c.textSecondary }]}>
+              {anyApproximate ? 'FP*' : 'FP'}
+            </Text>
             <Text style={[styles.narrow, styles.head, { color: c.textSecondary }]}>FP/G</Text>
             <Text style={[styles.rank, styles.head, { color: c.textSecondary }]}>RANK</Text>
             {columns.map((col) => (
@@ -78,11 +84,15 @@ export function CareerTable({
               <Text style={[styles.narrow, styles.cell, NUMERIC, { color: c.textSecondary }]}>
                 {int(s.gamesPlayed)}
               </Text>
+              {/* Exact where we hold the game rows, season totals otherwise.
+                  The asterisk marks only the rows that are actually
+                  approximate, rather than tarring the whole column. */}
               <Text style={[styles.fp, styles.cell, styles.strong, NUMERIC, { color: c.text }]}>
-                {oneDp(s.baseFp)}
+                {oneDp(s.exactFp ?? s.baseFp)}
+                {s.exactFp === null && s.baseFp !== null ? '*' : ''}
               </Text>
               <Text style={[styles.narrow, styles.cell, NUMERIC, { color: c.textSecondary }]}>
-                {oneDp(s.baseFpPerGame)}
+                {oneDp(s.exactFpPerGame ?? s.baseFpPerGame)}
               </Text>
               <Text style={[styles.rank, styles.cell, NUMERIC, { color: c.textSecondary }]}>
                 {s.posRank === null
@@ -102,10 +112,11 @@ export function CareerTable({
       </ScrollView>
 
       <Text style={[styles.footnote, { color: c.textSecondary }]}>
-        * From season totals, so the per-game yardage bonuses in our scoring are
-        not included — those need game-by-game data, which we hold from 2026
-        onward. Rank is among players on a roster today, which is why the pool
-        shrinks in older seasons.
+        {anyApproximate
+          ? '* From season totals, so the per-game yardage bonuses in our scoring are not included. Unmarked seasons are scored from game-by-game data and match the leaderboard exactly. '
+          : 'Scored from game-by-game data, so these match the leaderboard exactly. '}
+        Rank is among players on a roster today, which is why the pool shrinks in
+        older seasons.
         {anyUnreported ? ' A dash means the provider reported no stats for that season.' : ''}
       </Text>
     </View>

@@ -32,6 +32,8 @@ import { parseGameLog } from '@/components/players/game-log';
 import { TeamContext } from '@/components/players/TeamContext';
 import { UsagePanel } from '@/components/players/UsagePanel';
 import { parseProfile } from '@/components/players/profile';
+import { Panel } from '@/components/ui/Panel';
+import { Tabs } from '@/components/ui/Tabs';
 import { Screen } from '@/components/shell/Screen';
 import { SegmentedControl, type Segment } from '@/components/shell/SegmentedControl';
 import { Sidebar } from '@/components/shell/Sidebar';
@@ -174,6 +176,7 @@ function LineupFixture() {
  * starter looks like until the regular season begins.
  */
 function ProfileFixture() {
+  const [pt, setPt] = useState<'overview' | 'career' | 'log'>('overview');
   const profile = parseProfile(MCCAFFREY_PROFILE);
   if (!profile) return null;
 
@@ -185,6 +188,23 @@ function ProfileFixture() {
   return (
     <View style={styles.profile}>
       <BioStrip bio={profile.player} />
+
+      {/* Mirrors the real screen's tab split so the primitive is seen in the
+          arrangement it actually ships in, not in isolation. */}
+      <Tabs
+        tabs={[
+          { value: 'overview', label: 'Overview' },
+          { value: 'career', label: 'Career' },
+          { value: 'log', label: 'Game log', hint: '3' },
+        ]}
+        value={pt}
+        onChange={setPt}
+      />
+
+      <Panel title="All sections" hint="gallery shows every tab at once">
+        <View style={{ height: 0 }} />
+      </Panel>
+
       <CareerTable career={profile.career} position={profile.player.positionAbbreviation} />
       <UsagePanel
         usage={withUsage?.usage ?? null}

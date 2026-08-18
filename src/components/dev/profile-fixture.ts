@@ -48,8 +48,10 @@ export const MCCAFFREY_PROFILE: Json = {
   },
   career: [
     { season: 2025, games_played: 17, base_fp: 416.6, base_fp_per_game: 24.51, pos_rank: 1, rank_pool: 126,
+      exact_fp: 428.6, exact_games: 17, exact_fp_per_game: 25.21,
       stats: { rushing_attempts: 311, rushing_yards: 1202, rushing_touchdowns: 10, receptions: 102, receiving_yards: 924 } },
     { season: 2024, games_played: 4, base_fp: 49.8, base_fp_per_game: 12.45, pos_rank: 55, rank_pool: 94,
+      exact_fp: 47.8, exact_games: 4, exact_fp_per_game: 11.95,
       stats: { rushing_attempts: 50, rushing_yards: 202, rushing_touchdowns: null, receptions: 15, receiving_yards: 146 } },
     { season: 2023, games_played: 16, base_fp: 395.3, base_fp_per_game: 24.71, pos_rank: 1, rank_pool: 73,
       stats: { rushing_attempts: 272, rushing_yards: 1459, rushing_touchdowns: 14, receptions: 67, receiving_yards: 564 } },

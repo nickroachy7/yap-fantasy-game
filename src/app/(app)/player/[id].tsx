@@ -35,10 +35,27 @@ import { GameLog } from '@/components/players/GameLog';
 import { parseGameLog, type GameLogSection } from '@/components/players/game-log';
 import { parseProfile, type PlayerProfile } from '@/components/players/profile';
 import { Screen } from '@/components/shell/Screen';
+import { Tabs, type Tab } from '@/components/ui/Tabs';
 import { BottomTabInset, Colors, Spacing } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
 const NUMERIC = { fontVariant: ['tabular-nums' as const] };
+
+type PlayerTab = 'overview' | 'career' | 'log';
+
+/**
+ * Tabs rather than one long scroll.
+ *
+ * Everything here is worth having, but stacked it runs to five screens and the
+ * game log — the part a manager checks most often — ends up furthest from the
+ * top. Splitting is what every real fantasy player page does, and for the same
+ * reason. Overview stays first because it answers "should I start him".
+ */
+const PLAYER_TABS: Tab<PlayerTab>[] = [
+  { value: 'overview', label: 'Overview' },
+  { value: 'career', label: 'Career' },
+  { value: 'log', label: 'Game log' },
+];
 
 const oneDp = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
@@ -51,6 +68,7 @@ export default function PlayerDetailScreen() {
   const [player, setPlayer] = useState<DirectoryPlayer | null>(null);
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [sections, setSections] = useState<GameLogSection[]>([]);
+  const [tab, setTab] = useState<PlayerTab>('overview');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -167,36 +185,48 @@ export default function PlayerDetailScreen() {
           <StatTile label="FP / GAME" value={oneDp(player.fpPerGame)} />
         </View>
 
-        {profile?.player.injuryComment ? (
-          <View style={[styles.note, { backgroundColor: c.backgroundElement }]}>
-            <Text style={[styles.noteBody, { color: c.textSecondary }]}>
-              {profile.player.injuryComment}
-            </Text>
-          </View>
-        ) : null}
+        <View style={[styles.tabBar, { borderColor: c.backgroundElement }]}>
+          <Tabs
+            tabs={PLAYER_TABS.map((t) =>
+              t.value === 'log' && sections.length > 0
+                ? { ...t, hint: String(sections.length) }
+                : t,
+            )}
+            value={tab}
+            onChange={setTab}
+          />
+        </View>
 
-        {profile ? (
+        {tab === 'overview' ? (
           <>
-            <Text style={[styles.sectionTitle, { color: c.text }]}>Career</Text>
-            <CareerTable
-              career={profile.career}
-              position={profile.player.positionAbbreviation}
-            />
+            {profile?.player.injuryComment ? (
+              <View style={[styles.note, { backgroundColor: c.backgroundElement }]}>
+                <Text style={[styles.noteBody, { color: c.textSecondary }]}>
+                  {profile.player.injuryComment}
+                </Text>
+              </View>
+            ) : null}
 
-            <Text style={[styles.sectionTitle, { color: c.text }]}>Usage</Text>
-            <UsagePanel
-              usage={profile.usage}
-              position={profile.player.positionAbbreviation}
-              teamAbbreviation={profile.player.teamAbbreviation}
-            />
-
-            <Text style={[styles.sectionTitle, { color: c.text }]}>Team</Text>
-            <TeamContext bio={profile.player} standings={profile.standings} />
+            {profile ? (
+              <>
+                <UsagePanel
+                  usage={profile.usage}
+                  position={profile.player.positionAbbreviation}
+                  teamAbbreviation={profile.player.teamAbbreviation}
+                />
+                <TeamContext bio={profile.player} standings={profile.standings} />
+              </>
+            ) : null}
           </>
         ) : null}
 
-        <Text style={[styles.sectionTitle, { color: c.text }]}>Game log</Text>
-        <GameLog sections={sections} position={profile?.player.positionAbbreviation ?? null} />
+        {tab === 'career' && profile ? (
+          <CareerTable career={profile.career} position={profile.player.positionAbbreviation} />
+        ) : null}
+
+        {tab === 'log' ? (
+          <GameLog sections={sections} position={profile?.player.positionAbbreviation ?? null} />
+        ) : null}
 
         <View style={styles.tailSpace} />
       </>
@@ -262,6 +292,7 @@ const styles = StyleSheet.create({
   tile: { flex: 1, minWidth: 0, borderRadius: 12, padding: Spacing.three, gap: 2 },
   tileLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8 },
   tileValue: { fontWeight: '800' },
+  tabBar: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 2 },
   note: { borderRadius: 12, padding: Spacing.two + 4 },
   noteBody: { fontSize: 12, lineHeight: 17 },
   sectionTitle: { fontSize: 18, fontWeight: '700', marginTop: Spacing.two },

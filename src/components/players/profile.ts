@@ -18,6 +18,21 @@ export type CareerSeason = {
   /** Null when the provider reported no scoring stats for this season. */
   baseFp: number | null;
   baseFpPerGame: number | null;
+  /**
+   * Scored from per-game rows, so it INCLUDES the per-game bonuses that a
+   * season total cannot express — and it is the same number the leaderboard
+   * uses. Present only for seasons whose game rows we ingested; prefer it
+   * wherever it exists.
+   *
+   * It does not always exceed `baseFp`. 2025 comes out +12.0 (four bonus
+   * games) but 2024 is -2.0: the provider's season totals do not perfectly
+   * reconcile with its own game logs. Preferring this one is still right,
+   * because agreeing with our own leaderboard matters more than agreeing with
+   * the provider's aggregate.
+   */
+  exactFp: number | null;
+  exactGames: number | null;
+  exactFpPerGame: number | null;
   /** Null whenever baseFp is — you cannot rank a season you have no number for. */
   posRank: number | null;
   /** How many players the rank was computed against. Always shown with it. */
@@ -131,6 +146,9 @@ export function parseProfile(payload: Json): PlayerProfile | null {
         gamesPlayed: num(e.games_played),
         baseFp: num(e.base_fp),
         baseFpPerGame: num(e.base_fp_per_game),
+        exactFp: num(e.exact_fp),
+        exactGames: num(e.exact_games),
+        exactFpPerGame: num(e.exact_fp_per_game),
         posRank: num(e.pos_rank),
         rankPool: num(e.rank_pool),
         stats: statsOf(e.stats),

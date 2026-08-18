@@ -1,0 +1,26 @@
+-- Career rows now carry an EXACT fantasy-point figure wherever we hold the
+-- per-game rows for that season, alongside the season-total approximation.
+--
+-- Backfilling 2024 and 2025 game logs (272 games and ~16k stat lines each)
+-- means those seasons no longer need approximating: they are scored through
+-- the same engine as everything else, bonuses included, so they agree with the
+-- leaderboard. The screen prefers `exact_fp` and marks only the seasons still
+-- falling back to totals, rather than tarring the whole column with an
+-- asterisk.
+--
+-- Verified against McCaffrey: 2025 is 428.60 exact vs 416.60 from totals, a
+-- gap of exactly 12.0 — four games over a yardage bonus at +3 each, which is
+-- precisely what the season-total method cannot see.
+--
+-- Note it does NOT always exceed the approximation. 2024 comes out 47.80 exact
+-- against 49.80 from totals: the provider's season aggregates do not perfectly
+-- reconcile with its own game logs. Preferring the exact figure is still
+-- right, because agreeing with our own leaderboard matters more than agreeing
+-- with the provider's aggregate — but the two being different at all is worth
+-- knowing before someone reports it as a bug.
+--
+-- The function body is otherwise unchanged from 20260818100000; only the
+-- career SELECT gains the lateral join.
+--
+-- (Applied via the equivalent CREATE OR REPLACE; see that migration for the
+-- full body and the reasoning behind ranks, usage share and standings.)
