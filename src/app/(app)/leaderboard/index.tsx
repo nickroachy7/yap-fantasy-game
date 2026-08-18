@@ -32,6 +32,8 @@ import { StandingsHeader, StandingsRow, boardColumns } from '@/components/leader
 import { WeekBreakdown } from '@/components/leaderboard/WeekBreakdown';
 import { YourStanding } from '@/components/leaderboard/YourStanding';
 import { Screen } from '@/components/shell/Screen';
+import { SubNav } from '@/components/shell/SubNav';
+import { LEADERBOARD_SEGMENTS } from '@/components/shell/sections';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Panel } from '@/components/ui/Panel';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
@@ -212,6 +214,7 @@ export default function LeaderboardScreen() {
     // scroll={false}: the FlatList below owns the scroll container, and nesting
     // a virtualised list inside a ScrollView defeats the virtualisation.
     <Screen title="Leaderboard" measure="table" context={headerContext} scroll={false}>
+      <SubNav segments={LEADERBOARD_SEGMENTS} />
       {entries === null && !error ? (
         <ActivityIndicator style={styles.centred} />
       ) : error ? (

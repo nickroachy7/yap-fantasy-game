@@ -26,6 +26,8 @@ import {
 } from '@/components/lineup/model';
 import { useLineupData } from '@/components/lineup/use-lineup-data';
 import { Screen } from '@/components/shell/Screen';
+import { SubNav } from '@/components/shell/SubNav';
+import { LINEUP_SEGMENTS } from '@/components/shell/sections';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Tabs } from '@/components/ui/Tabs';
 import { Colors, Spacing, Type } from '@/constants/theme';
@@ -230,6 +232,7 @@ export default function LineupScreen() {
       context={context}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}>
+      <SubNav segments={LINEUP_SEGMENTS} inset={false} />
       <LineupSummary
         lockAt={lockAt}
         locked={locked}

@@ -13,7 +13,19 @@ import { SegmentedControl, type Segment } from '@/components/shell/SegmentedCont
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Spacing } from '@/constants/theme';
 
-export function SubNav({ segments }: { segments: Segment<string>[] }) {
+export function SubNav({
+  segments,
+  /**
+   * False on a screen whose `Screen` already scrolls and therefore already
+   * pads its content. Leaving the gutter on there insets the control 32pt from
+   * the edge while every row beneath it sits at 16pt, which reads as a
+   * misalignment rather than as a deliberate step.
+   */
+  inset = true,
+}: {
+  segments: Segment<string>[];
+  inset?: boolean;
+}) {
   const isWide = useIsWide();
   const router = useRouter();
   const pathname = usePathname();
@@ -21,7 +33,7 @@ export function SubNav({ segments }: { segments: Segment<string>[] }) {
   if (isWide) return null;
 
   return (
-    <View style={styles.wrap}>
+    <View style={inset ? styles.wrap : undefined}>
       <SegmentedControl
         segments={segments}
         value={pathname}

@@ -13,6 +13,12 @@
  *
  * Order is deliberate: the weekly decision first, standings second, acquisition
  * third, what you own fourth, identity last.
+ *
+ * A section's FIRST child deliberately shares the section's own href. The
+ * segmented control needs a segment for the landing page or there is no way
+ * back to it, and the sidebar needs the parent row to stay a live target. The
+ * alternative — a bare `/lineup/index` child — would show the same word twice
+ * in the rail for no gain.
  */
 import type { Segment } from '@/components/shell/SegmentedControl';
 
@@ -20,9 +26,30 @@ export type NavChild = { href: string; label: string; badge?: string };
 export type NavSection = { href: string; label: string; children?: NavChild[] };
 
 export const NAV_SECTIONS: NavSection[] = [
-  { href: '/lineup', label: 'Lineup' },
-  { href: '/leaderboard', label: 'Leaderboard' },
-  { href: '/cards', label: 'Cards' },
+  {
+    href: '/lineup',
+    label: 'Lineup',
+    children: [
+      { href: '/lineup', label: 'This week' },
+      { href: '/lineup/scores', label: 'Scores' },
+    ],
+  },
+  {
+    href: '/leaderboard',
+    label: 'Leaderboard',
+    children: [
+      { href: '/leaderboard', label: 'Standings' },
+      { href: '/leaderboard/scoring', label: 'Scoring' },
+    ],
+  },
+  {
+    href: '/cards',
+    label: 'Cards',
+    children: [
+      { href: '/cards', label: 'Directory' },
+      { href: '/cards/trend', label: 'Trend' },
+    ],
+  },
   {
     href: '/collection',
     label: 'Collection',
@@ -52,3 +79,7 @@ export function segmentsFor(sectionHref: string): Segment<string>[] {
  * duplicated — that is the entire point of this file.
  */
 export const COLLECTION_SEGMENTS: Segment<string>[] = segmentsFor('/collection');
+
+export const LINEUP_SEGMENTS: Segment<string>[] = segmentsFor('/lineup');
+export const LEADERBOARD_SEGMENTS: Segment<string>[] = segmentsFor('/leaderboard');
+export const CARDS_SEGMENTS: Segment<string>[] = segmentsFor('/cards');

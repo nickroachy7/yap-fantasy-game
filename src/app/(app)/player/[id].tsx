@@ -12,7 +12,9 @@
  * measurement. See UsagePanel.
  *
  * The route param is the PLAYER id (not the card id) — a player is one row in
- * the directory but potentially many owned card instances.
+ * the directory but potentially many owned card instances, which is what the
+ * `Your cards` panel exists to show. See CardHistory for why that panel is the
+ * right analogue of a transaction history in a game with no transactions.
  *
  * No photo, no logo, no jersey: unlicensed. Club is text, position is a glyph.
  */
@@ -28,6 +30,7 @@ import {
   type DirectoryPlayer,
 } from '@/components/cards/player-directory';
 import { BioStrip } from '@/components/players/BioStrip';
+import { CardHistory, type OwnedCard } from '@/components/players/CardHistory';
 import { CareerTable } from '@/components/players/CareerTable';
 import { TeamContext } from '@/components/players/TeamContext';
 import { UsagePanel } from '@/components/players/UsagePanel';
@@ -36,7 +39,7 @@ import { parseGameLog, type GameLogSection } from '@/components/players/game-log
 import { parseProfile, type PlayerProfile } from '@/components/players/profile';
 import { Screen } from '@/components/shell/Screen';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
-import { BottomTabInset, Colors, Spacing } from '@/constants/theme';
+import { BottomTabInset, Colors, Spacing, type CardTier } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
 const NUMERIC = { fontVariant: ['tabular-nums' as const] };
@@ -59,6 +62,31 @@ const PLAYER_TABS: Tab<PlayerTab>[] = [
 
 const oneDp = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
+/**
+ * The player's position rank, for the stat strip.
+ *
+ * The spec's hero band carries `#5 QB` and `#9 OVERALL`. Only the first is
+ * available: `player_season_ranks` ranks within a position, and there is no
+ * cross-position ranking in the data — nor would one mean much under a scoring
+ * system where a quarterback's baseline is twice a tight end's.
+ *
+ * Prefers the current season, falling back to the most recent season that has
+ * a rank at all. In August the current season has no ranked games yet, and
+ * showing last year's rank clearly labelled beats showing nothing.
+ */
+function currentRank(profile: PlayerProfile | null): {
+  rank: number;
+  pool: number | null;
+  season: number;
+} | null {
+  if (!profile) return null;
+  const ranked = profile.career.filter((s) => s.posRank !== null);
+  if (ranked.length === 0) return null;
+  const forCurrent = ranked.find((s) => s.season === profile.current?.season);
+  const best = forCurrent ?? ranked.reduce((a, b) => (b.season > a.season ? b : a));
+  return { rank: best.posRank as number, pool: best.rankPool, season: best.season };
+}
+
 export default function PlayerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -68,6 +96,8 @@ export default function PlayerDetailScreen() {
   const [player, setPlayer] = useState<DirectoryPlayer | null>(null);
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [sections, setSections] = useState<GameLogSection[]>([]);
+  const [owned, setOwned] = useState<OwnedCard[]>([]);
+  const [ownedLoading, setOwnedLoading] = useState(true);
   const [tab, setTab] = useState<PlayerTab>('overview');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -80,7 +110,7 @@ export default function PlayerDetailScreen() {
       else setLoading(true);
       setError(null);
 
-      const [directoryRes, profileRes, gameLogRes] = await Promise.all([
+      const [directoryRes, profileRes, gameLogRes, ownedRes] = await Promise.all([
         supabase
           .from('player_directory')
           .select(DIRECTORY_COLUMNS)
@@ -90,6 +120,17 @@ export default function PlayerDetailScreen() {
           .maybeSingle(),
         supabase.rpc('player_profile', { p_player_id: id }),
         supabase.rpc('player_game_log', { p_player_id: id }),
+        /* RLS scopes `my_collection` to the caller, so this needs no user
+           filter — and cannot leak anyone else's cards even if one were added
+           by mistake. Unpaged deliberately: this is one player's copies, which
+           is a handful, not the whole collection. */
+        supabase
+          .from('my_collection')
+          .select(
+            'id, tier, career_fp, lineup_starts, season, acquired_at, tier_floor_fp, next_tier_at, next_tier_label',
+          )
+          .eq('player_id', id)
+          .order('acquired_at', { ascending: false }),
       ]);
 
       const failure = directoryRes.error;
@@ -108,6 +149,25 @@ export default function PlayerDetailScreen() {
       // The game log RPC spans every season we hold AND the fixtures still to
       // come, so there is no client-side merging left to do here.
       setSections(gameLogRes.error || !gameLogRes.data ? [] : parseGameLog(gameLogRes.data));
+
+      // Also non-fatal: not knowing which cards you hold should never take the
+      // player's stats off the screen.
+      setOwned(
+        ownedRes.error || !ownedRes.data
+          ? []
+          : ownedRes.data.map((r) => ({
+              id: String(r.id),
+              tier: (r.tier ?? 'bronze') as CardTier,
+              careerFp: Number(r.career_fp ?? 0),
+              lineupStarts: Number(r.lineup_starts ?? 0),
+              season: r.season,
+              acquiredAt: r.acquired_at,
+              tierFloorFp: r.tier_floor_fp === null ? null : Number(r.tier_floor_fp),
+              nextTierAt: r.next_tier_at === null ? null : Number(r.next_tier_at),
+              nextTierLabel: r.next_tier_label,
+            })),
+      );
+      setOwnedLoading(false);
 
       setLoading(false);
       setRefreshing(false);
@@ -151,6 +211,8 @@ export default function PlayerDetailScreen() {
       );
     }
 
+    const rank = currentRank(profile);
+
     return (
       <>
         <View style={[styles.identity, { backgroundColor: c.backgroundElement }]}>
@@ -183,6 +245,15 @@ export default function PlayerDetailScreen() {
           <StatTile label="SEASON FP" value={oneDp(player.seasonFp)} emphasis />
           <StatTile label="GAMES" value={String(player.gamesPlayed)} />
           <StatTile label="FP / GAME" value={oneDp(player.fpPerGame)} />
+          {rank ? (
+            <StatTile
+              label={rank.season === player.season ? 'POS RANK' : `POS RANK ${rank.season}`}
+              value={`${player.position ?? ''}${rank.rank}`}
+              /* The pool travels with the rank everywhere in this app — see
+                 CareerTable. "QB4" alone is a claim the data cannot support. */
+              hint={rank.pool ? `of ${rank.pool}` : undefined}
+            />
+          ) : null}
         </View>
 
         <View style={[styles.tabBar, { borderColor: c.backgroundElement }]}>
@@ -206,6 +277,10 @@ export default function PlayerDetailScreen() {
                 </Text>
               </View>
             ) : null}
+
+            {/* Before the league-wide context, because "what do I hold" is the
+                question that brought most people to this page from a pack. */}
+            <CardHistory cards={owned} loading={ownedLoading} />
 
             {profile ? (
               <>
@@ -253,7 +328,18 @@ export default function PlayerDetailScreen() {
   );
 }
 
-function StatTile({ label, value, emphasis }: { label: string; value: string; emphasis?: boolean }) {
+function StatTile({
+  label,
+  value,
+  hint,
+  emphasis,
+}: {
+  label: string;
+  value: string;
+  /** A qualifier under the figure — "of 84". Never load-bearing on its own. */
+  hint?: string;
+  emphasis?: boolean;
+}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
@@ -267,6 +353,11 @@ function StatTile({ label, value, emphasis }: { label: string; value: string; em
         style={[styles.tileValue, NUMERIC, { color: c.text, fontSize: emphasis ? 24 : 20 }]}>
         {value}
       </Text>
+      {hint ? (
+        <Text numberOfLines={1} style={[styles.tileHint, NUMERIC, { color: c.textSecondary }]}>
+          {hint}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -292,6 +383,7 @@ const styles = StyleSheet.create({
   tile: { flex: 1, minWidth: 0, borderRadius: 12, padding: Spacing.three, gap: 2 },
   tileLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8 },
   tileValue: { fontWeight: '800' },
+  tileHint: { fontSize: 10, fontWeight: '600' },
   tabBar: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 2 },
   note: { borderRadius: 12, padding: Spacing.two + 4 },
   noteBody: { fontSize: 12, lineHeight: 17 },

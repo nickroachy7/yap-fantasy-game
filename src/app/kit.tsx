@@ -1,0 +1,316 @@
+/**
+ * Dev-only gallery for the shared UI kit.
+ *
+ * Separate from `/preview` (card treatments) and `/gallery` (navigation shell)
+ * because it is answering a different question: those two show how a finished
+ * thing looks, and this shows every STATE of a primitive at once — all five
+ * position badges including the split FLEX form, every status tone, a game that
+ * is scheduled next to one that is final.
+ *
+ * That matters because every one of these components has states that are hard
+ * to reach in the product. A live game exists for about three hours a week; an
+ * empty leaders panel only in the hours after a schedule is published. Without
+ * this page those states get reviewed for the first time in production.
+ *
+ * Outside the auth gate, and inert outside development — `expo export` emits
+ * every route it finds, so the __DEV__ guard is what keeps it off the site.
+ */
+import { Redirect } from 'expo-router';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { GameRow } from '@/components/scores/GameRow';
+import { LeadersPanel } from '@/components/scores/LeadersPanel';
+import type { Leader, ScoreGame } from '@/components/scores/scoreboard';
+import { DropdownChip } from '@/components/ui/DropdownChip';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Panel } from '@/components/ui/Panel';
+import { PositionBadge, positionsForSlot } from '@/components/ui/PositionBadge';
+import { StatusChip } from '@/components/ui/StatusChip';
+import { DataTable, type Column } from '@/components/ui/DataTable';
+import { POSITION_ORDER, POSITIONS } from '@/constants/positions';
+import { Colors, Spacing, Type } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+
+/** Every lineup slot the config ships with, so the split badge is exercised. */
+const SLOTS = ['QB', 'RB1', 'RB2', 'WR1', 'WR2', 'TE', 'FLEX', 'K'];
+
+const team = (id: string, abbreviation: string) => ({ id, abbreviation, name: abbreviation });
+
+const GAMES: ScoreGame[] = [
+  {
+    id: 'g1',
+    season: 2026,
+    seasonType: 1,
+    week: 2,
+    home: team('h1', 'HOU'),
+    away: team('a1', 'LV'),
+    homeScore: 24,
+    awayScore: 17,
+    startsAt: '2026-08-20T20:00:00Z',
+    status: 'final',
+    statusText: 'Final',
+  },
+  {
+    id: 'g2',
+    season: 2026,
+    seasonType: 1,
+    week: 2,
+    home: team('h2', 'KC'),
+    away: team('a2', 'SF'),
+    homeScore: 31,
+    awayScore: 31,
+    startsAt: '2026-08-20T20:00:00Z',
+    status: 'final',
+    statusText: 'Final/OT',
+  },
+  {
+    id: 'g3',
+    season: 2026,
+    seasonType: 1,
+    week: 2,
+    home: team('h3', 'PHI'),
+    away: team('a3', 'DAL'),
+    homeScore: 14,
+    awayScore: 10,
+    startsAt: '2026-08-21T00:15:00Z',
+    status: 'live',
+    statusText: null,
+  },
+  {
+    id: 'g4',
+    season: 2026,
+    seasonType: 1,
+    week: 2,
+    home: team('h4', 'BUF'),
+    away: team('a4', 'NYJ'),
+    homeScore: null,
+    awayScore: null,
+    startsAt: '2026-08-22T17:00:00Z',
+    status: 'scheduled',
+    statusText: 'TBD',
+  },
+  /* A fixture with an unresolved side. The provider does occasionally hand us
+     a game whose team id we do not hold, and the row must not collapse. */
+  {
+    id: 'g5',
+    season: 2026,
+    seasonType: 1,
+    week: 2,
+    home: null,
+    away: team('a5', 'GB'),
+    homeScore: null,
+    awayScore: null,
+    startsAt: null,
+    status: 'scheduled',
+    statusText: null,
+  },
+];
+
+const leader = (
+  name: string,
+  position: Leader['position'],
+  positionLabel: string,
+  points: number,
+  owned: boolean,
+): Leader => ({
+  playerId: name,
+  gameId: 'g1',
+  name,
+  position,
+  positionLabel,
+  teamAbbreviation: 'HOU',
+  points,
+  owned,
+});
+
+const LEADERS: Leader[] = [
+  leader('C.J. Stroud', 'QB', 'QB', 27.4, true),
+  leader('Jalen Milroe', 'QB', 'QB', 11.2, false),
+  leader('Joe Mixon', 'RB', 'RB', 19.8, false),
+  leader('Nico Collins', 'WR', 'WR', 24.1, true),
+  leader('Tank Dell', 'WR', 'WR', 9.3, false),
+  leader('Dalton Schultz', 'TE', 'TE', 8.6, false),
+  leader('Ka’imi Fairbairn', 'PK', 'PK', 12.0, false),
+];
+
+type StatRow = { season: number; att: number; yds: number; td: number; rec: number; recYds: number };
+
+const STAT_ROWS: StatRow[] = [
+  { season: 2026, att: 214, yds: 1002, td: 9, rec: 44, recYds: 388 },
+  { season: 2025, att: 198, yds: 874, td: 6, rec: 51, recYds: 402 },
+  { season: 2024, att: 121, yds: 503, td: 3, rec: 22, recYds: 165 },
+];
+
+const STAT_COLUMNS: Column<StatRow>[] = [
+  { key: 'att', label: 'ATT', value: (r) => r.att },
+  { key: 'yds', label: 'YD', value: (r) => r.yds },
+  { key: 'td', label: 'TD', value: (r) => r.td },
+  { key: 'rec', label: 'REC', value: (r) => r.rec },
+  { key: 'recYds', label: 'YD', value: (r) => r.recYds },
+];
+
+export default function KitScreen() {
+  if (!__DEV__) return <Redirect href="/" />;
+  return <Kit />;
+}
+
+/**
+ * Split from the guard so the hooks below never sit after a conditional
+ * return — which is a rules-of-hooks violation even when the condition is a
+ * build-time constant.
+ */
+function Kit() {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const [week, setWeek] = useState('2');
+  const [selected, setSelected] = useState<string | null>('g3');
+
+  return (
+    <View style={[styles.fill, { backgroundColor: c.background }]}>
+      <SafeAreaView style={styles.fill}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <Text style={[Type.page, { color: c.text }]}>UI kit</Text>
+
+          <Section title="Position badges" note="Every position, then every lineup slot.">
+            <View style={styles.row}>
+              {POSITIONS.map((p) => (
+                <PositionBadge key={p} label={p} size={28} />
+              ))}
+            </View>
+            <View style={styles.row}>
+              {SLOTS.map((slot) => (
+                <PositionBadge
+                  key={slot}
+                  label={slot}
+                  positions={positionsForSlot(slot)}
+                  size={28}
+                />
+              ))}
+            </View>
+            <View style={styles.row}>
+              {SLOTS.map((slot) => (
+                <PositionBadge
+                  key={`sm-${slot}`}
+                  label={slot}
+                  positions={positionsForSlot(slot)}
+                  size={20}
+                />
+              ))}
+            </View>
+          </Section>
+
+          <Section title="Status chips" note="Only `live` is filled and saturated.">
+            <View style={styles.row}>
+              <StatusChip label="Live" tone="live" />
+              <StatusChip label="Final" />
+              <StatusChip label="Version 1" />
+              <StatusChip label="Saved" tone="positive" />
+              <StatusChip label="Locked" tone="negative" />
+              <StatusChip label="Soon" tone="warning" />
+            </View>
+          </Section>
+
+          <Section title="Week picker" note="Chip plus a three-column grid popover.">
+            <DropdownChip
+              value={week}
+              options={Array.from({ length: 18 }, (_, i) => ({
+                value: String(i + 1),
+                label: `Week ${i + 1}`,
+              }))}
+              onChange={setWeek}
+              columns={3}
+              title="Jump to week"
+              accessibilityLabel="Week"
+            />
+          </Section>
+
+          <Section title="Game rows" note="Final, final after overtime, live, scheduled, unresolved.">
+            <Panel>
+              {GAMES.map((g) => (
+                <GameRow
+                  key={g.id}
+                  game={g}
+                  selected={g.id === selected}
+                  onPress={(next) => setSelected((cur) => (cur === next.id ? null : next.id))}
+                />
+              ))}
+            </Panel>
+          </Section>
+
+          <Section title="Leaders" note="A green dot marks a player the viewer owns.">
+            <Panel>
+              <LeadersPanel
+                leaders={LEADERS}
+                order={POSITION_ORDER}
+                limit={5}
+                onOpenPlayer={() => {}}
+                emptyTitle="No scores yet"
+                emptyBody="Unused here."
+              />
+            </Panel>
+          </Section>
+
+          <Section title="Grouped table bands" note="Bands are laid over the columns positionally.">
+            <Panel>
+              <DataTable
+                rows={STAT_ROWS}
+                columns={STAT_COLUMNS}
+                groups={[
+                  { label: 'RUSHING', span: 3 },
+                  { label: 'RECEIVING', span: 2 },
+                ]}
+                keyOf={(r) => String(r.season)}
+                leadingLabel="SEASON"
+                leadingWidth={64}
+                leading={(r) => (
+                  <Text style={[Type.body, { color: c.text }]}>{r.season}</Text>
+                )}
+              />
+            </Panel>
+          </Section>
+
+          <Section title="Empty state" note="Bold line, quiet line, at most one action.">
+            <Panel>
+              <EmptyState
+                title="Not enough football yet"
+                body="Movement needs two completed weeks to compare. Check back once a second week has been played and swept."
+                actionLabel="Open the shop"
+                onAction={() => {}}
+              />
+            </Panel>
+          </Section>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+function Section({
+  title,
+  note,
+  children,
+}: {
+  title: string;
+  note: string;
+  children: React.ReactNode;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
+  return (
+    <View style={styles.section}>
+      <Text style={[Type.section, { color: c.text }]}>{title}</Text>
+      <Text style={[Type.fine, { color: c.textTertiary }]}>{note}</Text>
+      {children}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+  content: { padding: Spacing.four, gap: Spacing.five, maxWidth: 760, width: '100%', alignSelf: 'center' },
+  section: { gap: Spacing.two },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, alignItems: 'center' },
+});

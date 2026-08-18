@@ -12,6 +12,12 @@
  *    things and a stat table is exactly where that matters.
  *  - The first column is sticky-ish by being outside the horizontal scroller,
  *    so scrolling a wide stat set never loses the row's identity.
+ *  - Related columns can carry a GROUP band above them (`groups`). Once a
+ *    table has fourteen numeric columns, `YD` and `TD` appear three times each
+ *    and the header row stops disambiguating anything; a RUSHING / RECEIVING /
+ *    PASSING band above it is what makes those columns readable. The band is
+ *    optional and costs one 16pt row, so tables with one obvious subject
+ *    should not use it.
  *
  * NOT FOR PRESSABLE ROWS. This shipped with an `onRowPress` prop that was
  * accepted and never wired to anything — a prop that silently does nothing is
@@ -30,6 +36,14 @@ import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export const DASH = '—';
+
+/**
+ * A band spanning `span` consecutive columns. Spans are positional: the groups
+ * are laid over `columns` in order, so the first group covers columns 0..span-1
+ * and so on. Columns left over after the last group get an unlabelled band,
+ * which is why a short `groups` array degrades rather than misaligns.
+ */
+export type ColumnGroup = { label: string; span: number };
 
 export type Column<Row> = {
   key: string;
@@ -60,6 +74,7 @@ export function DataTable<Row>({
   leadingLabel,
   leadingWidth = 84,
   emptyLabel = 'Nothing to show yet.',
+  groups,
 }: {
   rows: Row[];
   columns: Column<Row>[];
@@ -68,6 +83,8 @@ export function DataTable<Row>({
   leadingLabel: string;
   leadingWidth?: number;
   emptyLabel?: string;
+  /** Optional bands over the numeric columns. See ColumnGroup. */
+  groups?: ColumnGroup[];
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -78,10 +95,19 @@ export function DataTable<Row>({
     );
   }
 
+  /* A band's width has to be derived from the columns it covers rather than
+     guessed, or it drifts a few pixels per column and by the fourth group the
+     label is sitting over the wrong numbers. The row lays its children out with
+     `gap`, so a band of n columns is their widths plus (n-1) gaps. */
+  const bands = groups ? layOutBands(groups, columns) : null;
+
   return (
     <View style={styles.wrap}>
       {/* Identity column, fixed. */}
       <View style={{ width: leadingWidth }}>
+        {/* Blank spacer matching the band row, so the two halves of the header
+            stay the same height and the rows below them line up. */}
+        {bands ? <View style={styles.bandRow} /> : null}
         <View style={[styles.headRow, { borderColor: c.border }]}>
           <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
             {leadingLabel}
@@ -97,6 +123,21 @@ export function DataTable<Row>({
       {/* Stats, scrollable. */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View>
+          {bands ? (
+            <View style={styles.bandRow}>
+              {bands.map((b, i) => (
+                <View key={`${b.label}-${i}`} style={{ width: b.width }}>
+                  {b.label ? (
+                    <Text
+                      numberOfLines={1}
+                      style={[Type.micro, styles.band, { color: c.textTertiary, borderColor: c.border }]}>
+                      {b.label}
+                    </Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          ) : null}
           <View style={[styles.headRow, { borderColor: c.border }]}>
             {columns.map((col) => (
               <Text
@@ -134,6 +175,37 @@ export function DataTable<Row>({
   );
 }
 
+const DEFAULT_COL_WIDTH = 52;
+
+/**
+ * Widths for each band, plus a trailing unlabelled band for any columns the
+ * caller's groups did not cover. Exported for the gallery, which is the only
+ * place the arithmetic is visible enough to check.
+ */
+export function layOutBands<Row>(
+  groups: ColumnGroup[],
+  columns: Column<Row>[],
+): { label: string; width: number }[] {
+  const out: { label: string; width: number }[] = [];
+  let i = 0;
+  const widthOf = (from: number, count: number) => {
+    let w = 0;
+    for (let k = from; k < from + count && k < columns.length; k += 1) {
+      w += columns[k].width ?? DEFAULT_COL_WIDTH;
+    }
+    // Interior gaps belong to the band; the gap AFTER it separates bands.
+    return w + Spacing.two * Math.max(0, Math.min(count, columns.length - from) - 1);
+  };
+
+  for (const g of groups) {
+    if (i >= columns.length) break;
+    out.push({ label: g.label, width: widthOf(i, g.span) });
+    i += g.span;
+  }
+  if (i < columns.length) out.push({ label: '', width: widthOf(i, columns.length - i) });
+  return out;
+}
+
 const ROW_HEIGHT = 30;
 
 const styles = StyleSheet.create({
@@ -154,6 +226,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: Spacing.two,
   },
+  bandRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    height: 16,
+    paddingHorizontal: Spacing.two,
+  },
+  /* The rule under the label is what ties the word to its columns. Without it
+     the band reads as floating above the whole table rather than over four of
+     its columns. */
+  band: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 2 },
   right: { textAlign: 'right' },
   empty: { padding: Spacing.three },
 });
