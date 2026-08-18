@@ -8,8 +8,13 @@ const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 if (!url || !key) {
+  // This fires at build time as well as runtime, because static rendering
+  // imports the app. On a hosting provider .env.local does not exist, so name
+  // both places the values can come from.
   throw new Error(
-    'Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY. Copy .env.example to .env.local.',
+    'Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY. ' +
+      'Locally: copy .env.example to .env.local. ' +
+      'On a host (Vercel/Cloudflare): set both as project environment variables.',
   );
 }
 

@@ -47,5 +47,8 @@
     "smoke:provider": "deno run --allow-net --allow-env --allow-read supabase/tests/provider_smoke.ts",
     "gen:types": "supabase gen types typescript --linked > src/lib/database.types.ts"
   },
-  "private": true
+  "private": true,
+  "engines": {
+    "node": "22.x"
+  }
 }
