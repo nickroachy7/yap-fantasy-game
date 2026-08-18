@@ -17,7 +17,7 @@ export default function CardsScreen() {
   const context = directory?.season ? `${directory.season} player directory` : 'Player directory';
 
   return (
-    <Screen title="Cards" context={context} scroll={false}>
+    <Screen title="Cards" measure="table" context={context} scroll={false}>
       <PlayersPanel onOpenPlayer={openPlayer} onLoaded={setDirectory} />
     </Screen>
   );

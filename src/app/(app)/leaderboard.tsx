@@ -64,7 +64,7 @@ export default function LeaderboardScreen() {
   return (
     // scroll={false}: the FlatList below owns the scroll container, and nesting
     // a virtualised list inside a ScrollView defeats the virtualisation.
-    <Screen title="Leaderboard" context={headerContext} scroll={false}>
+    <Screen title="Leaderboard" measure="table" context={headerContext} scroll={false}>
       {rows === null && !error ? (
           <ActivityIndicator style={styles.centred} />
         ) : error ? (

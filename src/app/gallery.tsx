@@ -28,7 +28,7 @@ import { Screen } from '@/components/shell/Screen';
 import { SegmentedControl, type Segment } from '@/components/shell/SegmentedControl';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { WIDE_BREAKPOINT, useIsWide } from '@/components/shell/useResponsive';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing, type Measure } from '@/constants/theme';
 import { PlayerContext, type PlayerState } from '@/context/PlayerContext';
 
 const FIXTURE_PLAYER: PlayerState = {
@@ -46,6 +46,18 @@ const VIEWS: Segment<View_>[] = [
   { value: 'leaderboard', label: 'Leaderboard' },
   { value: 'lineup', label: 'Lineup' },
 ];
+
+/** Each view previews the measure its real screen asks for, not a single one. */
+const VIEW_MEASURE: Record<View_, Measure> = {
+  inventory: 'grid',
+  leaderboard: 'table',
+  lineup: 'form',
+};
+const VIEW_TITLE: Record<View_, string> = {
+  inventory: 'Inventory',
+  leaderboard: 'Leaderboard',
+  lineup: 'Lineup',
+};
 
 /* ---- fixture content ---------------------------------------------------- */
 
@@ -160,15 +172,15 @@ function GalleryBody() {
     () =>
       `${Math.round(width)}px · ${isWide ? 'wide' : 'narrow'} (breakpoint ${WIDE_BREAKPOINT}) · rail ${
         isWide ? 'on' : 'off'
-      }`,
-    [width, isWide],
+      } · measure ${VIEW_MEASURE[view]}`,
+    [width, isWide, view],
   );
 
   return (
     <View style={[styles.shell, isWide && styles.shellWide, { backgroundColor: c.background }]}>
       {isWide ? <Sidebar /> : null}
       <View style={styles.content}>
-        <Screen title="Collection" context="Preseason · Week 3">
+        <Screen title={VIEW_TITLE[view]} measure={VIEW_MEASURE[view]} context="Preseason · Week 3">
           {/* A live read-out of what the layout thinks it is. The single most
               useful thing to see while resizing: which branch is rendering. */}
           <Text style={[styles.banner, { color: c.textSecondary }]}>{banner}</Text>

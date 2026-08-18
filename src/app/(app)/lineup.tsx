@@ -175,7 +175,7 @@ export default function LineupScreen() {
 
   if (loading) {
     return (
-      <Screen title="Lineup">
+      <Screen title="Lineup" measure="form">
         <ActivityIndicator style={styles.pad} />
       </Screen>
     );
@@ -188,7 +188,7 @@ export default function LineupScreen() {
     : 'No slate scheduled';
 
   return (
-    <Screen title="Lineup" context={headerContext}>
+    <Screen title="Lineup" measure="form" context={headerContext}>
 
           {lockAt ? (
             <ThemedView type="backgroundElement" style={styles.lockBanner}>

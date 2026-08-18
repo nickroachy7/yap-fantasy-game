@@ -9,11 +9,18 @@ import { RefreshControl, ScrollView, StyleSheet, Text, View, useColorScheme } fr
 
 import { AppHeader } from '@/components/shell/AppHeader';
 import { useIsWide } from '@/components/shell/useResponsive';
-import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Colors, ContentMeasure, Spacing, type Measure } from '@/constants/theme';
 
 type Props = {
   /** Page name, e.g. "Leaderboard". Rendered as the page heading on wide web. */
   title?: string;
+  /**
+   * How wide this screen's content wants to be. A grid of cards and a settings
+   * form are not the same kind of page and should not share a measure — see
+   * ContentMeasure. Defaults to `grid` because the collection is the screen
+   * the width was reclaimed for.
+   */
+  measure?: Measure;
   /** Secondary line in the header, e.g. "Preseason · Week 3". */
   context?: string;
   children: ReactNode;
@@ -23,7 +30,16 @@ type Props = {
   onRefresh?: () => void;
 };
 
-export function Screen({ title, context, children, scroll = true, refreshing, onRefresh }: Props) {
+export function Screen({
+  title,
+  measure = 'grid',
+  context,
+  children,
+  scroll = true,
+  refreshing,
+  onRefresh,
+}: Props) {
+  const maxWidth = ContentMeasure[measure];
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   // The sidebar already shows the wordmark, balance and account on wide web;
@@ -32,7 +48,7 @@ export function Screen({ title, context, children, scroll = true, refreshing, on
 
   const body = scroll ? (
     <ScrollView
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { maxWidth }]}
       keyboardShouldPersistTaps="handled"
       refreshControl={
         onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} /> : undefined
@@ -41,7 +57,7 @@ export function Screen({ title, context, children, scroll = true, refreshing, on
     </ScrollView>
   ) : (
     // A virtualised list must own the scroll container, so only gutters here.
-    <View style={styles.flexContent}>{children}</View>
+    <View style={[styles.flexContent, { maxWidth }]}>{children}</View>
   );
 
   return (
@@ -57,7 +73,7 @@ export function Screen({ title, context, children, scroll = true, refreshing, on
          * context line and nothing else, so web pages had no heading at all and
          * "Leaderboard" appeared only on a segmented control. The rail says
          * which section you are in; the page should still say what it is. */
-        <View style={styles.pageHeader}>
+        <View style={[styles.pageHeader, { maxWidth }]}>
           {title ? <Text style={[styles.title, { color: c.text }]}>{title}</Text> : null}
           {context ? (
             <Text style={[styles.context, { color: c.textSecondary }]}>{context}</Text>
@@ -80,12 +96,10 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     gap: 14,
     width: '100%',
-    maxWidth: MaxContentWidth,
     alignSelf: 'center',
   },
   pageHeader: {
     width: '100%',
-    maxWidth: MaxContentWidth,
     alignSelf: 'center',
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.four,
@@ -97,7 +111,6 @@ const styles = StyleSheet.create({
   flexContent: {
     flex: 1,
     width: '100%',
-    maxWidth: MaxContentWidth,
     alignSelf: 'center',
   },
 });

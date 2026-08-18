@@ -64,22 +64,33 @@ export const Spacing = {
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 
 /**
- * Content measure.
+ * Content measures.
  *
- * 800 was a prose measure applied to screens that are grids and tables. Beside
- * a 236pt rail on a 1440pt window it left 405pt of dead space — more than half
- * the width of the column it was protecting — and a five-row leaderboard read
- * as a narrow strip adrift in an empty page. Grids and tables want width; only
- * running text wants a short line.
+ * One number was wrong, because these screens are not one kind of thing. 800
+ * was a prose measure applied to everything, which left 405pt of dead space
+ * beside the rail on a 1440pt window and made a collection unbrowsable. But
+ * simply widening it to 1180 stretches a settings form and an eight-row lineup
+ * across a monitor, and hands them a 1180pt-wide submit button.
  *
- * 1180 keeps a modest gutter at 1440 (52pt a side beside the rail) and still
- * caps the sprawl on a very wide monitor. Below it the window is the measure,
- * so this is inert on every phone.
+ * So the measure is a property of the screen:
+ *   grid  — you are scanning many small things at once. Use the window.
+ *   table — you are reading rows. Wide enough to hold columns, narrow enough
+ *           that the eye does not have to travel from name to score.
+ *   form  — you are filling something in, or reading sentences. A short line.
+ *
+ * Below each number the window is the measure, so all three are inert on a
+ * phone. Choosing per screen is the point; do not add a fourth without one.
  */
-export const MaxContentWidth = 1180;
+export const ContentMeasure = {
+  grid: 1180,
+  table: 940,
+  form: 720,
+} as const;
 
-/** Prose measure, for screens that really are running text (legal pages). */
-export const MaxProseWidth = 720;
+export type Measure = keyof typeof ContentMeasure;
+
+/** The widest measure, for code that needs the outer bound (galleries). */
+export const MaxContentWidth = ContentMeasure.grid;
 
 /** The wide-web sidebar's width, shared so layout arithmetic can subtract it. */
 export const RailWidth = 236;

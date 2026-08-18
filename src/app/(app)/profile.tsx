@@ -115,7 +115,7 @@ export default function ProfileScreen() {
   }
 
   return (
-    <Screen title="Profile" context="Account" refreshing={refreshing} onRefresh={onRefresh}>
+    <Screen title="Profile" measure="form" context="Account" refreshing={refreshing} onRefresh={onRefresh}>
       {/* ---- identity ---------------------------------------------------- */}
       <View style={[styles.card, { backgroundColor: c.backgroundElement }]}>
         <Text style={[styles.label, { color: c.textSecondary }]}>DISPLAY NAME</Text>
