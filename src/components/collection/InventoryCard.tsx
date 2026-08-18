@@ -72,7 +72,7 @@ export function InventoryCard({
 
   return (
     <View style={[styles.cell, { width }]}>
-      <PlayerCard model={toCardModel(card)} size="grid" fixedWidth={false} onPress={onPress} />
+      <PlayerCard model={toCardModel(card)} size="compact" fixedWidth={false} onPress={onPress} />
       {weight && card.injuryStatus ? (
         <InjuryFlag weight={weight} status={card.injuryStatus} />
       ) : null}

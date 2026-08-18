@@ -50,8 +50,9 @@ import { injuryWeight } from '@/lib/injury';
 const GUTTER = Spacing.three;
 const GAP = Spacing.two + 4;
 /** Below this the card's stat row starts wrapping, so it is the hard floor. */
-const MIN_CARD_WIDTH = 156;
-const MAX_COLUMNS = 4;
+const MIN_CARD_WIDTH = 100;
+const MIN_COLUMNS = 3;
+const MAX_COLUMNS = 5;
 
 export default function InventoryScreen() {
   const router = useRouter();
@@ -72,8 +73,11 @@ export default function InventoryScreen() {
    * an exact width rather than flex: 1 so a short final row does not
    * stretch its cards wider than the rows above it.                       */
   const contentWidth = Math.min(width, MaxContentWidth) - GUTTER * 2;
+  // Three across is the floor, not a derived result: at two columns the cards
+  // read as a list rather than a collection, and browsing what you own is the
+  // whole point of this screen. Wider windows may fit more, never fewer.
   const columns = Math.max(
-    2,
+    MIN_COLUMNS,
     Math.min(MAX_COLUMNS, Math.floor((contentWidth + GAP) / (MIN_CARD_WIDTH + GAP))),
   );
   const itemWidth = Math.floor((contentWidth - GAP * (columns - 1)) / columns);

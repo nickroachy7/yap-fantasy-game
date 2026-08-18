@@ -283,6 +283,23 @@ export function getTierTheme(tier: CardTier, scheme: 'light' | 'dark'): TierThem
 
 /** Card geometry per size variant. Art slot keeps its box when real art lands. */
 export const CardSizes = {
+  /**
+   * Three-across on a phone gives each card ~106pt. The grid size is drawn for
+   * 168 and its type does not survive that reduction, so compact is its own
+   * set of values rather than the same card scaled down.
+   */
+  compact: {
+    width: 106,
+    padding: Spacing.one + 1,
+    gap: Spacing.one,
+    artAspect: 1.25,
+    nameSize: 11,
+    nameLines: 1,
+    labelSize: 7,
+    statSize: 10,
+    glyph: 18,
+    pip: 4,
+  },
   grid: {
     width: 168,
     padding: Spacing.two,

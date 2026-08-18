@@ -44,7 +44,7 @@ export default function AppLayout() {
             {/* Order is deliberate: the weekly decision first, standings second,
                 acquisition third, what you own fourth, identity last. */}
             <Tabs.Screen name="lineup" options={{ title: 'Lineup' }} />
-            <Tabs.Screen name="leaderboard" options={{ title: 'Board' }} />
+            <Tabs.Screen name="leaderboard" options={{ title: 'Leaderboard' }} />
             <Tabs.Screen name="cards" options={{ title: 'Cards' }} />
             <Tabs.Screen name="collection" options={{ title: 'Collection' }} />
             <Tabs.Screen name="profile" options={{ title: 'Profile' }} />

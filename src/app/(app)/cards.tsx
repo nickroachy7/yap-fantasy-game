@@ -4,10 +4,8 @@ import { useCallback, useState } from 'react';
 import { PlayersPanel } from '@/components/cards/PlayersPanel';
 import type { DirectoryFetch } from '@/components/cards/player-directory';
 import { Screen } from '@/components/shell/Screen';
-import { SubNav } from '@/components/shell/SubNav';
-import { CARD_SEGMENTS } from '@/components/shell/sections';
 
-export default function PlayersScreen() {
+export default function CardsScreen() {
   const router = useRouter();
   const [directory, setDirectory] = useState<DirectoryFetch | null>(null);
 
@@ -20,7 +18,6 @@ export default function PlayersScreen() {
 
   return (
     <Screen context={context} scroll={false}>
-      <SubNav segments={CARD_SEGMENTS} />
       <PlayersPanel onOpenPlayer={openPlayer} onLoaded={setDirectory} />
     </Screen>
   );

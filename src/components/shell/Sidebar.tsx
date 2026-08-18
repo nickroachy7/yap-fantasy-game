@@ -20,20 +20,14 @@ type Item = { href: string; label: string; children?: { href: string; label: str
 const NAV: Item[] = [
   { href: '/lineup', label: 'Lineup' },
   { href: '/leaderboard', label: 'Leaderboard' },
-  {
-    href: '/cards',
-    label: 'Cards',
-    children: [
-      { href: '/cards/players', label: 'Players' },
-      { href: '/cards/shop', label: 'Shop' },
-    ],
-  },
+  { href: '/cards', label: 'Cards' },
   {
     href: '/collection',
     label: 'Collection',
     children: [
       { href: '/collection/inventory', label: 'Inventory' },
       { href: '/collection/sets', label: 'Sets' },
+      { href: '/collection/shop', label: 'Shop' },
     ],
   },
   { href: '/profile', label: 'Profile' },

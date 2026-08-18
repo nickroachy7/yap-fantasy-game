@@ -5,14 +5,14 @@ import type { Segment } from '@/components/shell/SegmentedControl';
  * mobile SubNav renders them as segments — two presentations, one source, so
  * they cannot drift apart.
  *
- * Values are the route paths, which is what SubNav navigates to.
+ * Values are route paths, which is what SubNav navigates to.
+ *
+ * Shop lives under Collection rather than Cards: buying a pack is something you
+ * do to your collection, and it puts spending gems next to the cards you get
+ * for them. Cards is now purely the player lookup.
  */
-export const CARD_SEGMENTS: Segment<string>[] = [
-  { value: '/cards/players', label: 'Players' },
-  { value: '/cards/shop', label: 'Shop' },
-];
-
 export const COLLECTION_SEGMENTS: Segment<string>[] = [
   { value: '/collection/inventory', label: 'Inventory' },
   { value: '/collection/sets', label: 'Sets', badge: 'Soon' },
+  { value: '/collection/shop', label: 'Shop' },
 ];
