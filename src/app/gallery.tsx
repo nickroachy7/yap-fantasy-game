@@ -59,6 +59,13 @@ const VIEW_TITLE: Record<View_, string> = {
   lineup: 'Lineup',
 };
 
+/** Drives the rail's active/nested state, which is otherwise unreachable here. */
+const VIEW_PATH: Record<View_, string> = {
+  inventory: '/collection/inventory',
+  leaderboard: '/leaderboard',
+  lineup: '/lineup',
+};
+
 /* ---- fixture content ---------------------------------------------------- */
 
 const GAP = Spacing.two + 4;
@@ -178,7 +185,7 @@ function GalleryBody() {
 
   return (
     <View style={[styles.shell, isWide && styles.shellWide, { backgroundColor: c.background }]}>
-      {isWide ? <Sidebar /> : null}
+      {isWide ? <Sidebar pathnameOverride={VIEW_PATH[view]} /> : null}
       <View style={styles.content}>
         <Screen title={VIEW_TITLE[view]} measure={VIEW_MEASURE[view]} context="Preseason · Week 3">
           {/* A live read-out of what the layout thinks it is. The single most

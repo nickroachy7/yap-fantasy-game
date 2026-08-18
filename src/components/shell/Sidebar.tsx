@@ -6,6 +6,7 @@
  * a segmented control because there is no room for eight targets.
  */
 import { Link, usePathname } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 import { Gem, initialsOf } from '@/components/shell/AppHeader';
@@ -16,10 +17,17 @@ import { usePlayer } from '@/context/PlayerContext';
 const NUMERIC = { fontVariant: ['tabular-nums' as const] };
 const BAND = '#0E0F12';
 
-export function Sidebar() {
+/**
+ * @param pathnameOverride Dev galleries only. The rail's active and nested
+ * states are the part most likely to be wrong, and they are unreachable from a
+ * gallery route because the real pathname never matches a nav href — so they
+ * went unseen. Product code passes nothing and uses the real router.
+ */
+export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const accent = TierColors[scheme].gold.accent;
-  const pathname = usePathname();
+  const realPathname = usePathname();
+  const pathname = pathnameOverride ?? realPathname;
   const { gems, displayName, loading } = usePlayer();
 
   return (
@@ -59,14 +67,19 @@ export function Sidebar() {
         })}
       </View>
 
+      {/* Same defect as NavRow: the style must not be a function here. */}
       <Link href="/profile" asChild>
-        <Pressable style={({ pressed }) => [styles.account, pressed && styles.pressed]}>
-          <View style={[styles.avatar, { borderColor: accent }]}>
-            <Text style={styles.avatarText}>{initialsOf(displayName)}</Text>
-          </View>
-          <Text style={styles.accountName} numberOfLines={1}>
-            {displayName}
-          </Text>
+        <Pressable>
+          {({ pressed }) => (
+            <View style={[styles.account, pressed && styles.pressed]}>
+              <View style={[styles.avatar, { borderColor: accent }]}>
+                <Text style={styles.avatarText}>{initialsOf(displayName)}</Text>
+              </View>
+              <Text style={styles.accountName} numberOfLines={1}>
+                {displayName}
+              </Text>
+            </View>
+          )}
         </Pressable>
       </Link>
     </View>
@@ -89,27 +102,52 @@ function NavRow({
   accent: string;
   nested?: boolean;
 }) {
+  const [hovered, setHovered] = useState(false);
+
   return (
     <Link href={href as never} asChild>
       <Pressable
         accessibilityRole="link"
         accessibilityState={{ selected: active }}
-        style={({ pressed }) => [
-          styles.row,
-          nested && styles.nestedRow,
-          active && !nested && { backgroundColor: 'rgba(255,255,255,0.07)' },
-          pressed && styles.pressed,
-        ]}>
-        {active ? <View style={[styles.marker, { backgroundColor: accent }]} /> : null}
-        <Text
-          numberOfLines={1}
-          style={[
-            nested ? styles.nestedLabel : styles.label,
-            { color: active ? '#FFFFFF' : 'rgba(255,255,255,0.62)' },
-          ]}>
-          {label}
-        </Text>
-        {badge ? <Text style={styles.badge}>{badge}</Text> : null}
+        onHoverIn={() => setHovered(true)}
+        onHoverOut={() => setHovered(false)}>
+        {({ pressed }) => (
+          /* The visual style lives on this View, NOT on the Pressable.
+           *
+           * `Link asChild` clones its child into an anchor, and a FUNCTION
+           * style — `({pressed}) => [...]` — does not survive that clone. It
+           * was silently dropped, so every row in the rail rendered with React
+           * Native Web's default View styling: column direction, no padding,
+           * no min-height, no active background. The active marker stacked
+           * ABOVE its label instead of beside it, the "Soon" badge sat under
+           * "Sets", and the account name ran to the full rail width ignoring
+           * its padding. Nothing errored; the rail just quietly had no layout.
+           *
+           * A plain style array on a plain View clones intact. */
+          <View
+            style={[
+              styles.row,
+              nested && styles.nestedRow,
+              active && !nested && styles.activeRow,
+              hovered && !active && styles.hoveredRow,
+              pressed && styles.pressed,
+            ]}>
+            {/* Reserved whether or not it is drawn, so labels do not shift
+                sideways as the active row changes. */}
+            <View
+              style={[styles.marker, active && { backgroundColor: accent }]}
+            />
+            <Text
+              numberOfLines={1}
+              style={[
+                nested ? styles.nestedLabel : styles.label,
+                { color: active ? '#FFFFFF' : 'rgba(255,255,255,0.62)' },
+              ]}>
+              {label}
+            </Text>
+            {badge ? <Text style={styles.badge}>{badge}</Text> : null}
+          </View>
+        )}
       </Pressable>
     </Link>
   );
@@ -143,7 +181,9 @@ const styles = StyleSheet.create({
     minHeight: 40,
   },
   nestedRow: { paddingVertical: 7, paddingLeft: 22, minHeight: 32 },
-  marker: { width: 3, height: 14, borderRadius: 2 },
+  marker: { width: 3, height: 14, borderRadius: 2, backgroundColor: 'transparent' },
+  activeRow: { backgroundColor: 'rgba(255,255,255,0.07)' },
+  hoveredRow: { backgroundColor: 'rgba(255,255,255,0.035)' },
   label: { fontSize: 14, fontWeight: '600' },
   nestedLabel: { fontSize: 13, fontWeight: '500' },
   badge: {
