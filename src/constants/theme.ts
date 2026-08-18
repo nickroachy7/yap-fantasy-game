@@ -62,7 +62,27 @@ export const Spacing = {
 } as const;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
-export const MaxContentWidth = 800;
+
+/**
+ * Content measure.
+ *
+ * 800 was a prose measure applied to screens that are grids and tables. Beside
+ * a 236pt rail on a 1440pt window it left 405pt of dead space — more than half
+ * the width of the column it was protecting — and a five-row leaderboard read
+ * as a narrow strip adrift in an empty page. Grids and tables want width; only
+ * running text wants a short line.
+ *
+ * 1180 keeps a modest gutter at 1440 (52pt a side beside the rail) and still
+ * caps the sprawl on a very wide monitor. Below it the window is the measure,
+ * so this is inert on every phone.
+ */
+export const MaxContentWidth = 1180;
+
+/** Prose measure, for screens that really are running text (legal pages). */
+export const MaxProseWidth = 720;
+
+/** The wide-web sidebar's width, shared so layout arithmetic can subtract it. */
+export const RailWidth = 236;
 
 /* ------------------------------------------------------------------------- *
  * Card tier design tokens (Yap Fantasy)

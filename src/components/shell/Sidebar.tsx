@@ -9,29 +9,12 @@ import { Link, usePathname } from 'expo-router';
 import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 import { Gem, initialsOf } from '@/components/shell/AppHeader';
-import { Colors, TierColors } from '@/constants/theme';
+import { NAV_SECTIONS } from '@/components/shell/sections';
+import { RailWidth, TierColors } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 
 const NUMERIC = { fontVariant: ['tabular-nums' as const] };
 const BAND = '#0E0F12';
-
-type Item = { href: string; label: string; children?: { href: string; label: string }[] };
-
-const NAV: Item[] = [
-  { href: '/lineup', label: 'Lineup' },
-  { href: '/leaderboard', label: 'Leaderboard' },
-  { href: '/cards', label: 'Cards' },
-  {
-    href: '/collection',
-    label: 'Collection',
-    children: [
-      { href: '/collection/inventory', label: 'Inventory' },
-      { href: '/collection/sets', label: 'Sets' },
-      { href: '/collection/shop', label: 'Shop' },
-    ],
-  },
-  { href: '/profile', label: 'Profile' },
-];
 
 export function Sidebar() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -51,7 +34,7 @@ export function Sidebar() {
       </View>
 
       <View style={styles.nav}>
-        {NAV.map((item) => {
+        {NAV_SECTIONS.map((item) => {
           // A parent is active when the path is inside it, so /cards/shop keeps
           // Cards lit as well as Shop.
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -64,6 +47,7 @@ export function Sidebar() {
                       key={child.href}
                       href={child.href}
                       label={child.label}
+                      badge={child.badge}
                       active={pathname === child.href}
                       accent={accent}
                       nested
@@ -92,12 +76,15 @@ export function Sidebar() {
 function NavRow({
   href,
   label,
+  badge,
   active,
   accent,
   nested,
 }: {
   href: string;
   label: string;
+  /** e.g. "Soon" on Sets — the same signal the mobile segmented control gives. */
+  badge?: string;
   active: boolean;
   accent: string;
   nested?: boolean;
@@ -122,13 +109,14 @@ function NavRow({
           ]}>
           {label}
         </Text>
+        {badge ? <Text style={styles.badge}>{badge}</Text> : null}
       </Pressable>
     </Link>
   );
 }
 
 const styles = StyleSheet.create({
-  rail: { width: 236, paddingVertical: 20, justifyContent: 'flex-start' },
+  rail: { width: RailWidth, paddingVertical: 20, justifyContent: 'flex-start' },
   brandBlock: { paddingHorizontal: 18, gap: 12, marginBottom: 22 },
   wordmark: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', letterSpacing: 1.8 },
   gems: {
@@ -158,6 +146,13 @@ const styles = StyleSheet.create({
   marker: { width: 3, height: 14, borderRadius: 2 },
   label: { fontSize: 14, fontWeight: '600' },
   nestedLabel: { fontSize: 13, fontWeight: '500' },
+  badge: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
   account: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -18,7 +18,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 
-type PlayerState = {
+export type PlayerState = {
   gems: number;
   displayName: string;
   cardCount: number;
@@ -28,7 +28,13 @@ type PlayerState = {
   refresh: () => Promise<void>;
 };
 
-const PlayerContext = createContext<PlayerState | null>(null);
+/**
+ * Exported so the dev galleries can supply a fixture player without a session.
+ * The whole shell — rail, header, gem balance — reads this, so there is no way
+ * to render the chrome for design work without either signing in or providing
+ * the context directly. Product code should use <PlayerProvider>.
+ */
+export const PlayerContext = createContext<PlayerState | null>(null);
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();

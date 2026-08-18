@@ -296,6 +296,7 @@ export default function PlayerDetailScreen() {
 
   return (
     <Screen
+      title={player?.name}
       context={player ? `${player.season ?? ''} game log`.trim() : 'Player'}
       refreshing={refreshing}
       onRefresh={() => void load('refresh')}>

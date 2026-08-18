@@ -16,7 +16,6 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from 'react-native';
 
 import {
@@ -41,7 +40,7 @@ import { useCollection } from '@/components/collection/use-collection';
 import { Screen } from '@/components/shell/Screen';
 import { SubNav } from '@/components/shell/SubNav';
 import { COLLECTION_SEGMENTS } from '@/components/shell/sections';
-import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Colors, Spacing } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { injuryWeight } from '@/lib/injury';
@@ -52,13 +51,20 @@ const GAP = Spacing.two + 4;
 /** Below this the card's stat row starts wrapping, so it is the hard floor. */
 const MIN_CARD_WIDTH = 100;
 const MIN_COLUMNS = 3;
-const MAX_COLUMNS = 5;
+/**
+ * Seven puts a card at ~153pt in the widest content box, which is close to the
+ * 168pt the grid card is drawn for. Five capped it at 220pt — wider than the
+ * card was ever designed to be, and the compact type scale looks lost at that
+ * size.
+ */
+const MAX_COLUMNS = 7;
 
 export default function InventoryScreen() {
   const router = useRouter();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const { width } = useWindowDimensions();
+  /** 0 until the list has been laid out; the grid waits rather than guess. */
+  const [listWidth, setListWidth] = useState(0);
 
   const { cards, playerIds, error, loading, refreshing, refresh } = useCollection();
   const { cardCount, refresh: refreshPlayer } = usePlayer();
@@ -68,11 +74,17 @@ export default function InventoryScreen() {
   const [sort, setSort] = useState<SortKey>('fp');
 
   /* ---- grid geometry ------------------------------------------------- *
-   * Screen caps its content at MaxContentWidth, so columns are derived
-   * from the width the list actually gets, not the window. Cards are given
-   * an exact width rather than flex: 1 so a short final row does not
+   * MEASURED, not recomputed. This used to derive the column width from the
+   * window, which meant restating the frame's own arithmetic — the content
+   * cap, the gutters, and (once the sidebar existed) the rail width. It got
+   * the rail wrong, so on any wide window narrower than the cap the last card
+   * in every row pushed past the right edge.
+   *
+   * onLayout reports what the list actually got, so the grid cannot disagree
+   * with the frame no matter what the frame later decides to do. Cards are
+   * given an exact width rather than flex: 1 so a short final row does not
    * stretch its cards wider than the rows above it.                       */
-  const contentWidth = Math.min(width, MaxContentWidth) - GUTTER * 2;
+  const contentWidth = listWidth - GUTTER * 2;
   // Three across is the floor, not a derived result: at two columns the cards
   // read as a list rather than a collection, and browsing what you own is the
   // whole point of this screen. Wider windows may fit more, never fewer.
@@ -142,9 +154,12 @@ export default function InventoryScreen() {
     (unavailable > 0 ? ` · ${unavailable} unavailable` : '');
 
   return (
-    <Screen context={context} scroll={false}>
+    <Screen title="Inventory" context={context} scroll={false}>
       <SubNav segments={COLLECTION_SEGMENTS} />
 
+      <View
+        style={styles.fill}
+        onLayout={(e) => setListWidth(e.nativeEvent.layout.width)}>
       {loading ? (
         <View style={styles.centred}>
           <ActivityIndicator />
@@ -171,10 +186,11 @@ export default function InventoryScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
           <EmptyCollection onGetCards={() => router.push('/cards')} />
         </ScrollView>
-      ) : (
+      ) : listWidth === 0 ? null : (
         <FlatList
           // numColumns cannot change on a live list, so a width change that
-          // changes the column count remounts it.
+          // changes the column count remounts it. Holding the first render
+          // until the measurement lands avoids one guaranteed remount.
           key={`cols-${columns}`}
           style={styles.fill}
           data={visible}
@@ -210,6 +226,7 @@ export default function InventoryScreen() {
           )}
         />
       )}
+      </View>
     </Screen>
   );
 }

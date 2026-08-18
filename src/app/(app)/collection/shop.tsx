@@ -5,7 +5,7 @@ import { COLLECTION_SEGMENTS } from '@/components/shell/sections';
 
 export default function ShopScreen() {
   return (
-    <Screen context="Packs & pulls" scroll={false}>
+    <Screen title="Shop" context="Packs & pulls" scroll={false}>
       <SubNav segments={COLLECTION_SEGMENTS} />
       <ShopPanel />
     </Screen>

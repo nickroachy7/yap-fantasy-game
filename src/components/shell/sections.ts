@@ -1,18 +1,54 @@
+/**
+ * The navigation model, declared once.
+ *
+ * Two presentations read this: the wide-web sidebar renders sections as rows
+ * with their sub-pages nested beneath, and the mobile `SubNav` renders a
+ * section's sub-pages as a segmented control. Values are route paths.
+ *
+ * This file previously declared only the Collection segments while
+ * `Sidebar.tsx` kept its own parallel copy of the whole nav — so the comment
+ * claiming they could not drift was describing an intention rather than the
+ * code, and adding a sub-page meant remembering to edit two files. The sidebar
+ * now derives from here, which is what makes that claim true.
+ *
+ * Order is deliberate: the weekly decision first, standings second, acquisition
+ * third, what you own fourth, identity last.
+ */
 import type { Segment } from '@/components/shell/SegmentedControl';
 
-/**
- * Section sub-pages, declared once. The sidebar lists them as rows and the
- * mobile SubNav renders them as segments — two presentations, one source, so
- * they cannot drift apart.
- *
- * Values are route paths, which is what SubNav navigates to.
- *
- * Shop lives under Collection rather than Cards: buying a pack is something you
- * do to your collection, and it puts spending gems next to the cards you get
- * for them. Cards is now purely the player lookup.
- */
-export const COLLECTION_SEGMENTS: Segment<string>[] = [
-  { value: '/collection/inventory', label: 'Inventory' },
-  { value: '/collection/sets', label: 'Sets', badge: 'Soon' },
-  { value: '/collection/shop', label: 'Shop' },
+export type NavChild = { href: string; label: string; badge?: string };
+export type NavSection = { href: string; label: string; children?: NavChild[] };
+
+export const NAV_SECTIONS: NavSection[] = [
+  { href: '/lineup', label: 'Lineup' },
+  { href: '/leaderboard', label: 'Leaderboard' },
+  { href: '/cards', label: 'Cards' },
+  {
+    href: '/collection',
+    label: 'Collection',
+    children: [
+      { href: '/collection/inventory', label: 'Inventory' },
+      // Sets is a designed empty state until Week 3; the badge says so rather
+      // than the screen looking broken.
+      { href: '/collection/sets', label: 'Sets', badge: 'Soon' },
+      { href: '/collection/shop', label: 'Shop' },
+    ],
+  },
+  { href: '/profile', label: 'Profile' },
 ];
+
+/** The sub-pages of a section, as SubNav's segmented control wants them. */
+export function segmentsFor(sectionHref: string): Segment<string>[] {
+  const section = NAV_SECTIONS.find((s) => s.href === sectionHref);
+  return (section?.children ?? []).map((c) => ({
+    value: c.href,
+    label: c.label,
+    badge: c.badge,
+  }));
+}
+
+/**
+ * Retained so the Collection screens keep a stable import. Derived rather than
+ * duplicated — that is the entire point of this file.
+ */
+export const COLLECTION_SEGMENTS: Segment<string>[] = segmentsFor('/collection');
