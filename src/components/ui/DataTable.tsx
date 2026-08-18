@@ -12,6 +12,16 @@
  *    things and a stat table is exactly where that matters.
  *  - The first column is sticky-ish by being outside the horizontal scroller,
  *    so scrolling a wide stat set never loses the row's identity.
+ *
+ * NOT FOR PRESSABLE ROWS. This shipped with an `onRowPress` prop that was
+ * accepted and never wired to anything — a prop that silently does nothing is
+ * worse than no prop, so it is gone. Making it real is not a one-line fix: the
+ * row is split across two independently scrolling halves, so a press would
+ * have to hit both and stay visually joined while they scroll apart. Screens
+ * that need pressable or tinted rows (lineup, leaderboard) hand-roll the row
+ * and re-apply the rules above instead, which is why those rows still line up
+ * with these. If a third screen needs it, that is the signal to build a
+ * PressableDataTable rather than widen this one.
  */
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -49,7 +59,6 @@ export function DataTable<Row>({
   leading,
   leadingLabel,
   leadingWidth = 84,
-  onRowPress,
   emptyLabel = 'Nothing to show yet.',
 }: {
   rows: Row[];
@@ -58,7 +67,6 @@ export function DataTable<Row>({
   leading: (row: Row) => ReactNode;
   leadingLabel: string;
   leadingWidth?: number;
-  onRowPress?: (row: Row) => void;
   emptyLabel?: string;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
