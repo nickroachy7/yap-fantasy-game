@@ -18,9 +18,10 @@
     "expo-env.d.ts"
   ],
   "exclude": [
-    ".expo",
     "dist",
     "node_modules",
-    "supabase"
+    "supabase",
+    ".expo/web",
+    ".expo/devices.json"
   ]
 }

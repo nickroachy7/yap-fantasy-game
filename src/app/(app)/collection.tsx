@@ -1,178 +1,239 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+/**
+ * Collection — what you own (Inventory) and what you are chasing (Sets).
+ *
+ * Inventory is virtualised from the first render: a collection has no upper
+ * bound, so mapping over an array here would be a cliff rather than a slowdown.
+ * Sets is deliberately an empty state — see SetsPanel for why.
+ */
+import { useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 
-import { PlayerCard, type PlayerCardModel } from '@/components/cards';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import type { CardTier } from '@/constants/theme';
-import { supabase } from '@/lib/supabase';
+import {
+  PositionFilterRow,
+  SortRow,
+  TierFilterRow,
+} from '@/components/collection/CollectionFilters';
+import { EmptyCollection, EmptyFilterResult } from '@/components/collection/EmptyInventory';
+import { InventoryCard } from '@/components/collection/InventoryCard';
+import { SetsPanel } from '@/components/collection/SetsPanel';
+import {
+  countByPosition,
+  countByTier,
+  matchesPosition,
+  matchesTier,
+  sortCards,
+  type CollectionCard,
+  type PositionFilter,
+  type SortKey,
+  type TierFilter,
+} from '@/components/collection/types';
+import { useCollection } from '@/components/collection/use-collection';
+import { Screen } from '@/components/shell/Screen';
+import { SegmentedControl, type Segment } from '@/components/shell/SegmentedControl';
+import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { usePlayer } from '@/context/PlayerContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { injuryWeight } from '@/lib/injury';
 
-type Row = {
-  id: string;
-  player_name: string | null;
-  position_abbreviation: string | null;
-  team_abbreviation: string | null;
-  tier: CardTier;
-  career_fp: number;
-  lineup_starts: number;
-  tier_floor_fp: number | null;
-  next_tier_at: number | null;
-  next_tier_label: string | null;
-};
+type Tab = 'inventory' | 'sets';
 
-const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'PK'] as const;
-const TIERS = ['ALL', 'bronze', 'silver', 'gold', 'diamond'] as const;
+const GUTTER = Spacing.three;
+const GAP = Spacing.two + 4;
+/** Below this the card's stat row starts wrapping, so it is the hard floor. */
+const MIN_CARD_WIDTH = 156;
+const MAX_COLUMNS = 4;
 
 export default function CollectionScreen() {
-  const [rows, setRows] = useState<Row[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [position, setPosition] = useState<(typeof POSITIONS)[number]>('ALL');
-  const [tier, setTier] = useState<(typeof TIERS)[number]>('ALL');
+  const router = useRouter();
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const { width } = useWindowDimensions();
 
-  const load = useCallback(async () => {
-    setError(null);
-    // my_collection is security_invoker, so RLS scopes this to the caller.
-    const { data, error: err } = await supabase
-      .from('my_collection')
-      .select(
-        'id, player_name, position_abbreviation, team_abbreviation, tier, career_fp, lineup_starts, tier_floor_fp, next_tier_at, next_tier_label',
-      )
-      .order('career_fp', { ascending: false });
+  const { cards, playerIds, error, loading, refreshing, refresh } = useCollection();
+  const { cardCount, refresh: refreshPlayer } = usePlayer();
 
-    if (err) {
-      setError(err.message);
-      return;
-    }
-    setRows((data ?? []) as Row[]);
+  const [tab, setTab] = useState<Tab>('inventory');
+  const [position, setPosition] = useState<PositionFilter>('ALL');
+  const [tier, setTier] = useState<TierFilter>('ALL');
+  const [sort, setSort] = useState<SortKey>('fp');
+
+  /* ---- grid geometry ------------------------------------------------- *
+   * Screen caps its content at MaxContentWidth, so columns are derived
+   * from the width the list actually gets, not the window. Cards are given
+   * an exact width rather than flex: 1 so a short final row does not
+   * stretch its cards wider than the rows above it.                       */
+  const contentWidth = Math.min(width, MaxContentWidth) - GUTTER * 2;
+  const columns = Math.max(
+    2,
+    Math.min(MAX_COLUMNS, Math.floor((contentWidth + GAP) / (MIN_CARD_WIDTH + GAP))),
+  );
+  const itemWidth = Math.floor((contentWidth - GAP * (columns - 1)) / columns);
+
+  /* ---- faceting ------------------------------------------------------ *
+   * Each row's counts are computed with its OWN filter lifted, which is
+   * what makes the numbers mean "how many would I get if I pressed this".  */
+  const all = cards ?? [];
+  const forTierCounts = useMemo(
+    () => all.filter((card) => matchesPosition(card, position)),
+    [all, position],
+  );
+  const forPositionCounts = useMemo(
+    () => all.filter((card) => matchesTier(card, tier)),
+    [all, tier],
+  );
+  const tierCounts = useMemo(() => countByTier(forTierCounts), [forTierCounts]);
+  const positionCounts = useMemo(() => countByPosition(forPositionCounts), [forPositionCounts]);
+
+  const visible = useMemo(
+    () =>
+      sortCards(
+        all.filter((card) => matchesPosition(card, position) && matchesTier(card, tier)),
+        sort,
+      ),
+    [all, position, tier, sort],
+  );
+
+  const unavailable = useMemo(
+    () => all.filter((card) => injuryWeight(card.injuryStatus) === 'blocking').length,
+    [all],
+  );
+
+  const filtered = position !== 'ALL' || tier !== 'ALL';
+  const clearFilters = useCallback(() => {
+    setPosition('ALL');
+    setTier('ALL');
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }, [load]);
+    await Promise.all([refresh(), refreshPlayer()]);
+  }, [refresh, refreshPlayer]);
 
-  const visible = useMemo(() => {
-    if (!rows) return [];
-    return rows.filter(
-      (r) =>
-        (position === 'ALL' || r.position_abbreviation === position) &&
-        (tier === 'ALL' || r.tier === tier),
-    );
-  }, [rows, position, tier]);
+  /* ---- navigation ------------------------------------------------------ *
+   * `my_collection` exposes card_id, not player_id, so the id is resolved
+   * through the `cards` catalogue (see use-collection.ts). If that lookup
+   * has not landed the card simply is not pressable — better than a tap
+   * that navigates nowhere.                                                */
+  const openPlayer = useCallback(
+    (card: CollectionCard) => {
+      const playerId = card.cardId ? playerIds.get(card.cardId) : undefined;
+      if (!playerId) return undefined;
 
-  const toModel = useCallback(
-    (r: Row): PlayerCardModel => ({
-      playerName: r.player_name ?? 'Unknown player',
-      positionAbbreviation: r.position_abbreviation,
-      teamAbbreviation: r.team_abbreviation,
-      tier: r.tier,
-      careerFp: Number(r.career_fp),
-      lineupStarts: r.lineup_starts,
-      tierFloorFp: r.tier_floor_fp == null ? undefined : Number(r.tier_floor_fp),
-      nextTierAt: r.next_tier_at == null ? null : Number(r.next_tier_at),
-      nextTierLabel: r.next_tier_label?.toUpperCase(),
-    }),
-    [],
+      return () => router.push({ pathname: '/player/[id]', params: { id: playerId } });
+    },
+    [playerIds, router],
   );
 
+  const total = cards?.length ?? cardCount;
+  const context =
+    tab === 'sets'
+      ? 'Sets · not built yet'
+      : `${total.toLocaleString()} card${total === 1 ? '' : 's'}` +
+        (unavailable > 0 ? ` · ${unavailable} unavailable` : '');
+
+  const segments: Segment<Tab>[] = [
+    { value: 'inventory', label: 'Inventory', badge: cards ? String(cards.length) : undefined },
+    { value: 'sets', label: 'Sets', badge: 'Soon' },
+  ];
+
   return (
-    <ThemedView style={styles.fill}>
-      <SafeAreaView style={styles.fill}>
-        <View style={styles.header}>
-          <ThemedText type="title">Collection</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {rows === null ? ' ' : `${visible.length} of ${rows.length} cards`}
-          </ThemedText>
+    <Screen context={context} scroll={false}>
+      <View style={styles.subnav}>
+        <SegmentedControl segments={segments} value={tab} onChange={setTab} />
+      </View>
+
+      {tab === 'sets' ? (
+        <SetsPanel onBackToInventory={() => setTab('inventory')} />
+      ) : loading ? (
+        <View style={styles.centred}>
+          <ActivityIndicator />
         </View>
-
-        <FilterRow options={POSITIONS} value={position} onChange={setPosition} />
-        <FilterRow options={TIERS} value={tier} onChange={setTier} labelCase />
-
-        {rows === null && !error ? (
-          <ActivityIndicator style={styles.centred} />
-        ) : error ? (
-          <ThemedText style={styles.centred}>{error}</ThemedText>
-        ) : rows !== null && visible.length === 0 ? (
-          <ThemedView style={styles.centred}>
-            <ThemedText type="subtitle">
-              {rows.length === 0 ? 'No cards yet' : 'Nothing matches those filters'}
-            </ThemedText>
-            <ThemedText themeColor="textSecondary" style={styles.emptyBody}>
-              {rows.length === 0
-                ? 'Open a pack to start your collection.'
-                : 'Try clearing a filter.'}
-            </ThemedText>
-          </ThemedView>
-        ) : (
-          // Virtualised from day one — a full collection is hundreds of cards.
-          <FlatList
-            data={visible}
-            keyExtractor={(r) => r.id}
-            numColumns={2}
-            columnWrapperStyle={styles.column}
-            contentContainerStyle={styles.list}
-            initialNumToRender={8}
-            maxToRenderPerBatch={8}
-            windowSize={5}
-            removeClippedSubviews
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-            renderItem={({ item }) => <PlayerCard model={toModel(item)} size="grid" />}
-          />
-        )}
-      </SafeAreaView>
-    </ThemedView>
-  );
-}
-
-function FilterRow<T extends string>({
-  options,
-  value,
-  onChange,
-  labelCase,
-}: {
-  options: readonly T[];
-  value: T;
-  onChange: (v: T) => void;
-  labelCase?: boolean;
-}) {
-  return (
-    <View style={styles.filterRow}>
-      {options.map((opt) => {
-        const selected = opt === value;
-        return (
+      ) : error ? (
+        <View style={styles.centred}>
+          <Text style={[styles.errorTitle, { color: c.text }]}>Could not load your cards</Text>
+          <Text style={[styles.errorBody, { color: c.textSecondary }]}>{error}</Text>
           <Pressable
-            key={opt}
-            onPress={() => onChange(opt)}
+            onPress={() => void onRefresh()}
             accessibilityRole="button"
-            accessibilityState={{ selected }}>
-            <ThemedView
-              type={selected ? 'backgroundSelected' : 'backgroundElement'}
-              style={styles.chip}>
-              <ThemedText type="small" themeColor={selected ? 'text' : 'textSecondary'}>
-                {labelCase && opt !== 'ALL' ? opt.toUpperCase() : opt}
-              </ThemedText>
-            </ThemedView>
+            style={({ pressed }) => [
+              styles.retry,
+              { backgroundColor: c.backgroundElement },
+              pressed && styles.pressed,
+            ]}>
+            <Text style={[styles.retryLabel, { color: c.text }]}>Try again</Text>
           </Pressable>
-        );
-      })}
-    </View>
+        </View>
+      ) : all.length === 0 ? (
+        <ScrollView
+          style={styles.fill}
+          contentContainerStyle={styles.emptyContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+          <EmptyCollection onGetCards={() => router.push('/cards')} />
+        </ScrollView>
+      ) : (
+        <FlatList
+          // numColumns cannot change on a live list, so a width change that
+          // changes the column count remounts it.
+          key={`cols-${columns}`}
+          style={styles.fill}
+          data={visible}
+          keyExtractor={(card) => card.id}
+          numColumns={columns}
+          columnWrapperStyle={styles.row}
+          contentContainerStyle={styles.list}
+          initialNumToRender={columns * 4}
+          maxToRenderPerBatch={columns * 4}
+          windowSize={7}
+          removeClippedSubviews
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          ListHeaderComponent={
+            <View style={styles.header}>
+              <TierFilterRow
+                value={tier}
+                onChange={setTier}
+                total={forTierCounts.length}
+                counts={tierCounts}
+              />
+              <PositionFilterRow
+                value={position}
+                onChange={setPosition}
+                total={forPositionCounts.length}
+                counts={positionCounts}
+              />
+              <SortRow value={sort} onChange={setSort} />
+            </View>
+          }
+          ListEmptyComponent={<EmptyFilterResult onClear={clearFilters} hasFilters={filtered} />}
+          renderItem={({ item }) => (
+            <InventoryCard card={item} width={itemWidth} onPress={openPlayer(item)} />
+          )}
+        />
+      )}
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  header: { paddingHorizontal: 20, paddingTop: 12, gap: 2 },
-  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, paddingTop: 10 },
-  chip: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999 },
-  list: { padding: 16, gap: 16 },
-  column: { gap: 16, justifyContent: 'flex-start' },
-  centred: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, padding: 24 },
-  emptyBody: { textAlign: 'center' },
+  subnav: { paddingHorizontal: GUTTER, paddingTop: Spacing.two + 2, paddingBottom: Spacing.two },
+  list: { paddingHorizontal: GUTTER, paddingBottom: Spacing.six, gap: GAP },
+  row: { gap: GAP },
+  header: { gap: Spacing.two + 2, paddingBottom: Spacing.one },
+  emptyContent: { padding: GUTTER, paddingBottom: Spacing.six },
+  centred: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.four },
+  errorTitle: { fontSize: 18, fontWeight: '700' },
+  errorBody: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  retry: { borderRadius: 12, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two + 2 },
+  retryLabel: { fontSize: 14, fontWeight: '700' },
+  pressed: { opacity: 0.75 },
 });

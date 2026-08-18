@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet } from 'react-native';
 
+import { Screen } from '@/components/shell/Screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuth } from '@/context/AuthContext';
@@ -57,17 +57,15 @@ export default function LeaderboardScreen() {
     setRefreshing(false);
   }, [load]);
 
-  return (
-    <ThemedView style={styles.fill}>
-      <SafeAreaView style={styles.fill}>
-        <View style={styles.header}>
-          <ThemedText type="title">Leaderboard</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {slate ? `${slate.season} ${slate.season_type === 1 ? 'preseason' : 'season'}` : `${SEASON} season`} · all players
-          </ThemedText>
-        </View>
+  const headerContext = slate
+    ? `${slate.season_type === 1 ? 'Preseason' : 'Season'} · All players`
+    : `${SEASON} season · All players`;
 
-        {rows === null && !error ? (
+  return (
+    // scroll={false}: the FlatList below owns the scroll container, and nesting
+    // a virtualised list inside a ScrollView defeats the virtualisation.
+    <Screen context={headerContext} scroll={false}>
+      {rows === null && !error ? (
           <ActivityIndicator style={styles.centred} />
         ) : error ? (
           <ThemedText style={styles.centred}>{error}</ThemedText>
@@ -78,8 +76,8 @@ export default function LeaderboardScreen() {
               The board fills in once Week 1 lineups are scored.
             </ThemedText>
           </ThemedView>
-        ) : (
-          <FlatList
+      ) : (
+        <FlatList
             data={rows ?? []}
             keyExtractor={(r) => r.user_id}
             contentContainerStyle={styles.list}
@@ -101,15 +99,13 @@ export default function LeaderboardScreen() {
                 </ThemedView>
               );
             }}
-          />
-        )}
-      </SafeAreaView>
-    </ThemedView>
+        />
+      )}
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1 },
   header: { paddingHorizontal: 20, paddingTop: 12, gap: 2 },
   list: { padding: 16, gap: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12 },

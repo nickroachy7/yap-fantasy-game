@@ -774,6 +774,7 @@ export type Database = {
           lineup_starts: number | null
           next_tier_at: number | null
           next_tier_label: Database["public"]["Enums"]["card_tier"] | null
+          player_id: string | null
           player_name: string | null
           position_abbreviation: string | null
           season: number | null
@@ -796,6 +797,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "player_directory"
             referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "cards_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["player_id"]
+          },
+          {
+            foreignKeyName: "cards_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
           },
         ]
       }

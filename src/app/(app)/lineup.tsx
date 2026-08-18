@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { Screen } from '@/components/shell/Screen';
+import { fetchAllPages } from '@/lib/paged';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { injuryWeight } from '@/lib/injury';
@@ -27,6 +28,42 @@ type Card = {
  * BLOCKING  — the player is very unlikely to play. Loud.
  * ADVISORY  — genuinely uncertain. Worth knowing, not worth shouting.
  */
+
+/**
+ * The picker needs the whole collection, and PostgREST silently caps select()
+ * at 1000 rows — a large collection would lose its tail with no error at all.
+ *
+ * career_fp is not unique, so `id` is the tiebreak: paging over a non-unique
+ * sort key can repeat or drop rows between requests.
+ */
+async function loadCollection(): Promise<{ data: Card[]; error: string | null }> {
+  try {
+    const rows = await fetchAllPages((from, to) =>
+      supabase
+        .from('my_collection')
+        .select('id, player_name, position_abbreviation, team_abbreviation, injury_status, career_fp, tier')
+        .order('career_fp', { ascending: false })
+        .order('id', { ascending: true })
+        .range(from, to),
+    );
+    const cards: Card[] = rows.flatMap((r) =>
+      r.id
+        ? [{
+            id: r.id,
+            player_name: r.player_name,
+            position_abbreviation: r.position_abbreviation,
+            team_abbreviation: r.team_abbreviation,
+            injury_status: r.injury_status,
+            career_fp: Number(r.career_fp ?? 0),
+            tier: (r.tier ?? 'bronze') as Card['tier'],
+          }]
+        : [],
+    );
+    return { data: cards, error: null };
+  } catch (err) {
+    return { data: [], error: err instanceof Error ? err.message : 'Could not load your cards.' };
+  }
+}
 
 export default function LineupScreen() {
   const [slate, setSlate] = useState<Slate | null>(null);
@@ -64,10 +101,7 @@ export default function LineupScreen() {
 
     const [cfg, coll, lock, existing] = await Promise.all([
       supabase.from('lineup_slot_config').select('slot, eligible_positions, display_order').order('display_order'),
-      supabase
-        .from('my_collection')
-        .select('id, player_name, position_abbreviation, team_abbreviation, injury_status, career_fp, tier')
-        .order('career_fp', { ascending: false }),
+      loadCollection(),
       s
         ? supabase.rpc('week_lock_time', {
             p_season: s.season,
@@ -88,7 +122,7 @@ export default function LineupScreen() {
 
     if (cfg.error) setError(cfg.error.message);
     else setSlots((cfg.data ?? []) as SlotConfig[]);
-    if (!coll.error) setCards((coll.data ?? []) as Card[]);
+    if (coll.error) setError(coll.error); else setCards(coll.data);
     if (!lock.error && lock.data) setLockAt(String(lock.data));
 
     // Re-hydrate a lineup already submitted for this week.
@@ -141,24 +175,20 @@ export default function LineupScreen() {
 
   if (loading) {
     return (
-      <ThemedView style={styles.fill}>
-        <SafeAreaView style={styles.centre}>
-          <ActivityIndicator />
-        </SafeAreaView>
-      </ThemedView>
+      <Screen context="Lineup">
+        <ActivityIndicator style={styles.pad} />
+      </Screen>
     );
   }
 
+  const headerContext = slate
+    ? `${slate.season_type === 1 ? 'Preseason' : 'Season'} · Week ${slate.week}${
+        locked ? ' · Locked' : ''
+      }`
+    : 'No slate scheduled';
+
   return (
-    <ThemedView style={styles.fill}>
-      <SafeAreaView style={styles.fill}>
-        <ScrollView contentContainerStyle={styles.content}>
-          <ThemedText type="title">Lineup</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {slate
-              ? `${slate.season} ${slate.season_type === 1 ? 'preseason' : 'season'} · week ${slate.week}`
-              : 'No slate scheduled'}
-          </ThemedText>
+    <Screen context={headerContext}>
 
           {lockAt ? (
             <ThemedView type="backgroundElement" style={styles.lockBanner}>
@@ -301,16 +331,12 @@ export default function LineupScreen() {
 
           {saved ? <ThemedText style={styles.centreText}>{saved}</ThemedText> : null}
           {error ? <ThemedText style={styles.centreText}>{error}</ThemedText> : null}
-        </ScrollView>
-      </SafeAreaView>
-    </ThemedView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1 },
-  centre: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 20, gap: 10, maxWidth: 640, width: '100%', alignSelf: 'center' },
+  pad: { paddingVertical: 24 },
   lockBanner: { padding: 12, borderRadius: 12 },
   warn: { padding: 12, borderRadius: 12 },
   slotRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12 },

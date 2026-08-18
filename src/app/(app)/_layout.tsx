@@ -41,6 +41,10 @@ export default function AppLayout() {
         <Tabs.Screen name="collection" options={{ title: 'Collection' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
 
+        {/* `/` redirects to Lineup; present so the bare path resolves, hidden
+            so it does not become a sixth tab. */}
+        <Tabs.Screen name="index" options={{ href: null }} />
+
         {/* Detail routes live in the stack but never appear as tabs. */}
         <Tabs.Screen name="player/[id]" options={{ href: null }} />
       </Tabs>
