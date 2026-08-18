@@ -26,7 +26,6 @@ import {
 } from '@/components/collection/CollectionFilters';
 import { EmptyCollection, EmptyFilterResult } from '@/components/collection/EmptyInventory';
 import { InventoryCard } from '@/components/collection/InventoryCard';
-import { SetsPanel } from '@/components/collection/SetsPanel';
 import {
   countByPosition,
   countByTier,
@@ -40,13 +39,13 @@ import {
 } from '@/components/collection/types';
 import { useCollection } from '@/components/collection/use-collection';
 import { Screen } from '@/components/shell/Screen';
-import { SegmentedControl, type Segment } from '@/components/shell/SegmentedControl';
+import { SubNav } from '@/components/shell/SubNav';
+import { COLLECTION_SEGMENTS } from '@/components/shell/sections';
 import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { injuryWeight } from '@/lib/injury';
 
-type Tab = 'inventory' | 'sets';
 
 const GUTTER = Spacing.three;
 const GAP = Spacing.two + 4;
@@ -54,7 +53,7 @@ const GAP = Spacing.two + 4;
 const MIN_CARD_WIDTH = 156;
 const MAX_COLUMNS = 4;
 
-export default function CollectionScreen() {
+export default function InventoryScreen() {
   const router = useRouter();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -63,7 +62,6 @@ export default function CollectionScreen() {
   const { cards, playerIds, error, loading, refreshing, refresh } = useCollection();
   const { cardCount, refresh: refreshPlayer } = usePlayer();
 
-  const [tab, setTab] = useState<Tab>('inventory');
   const [position, setPosition] = useState<PositionFilter>('ALL');
   const [tier, setTier] = useState<TierFilter>('ALL');
   const [sort, setSort] = useState<SortKey>('fp');
@@ -136,25 +134,14 @@ export default function CollectionScreen() {
 
   const total = cards?.length ?? cardCount;
   const context =
-    tab === 'sets'
-      ? 'Sets · not built yet'
-      : `${total.toLocaleString()} card${total === 1 ? '' : 's'}` +
-        (unavailable > 0 ? ` · ${unavailable} unavailable` : '');
-
-  const segments: Segment<Tab>[] = [
-    { value: 'inventory', label: 'Inventory', badge: cards ? String(cards.length) : undefined },
-    { value: 'sets', label: 'Sets', badge: 'Soon' },
-  ];
+    `${total.toLocaleString()} card${total === 1 ? '' : 's'}` +
+    (unavailable > 0 ? ` · ${unavailable} unavailable` : '');
 
   return (
     <Screen context={context} scroll={false}>
-      <View style={styles.subnav}>
-        <SegmentedControl segments={segments} value={tab} onChange={setTab} />
-      </View>
+      <SubNav segments={COLLECTION_SEGMENTS} />
 
-      {tab === 'sets' ? (
-        <SetsPanel onBackToInventory={() => setTab('inventory')} />
-      ) : loading ? (
+      {loading ? (
         <View style={styles.centred}>
           <ActivityIndicator />
         </View>

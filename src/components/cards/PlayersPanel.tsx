@@ -22,7 +22,7 @@ import { PLAYER_ROW_HEIGHT, PlayerRow } from './PlayerRow';
 import {
   POSITION_FILTERS,
   filterAndSort,
-  fetchPlayerDirectory,
+  loadPlayerDirectory,
   type DirectoryFetch,
   type DirectoryPlayer,
   type PositionFilter,
@@ -60,7 +60,7 @@ export function PlayersPanel({
       else setLoading(true);
       setError(null);
       try {
-        const next = await fetchPlayerDirectory();
+        const next = await loadPlayerDirectory();
         setResult(next);
         onLoaded?.(next);
       } catch (e) {

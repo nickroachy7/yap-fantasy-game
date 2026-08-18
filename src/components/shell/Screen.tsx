@@ -5,9 +5,10 @@
  * Every tab uses this so the chrome cannot drift between screens.
  */
 import type { ReactNode } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View, useColorScheme } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 import { AppHeader } from '@/components/shell/AppHeader';
+import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, MaxContentWidth } from '@/constants/theme';
 
 type Props = {
@@ -23,6 +24,9 @@ type Props = {
 export function Screen({ context, children, scroll = true, refreshing, onRefresh }: Props) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  // The sidebar already shows the wordmark, balance and account on wide web;
+  // rendering the header too would say all of it twice.
+  const isWide = useIsWide();
 
   const body = scroll ? (
     <ScrollView
@@ -40,7 +44,15 @@ export function Screen({ context, children, scroll = true, refreshing, onRefresh
 
   return (
     <View style={[styles.fill, { backgroundColor: c.background }]}>
-      <AppHeader context={context} />
+      {isWide ? (
+        context ? (
+          <View style={styles.wideContext}>
+            <Text style={[styles.wideContextText, { color: c.textSecondary }]}>{context}</Text>
+          </View>
+        ) : null
+      ) : (
+        <AppHeader context={context} />
+      )}
       {body}
     </View>
   );
@@ -55,6 +67,8 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
   },
+  wideContext: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 2, width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center' },
+  wideContextText: { fontSize: 12, letterSpacing: 0.3 },
   flexContent: {
     flex: 1,
     width: '100%',

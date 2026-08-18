@@ -94,6 +94,32 @@ async function latestSeason(): Promise<number | null> {
  * Read the whole directory for the current season, in pages, and prove the read
  * was complete by comparing against an exact server-side count.
  */
+/**
+ * Players and Shop are separate routes now, so switching between them unmounts
+ * the panel. Without a cache that means re-reading ~1,000 rows across three
+ * round trips every time someone glances at the Shop and comes back.
+ *
+ * Held for the session and cleared by `invalidatePlayerDirectory()` — the
+ * directory only changes when the nightly sync runs.
+ */
+let cached: Promise<DirectoryFetch> | null = null;
+
+export function invalidatePlayerDirectory(): void {
+  cached = null;
+}
+
+export function loadPlayerDirectory(): Promise<DirectoryFetch> {
+  if (!cached) {
+    cached = fetchPlayerDirectory().catch((err) => {
+      // A failed read must not be cached, or the screen is stuck on the error
+      // until a reload.
+      cached = null;
+      throw err;
+    });
+  }
+  return cached;
+}
+
 export async function fetchPlayerDirectory(): Promise<DirectoryFetch> {
   const season = await latestSeason();
 
