@@ -7,7 +7,8 @@
  * carries all of it and the bench is drawn in the same columns for comparison.
  *
  * The screen reads top to bottom as the week does: what is on (the scoreboard
- * strip), where you stand (the contest card), who needs a look (alerts), who is
+ * strip), where you stand (the contest card, which COUNTS who needs a look
+ * rather than listing them — the rows say which), who is
  * starting, and who is not. The starters and the bench used to be two tabs;
  * they are now one scroll, because choosing between them is the entire task and
  * a tab pair meant only ever seeing half of it.
@@ -159,6 +160,17 @@ export default function LineupScreen() {
     return scored.reduce((sum, s) => sum + (s.card.form?.fpPerGame ?? 0), 0);
   }, [starters]);
 
+  /**
+   * Counted, not listed.
+   *
+   * There was a panel here that named every flagged starter above the boards.
+   * It is gone: the rows themselves carry the designation chip and say BYE in
+   * the negative colour, so the panel was the same warning a second time, in a
+   * different vocabulary, twenty points further from the player it was about.
+   * What survives is the NUMBER on the contest card — "two of your eight want
+   * looking at" — which sends you to the rows rather than trying to replace
+   * them.
+   */
   const alerts = useMemo<Alert[]>(
     () =>
       starters.flatMap<Alert>(({ slot, card }) => {
@@ -366,33 +378,6 @@ export default function LineupScreen() {
         <Text style={[Type.fine, { color: c.textTertiary }]}>{lockCaption(lockAt, locked)}</Text>
       ) : null}
 
-      {alerts.length > 0 && !locked ? (
-        <View style={[styles.alerts, { backgroundColor: c.surface, borderColor: c.border }]}>
-          {alerts.map(({ slot, card, kind }) => (
-            <View key={slot} style={styles.alertRow}>
-              <Text style={[Type.micro, styles.alertSlot, { color: c.textTertiary }]}>{slot}</Text>
-              <Text numberOfLines={1} style={[Type.fine, styles.alertText, { color: c.text }]}>
-                {card.name}
-              </Text>
-              {/* Blocking and "no game" are the same practical outcome — no
-                  points — so they get the same weight. Questionable does not:
-                  it is the most common designation in the feed, and shouting
-                  about it teaches people to ignore the shouting. */}
-              <Text
-                numberOfLines={1}
-                style={[
-                  Type.fine,
-                  { color: kind === 'advisory' ? c.textSecondary : c.negative },
-                ]}>
-                {kind === 'no-game'
-                  ? 'no game this week'
-                  : (card.injuryStatus ?? 'unavailable').toLowerCase()}
-              </Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
-
       {cards.length === 0 ? (
         <Text style={[Type.body, { color: c.textSecondary }]}>
           You have no cards yet — open a pack first.
@@ -505,20 +490,6 @@ function SectionHead({ label, hint, tone }: { label: string; hint: string; tone:
 
 const styles = StyleSheet.create({
   pad: { paddingVertical: Spacing.four },
-  alerts: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 10,
-    paddingVertical: Spacing.one,
-  },
-  alertRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
-  },
-  alertSlot: { width: 30 },
-  alertText: { flex: 1 },
   /* The boards run to the page edges, like the directory and the collection
      do, rather than sitting in a 16pt trough inside it. `Screen` pads its
      content; this gives that padding back, and the rows supply their own

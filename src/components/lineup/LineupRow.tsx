@@ -363,10 +363,19 @@ function Identity({
                 ) : null}
               </View>
               {/* The fixture is the whole point of a week row, so it gets its
-                  own baseline rather than trailing the club. A team with no
-                  game reads BYE, which is the failure people actually lose
-                  weeks to. */}
-              <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
+                  own baseline rather than trailing the club.
+                  A team with no game reads BYE, and reads it in the NEGATIVE
+                  colour rather than the same grey as a kickoff time. It is the
+                  failure people actually lose weeks to, no injury feed ever
+                  mentions it, and it is now the only place the screen says so —
+                  the alert list that used to repeat it above the boards is
+                  gone, because the rows already carry every designation. */}
+              <Text
+                numberOfLines={1}
+                style={[
+                  Type.fine,
+                  { color: card.game?.opponent ? c.textTertiary : c.negative },
+                ]}>
                 {card.game?.opponent
                   ? `${kick ? `${kick} ` : ''}${matchupLabel(card.game)}`
                   : 'BYE — no game this week'}
