@@ -756,6 +756,54 @@ export type Database = {
           },
         ]
       }
+      sweep_log: {
+        Row: {
+          duration_ms: number | null
+          id: number
+          ingest_body: Json | null
+          ingest_error: string | null
+          ingest_request_id: number | null
+          ingest_status: number | null
+          ingest_timed_out: boolean | null
+          outcome: string
+          ran_at: string
+          scored: Json | null
+          season: number | null
+          season_type: number | null
+          week: number | null
+        }
+        Insert: {
+          duration_ms?: number | null
+          id?: never
+          ingest_body?: Json | null
+          ingest_error?: string | null
+          ingest_request_id?: number | null
+          ingest_status?: number | null
+          ingest_timed_out?: boolean | null
+          outcome: string
+          ran_at?: string
+          scored?: Json | null
+          season?: number | null
+          season_type?: number | null
+          week?: number | null
+        }
+        Update: {
+          duration_ms?: number | null
+          id?: never
+          ingest_body?: Json | null
+          ingest_error?: string | null
+          ingest_request_id?: number | null
+          ingest_status?: number | null
+          ingest_timed_out?: boolean | null
+          outcome?: string
+          ran_at?: string
+          scored?: Json | null
+          season?: number | null
+          season_type?: number | null
+          week?: number | null
+        }
+        Relationships: []
+      }
       team_standings: {
         Row: {
           conference_record: string | null
@@ -989,9 +1037,58 @@ export type Database = {
           },
         ]
       }
+      sweep_health: {
+        Row: {
+          duration_ms: number | null
+          ingest_error: string | null
+          ingest_message: string | null
+          ingest_status: number | null
+          ingest_timed_out: boolean | null
+          outcome: string | null
+          ran_at: string | null
+          response_never_landed: boolean | null
+          season: number | null
+          season_type: number | null
+          slots_scored: number | null
+          week: number | null
+        }
+        Insert: {
+          duration_ms?: number | null
+          ingest_error?: string | null
+          ingest_message?: never
+          ingest_status?: number | null
+          ingest_timed_out?: boolean | null
+          outcome?: string | null
+          ran_at?: string | null
+          response_never_landed?: never
+          season?: number | null
+          season_type?: number | null
+          slots_scored?: never
+          week?: number | null
+        }
+        Update: {
+          duration_ms?: number | null
+          ingest_error?: string | null
+          ingest_message?: never
+          ingest_status?: number | null
+          ingest_timed_out?: boolean | null
+          outcome?: string | null
+          ran_at?: string | null
+          response_never_landed?: never
+          season?: number | null
+          season_type?: number | null
+          slots_scored?: never
+          week?: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       apply_injuries: { Args: { payload: Json }; Returns: number }
+      assign_card_rarity: {
+        Args: { p_production_season?: number; p_season: number }
+        Returns: Json
+      }
       award_score_gems: {
         Args: {
           p_per_point?: number
