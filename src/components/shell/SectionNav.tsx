@@ -15,12 +15,15 @@
  * wide web. The active item is the answer, and it doubles as the way back from
  * a filter you left open.
  *
- * Filters come after, from the screen, because only the screen knows what it
- * can filter by. Order matters and is deliberate: pages first, then facets, so
- * the leftmost items are the ones that change what page you are on.
+ * PAGES ONLY. The screen's filters used to be appended here, which made the
+ * bar a different shape on every page of a section — three items on Sets and
+ * seven on Inventory — so the tab strip appeared to change under you as you
+ * flipped through it. It is a stable strip now: same items, same width, same
+ * place, and the only thing that moves is the highlight. Filters live below it
+ * as chips.
  *
- * On wide web the pages drop out and only the facets remain — `ActionBar` does
- * that, and the rail is why.
+ * On wide web it renders nothing at all: the rail already lists every sub-page
+ * as a row, and `ActionBar` drops items marked `nav`.
  */
 import { usePathname, useRouter } from 'expo-router';
 import { useMemo } from 'react';
@@ -29,15 +32,7 @@ import { ActionBar, type Action } from '@/components/shell/ActionBar';
 import { childrenOf } from '@/components/shell/sections';
 import { useIsWide } from '@/components/shell/useResponsive';
 
-export function SectionNav({
-  section,
-  extra,
-}: {
-  /** The section's own href, e.g. `/collection`. */
-  section: string;
-  /** The screen's own filter actions, appended after the pages. */
-  extra?: Action[];
-}) {
+export function SectionNav({ section }: { /** e.g. `/collection`. */ section: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const wide = useIsWide();
@@ -54,8 +49,8 @@ export function SectionNav({
       // stack of every toggle between them.
       onPress: () => router.replace(child.href as never),
     }));
-    return [...pages, ...(extra ?? [])];
-  }, [section, pathname, router, extra]);
+    return pages;
+  }, [section, pathname, router]);
 
   return <ActionBar actions={actions} wide={wide} />;
 }

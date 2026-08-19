@@ -10,12 +10,13 @@
  * same kind of place: the same bar in the same position, with the same position
  * chips beneath it.
  *
- * Items are of two kinds and the bar does not distinguish them visually,
- * because to a reader they are the same gesture — "show me the X view":
- *
- *   toggle — reveals a control that was folded away (search, sort, tiers), or
- *            flips a filter on and off (available).
- *   link   — goes to a sibling page (Trend, Shop, Sets).
+ * WHAT IT IS NOT. It is not a general control strip. It carried a screen's
+ * filters for one commit and that was wrong for a reason worth writing down:
+ * the bar is the same object on every page of a section, so anything page-
+ * specific in it changes its size and item count as you move between pages —
+ * the Collection read as three items on Sets and seven on Inventory, and the
+ * "tabs" appeared to jump around while you were using them. Filters are chips
+ * now, on their own line, where a page may have as many or as few as it likes.
  *
  * WIDE WEB DROPS THE LINKS. The rail already lists every sub-page as a row, so
  * repeating them here would put the same navigation on screen twice. Filters
@@ -76,6 +77,13 @@ export function ActionBar({ actions, wide }: { actions: Action[]; wide: boolean 
       horizontal
       showsHorizontalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      /* `flexGrow: 0`, and it is load-bearing. React-native-web gives every
+         ScrollView `flexGrow: 1, flexShrink: 1` by default, so inside a column
+         that has room to spare — a `scroll={false}` screen whose content is
+         short, e.g. Sets — the bar grew to fill the WHOLE page and its active
+         item rendered as a 370pt block. Nothing errored; the bar just quietly
+         became the page. */
+      style={styles.scroll}
       contentContainerStyle={[styles.bar, { backgroundColor: c.surface, borderColor: c.border }]}>
       {shown.map((a) => (
         <Pressable
@@ -413,6 +421,7 @@ function ActionIcon({
 }
 
 const styles = StyleSheet.create({
+  scroll: { flexGrow: 0, flexShrink: 0 },
   bar: {
     flexDirection: 'row',
     // Grows to the full width when the items do not fill it, so the bar is a

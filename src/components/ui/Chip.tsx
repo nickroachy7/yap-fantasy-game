@@ -9,6 +9,12 @@
  *
  * Selection is not colour alone: the selected chip gains a heavier border and
  * a fill, both of which survive greyscale.
+ *
+ * `FilterChips` is the same chip put to a second job: the page-level toggles —
+ * search, sort, tiers — that used to sit in the section's action bar. They came
+ * out of it because the bar has to be identical on every page of a section, and
+ * a page's own controls are by definition not. A chip is the right size for
+ * them: they are worth one line, below the strip that says where you are.
  */
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -90,5 +96,42 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2, paddingRight: Spacing.two },
   chip: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1, borderRadius: 7 },
   count: { fontWeight: '600' },
+  divider: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', marginHorizontal: Spacing.one },
   pressed: { opacity: 0.7 },
 });
+
+
+export type FilterChip = {
+  key: string;
+  label: string;
+  active: boolean;
+  onPress: () => void;
+};
+
+/**
+ * A group of page-level toggles.
+ *
+ * Rendered after a divider when it shares a row with something else — the
+ * position facets, usually — so "which position" and "show me the search box"
+ * do not read as one list of eight equal choices.
+ */
+export function FilterChips({ items, divided }: { items: FilterChip[]; divided?: boolean }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  if (items.length === 0) return null;
+
+  return (
+    <>
+      {divided ? <View style={[styles.divider, { backgroundColor: c.border }]} /> : null}
+      {items.map((f) => (
+        <Chip
+          key={f.key}
+          selected={f.active}
+          label={f.label}
+          onPress={f.onPress}
+          accessibilityLabel={f.label}
+        />
+      ))}
+    </>
+  );
+}

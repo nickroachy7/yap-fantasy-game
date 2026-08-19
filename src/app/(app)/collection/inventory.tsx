@@ -52,7 +52,7 @@ import {
   type TierFilter,
 } from '@/components/collection/types';
 import { useCollection } from '@/components/collection/use-collection';
-import { type Action } from '@/components/shell/ActionBar';
+import { ChipRow, FilterChips, type FilterChip } from '@/components/ui/Chip';
 import { Screen } from '@/components/shell/Screen';
 import { SectionNav } from '@/components/shell/SectionNav';
 import { Colors, Spacing, Type } from '@/constants/theme';
@@ -209,7 +209,7 @@ export default function InventoryScreen() {
   const total = cards?.length ?? cardCount;
   const context = filtered ? `${visible.length} of ${total} cards` : `${total} cards`;
 
-  const facets = useMemo<Action[]>(
+  const facets = useMemo<FilterChip[]>(
     () => [
       // Search only appears above the size where scanning stops working — the
       // same threshold that used to gate the field itself.
@@ -217,8 +217,7 @@ export default function InventoryScreen() {
         ? [
             {
               key: 'search',
-              label: 'Search',
-              icon: 'search' as const,
+              label: 'SEARCH',
               active: showSearch || needle.length > 0,
               onPress: () => setShowSearch((v) => !v),
             },
@@ -226,27 +225,19 @@ export default function InventoryScreen() {
         : []),
       {
         key: 'tiers',
-        label: 'Tiers',
-        icon: 'tiers' as const,
+        label: 'TIERS',
         active: showTiers || tier !== 'ALL',
         onPress: () => setShowTiers((v) => !v),
       },
       {
         key: 'available',
-        label: 'Available',
-        icon: 'available' as const,
+        label: 'AVAILABLE',
         // Not a disclosure — this one IS the filter. Pressing it hides the
         // cards that are already in a lineup.
         active: availability === 'AVAILABLE',
         onPress: () => setAvailability((a) => (a === 'ALL' ? 'AVAILABLE' : 'ALL')),
       },
-      {
-        key: 'sort',
-        label: 'Sort',
-        icon: 'sort' as const,
-        active: showSort,
-        onPress: () => setShowSort((v) => !v),
-      },
+      { key: 'sort', label: 'SORT', active: showSort, onPress: () => setShowSort((v) => !v) },
     ],
     [searchable, showSearch, needle, showTiers, tier, availability, showSort],
   );
@@ -283,8 +274,17 @@ export default function InventoryScreen() {
           </ScrollView>
         ) : listWidth === 0 ? null : (
           <>
+            {/* Pinned: where you are, then what you are filtering by. The
+                facets themselves — tiers, positions, sort — stay in the list's
+                header, where they scroll away once you have stopped using them.
+                The search FIELD cannot: a TextInput in a ListHeaderComponent is
+                remounted on every keystroke and loses focus after one
+                character, which is why it lives up here beside its chip. */}
             <View style={styles.toolbar}>
-              <SectionNav section="/collection" extra={facets} />
+              <SectionNav section="/collection" />
+              <ChipRow>
+                <FilterChips items={facets} />
+              </ChipRow>
               {searchable && showSearch ? (
                 <SearchField value={query} onChange={setQuery} hint={`${total} OWNED`} />
               ) : null}

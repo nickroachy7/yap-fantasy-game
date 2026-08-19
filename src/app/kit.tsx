@@ -503,7 +503,7 @@ function Kit() {
 
           <Section
             title="Action bar"
-            note="Every glyph, hollow then solid. The second bar overflows, which is how a seven-item Collection page behaves on a phone.">
+            note="A section's pages, and nothing else — same strip on every page of the section, only the highlight moves. Every glyph, hollow then solid.">
             <ActionBar
               wide={false}
               actions={[

@@ -30,10 +30,9 @@ import {
   useColorScheme,
 } from 'react-native';
 
-import { type Action } from '@/components/shell/ActionBar';
 import { SectionNav } from '@/components/shell/SectionNav';
 import { useTabBarInset } from '@/components/shell/useResponsive';
-import { Chip, ChipRow } from '@/components/ui/Chip';
+import { Chip, ChipRow, FilterChips, type FilterChip } from '@/components/ui/Chip';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { PLAYER_ROW_HEIGHT, PlayerRow, ROW_GUTTER } from './PlayerRow';
@@ -138,30 +137,23 @@ export function PlayersPanel({
     setPosition('ALL');
   }, []);
 
-  const facets = useMemo<Action[]>(
+  const filtering = query.trim().length > 0 || position !== 'ALL';
+
+  const facets = useMemo<FilterChip[]>(
     () => [
       {
         key: 'search',
-        label: 'Search',
-        icon: 'search',
+        label: 'SEARCH',
         // Active when the field is open OR when a query is narrowing the list
         // from behind a closed one — a filter you cannot see is the one that
         // most needs saying.
         active: showSearch || query.trim().length > 0,
         onPress: () => setShowSearch((v) => !v),
       },
-      {
-        key: 'sort',
-        label: 'Sort',
-        icon: 'sort',
-        active: showSort,
-        onPress: () => setShowSort((v) => !v),
-      },
+      { key: 'sort', label: 'SORT', active: showSort, onPress: () => setShowSort((v) => !v) },
     ],
     [showSearch, showSort, query],
   );
-
-  const filtering = query.trim().length > 0 || position !== 'ALL';
 
   const renderItem = useCallback(
     ({ item }: { item: DirectoryPlayer }) => (
@@ -179,7 +171,7 @@ export function PlayersPanel({
       {/* Controls live OUTSIDE the FlatList. As a ListHeaderComponent the text
           input is remounted on every keystroke and loses focus. */}
       <View style={styles.controls}>
-        <SectionNav section="/players" extra={facets} />
+        <SectionNav section="/players" />
 
         {showSearch ? (
           <View style={styles.searchRow}>
@@ -203,6 +195,9 @@ export function PlayersPanel({
           </View>
         ) : null}
 
+        {/* One line: the position facets, then this page's own toggles behind
+            a divider. Two chip rows would have been tidier to write and would
+            have cost another 32pt above the first player. */}
         <ChipRow>
           {POSITION_FILTERS.map((p) => (
             <Chip
@@ -214,6 +209,7 @@ export function PlayersPanel({
               accessibilityLabel={`${p === 'ALL' ? 'All positions' : p}${counts ? `, ${counts[p]} players` : ''}`}
             />
           ))}
+          <FilterChips items={facets} divided />
         </ChipRow>
 
         {showSort ? <SortBar sort={sort} onSort={pressSort} /> : null}
