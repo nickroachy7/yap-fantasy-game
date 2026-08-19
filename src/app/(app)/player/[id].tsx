@@ -11,10 +11,20 @@
  * panel shows measured share of the team's work and says plainly that it is a
  * measurement. See UsagePanel.
  *
- * The route param is the PLAYER id (not the card id) — a player is one row in
- * the directory but potentially many owned card instances, which is what the
- * `Your cards` panel exists to show. See CardHistory for why that panel is the
- * right analogue of a transaction history in a game with no transactions.
+ * ONE OF TWO PROFILES. This is the DIRECTORY one: it is about the footballer,
+ * it is identical for every user, and ownership appears only in aggregate. Its
+ * sibling, `/card/<card_instance_id>`, is about ONE copy you hold — what that
+ * copy has earned, which weeks it started, and where it ranks against every
+ * other copy of him. Two people holding the same player hold genuinely
+ * different objects, and one screen could not put both cases first.
+ *
+ * The route param is therefore the PLAYER id, never the card id. `Your cards`
+ * is the bridge: it lists your copies and each one links across. Selling lives
+ * over there too, because selling is per-copy and this screen shows a player.
+ *
+ * `Across the community` is the panel that only exists because this is a
+ * collection game — how many copies are in circulation, how many are actually
+ * being played, and how good the best one in the game has become.
  *
  * No photo, no logo, no jersey: unlicensed. Club and position are text — the
  * sheet's own header carries them, so this screen no longer draws an identity
@@ -32,17 +42,17 @@ import {
 } from '@/components/cards/player-directory';
 import { BioStrip } from '@/components/players/BioStrip';
 import { CardHistory, type OwnedCard } from '@/components/players/CardHistory';
+import { CommunityPanel } from '@/components/players/CommunityPanel';
 import { CareerTable } from '@/components/players/CareerTable';
 import { TeamContext } from '@/components/players/TeamContext';
 import { UsagePanel } from '@/components/players/UsagePanel';
 import { GameLog } from '@/components/players/GameLog';
 import { parseGameLog, type GameLogSection } from '@/components/players/game-log';
+import { parseMarket, type PlayerMarket } from '@/components/players/market';
 import { parseProfile, type PlayerProfile } from '@/components/players/profile';
-import { sellErrorMessage } from '@/components/players/sell';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
 import { Colors, Spacing, type CardTier } from '@/constants/theme';
-import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
@@ -97,11 +107,11 @@ export default function PlayerDetailScreen() {
   const router = useRouter();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const { refresh: refreshWallet } = usePlayer();
 
   const [player, setPlayer] = useState<DirectoryPlayer | null>(null);
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [sections, setSections] = useState<GameLogSection[]>([]);
+  const [market, setMarket] = useState<PlayerMarket | null>(null);
   const [owned, setOwned] = useState<OwnedCard[]>([]);
   const [ownedLoading, setOwnedLoading] = useState(true);
   const [tab, setTab] = useState<PlayerTab>('overview');
@@ -110,7 +120,7 @@ export default function PlayerDetailScreen() {
     async (live) => {
       if (!id) return;
 
-      const [directoryRes, profileRes, gameLogRes, ownedRes] = await Promise.all([
+      const [directoryRes, profileRes, gameLogRes, marketRes, ownedRes] = await Promise.all([
         supabase
           .from('player_directory')
           .select(DIRECTORY_COLUMNS)
@@ -120,6 +130,7 @@ export default function PlayerDetailScreen() {
           .maybeSingle(),
         supabase.rpc('player_profile', { p_player_id: id }),
         supabase.rpc('player_game_log', { p_player_id: id }),
+        supabase.rpc('player_market', { p_player_id: id }),
         /* RLS scopes `my_collection` to the caller, so this needs no user
            filter — and cannot leak anyone else's cards even if one were added
            by mistake. Unpaged deliberately: this is one player's copies, which
@@ -144,6 +155,11 @@ export default function PlayerDetailScreen() {
       // The game log RPC spans every season we hold AND the fixtures still to
       // come, so there is no client-side merging left to do here.
       setSections(gameLogRes.error || !gameLogRes.data ? [] : parseGameLog(gameLogRes.data));
+
+      // Also non-fatal. Community ownership is the most interesting panel on
+      // the page and the least load-bearing: nobody should lose a player's
+      // stats because an aggregate over card_instances timed out.
+      setMarket(marketRes.error || !marketRes.data ? null : parseMarket(marketRes.data));
 
       // Also non-fatal: not knowing which cards you hold should never take the
       // player's stats off the screen.
@@ -172,29 +188,25 @@ export default function PlayerDetailScreen() {
   );
 
   /* No `refreshing`, deliberately. Pull-to-refresh is gone from this screen:
-     inside a native formSheet a downward drag is the DISMISS gesture, so a
+     inside a native page sheet a downward drag is the DISMISS gesture, so a
      RefreshControl competing for it would make the sheet feel broken at the
-     top of the scroll. `refresh()` is still here and still used — selling a
-     card re-reads both this profile and the wallet. */
-  const { loading, error, refresh } = useLoader(load);
+     top of the scroll. Nothing on this screen mutates any more either —
+     selling moved to the card profile — so there is nothing to re-read. */
+  const { loading, error } = useLoader(load);
 
   /**
-   * Sell one copy.
+   * Open one of your copies.
    *
-   * Rejects rather than swallowing, so the dialog can stay open and say why.
-   * On success both the collection and the wallet are re-read from the server
-   * instead of being patched locally: the balance in the header is the number
-   * the user will check, and it must come from the same place the sale did.
+   * `/card/<card_instance_id>`, NOT `/player/<player_id>`: this is the one
+   * place in the app where both ids are in scope at once, and they are easy to
+   * confuse. A player is one row; the copies of him are many, and this link is
+   * about exactly one of them.
    */
-  const sellCard = useCallback(
-    async (card: OwnedCard) => {
-      const { error: err } = await supabase.rpc('sell_card', {
-        p_card_instance_id: card.id,
-      });
-      if (err) throw new Error(sellErrorMessage(err.message));
-      await Promise.all([refresh(), refreshWallet()]);
+  const openCard = useCallback(
+    (card: OwnedCard) => {
+      router.push({ pathname: '/card/[id]', params: { id: card.id } });
     },
-    [refresh, refreshWallet],
+    [router],
   );
 
   /**
@@ -274,6 +286,19 @@ export default function PlayerDetailScreen() {
               hint={rank.pool ? `of ${rank.pool}` : undefined}
             />
           ) : null}
+          {/* The spec's OWNERSHIP block, as a COUNT rather than the percentage
+              Sleeper prints. A percentage of a beta-sized user base reads 0% or
+              100% and teaches people to distrust the column; "12 copies held by
+              3 people" is exactly as true at every scale. The rest of the
+              picture — tier spread, how many are actually played, the best copy
+              in the game — is in the community panel below. */}
+          {market ? (
+            <StatTile
+              label="COPIES HELD"
+              value={String(market.totals.held)}
+              hint={`${market.totals.owners} owner${market.totals.owners === 1 ? '' : 's'}`}
+            />
+          ) : null}
         </View>
 
         <View style={[styles.tabBar, { borderColor: c.backgroundElement }]}>
@@ -304,7 +329,7 @@ export default function PlayerDetailScreen() {
               cards={owned}
               loading={ownedLoading}
               playerName={player.name}
-              onSell={sellCard}
+              onOpen={openCard}
             />
 
             {profile ? (
@@ -317,6 +342,11 @@ export default function PlayerDetailScreen() {
                 <TeamContext bio={profile.player} standings={profile.standings} />
               </>
             ) : null}
+
+            {/* Last on the tab, and deliberately so. Everything above is about
+                the footballer; this is about the card, and it is the part that
+                only exists because this is a collection game. */}
+            <CommunityPanel market={market} />
           </>
         ) : null}
 

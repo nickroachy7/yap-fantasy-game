@@ -15,6 +15,14 @@
  *    paginating hides that prior seasons exist at all. Collapsed sections keep
  *    the summary line visible, which is usually the answer anyway.
  *
+ * 3. EVERY SEASON WE HOLD IS HERE — there is no "last N" cut. A twelve-year
+ *    veteran gets twelve sections, not three, because the question "was he ever
+ *    actually good" is one a card game asks constantly and a truncated log
+ *    cannot answer. Collapsing is what makes that affordable; truncating would
+ *    have been the cheaper and wrong answer. `Expand all` exists for exactly
+ *    the vet case, where opening twelve sections one at a time is the tax that
+ *    collapsing would otherwise impose.
+ *
  * Season summaries count PLAYED games only. An upcoming fixture is not a zero,
  * and averaging it in would drag every in-progress season toward nothing.
  */
@@ -75,8 +83,38 @@ export function GameLog({
     );
   }
 
+  const openCount = sections.filter((s) => open[s.key]).length;
+  const allOpen = openCount === sections.length;
+
   return (
     <View style={styles.wrap}>
+      {/* Only worth drawing once there is more than one season to move. With a
+          rookie this is a control that does nothing, which is worse than no
+          control at all. */}
+      {sections.length > 1 ? (
+        <View style={styles.toolbar}>
+          <Text style={[Type.fine, { color: c.textTertiary }]}>
+            {`${sections.length} seasons on record`}
+          </Text>
+          <Pressable
+            onPress={() =>
+              setOpen(
+                allOpen
+                  ? {}
+                  : Object.fromEntries(sections.map((s) => [s.key, true])),
+              )
+            }
+            accessibilityRole="button"
+            accessibilityLabel={allOpen ? 'Collapse every season' : 'Expand every season'}
+            hitSlop={8}
+            style={({ pressed }) => [pressed && styles.pressed]}>
+            <Text style={[Type.micro, { color: c.textSecondary }]}>
+              {allOpen ? 'COLLAPSE ALL' : 'EXPAND ALL'}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       {sections.map((section) => (
         <SeasonSection
           key={section.key}
@@ -230,6 +268,12 @@ function Summary({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   wrap: { gap: Spacing.two },
+  toolbar: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
   section: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, overflow: 'hidden' },
   head: {
     flexDirection: 'row',
