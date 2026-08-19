@@ -80,7 +80,20 @@ export function PlayerSheetFrame({
   }, [isWeb, onClose]);
 
   const header = (
-    <View style={[styles.header, { borderBottomColor: c.border }]}>
+    /**
+     * `collapsable={false}` is load-bearing on iOS, not a hint.
+     *
+     * React Native drops layout-only Views from the native tree as an
+     * optimisation, hoisting their children into the parent. react-native-screens'
+     * formSheet counts its subviews to decide how to lay a sheet out and expects
+     * at most two — a header and a scroll view — so once this View was collapsed
+     * the sheet saw six loose subviews, gave the header no height, and painted it
+     * on top of the scrolling content. It looked like three separate bugs
+     * (overlapping text, content past the sheet edge, a dead top area) and was
+     * this one flag. The library says so out loud in a warning worth reading:
+     * "FormSheet with ScrollView expects at most 2 subviews. Got 6".
+     */
+    <View collapsable={false} style={[styles.header, { borderBottomColor: c.border }]}>
       <View style={styles.headerText}>
         {title ? (
           <Text numberOfLines={1} style={[Type.section, { color: c.text }]}>
@@ -127,7 +140,7 @@ export function PlayerSheetFrame({
   if (!isWeb) {
     // The formSheet already IS the surface — draw on it, do not draw another.
     return (
-      <View style={[styles.fill, { backgroundColor: c.background }]}>
+      <View collapsable={false} style={[styles.sheetRoot, { backgroundColor: c.background }]}>
         {header}
         {scroller}
       </View>
@@ -172,6 +185,18 @@ export function PlayerSheetFrame({
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  /**
+   * `height: '100%'`, not just `flex: 1`.
+   *
+   * A formSheet sizes itself to its detent, and react-native-screens does not
+   * hand the screen's root view a definite height — so `flex: 1` alone resolves
+   * against nothing and the root measures ZERO. The children still PAINT, which
+   * is what made this so confusing to look at: the header rendered on top of
+   * the scroll content instead of above it, and the content ran past the
+   * sheet's own edge. It reads as three unrelated glitches and is one missing
+   * height.
+   */
+  sheetRoot: { flex: 1, height: '100%' },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.62)' },
   backdropBottom: { justifyContent: 'flex-end' },
   backdropCentre: {

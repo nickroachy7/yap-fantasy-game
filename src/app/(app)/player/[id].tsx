@@ -16,14 +16,15 @@
  * `Your cards` panel exists to show. See CardHistory for why that panel is the
  * right analogue of a transaction history in a game with no transactions.
  *
- * No photo, no logo, no jersey: unlicensed. Club is text, position is a glyph.
+ * No photo, no logo, no jersey: unlicensed. Club and position are text — the
+ * sheet's own header carries them, so this screen no longer draws an identity
+ * block of its own.
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { InjuryChip } from '@/components/cards/InjuryChip';
-import { PositionGlyph } from '@/components/cards/PositionGlyph';
 import {
   DIRECTORY_COLUMNS,
   normalise,
@@ -244,26 +245,16 @@ export default function PlayerDetailScreen() {
 
     return (
       <>
-        <View style={[styles.identity, { backgroundColor: c.backgroundElement }]}>
-          <PositionGlyph
-            position={player.position}
-            size={48}
-            color={c.text}
-            background={c.background}
-            borderColor={c.backgroundSelected}
-          />
-          <View style={styles.identityText}>
-            <Text numberOfLines={2} style={[styles.name, { color: c.text }]}>
-              {player.name}
-            </Text>
-            <Text numberOfLines={1} style={[styles.subline, { color: c.textSecondary }]}>
-              {[player.team?.toUpperCase(), player.position, player.rarity?.toUpperCase()]
-                .filter(Boolean)
-                .join(' · ')}
-            </Text>
+        {/* No identity block here any more. The sheet's own header carries the
+            name and `TEAM · POS · RARITY`, and repeating it immediately below
+            printed the player's name twice on a surface where vertical space is
+            the scarcest thing there is. The designation still needs somewhere to
+            live, because it is the one part of that block which is news. */}
+        {player.injuryStatus ? (
+          <View style={styles.injuryRow}>
             <InjuryChip status={player.injuryStatus} size="detail" />
           </View>
-        </View>
+        ) : null}
 
         {profile ? <BioStrip bio={profile.player} /> : null}
 
@@ -344,9 +335,15 @@ export default function PlayerDetailScreen() {
   return (
     <PlayerSheetFrame
       title={player?.name}
+      /* Carries the rarity too, now that the body no longer prints an identity
+         block. This is the whole of `TEAM · POS · RARITY` that used to sit
+         under the name below — said once, at the top, where a sheet's title
+         belongs. */
       subtitle={
         player
-          ? [player.team?.toUpperCase(), player.position].filter(Boolean).join(' · ')
+          ? [player.team?.toUpperCase(), player.position, player.rarity?.toUpperCase()]
+              .filter(Boolean)
+              .join(' · ')
           : undefined
       }
       onClose={dismiss}>
@@ -393,18 +390,21 @@ const styles = StyleSheet.create({
   centre: { alignItems: 'center', justifyContent: 'center', gap: Spacing.two, paddingVertical: Spacing.six },
   emptyTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
   emptyBody: { fontSize: 14, lineHeight: 20, textAlign: 'center' },
-  identity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
+  injuryRow: { flexDirection: 'row' },
+  /* Wraps. Four tiles across a phone-width sheet leaves ~46pt of usable width
+     inside each one, which truncated both the label AND the figure — "SEASO…"
+     over "30…", the two things the tile exists to say. `flexBasis` lets the row
+     lay out two-up on a phone and four-up once there is room, without a
+     breakpoint to keep in sync. */
+  statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  tile: {
+    flexGrow: 1,
+    flexBasis: 140,
+    minWidth: 140,
+    borderRadius: 12,
     padding: Spacing.three,
-    borderRadius: 16,
+    gap: 2,
   },
-  identityText: { flex: 1, minWidth: 0, gap: Spacing.one },
-  name: { fontSize: 24, fontWeight: '800', lineHeight: 29 },
-  subline: { fontSize: 13, fontWeight: '600', letterSpacing: 0.8 },
-  statRow: { flexDirection: 'row', gap: Spacing.two },
-  tile: { flex: 1, minWidth: 0, borderRadius: 12, padding: Spacing.three, gap: 2 },
   tileLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8 },
   tileValue: { fontWeight: '800' },
   tileHint: { fontSize: 10, fontWeight: '600' },
