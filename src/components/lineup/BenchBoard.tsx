@@ -11,6 +11,12 @@
  * It used to be drawn by a compact table row inside a bordered
  * board. Both are gone. See `LineupRow` for why the row changed, and
  * `SlotBoard` for why the border did.
+ *
+ * NO SORT BAR. There was one — FP, FP/G, name — and it answered a question the
+ * bench does not ask. See `sortByPosition`: the order is now fixed and grouped
+ * by position, which is the only grouping a swap can act on, and a control
+ * offering three orderings of a list that has one useful one was a decision
+ * handed to the reader that the screen should have made itself.
  */
 import { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -19,16 +25,13 @@ import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { BenchRow } from './LineupRow';
-import { SortBar } from './SortBar';
-import { type LineupCard, type SortKey } from './model';
+import { type LineupCard } from './model';
 
 function BenchBoardImpl({
   cards,
   targetSlotFor,
   startableFor,
   locked,
-  sort,
-  onSort,
   onOpen,
   onOpenProfile,
   offSeasonCount,
@@ -39,8 +42,6 @@ function BenchBoardImpl({
   /** Whether any slot at all accepts him — a taken slot still counts. */
   startableFor: (card: LineupCard) => boolean;
   locked: boolean;
-  sort: SortKey;
-  onSort: (next: SortKey) => void;
   /** The badge opens the swap sheet for this card. */
   onOpen: (card: LineupCard) => void;
   /** Everything else opens the player. */
@@ -53,7 +54,6 @@ function BenchBoardImpl({
 
   return (
     <View>
-      <SortBar value={sort} onChange={onSort} hint={`${cards.length} ON THE BENCH`} />
       {cards.length === 0 ? (
         <Text style={[Type.body, styles.empty, { color: c.textSecondary }]}>
           Every card you own is in the lineup.

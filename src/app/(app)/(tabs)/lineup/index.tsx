@@ -15,6 +15,23 @@
  *
  * Nothing here is a projection. Every number is either a clock or something
  * that has already happened.
+ *
+ * THERE IS NO SAVE BUTTON. Every change writes itself.
+ *
+ * A save button on this screen was asking people to confirm a decision they had
+ * already made — the swap sheet is where the choosing happens, and by the time
+ * it closes the choice is finished. What the button actually added was a way to
+ * lose work: pick a lineup, get distracted, leave the tab, and the week locks
+ * on whatever was there before. Autosave removes that failure entirely, and the
+ * lock is the only deadline that was ever real.
+ *
+ * The write is DEBOUNCED, not immediate — see the effect below. Swapping three
+ * slots in a row is one decision, and it should cost one round trip.
+ *
+ * What replaces the button is a status line, because a silent autosave is worse
+ * than no autosave: it asks you to trust that something happened. And the one
+ * case a button genuinely handled — the write FAILING — gets a retry, because
+ * an autosave that cannot save and cannot be told to try again is a dead end.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
@@ -29,6 +46,7 @@ import {
   firstOpenSlotFor,
   isEligible,
   lockCaption,
+  sortByPosition,
   sortCards,
   type Alert,
   type LineupCard,
@@ -52,6 +70,14 @@ import { supabase } from '@/lib/supabase';
  * change what it shows, and a snapshot taken at open time would not.
  */
 type Swap = { kind: 'slot'; slot: string } | { kind: 'bench'; cardId: string };
+
+/**
+ * How long the screen waits after the last edit before writing.
+ *
+ * Long enough that a run of swaps is one write, short enough that it has
+ * happened by the time you have finished reading the row you just changed.
+ */
+const DEBOUNCE_MS = 700;
 
 export default function LineupScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -84,8 +110,17 @@ export default function LineupScreen() {
   const [swap, setSwap] = useState<Swap | null>(null);
   const [sort, setSort] = useState<SortKey>('fp');
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  /**
+   * A failed write STOPS the autosave until something changes.
+   *
+   * Without this the screen is a retry loop: the save fails, the edits are kept
+   * (they must be — losing them is the thing autosave exists to prevent), so
+   * `dirty` stays true, so the effect fires again, forever, against a server
+   * that is already saying no. Cleared by any further edit, or by the retry the
+   * status line offers.
+   */
+  const [blocked, setBlocked] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
@@ -136,9 +171,12 @@ export default function LineupScreen() {
     [eligibleBySlot],
   );
 
+  /* Grouped by position, not sorted by the reader — see `sortByPosition`. The
+     `sort` state below still drives the SWAP SHEET, where choosing an ordering
+     is the whole point of the list. */
   const bench = useMemo(
-    () => sortCards(seasonCards.filter((card) => !usedIds.has(card.id)), sort),
-    [seasonCards, usedIds, sort],
+    () => sortByPosition(seasonCards.filter((card) => !usedIds.has(card.id))),
+    [seasonCards, usedIds],
   );
 
   const starters = useMemo(
@@ -211,16 +249,20 @@ export default function LineupScreen() {
     return map;
   }, [starters]);
 
+  /* Both of these clear the failure state as well as the error text: a new
+     choice is a new thing to try, and it deserves an attempt of its own. */
   const setPick = useCallback((slot: string, cardId: string) => {
     setEdits((e) => ({ ...e, [slot]: cardId }));
     setSwap(null);
-    setSaved(null);
+    setSubmitError(null);
+    setBlocked(false);
   }, []);
 
   const clearPick = useCallback((slot: string) => {
     setEdits((e) => ({ ...e, [slot]: null }));
     setSwap(null);
-    setSaved(null);
+    setSubmitError(null);
+    setBlocked(false);
   }, []);
 
   // Stable identities so the memoised boards below are not defeated by a new
@@ -311,7 +353,6 @@ export default function LineupScreen() {
     if (!slate) return;
     setSaving(true);
     setSubmitError(null);
-    setSaved(null);
     const payload = Object.entries(picks).map(([slot, card_instance_id]) => ({ slot, card_instance_id }));
     // The server re-checks ownership, eligibility and the lock. This is a
     // convenience, not the enforcement.
@@ -323,10 +364,12 @@ export default function LineupScreen() {
     });
     if (err) {
       setSubmitError(err.message);
+      // Edits are deliberately NOT cleared: they are the user's work, and the
+      // server refusing them is not a reason to throw them away. See `blocked`.
+      setBlocked(true);
       setSaving(false);
       return;
     }
-    setSaved(`Lineup saved for week ${slate.week}.`);
     setSaving(false);
     // Re-read rather than trusting the payload: the server is the only thing
     // that knows what actually stuck, and clearing the edit overlay against a
@@ -334,6 +377,40 @@ export default function LineupScreen() {
     setEdits({});
     await reload();
   }, [slate, picks, reload]);
+
+  /**
+   * The autosave.
+   *
+   * Debounced by DEBOUNCE_MS rather than firing on every edit: filling an empty
+   * lineup is eight swaps in about as many seconds, and eight round trips to
+   * say one thing is both wasteful and a race — the last response back wins,
+   * and it is not guaranteed to be the last request sent.
+   *
+   * `submit` is in the dependency list and changes identity whenever `picks`
+   * does, which is exactly right: a further edit inside the debounce window
+   * tears down the pending timer and starts a fresh one carrying the newer
+   * picks. That is the coalescing, and it falls out of the cleanup rather than
+   * needing a ref to track.
+   *
+   * Guarded on `saving` so a write already in flight is never doubled up, and
+   * on `blocked` so a rejected write is not retried forever. `dirty` is the
+   * whole trigger — it compares picks against what the server last returned,
+   * so a save that lands makes it false and the effect goes quiet on its own.
+   */
+  useEffect(() => {
+    if (!dirty || locked || saving || blocked || !slate) return;
+    const t = setTimeout(() => void submit(), DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [dirty, locked, saving, blocked, slate, submit]);
+
+  /**
+   * The one thing the reader can still ask for by hand, and only after a
+   * failure. Clearing `blocked` is enough — the effect above picks it up.
+   */
+  const retry = useCallback(() => {
+    setSubmitError(null);
+    setBlocked(false);
+  }, []);
 
   if (loading) {
     return (
@@ -344,7 +421,10 @@ export default function LineupScreen() {
   }
 
   const filled = starters.length;
-  const canSubmit = !locked && !saving && filled > 0 && dirty;
+  /* "About to save" — the debounce window. The status line has to cover it or
+     there is a visible second where an edit has been made and the screen says
+     it is saved. */
+  const pending = dirty && !locked && !blocked;
   const context = slate
     ? `${slate.season_type === 1 ? 'Preseason' : 'Season'} · Week ${slate.week}${locked ? ' · Locked' : ''}`
     : 'No slate scheduled';
@@ -424,8 +504,6 @@ export default function LineupScreen() {
               targetSlotFor={targetSlotFor}
               startableFor={startableFor}
               locked={locked}
-              sort={sort}
-              onSort={setSort}
               onOpen={openBenchCard}
               onOpenProfile={openProfile}
               offSeasonCount={offSeasonCount}
@@ -434,25 +512,35 @@ export default function LineupScreen() {
         </>
       )}
 
-      <Pressable
-        onPress={() => void submit()}
-        disabled={!canSubmit}
-        accessibilityRole="button"
-        accessibilityLabel={locked ? 'Lineup locked' : 'Save lineup'}
-        accessibilityState={{ disabled: !canSubmit, busy: saving }}
-        style={({ pressed }) => [
-          styles.submit,
-          { backgroundColor: canSubmit ? c.text : c.backgroundElement },
-          pressed && styles.pressed,
-        ]}>
-        {saving ? (
-          <ActivityIndicator color={c.background} />
-        ) : (
-          <Text style={[Type.strong, { color: canSubmit ? c.background : c.textTertiary }]}>
-            {locked ? 'Locked' : dirty ? 'Save lineup' : 'Lineup saved'}
+      {/* Where the save button was. It says what just happened rather than
+          asking for permission to do it — and it is the only place a failed
+          write can be retried from. */}
+      <View style={styles.status} accessibilityLiveRegion="polite">
+        {blocked ? (
+          <Pressable
+            onPress={retry}
+            accessibilityRole="button"
+            accessibilityLabel="Try saving the lineup again"
+            style={({ pressed }) => [
+              styles.retry,
+              { borderColor: c.negative },
+              pressed && styles.pressed,
+            ]}>
+            <Text style={[Type.fine, { color: c.negative }]}>Not saved — tap to try again</Text>
+          </Pressable>
+        ) : saving || pending ? (
+          <>
+            <ActivityIndicator size="small" color={c.textTertiary} />
+            <Text style={[Type.fine, { color: c.textTertiary }]}>Saving…</Text>
+          </>
+        ) : locked ? (
+          <Text style={[Type.fine, { color: c.textTertiary }]}>
+            Locked — this week&apos;s lineup is final.
           </Text>
-        )}
-      </Pressable>
+        ) : filled > 0 ? (
+          <Text style={[Type.fine, { color: c.textTertiary }]}>Saved automatically.</Text>
+        ) : null}
+      </View>
 
       {!locked && filled < slots.length ? (
         <Text style={[Type.fine, styles.centreText, { color: c.textTertiary }]}>
@@ -461,9 +549,6 @@ export default function LineupScreen() {
         </Text>
       ) : null}
 
-      {saved ? (
-        <Text style={[Type.fine, styles.centreText, { color: c.positive }]}>{saved}</Text>
-      ) : null}
       {submitError ?? loadError ? (
         <Text style={[Type.fine, styles.centreText, { color: c.negative }]}>
           {submitError ?? loadError}
@@ -512,12 +597,23 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     marginBottom: -Spacing.one - 2,
   },
-  submit: {
-    borderRadius: 10,
+  /* A line, not a button: it reports, it does not ask. Fixed height so the
+     page does not jump as it moves between saving, saved and locked. */
+  status: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 44,
+    gap: Spacing.two,
+    height: 32,
     marginTop: Spacing.one,
+  },
+  /* The exception, and the only control here: a write that failed is the one
+     state a reader can do something about. */
+  retry: {
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one + 2,
   },
   pressed: { opacity: 0.75 },
   centreText: { textAlign: 'center' },
