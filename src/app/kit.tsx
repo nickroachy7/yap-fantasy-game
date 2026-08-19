@@ -42,6 +42,8 @@ import { DropdownChip } from '@/components/ui/DropdownChip';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
 import { PositionBadge, positionsForSlot, slotBadgeLabel } from '@/components/ui/PositionBadge';
+import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
+import { SegmentedControl } from '@/components/shell/SegmentedControl';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { POSITION_ORDER, POSITIONS } from '@/constants/positions';
@@ -74,6 +76,8 @@ const NO_STATS = {
  * cannot compare against yesterday's screenshot — and calling the clock during
  * render is impure, which the hooks lint rightly objects to.
  */
+type KitDirection = 'up' | 'down';
+
 const DEMO_NOW = Date.parse('2026-09-12T12:00:00Z');
 const DEMO_LOCK_SOON = '2026-09-12T15:00:00Z';
 const DEMO_LOCK_PAST = '2026-09-12T11:00:00Z';
@@ -427,6 +431,8 @@ function Kit() {
   const [swap, setSwap] = useState<SwapRequest | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [action, setAction] = useState('search');
+  const [kitPos, setKitPos] = useState<PosFilter>('ALL');
+  const [kitDirection, setKitDirection] = useState<KitDirection>('up');
   // The sheet changes shape at the same breakpoint the product uses, so this
   // gallery shows whichever one the current window would get.
   const wide = useIsWide();
@@ -541,6 +547,25 @@ function Kit() {
               dir="asc"
               onPress={() => {}}
             />
+          </Section>
+
+          <Section
+            title="Filter row"
+            note="The Players boards' one row of filters: shared position chips on the left, the page's own switch on the right. The compact segmented control is sized to Chip — same height, same corner, same 10pt uppercase — so the row reads as one set of controls rather than a chip strip with a widget bolted to it.">
+            <View style={styles.filterRow}>
+              <View style={styles.filterChips}>
+                <PositionFilter value={kitPos} onChange={setKitPos} />
+              </View>
+              <SegmentedControl
+                compact
+                segments={[
+                  { value: 'up', label: 'Up' },
+                  { value: 'down', label: 'Down' },
+                ]}
+                value={kitDirection}
+                onChange={setKitDirection}
+              />
+            </View>
           </Section>
 
           <Section
@@ -887,6 +912,8 @@ function Section({
 }
 
 const styles = StyleSheet.create({
+  filterRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  filterChips: { flex: 1, minWidth: 0 },
   fill: { flex: 1 },
   content: { padding: Spacing.four, gap: Spacing.five, maxWidth: 760, width: '100%', alignSelf: 'center' },
   section: { gap: Spacing.two },

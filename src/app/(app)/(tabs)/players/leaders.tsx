@@ -1,0 +1,167 @@
+/**
+ * The best players of the season, in order.
+ *
+ * WHAT THIS IS FOR THAT SEARCH IS NOT
+ *
+ * Search can be sorted by points, so the top of it is these same names — and
+ * that is the objection to this page, so it is worth answering. Search is a
+ * tool for a question you already have: you arrive with a name, or a position,
+ * or a college, and you narrow until you find it. This is a BOARD, which is a
+ * different object: fixed length, no state to set, nothing to type, and it
+ * answers a question you did not have to phrase. Opening Search and sorting it
+ * is four decisions to reach what this page shows on arrival.
+ *
+ * It is also the only place in the section that ranks. Search deliberately does
+ * not draw a rank column — its order changes with every sort key, so a number
+ * beside a name would mean something different from one press to the next. Here
+ * the order is the subject, so the rank is honest.
+ *
+ * ONE POOL AT A TIME. The position chips do not filter a global list, they
+ * CHANGE it: pick WR and you get the top fifty receivers ranked 1..50, not
+ * whichever receivers happened to place in the overall top fifty. A board of
+ * "the best wide receivers" that skips from 3rd to 11th because the quarterbacks
+ * between them were removed is not a board, it is a filtered table.
+ */
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+
+import { PlayerList, type ListedPlayer } from '@/components/cards/PlayerList';
+import { ROW_GUTTER } from '@/components/cards/PlayerRow';
+import {
+  loadPlayerDirectory,
+  type DirectoryFetch,
+  type DirectoryPlayer,
+} from '@/components/cards/player-directory';
+import { fixtureLabel, useUpcomingFixtures } from '@/components/cards/use-fixtures';
+import { Screen } from '@/components/shell/Screen';
+import { SectionNav } from '@/components/shell/SectionNav';
+import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Spacing } from '@/constants/theme';
+
+/** How long a board is. The same fifty as the trend board, for the same reason. */
+const SHOWN = 50;
+
+export default function LeadersScreen() {
+  const router = useRouter();
+
+  const [result, setResult] = useState<DirectoryFetch | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [pos, setPos] = useState<PosFilter>('ALL');
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const next = await loadPlayerDirectory();
+        if (live) setResult(next);
+      } catch {
+        if (live) setFailed(true);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const fixtures = useUpcomingFixtures();
+
+  /**
+   * The board.
+   *
+   * Ranked off `overallRank` / `posRank` rather than off this list's own index,
+   * so the number beside a name is the same number the directory row shows for
+   * him — see `assignRanks`. Deriving it from the index here would be a second
+   * ranking of the same players, and the two would disagree the moment either
+   * changed its mind about who counts as unranked.
+   *
+   * Which is also why a player with no games is simply absent: he has no rank,
+   * and a board is a list of ranks.
+   */
+  const { board, pool } = useMemo<{ board: ListedPlayer[]; pool: number }>(() => {
+    if (!result) return { board: [], pool: 0 };
+    const inPool =
+      pos === 'ALL'
+        ? result.players.filter((p) => p.overallRank !== null)
+        : result.players.filter(
+            (p) => p.posRank !== null && (p.position ?? '').toUpperCase() === pos,
+          );
+
+    const rankOf = (p: DirectoryPlayer) =>
+      (pos === 'ALL' ? p.overallRank : p.posRank) ?? Number.MAX_SAFE_INTEGER;
+
+    return {
+      board: [...inPool]
+        .sort((a, b) => rankOf(a) - rankOf(b))
+        .slice(0, SHOWN)
+        .map((player) => ({ player })),
+      pool: inPool.length,
+    };
+  }, [result, pos]);
+
+  const openPlayer = useCallback(
+    (player: DirectoryPlayer) =>
+      router.push({ pathname: '/player/[id]', params: { id: player.playerId } }),
+    [router],
+  );
+
+  const fixtureFor = useCallback(
+    (team: string | null) => (team ? fixtureLabel(fixtures.get(team.toUpperCase())) : undefined),
+    [fixtures],
+  );
+
+  const body = () => {
+    if (failed) {
+      return (
+        <EmptyState
+          title="Could not load the players"
+          body="The board is built from the directory, and that read failed. Try again in a moment."
+        />
+      );
+    }
+    if (!result) return <ActivityIndicator style={styles.pad} />;
+    if (board.length === 0) {
+      return (
+        <EmptyState
+          title="Nobody has played yet"
+          body={
+            pos === 'ALL'
+              ? 'A board needs scored games. Once a week has been played and swept, the leaders appear here.'
+              : `No ${pos} has a scored game this season yet.`
+          }
+        />
+      );
+    }
+    return <PlayerList players={board} fixtureFor={fixtureFor} onOpen={openPlayer} />;
+  };
+
+  /* The count names the POOL as well as the board. "Top 50 of 412" says both
+     how long the list is and how much it left out; "50 players" says only the
+     first, and reads as though that is all there are. A pool that fits inside
+     the board says so instead of claiming to have trimmed something. */
+  const context = !result
+    ? 'Season leaders'
+    : pool > board.length
+      ? `${result.season ?? ''} season · top ${board.length} of ${pool} by points`.trim()
+      : `${result.season ?? ''} season · ${board.length} ranked by points`.trim();
+
+  return (
+    <Screen title="Leaders" measure="table" context={context} scroll={false}>
+      {/* The list runs edge to edge, so the chrome supplies the gutter the
+          page does not. See the same block on the Trend board. */}
+      <View style={styles.controls}>
+        <SectionNav section="/players" />
+
+        <PositionFilter value={pos} onChange={setPos} />
+      </View>
+
+      {body()}
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  pad: { paddingVertical: Spacing.four },
+  controls: { paddingHorizontal: ROW_GUTTER, paddingBottom: Spacing.two, gap: Spacing.two },
+});

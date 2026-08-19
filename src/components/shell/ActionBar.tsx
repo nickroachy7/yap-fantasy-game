@@ -92,9 +92,18 @@ export function ActionBar({ actions, wide }: { actions: Action[]; wide: boolean 
           accessibilityRole="button"
           accessibilityState={{ selected: Boolean(a.active) }}
           accessibilityLabel={a.label}
+          /* The active cell is a RAISED tile, not a tinted one. `backgroundSelected`
+             on `surface` is a few points of lightness apart — enough to find
+             once you know which item is active and not enough to tell you, which
+             is the one job this highlight has. `background` against the tray's
+             `surface` is the same step the app uses everywhere else to say "this
+             sits on top", and it reverses cleanly in light mode where the tinted
+             version washed out entirely. */
           style={({ pressed }) => [
             styles.item,
-            a.active ? { backgroundColor: c.backgroundSelected } : null,
+            a.active
+              ? { backgroundColor: c.background, borderColor: c.border, borderWidth: StyleSheet.hairlineWidth }
+              : styles.inactive,
             pressed ? styles.pressed : null,
           ]}>
           <ActionIcon
@@ -436,22 +445,30 @@ const styles = StyleSheet.create({
   },
   /* Equal widths rather than hugging their labels: five cells of the same size
      read as one control, where five different widths read as a sentence of
-     buttons. */
+     buttons.
+     
+     NO MAXIMUM. There was a 104pt cap, put there so a TWO-item bar would not
+     give each cell half a phone and read as the segmented control this
+     replaced. It solved that and created a worse one the moment a section had
+     three pages: three capped cells centred in a full-width tray left ~64pt of
+     dead tray at either end, so the strip read as a box with some buttons
+     loose inside it rather than as one control. Filling is the honest look for
+     a set of pages that between them are the whole section — and the two-item
+     case it was guarding is gone, since Players is three and Collection and
+     Leaderboard were never two. */
   item: {
     flexGrow: 1,
     flexBasis: 0,
     minWidth: 62,
-    /* Capped, or a two-item bar — Players is Directory and Trend — gives each
-       cell half a phone and the pair reads as the segmented control this
-       replaced. The cap plus a centred row keeps a short bar looking like a
-       row of buttons and a long one looking like a scroller. */
-    maxWidth: 104,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 3,
     paddingVertical: Spacing.one + 2,
     borderRadius: Radius.control,
   },
+  /* A transparent border on the inactive cells, so selecting one does not make
+     the row a point and a half taller. */
+  inactive: { borderWidth: StyleSheet.hairlineWidth, borderColor: 'transparent' },
   label: { letterSpacing: 0.4 },
   badge: { fontSize: 7, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
   box: { alignItems: 'center', justifyContent: 'center' },

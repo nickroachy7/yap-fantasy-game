@@ -20,11 +20,14 @@
  * between the two you use together — the lineup and the collection it is drawn
  * from. They are now neighbours.
  *
- * A section's FIRST child deliberately shares the section's own href. The
- * segmented control needs a segment for the landing page or there is no way
- * back to it, and the sidebar needs the parent row to stay a live target. The
- * alternative — a bare `/lineup/index` child — would show the same word twice
- * in the rail for no gain.
+ * One child of every section deliberately shares the section's own href. The
+ * nav needs an item for the landing page or there is no way back to it, and the
+ * sidebar needs the parent row to stay a live target. The alternative — a bare
+ * `/lineup/index` child — would show the same word twice in the rail for no
+ * gain.
+ *
+ * It is the FIRST child everywhere except Players, which lands on its second;
+ * see the note there.
  */
 import type { ActionIconName } from '@/components/shell/ActionBar';
 import type { TabIconName } from '@/components/shell/TabIcon';
@@ -86,9 +89,24 @@ export const NAV_SECTIONS: NavSection[] = [
     href: '/players',
     label: 'Players',
     icon: 'players',
+    /* THE LANDING PAGE IS THE SECOND CHILD, not the first, and it is the only
+       section where that is true.
+       
+       The rule below — first child shares the section's href — exists so there
+       is always a way back to the landing page, and it is satisfied by ANY
+       child pointing at it; being first was convention, not mechanism, and
+       `SectionNav` marks the active item by comparing paths rather than by
+       position. What the order carries instead is how the three read as a set:
+       find a player, see who moved, see who is best. Opening on Trend is a
+       separate decision from where Trend sits in that row, and forcing the two
+       to agree would mean landing on a search box — a page that shows you
+       nothing until you type. */
     children: [
-      { href: '/players', label: 'Directory', icon: 'directory' },
-      { href: '/players/trend', label: 'Trend', icon: 'trend' },
+      /* Not `/players/search`: it is a full-screen takeover living above the
+         tab navigator, so its path is a root one. See `app/search.tsx`. */
+      { href: '/search', label: 'Search', icon: 'search' },
+      { href: '/players', label: 'Trend', icon: 'trend' },
+      { href: '/players/leaders', label: 'Leaders', icon: 'standings' },
     ],
   },
   {

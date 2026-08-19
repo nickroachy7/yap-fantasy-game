@@ -95,6 +95,21 @@ export default function AppLayout() {
             questions — see the note on sheetOptions. */}
         <Stack.Screen name="player/[id]" options={sheetOptions} />
         <Stack.Screen name="card/[id]" options={sheetOptions} />
+        {/* Search is a TAKEOVER, not a sheet: it covers the header and the tab
+            bar as well as the page, which is the whole point of it and the
+            reason it cannot live under `(tabs)`. `fullScreenModal` is the one
+            presentation that leaves nothing of the app visible behind it; the
+            profile routes above deliberately stop short of that, because a
+            profile is something you glance at over the app and this is
+            something you use instead of it. Web has no such presentation, so it
+            takes the ordinary push, which covers the screen there anyway. */}
+        <Stack.Screen
+          name="search"
+          options={{
+            presentation: Platform.OS === 'web' ? undefined : 'fullScreenModal',
+            animation: Platform.OS === 'web' ? 'fade' : undefined,
+          }}
+        />
       </Stack>
     </PlayerProvider>
   );

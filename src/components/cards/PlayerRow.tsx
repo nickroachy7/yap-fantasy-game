@@ -135,14 +135,35 @@ const EMPTY_MARKET = { copies: 0, bronze: 0, silver: 0, gold: 0, diamond: 0, bes
  * return a dash the caller then styles as if it were a number.
  */
 
+/**
+ * The one number a row LEADS with, when the screen it is on is about something
+ * other than season points.
+ *
+ * The right-hand figure is not "season FP" so much as "the quantity this list
+ * is ordered by" — on the directory those are the same thing, on the trend
+ * board it is the week-over-week delta, and a trend list whose headline figure
+ * was a season total would be sorted by a number it does not show.
+ *
+ * Default when absent: season points, gated on having played. See the note on
+ * `played` above.
+ */
+export type RowFigure = {
+  value: string;
+  /** The unit under it — `FP`, `WK`. Kept short; it sits in a 52pt column. */
+  label: string;
+  /** Overrides the figure's colour. For a signed delta, which reads as one. */
+  color?: string;
+};
+
 export type PlayerRowProps = {
   player: DirectoryPlayer;
   onPress: (player: DirectoryPlayer) => void;
   /** "Sun 1:05p vs BUF" or "BYE". Absent when the schedule has not loaded. */
   fixture?: string | null;
+  figure?: RowFigure;
 };
 
-function PlayerRowInner({ player, onPress, fixture }: PlayerRowProps) {
+function PlayerRowInner({ player, onPress, fixture, figure }: PlayerRowProps) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const accent = positionColors(player.position, scheme).accent;
@@ -249,8 +270,17 @@ function PlayerRowInner({ player, onPress, fixture }: PlayerRowProps) {
             it was a frame around something already anchored. */}
         <View style={styles.figure}>
           {/* An em dash at figure weight is a black bar, not an absence — it
-              reads as a redaction. Unplayed drops to the strip's weight. */}
-          {played ? (
+              reads as a redaction. Unplayed drops to the strip's weight.
+              A supplied figure is never dashed: the caller has already decided
+              it is worth printing, and a screen that ranks by it cannot then
+              claim not to have it. */}
+          {figure ? (
+            <Text
+              numberOfLines={1}
+              style={[styles.figureValue, NUMERIC, { color: figure.color ?? c.text }]}>
+              {figure.value}
+            </Text>
+          ) : played ? (
             <Text numberOfLines={1} style={[styles.figureValue, NUMERIC, { color: c.text }]}>
               {oneDp(player.seasonFp)}
             </Text>
@@ -259,7 +289,9 @@ function PlayerRowInner({ player, onPress, fixture }: PlayerRowProps) {
               {DASH}
             </Text>
           )}
-          <Text style={[Type.micro, styles.figureLabel, { color: c.textTertiary }]}>FP</Text>
+          <Text style={[Type.micro, styles.figureLabel, { color: c.textTertiary }]}>
+            {figure?.label ?? 'FP'}
+          </Text>
         </View>
       </View>
 
