@@ -52,9 +52,11 @@ import {
   type TierFilter,
 } from '@/components/collection/types';
 import { useCollection } from '@/components/collection/use-collection';
+import { ActionBar, type Action } from '@/components/shell/ActionBar';
 import { Screen } from '@/components/shell/Screen';
 import { SubNav } from '@/components/shell/SubNav';
 import { COLLECTION_SEGMENTS } from '@/components/shell/sections';
+import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -94,6 +96,15 @@ export default function InventoryScreen() {
   const [availability, setAvailability] = useState<AvailabilityFilter>('ALL');
   const [sort, setSort] = useState<SortKey>('fp');
   const [dir, setDir] = useState<SortDir>(SortDefaultDir.fp);
+
+  /* Search, tiers and sort fold away behind the action bar; positions do not.
+     Four permanent control rows plus the summary put the first card ~260pt down
+     a phone screen, and the one facet people reach for every visit is position.
+     The rest are a tap away and say so. */
+  const [showSearch, setShowSearch] = useState(false);
+  const [showTiers, setShowTiers] = useState(false);
+  const [showSort, setShowSort] = useState(false);
+  const wide = useIsWide();
 
   /* ---- grid geometry ------------------------------------------------- *
    * MEASURED, not recomputed. This used to derive the column width from the
@@ -201,6 +212,55 @@ export default function InventoryScreen() {
   const total = cards?.length ?? cardCount;
   const context = filtered ? `${visible.length} of ${total} cards` : `${total} cards`;
 
+  const actions = useMemo<Action[]>(
+    () => [
+      // Search only appears above the size where scanning stops working — the
+      // same threshold that used to gate the field itself.
+      ...(searchable
+        ? [
+            {
+              key: 'search',
+              label: 'Search',
+              icon: 'search' as const,
+              active: showSearch || needle.length > 0,
+              onPress: () => setShowSearch((v) => !v),
+            },
+          ]
+        : []),
+      {
+        key: 'tiers',
+        label: 'Tiers',
+        icon: 'tiers' as const,
+        active: showTiers || tier !== 'ALL',
+        onPress: () => setShowTiers((v) => !v),
+      },
+      {
+        key: 'available',
+        label: 'Available',
+        icon: 'available' as const,
+        // Not a disclosure — this one IS the filter. Pressing it hides the
+        // cards that are already in a lineup.
+        active: availability === 'AVAILABLE',
+        onPress: () => setAvailability((a) => (a === 'ALL' ? 'AVAILABLE' : 'ALL')),
+      },
+      {
+        key: 'sort',
+        label: 'Sort',
+        icon: 'sort' as const,
+        active: showSort,
+        onPress: () => setShowSort((v) => !v),
+      },
+      {
+        key: 'shop',
+        label: 'Shop',
+        icon: 'shop' as const,
+        nav: true,
+        onPress: () => router.push('/collection/shop'),
+      },
+    ],
+    [searchable, showSearch, needle, showTiers, tier, availability, showSort, router],
+  );
+
   return (
     <Screen title="Inventory" context={context} scroll={false}>
       <SubNav segments={COLLECTION_SEGMENTS} />
@@ -234,11 +294,12 @@ export default function InventoryScreen() {
           </ScrollView>
         ) : listWidth === 0 ? null : (
           <>
-            {searchable ? (
-              <View style={styles.toolbar}>
+            <View style={styles.toolbar}>
+              <ActionBar actions={actions} wide={wide} />
+              {searchable && showSearch ? (
                 <SearchField value={query} onChange={setQuery} hint={`${total} OWNED`} />
-              </View>
-            ) : null}
+              ) : null}
+            </View>
 
             <FlatList
               // numColumns cannot change on a live list, so a width change that
@@ -261,19 +322,23 @@ export default function InventoryScreen() {
               ListHeaderComponent={
                 <View style={styles.header}>
                   <CollectionSummary stats={stats} />
-                  <TierFilterRow
-                    value={tier}
-                    onChange={setTier}
-                    total={forTierCounts.length}
-                    counts={tierCounts}
-                  />
+                  {showTiers ? (
+                    <TierFilterRow
+                      value={tier}
+                      onChange={setTier}
+                      total={forTierCounts.length}
+                      counts={tierCounts}
+                    />
+                  ) : null}
                   <PositionFilterRow
                     value={position}
                     onChange={setPosition}
                     total={forPositionCounts.length}
                     counts={positionCounts}
                   />
-                  <SortRow value={sort} dir={dir} onChange={changeSort} onToggleDir={toggleDir} />
+                  {showSort ? (
+                    <SortRow value={sort} dir={dir} onChange={changeSort} onToggleDir={toggleDir} />
+                  ) : null}
                   <ResultLine
                     shown={visible.length}
                     total={all.length}
@@ -282,9 +347,6 @@ export default function InventoryScreen() {
                     // a chip that says "hide 0" cannot be pressed back off.
                     unavailable={stats.unavailable}
                     availability={availability}
-                    onToggleAvailability={() =>
-                      setAvailability((a) => (a === 'ALL' ? 'AVAILABLE' : 'ALL'))
-                    }
                   />
                 </View>
               }
@@ -302,7 +364,7 @@ export default function InventoryScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  toolbar: { paddingHorizontal: GUTTER, paddingBottom: Spacing.two },
+  toolbar: { paddingHorizontal: GUTTER, paddingBottom: Spacing.two, gap: Spacing.two },
   list: { paddingHorizontal: GUTTER, paddingBottom: Spacing.six, gap: GAP },
   row: { gap: GAP },
   header: { gap: Spacing.two, paddingBottom: Spacing.two },

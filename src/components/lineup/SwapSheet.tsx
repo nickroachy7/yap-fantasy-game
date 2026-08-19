@@ -30,6 +30,18 @@
  * and because two sheets would drift in exactly the ways a modal must not:
  * dismissal, safe-area padding, and what the backdrop does.
  *
+ * AND THEY ARE THE SAME SHAPE
+ *
+ * Both modes read: the subject pinned at the top under a label, then a labelled
+ * list of what you are choosing between, in ONE set of columns. The bench mode
+ * used to be a different object — taller rows, its own typography, its own
+ * FP/G pair written as a sentence — so the same decision looked like two
+ * unrelated screens depending on which end you started from. Now a destination
+ * is drawn by the same `CardRow` as a candidate, with the slot in the lead
+ * column where the `IN` mark sits on the other side, and an unoccupied slot
+ * uses the row's own empty state. You are always comparing like with like down
+ * the same columns.
+ *
  * The Modal-with-sibling-backdrop construction is the same as `DropdownChip`
  * and `ConfirmDialog` — a Pressable WRAPPING the sheet renders a <button>
  * containing <button>s on web, which React rejects at runtime.
@@ -40,7 +52,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DASH } from '@/components/ui/DataTable';
 import { PositionBadge, positionsForSlot } from '@/components/ui/PositionBadge';
-import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
+import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { CardRow, CardRowHeader } from './CardRow';
@@ -184,7 +196,7 @@ export function SwapSheet({
                     onClear={onClear}
                   />
                 ) : (
-                  <BenchBody request={request} onPick={onPick} />
+                  <BenchBody request={request} wide={wide} onPick={onPick} />
                 )}
               </ScrollView>
             </>
@@ -243,9 +255,7 @@ function SlotBody({
     <>
       {current ? (
         <View style={styles.section}>
-          <Text style={[Type.micro, styles.sectionLabel, { color: c.textTertiary }]}>
-            IN THIS SLOT NOW
-          </Text>
+          <SectionLabel>In this slot now</SectionLabel>
           <View style={[styles.pinned, { backgroundColor: c.surfaceSunken, borderColor: c.border }]}>
             <CardRow
               wide={wide}
@@ -312,9 +322,11 @@ function SlotBody({
  */
 function BenchBody({
   request,
+  wide,
   onPick,
 }: {
   request: Extract<SwapRequest, { kind: 'bench' }>;
+  wide: boolean;
   onPick: (slot: string, cardId: string) => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -332,62 +344,65 @@ function BenchBody({
   }
 
   return (
-    <View style={styles.section}>
-      <Text style={[Type.micro, styles.sectionLabel, { color: c.textTertiary }]}>
-        SEND {card.name.toUpperCase()} TO
-      </Text>
-      {destinations.map(({ slot, occupant }) => (
-        <Pressable
-          key={slot}
-          onPress={() => onPick(slot, card.id)}
-          accessibilityRole="button"
-          accessibilityLabel={
-            occupant
-              ? `Start ${card.name} at ${slot} in place of ${occupant.name}`
-              : `Start ${card.name} at ${slot}, which is empty`
-          }
-          style={({ pressed }) => [
-            styles.destination,
-            { borderColor: c.border },
-            pressed && { backgroundColor: c.backgroundElement },
-          ]}>
-          <PositionBadge label={slot} positions={positionsForSlot(slot)} size={28} />
-          <View style={styles.destinationText}>
-            {occupant ? (
-              <>
-                <Text numberOfLines={1} style={[Type.strong, { color: c.text }]}>
-                  Replace {occupant.name}
-                </Text>
-                <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
-                  {occupant.team ?? DASH} · {matchupLabel(occupant.game)}
-                </Text>
-              </>
-            ) : (
-              <>
-                <Text numberOfLines={1} style={[Type.strong, { color: c.text }]}>
-                  {slot} is empty
-                </Text>
-                <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
-                  Nothing is starting here yet
-                </Text>
-              </>
-            )}
-          </View>
-          {/* The comparison the swap turns on, stated in one number on each
-              side: what he averages against what the man in the slot does. */}
-          <View style={styles.compare}>
-            <Text style={[Type.micro, { color: c.textTertiary }]}>FP/G</Text>
-            <Text style={[Type.strong, NUMERIC, { color: c.text }]}>
-              {card.form ? card.form.fpPerGame.toFixed(1) : DASH}
-              <Text style={{ color: c.textTertiary }}>
-                {' vs '}
-                {occupant?.form ? occupant.form.fpPerGame.toFixed(1) : DASH}
+    <>
+      {/* The mirror of the slot mode's pinned incumbent: the player the sheet
+          is about, in the same box, under the same kind of label. */}
+      <View style={styles.section}>
+        <SectionLabel>Moving</SectionLabel>
+        <View style={[styles.pinned, { backgroundColor: c.surfaceSunken, borderColor: c.border }]}>
+          <CardRow
+            wide={wide}
+            card={card}
+            selected
+            accessibilityLabel={`${card.name} is on the bench`}
+            lead={<Text style={[Type.micro, { color: c.textSecondary }]}>OUT</Text>}
+          />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <SectionLabel>Send him to</SectionLabel>
+        {/* Every legal slot, taken ones included. A bench player whose slots are
+            all full is the ordinary case — three good running backs, two slots —
+            and a sheet that showed nothing there would be answering a question
+            nobody asked. What it shows instead is who he would replace, in the
+            columns you would compare them in. */}
+        <CardRowHeader wide={wide} leadLabel="SLOT" />
+        {destinations.map(({ slot, occupant }) => (
+          <CardRow
+            key={slot}
+            wide={wide}
+            card={occupant}
+            emptyPrimary={`${slot} is empty`}
+            emptySecondary="Nothing is starting here yet"
+            onPress={() => onPick(slot, card.id)}
+            accessibilityLabel={
+              occupant
+                ? `Start ${card.name} at ${slot} in place of ${occupant.name}`
+                : `Start ${card.name} at ${slot}, which is empty`
+            }
+            lead={
+              <Text
+                numberOfLines={1}
+                style={[Type.micro, { color: occupant ? c.text : c.textSecondary }]}>
+                {slot}
               </Text>
-            </Text>
-          </View>
-        </Pressable>
-      ))}
-    </View>
+            }
+          />
+        ))}
+      </View>
+    </>
+  );
+}
+
+/** One label, one treatment, so both modes are read the same way. */
+function SectionLabel({ children }: { children: string }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  return (
+    <Text style={[Type.micro, styles.sectionLabel, { color: c.textTertiary }]}>
+      {children.toUpperCase()}
+    </Text>
   );
 }
 
@@ -444,16 +459,6 @@ const styles = StyleSheet.create({
   },
   clear: { paddingHorizontal: Spacing.two + 2, paddingVertical: Spacing.two },
   empty: { padding: Spacing.three },
-  destination: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two + 2,
-    paddingHorizontal: Spacing.two + 2,
-    paddingVertical: Spacing.two + 2,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  destinationText: { flex: 1, minWidth: 0, gap: 1 },
-  compare: { alignItems: 'flex-end', gap: 1 },
   footer: {
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: Spacing.three,

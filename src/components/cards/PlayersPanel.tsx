@@ -1,6 +1,6 @@
 /**
- * The Cards player directory: a sortable, filterable table of every mintable
- * player in the current season.
+ * The player directory: a sortable, filterable table of every mintable player
+ * in the current season.
  *
  * This is a research surface, not a feed — the job is to answer "who is the
  * fourth-best tight end" and "which rookie receivers have actually played"
@@ -19,6 +19,7 @@
  * ~1,000 rows, so the list is virtualised from day one rather than "later",
  * and the read is paged and count-checked rather than trusted.
  */
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -30,9 +31,10 @@ import {
   useColorScheme,
 } from 'react-native';
 
+import { ActionBar, type Action } from '@/components/shell/ActionBar';
+import { useIsWide, useTabBarInset } from '@/components/shell/useResponsive';
+import { Chip, ChipRow } from '@/components/ui/Chip';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Tabs, type Tab } from '@/components/ui/Tabs';
-import { useTabBarInset } from '@/components/shell/useResponsive';
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { PLAYER_ROW_HEIGHT, PlayerRow, ROW_GUTTER } from './PlayerRow';
 import { SortBar } from './SortBar';
@@ -61,6 +63,8 @@ export function PlayersPanel({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const tabInset = useTabBarInset();
+  const wide = useIsWide();
+  const router = useRouter();
 
   const [result, setResult] = useState<DirectoryFetch | null>(null);
   const [loading, setLoading] = useState(true);
@@ -70,6 +74,15 @@ export function PlayersPanel({
   const [query, setQuery] = useState('');
   const [position, setPosition] = useState<PositionFilter>('ALL');
   const [sort, setSort] = useState<SortState>({ key: 'fp', dir: 'desc' });
+
+  /* Search and sort are folded away behind the action bar. They were both
+     permanently on screen, which cost ~72pt above the first player on a phone
+     for two controls most visits never touch — and the search field kept the
+     keyboard one tap away from a list you scroll with your thumb. The position
+     chips stay out, because narrowing to one position is the thing people
+     actually do here. */
+  const [showSearch, setShowSearch] = useState(false);
+  const [showSort, setShowSort] = useState(false);
 
   /* The row is fluid at every width now — five equal stat cells and one
      flexible name — so nothing here needs to know how wide it is. */
@@ -107,15 +120,7 @@ export function PlayersPanel({
   // Counts come from the unfiltered set so the tab labels stay put while you
   // type — a filter whose own count changes as you use it cannot be trusted.
   const counts = useMemo(() => (players ? positionCounts(players) : null), [players]);
-  const tabs = useMemo<Tab<PositionFilter>[]>(
-    () =>
-      POSITION_FILTERS.map((p) => ({
-        value: p,
-        label: p === 'ALL' ? 'All' : p,
-        hint: counts ? String(counts[p]) : undefined,
-      })),
-    [counts],
-  );
+
 
   const open = useCallback((p: DirectoryPlayer) => onOpenPlayer(p.playerId), [onOpenPlayer]);
 
@@ -135,6 +140,36 @@ export function PlayersPanel({
     setPosition('ALL');
   }, []);
 
+  const actions = useMemo<Action[]>(
+    () => [
+      {
+        key: 'search',
+        label: 'Search',
+        icon: 'search',
+        // Active when the field is open OR when a query is narrowing the list
+        // from behind a closed one — a filter you cannot see is the one that
+        // most needs saying.
+        active: showSearch || query.trim().length > 0,
+        onPress: () => setShowSearch((v) => !v),
+      },
+      {
+        key: 'sort',
+        label: 'Sort',
+        icon: 'sort',
+        active: showSort,
+        onPress: () => setShowSort((v) => !v),
+      },
+      {
+        key: 'trend',
+        label: 'Trend',
+        icon: 'trend',
+        nav: true,
+        onPress: () => router.push('/players/trend'),
+      },
+    ],
+    [showSearch, showSort, query, router],
+  );
+
   const filtering = query.trim().length > 0 || position !== 'ALL';
 
   const renderItem = useCallback(
@@ -153,31 +188,51 @@ export function PlayersPanel({
       {/* Controls live OUTSIDE the FlatList. As a ListHeaderComponent the text
           input is remounted on every keystroke and loses focus. */}
       <View style={styles.controls}>
-        <View style={styles.searchRow}>
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search name, team or college"
-            placeholderTextColor={c.textTertiary}
-            autoCapitalize="none"
-            autoCorrect={false}
-            returnKeyType="search"
-            clearButtonMode="while-editing"
-            accessibilityLabel="Search players by name, team or college"
-            style={[
-              styles.search,
-              Type.body,
-              { backgroundColor: c.backgroundElement, color: c.text, borderColor: c.border },
-            ]}
-          />
-          <Text numberOfLines={1} style={[Type.fine, NUMERIC, styles.count, { color: c.textTertiary }]}>
-            {result ? summarise(result, visible.length, filtering) : ' '}
-          </Text>
-        </View>
+        <ActionBar actions={actions} wide={wide} />
 
-        <Tabs tabs={tabs} value={position} onChange={setPosition} />
+        {showSearch ? (
+          <View style={styles.searchRow}>
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search name, team or college"
+              placeholderTextColor={c.textTertiary}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+              accessibilityLabel="Search players by name, team or college"
+              style={[
+                styles.search,
+                Type.body,
+                { backgroundColor: c.backgroundElement, color: c.text, borderColor: c.border },
+              ]}
+            />
+          </View>
+        ) : null}
 
-        <SortBar sort={sort} onSort={pressSort} />
+        <ChipRow>
+          {POSITION_FILTERS.map((p) => (
+            <Chip
+              key={p}
+              selected={position === p}
+              label={p === 'ALL' ? 'ALL' : p}
+              count={counts ? counts[p] : undefined}
+              onPress={() => setPosition(p)}
+              accessibilityLabel={`${p === 'ALL' ? 'All positions' : p}${counts ? `, ${counts[p]} players` : ''}`}
+            />
+          ))}
+        </ChipRow>
+
+        {showSort ? <SortBar sort={sort} onSort={pressSort} /> : null}
+
+        {/* The count line always shows, open field or not: it is the answer to
+            "am I looking at everything", and hiding it with the search box made
+            a narrowed list look like the whole directory. */}
+        <Text numberOfLines={1} style={[Type.fine, NUMERIC, { color: c.textTertiary }]}>
+          {result ? summarise(result, visible.length, filtering) : ' '}
+        </Text>
 
         {result && !result.complete ? (
           <Text

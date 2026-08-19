@@ -70,12 +70,12 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    href: '/cards',
-    label: 'Cards',
-    icon: 'cards',
+    href: '/players',
+    label: 'Players',
+    icon: 'players',
     children: [
-      { href: '/cards', label: 'Directory' },
-      { href: '/cards/trend', label: 'Trend' },
+      { href: '/players', label: 'Directory' },
+      { href: '/players/trend', label: 'Trend' },
     ],
   },
   {
@@ -122,4 +122,4 @@ export function segmentsFor(sectionHref: string): Segment<string>[] {
 export const COLLECTION_SEGMENTS: Segment<string>[] = segmentsFor('/collection');
 
 export const LEADERBOARD_SEGMENTS: Segment<string>[] = segmentsFor('/leaderboard');
-export const CARDS_SEGMENTS: Segment<string>[] = segmentsFor('/cards');
+export const PLAYERS_SEGMENTS: Segment<string>[] = segmentsFor('/players');

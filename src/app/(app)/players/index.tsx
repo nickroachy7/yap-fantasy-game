@@ -5,9 +5,9 @@ import { PlayersPanel } from '@/components/cards/PlayersPanel';
 import type { DirectoryFetch } from '@/components/cards/player-directory';
 import { Screen } from '@/components/shell/Screen';
 import { SubNav } from '@/components/shell/SubNav';
-import { CARDS_SEGMENTS } from '@/components/shell/sections';
+import { PLAYERS_SEGMENTS } from '@/components/shell/sections';
 
-export default function CardsScreen() {
+export default function PlayersScreen() {
   const router = useRouter();
   const [directory, setDirectory] = useState<DirectoryFetch | null>(null);
 
@@ -19,14 +19,14 @@ export default function CardsScreen() {
   // The panel's own count line moves with the filter; this one does not, so it
   // is the answer to "how big is the pool" rather than "what am I looking at".
   const context = directory?.season
-    ? `${directory.season} season · ${directory.expected} cards`
+    ? `${directory.season} season · ${directory.expected} players`
     : 'Player directory';
 
   return (
     /* 'table' rather than 'grid': this is nine columns of rows being read, and
        the wider measure only buys empty space between a name and its points. */
-    <Screen title="Cards" measure="table" context={context} scroll={false}>
-      <SubNav segments={CARDS_SEGMENTS} />
+    <Screen title="Players" measure="table" context={context} scroll={false}>
+      <SubNav segments={PLAYERS_SEGMENTS} />
       <PlayersPanel onOpenPlayer={openPlayer} onLoaded={setDirectory} />
     </Screen>
   );

@@ -20,6 +20,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ActionBar } from '@/components/shell/ActionBar';
 import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
 import { ContestCard } from '@/components/lineup/ContestCard';
 import { BenchRow, StarterRow } from '@/components/lineup/LineupRow';
@@ -47,7 +48,7 @@ import { Colors, Spacing, Type } from '@/constants/theme';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-const TAB_ICONS: TabIconName[] = ['lineup', 'leaderboard', 'cards', 'collection', 'profile'];
+const TAB_ICONS: TabIconName[] = ['lineup', 'leaderboard', 'players', 'collection', 'profile'];
 
 const NO_STATS = {
   receptions: 0,
@@ -407,6 +408,7 @@ function Kit() {
   const [confirmErr, setConfirmErr] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>('g3');
   const [swap, setSwap] = useState<SwapRequest | null>(null);
+  const [action, setAction] = useState('search');
   // The sheet changes shape at the same breakpoint the product uses, so this
   // gallery shows whichever one the current window would get.
   const wide = useIsWide();
@@ -497,6 +499,28 @@ function Kit() {
                 onPress={() => {}}
               />
             ))}
+          </Section>
+
+          <Section
+            title="Action bar"
+            note="Every glyph, hollow then solid. Nav items (Trend, Shop) are dropped on wide web, where the rail already lists them.">
+            <ActionBar
+              wide={false}
+              actions={[
+                { key: 'search', label: 'Search', icon: 'search', active: action === 'search', onPress: () => setAction('search') },
+                { key: 'sort', label: 'Sort', icon: 'sort', active: action === 'sort', onPress: () => setAction('sort') },
+                { key: 'tiers', label: 'Tiers', icon: 'tiers', active: action === 'tiers', onPress: () => setAction('tiers') },
+                { key: 'available', label: 'Available', icon: 'available', active: action === 'available', onPress: () => setAction('available') },
+                { key: 'trend', label: 'Trend', icon: 'trend', nav: true, active: action === 'trend', onPress: () => setAction('trend') },
+              ]}
+            />
+            <ActionBar
+              wide={false}
+              actions={[
+                { key: 'shop', label: 'Shop', icon: 'shop', active: action === 'shop', onPress: () => setAction('shop') },
+                { key: 'sets', label: 'Sets', icon: 'sets', active: action === 'sets', onPress: () => setAction('sets') },
+              ]}
+            />
           </Section>
 
           <Section

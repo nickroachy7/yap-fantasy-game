@@ -78,7 +78,7 @@ const VIEW_PATH: Record<View_, string> = {
   inventory: '/collection/inventory',
   leaderboard: '/leaderboard',
   lineup: '/lineup',
-  profile: '/cards',
+  profile: '/players',
 };
 
 /* ---- fixture content ---------------------------------------------------- */

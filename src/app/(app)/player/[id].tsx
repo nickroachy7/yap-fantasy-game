@@ -210,7 +210,7 @@ export default function PlayerDetailScreen() {
 
   const goBack = useCallback(() => {
     if (router.canGoBack()) router.back();
-    else router.replace('/cards');
+    else router.replace('/players');
   }, [router]);
 
   const body = () => {

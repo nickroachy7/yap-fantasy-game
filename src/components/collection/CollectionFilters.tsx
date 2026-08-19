@@ -16,7 +16,7 @@
  * with a 4pt tap-target-preserving hitSlop the whole facet block costs about
  * what two rows used to, and the cards start higher up the screen.
  */
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { TierBadge } from '@/components/cards';
 import {
@@ -28,6 +28,7 @@ import {
   getTierTheme,
   type CardTier,
 } from '@/constants/theme';
+import { Chip, ChipRow } from '@/components/ui/Chip';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   PositionOrder,
@@ -42,79 +43,6 @@ import {
 
 function useScheme(): 'light' | 'dark' {
   return useColorScheme() === 'dark' ? 'dark' : 'light';
-}
-
-function Chip({
-  selected,
-  label,
-  count,
-  children,
-  onPress,
-  accessibilityLabel,
-}: {
-  selected: boolean;
-  label?: string;
-  count?: number;
-  children?: React.ReactNode;
-  onPress: () => void;
-  accessibilityLabel: string;
-}) {
-  const c = Colors[useScheme()];
-
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      accessibilityLabel={accessibilityLabel}
-      // The chip is 24pt tall so four facet rows fit above the fold; hitSlop
-      // buys the touch target back without spending the pixels.
-      hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-      style={({ pressed }) => [pressed && styles.pressed]}>
-      <View
-        style={[
-          styles.chip,
-          {
-            backgroundColor: selected ? c.backgroundSelected : c.backgroundElement,
-            borderColor: selected ? c.text : c.border,
-            borderWidth: selected ? 1.5 : StyleSheet.hairlineWidth,
-            // Keep the box identical either way so nothing shifts on press.
-            paddingHorizontal: selected ? Spacing.two - 1 : Spacing.two,
-            paddingVertical: selected ? 3.5 : 4,
-          },
-        ]}>
-        {children}
-        {label ? (
-          <Text style={[Type.label, { color: selected ? c.text : c.textSecondary }]}>{label}</Text>
-        ) : null}
-        {count === undefined ? null : (
-          <Text
-            style={[
-              Type.label,
-              NUMERIC,
-              styles.count,
-              { color: selected ? c.text : c.textTertiary },
-            ]}>
-            {count}
-          </Text>
-        )}
-      </View>
-    </Pressable>
-  );
-}
-
-function Row({ children }: { children: React.ReactNode }) {
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      // A tap on a facet with the search field focused must apply the facet,
-      // not just dismiss the keyboard and be swallowed.
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={styles.row}>
-      {children}
-    </ScrollView>
-  );
 }
 
 /** Rendered only above the size where scanning stops working — see Inventory. */
@@ -168,7 +96,7 @@ export function TierFilterRow({
   const scheme = useScheme();
 
   return (
-    <Row>
+    <ChipRow>
       <Chip
         selected={value === 'ALL'}
         label="ALL TIERS"
@@ -194,7 +122,7 @@ export function TierFilterRow({
           </Chip>
         );
       })}
-    </Row>
+    </ChipRow>
   );
 }
 
@@ -210,7 +138,7 @@ export function PositionFilterRow({
   counts: Record<Position, number>;
 }) {
   return (
-    <Row>
+    <ChipRow>
       <Chip
         selected={value === 'ALL'}
         label="ALL POS"
@@ -232,7 +160,7 @@ export function PositionFilterRow({
           />
         );
       })}
-    </Row>
+    </ChipRow>
   );
 }
 
@@ -269,7 +197,7 @@ export function SortRow({
         showsHorizontalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         style={styles.sortScroll}
-        contentContainerStyle={styles.row}>
+        contentContainerStyle={styles.chipScrollRow}>
         {(Object.keys(SortLabels) as SortKey[]).map((key) => (
           <Chip
             key={key}
@@ -297,18 +225,25 @@ export function SortRow({
  * Hiding the unavailable is offered only when there ARE unavailable cards —
  * a permanent "hide 0" is a control that can never do anything.
  */
+/**
+ * The count under the facets.
+ *
+ * It used to carry the availability toggle as a chip on its right. The action
+ * bar owns that filter now, and two controls for one filter is how a screen
+ * ends up disagreeing with itself — press one, and the other still reads as
+ * off. What is left says what the filter DID, which the bar cannot: "12 of 40
+ * cards", and the count of what is being hidden.
+ */
 export function ResultLine({
   shown,
   total,
   unavailable,
   availability,
-  onToggleAvailability,
 }: {
   shown: number;
   total: number;
   unavailable: number;
   availability: AvailabilityFilter;
-  onToggleAvailability: () => void;
 }) {
   const c = Colors[useScheme()];
   const hiding = availability === 'AVAILABLE';
@@ -318,31 +253,16 @@ export function ResultLine({
       <Text numberOfLines={1} style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
         {shown === total ? `${total} cards` : `${shown} of ${total} cards`}
       </Text>
-      {unavailable > 0 || hiding ? (
-        <Chip
-          selected={hiding}
-          label={hiding ? 'SHOWING AVAILABLE' : `HIDE ${unavailable} UNAVAILABLE`}
-          onPress={onToggleAvailability}
-          accessibilityLabel={
-            hiding
-              ? 'Unavailable cards are hidden. Show them.'
-              : `Hide ${unavailable} unavailable cards`
-          }
-        />
+      {hiding && unavailable > 0 ? (
+        <Text numberOfLines={1} style={[Type.fine, NUMERIC, { color: c.textTertiary }]}>
+          {`${unavailable} in lineups hidden`}
+        </Text>
       ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2, paddingRight: Spacing.two },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one + 1,
-    borderRadius: 7,
-  },
-  count: { fontWeight: '600' },
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -354,6 +274,15 @@ const styles = StyleSheet.create({
   },
   search: { flex: 1, minWidth: 0, height: '100%' },
   sortRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  /* Same metrics as ChipRow's own content row — this one is a ScrollView the
+     sort strip owns, because it has a label and a direction chip pinned either
+     side of the scrolling part. */
+  chipScrollRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one + 2,
+    paddingRight: Spacing.two,
+  },
   sortScroll: { flexShrink: 1 },
   resultLine: {
     flexDirection: 'row',

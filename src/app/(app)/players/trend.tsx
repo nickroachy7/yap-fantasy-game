@@ -18,7 +18,7 @@ import { weekLabel } from '@/components/scores/scoreboard';
 import { useSeasonSchedule, useWeekLeaders, type Slate } from '@/components/scores/use-scores';
 import { Screen } from '@/components/shell/Screen';
 import { SubNav } from '@/components/shell/SubNav';
-import { CARDS_SEGMENTS } from '@/components/shell/sections';
+import { PLAYERS_SEGMENTS } from '@/components/shell/sections';
 import { useIsWide, useTabBarInset } from '@/components/shell/useResponsive';
 import { computeMovers, deltaText, type Mover } from '@/components/trend/movers';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -187,7 +187,7 @@ export default function TrendScreen() {
       title="Trend"
       measure="grid"
       context={comparison ?? `${season} season`}>
-      <SubNav segments={CARDS_SEGMENTS} inset={false} />
+      <SubNav segments={PLAYERS_SEGMENTS} inset={false} />
 
       <Tabs tabs={POS_TABS} value={pos} onChange={setPos} />
 

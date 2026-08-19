@@ -23,7 +23,7 @@
  */
 import { StyleSheet, View, type ColorValue } from 'react-native';
 
-export type TabIconName = 'lineup' | 'leaderboard' | 'cards' | 'collection' | 'profile';
+export type TabIconName = 'lineup' | 'leaderboard' | 'players' | 'collection' | 'profile';
 
 export type TabIconProps = {
   name: TabIconName;
@@ -101,7 +101,7 @@ export function TabIcon({ name, color, focused, size = 24 }: TabIconProps) {
         </View>
       );
 
-    case 'cards':
+    case 'players':
       /* Two cards, one tucked behind the other. The back card is always
          hollow — a solid pair at this size merges into one blob. */
       return (
