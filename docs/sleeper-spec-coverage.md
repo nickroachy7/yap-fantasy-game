@@ -26,10 +26,12 @@ building it.
 | §5 Trend | `/cards/trend` — reinterpreted, see below |
 | §3.5 Scoring settings | `/leaderboard/scoring` |
 | §1.5 player rankings strip | `POS RANK` tile on the player page |
-| §1.5 career heat map | `players/CareerTable`, shaded column-relative |
+| §1.5 career heat map | `players/CareerTable`, shaded column-relative — now the summary inside Game log rather than its own tab |
 | §1.5 transaction history | `players/CardHistory` — reinterpreted, see below |
 | §2.2 / §4.2 / §5 ownership block | `players/CommunityPanel` + the `COPIES HELD` tile — reinterpreted as counts, see below |
 | §1.5 player page, second variant | `/card/<card_instance_id>` — `CardStanding`, `StartLog` |
+| §1.5 hero identity band | `players/PlayerHero` — shared by both profiles; type and bio row, no photo/logo (unlicensed) |
+| §1.5 per-season game log sections | `players/GameLogTab` — career table folded in above the per-game sections |
 | §10 empty-state shape | `ui/EmptyState`, replacing four divergent hand-rolled copies |
 
 **Note on the grouped headers.** They were added for a Cards table that has

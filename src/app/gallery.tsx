@@ -33,14 +33,13 @@ import {
   USAGE_SAMPLE,
 } from '@/components/dev/profile-fixture';
 import { OWNED_MANY } from '@/components/dev/fixtures';
-import { BioStrip } from '@/components/players/BioStrip';
+import { PlayerHero } from '@/components/players/PlayerHero';
 import { CardStanding } from '@/components/players/CardStanding';
-import { CareerTable } from '@/components/players/CareerTable';
+import { GameLogTab } from '@/components/players/GameLogTab';
 import { CommunityPanel } from '@/components/players/CommunityPanel';
 import { StartLog } from '@/components/players/StartLog';
 import { parseCardProfile } from '@/components/players/card-profile';
 import { parseMarket } from '@/components/players/market';
-import { GameLog } from '@/components/players/GameLog';
 import { parseGameLog } from '@/components/players/game-log';
 import { TeamContext } from '@/components/players/TeamContext';
 import { UsagePanel } from '@/components/players/UsagePanel';
@@ -190,7 +189,7 @@ function LineupFixture() {
  * starter looks like until the regular season begins.
  */
 function ProfileFixture() {
-  const [pt, setPt] = useState<'overview' | 'career' | 'log'>('overview');
+  const [pt, setPt] = useState<'overview' | 'card' | 'log'>('overview');
   const profile = parseProfile(MCCAFFREY_PROFILE);
   if (!profile) return null;
 
@@ -201,14 +200,21 @@ function ProfileFixture() {
 
   return (
     <View style={styles.profile}>
-      <BioStrip bio={profile.player} />
+      {/* The shared hero, exactly as BOTH profiles draw it. */}
+      <PlayerHero
+        name={profile.player.name}
+        bio={profile.player}
+        team={profile.player.teamAbbreviation}
+        position={profile.player.positionAbbreviation}
+        injuryStatus={profile.player.injuryStatus}
+      />
 
-      {/* Mirrors the real screen's tab split so the primitive is seen in the
-          arrangement it actually ships in, not in isolation. */}
+      {/* Mirrors the real screens' tab split — same three, same order on both —
+          so the primitive is seen in the arrangement it actually ships in. */}
       <Tabs
         tabs={[
           { value: 'overview', label: 'Overview' },
-          { value: 'career', label: 'Career' },
+          { value: 'card', label: 'Card', hint: '2' },
           { value: 'log', label: 'Game log', hint: '3' },
         ]}
         value={pt}
@@ -219,29 +225,27 @@ function ProfileFixture() {
         <View style={{ height: 0 }} />
       </Panel>
 
-      <CareerTable career={profile.career} position={profile.player.positionAbbreviation} />
+      {/* ---- Overview ---------------------------------------------------- */}
       <UsagePanel
         usage={withUsage?.usage ?? null}
         position={profile.player.positionAbbreviation}
         teamAbbreviation={profile.player.teamAbbreviation}
       />
+      {/* Empty usage too: it is what every starter looks like until the
+          regular season begins. */}
       <UsagePanel
         usage={profile.usage}
         position={profile.player.positionAbbreviation}
         teamAbbreviation={profile.player.teamAbbreviation}
       />
       <TeamContext bio={profile.player} standings={profile.standings} />
-      <GameLog
-        sections={parseGameLog(MCCAFFREY_GAME_LOG)}
-        position={profile.player.positionAbbreviation}
-      />
 
-      {/* ---- the two profiles' distinguishing panels --------------------- *
-       * Both states of each, because the interesting one is the empty one.
-       * A market where nobody has started a copy, and a card that has never
-       * been started, are what the whole beta will look like for a month —
-       * and they are the two the panels have to be honest about rather than
-       * dressing up. */}
+      {/* ---- Game log: career folded in, season summary above per-game ---- */}
+      <GameLogTab profile={profile} sections={parseGameLog(MCCAFFREY_GAME_LOG)} />
+
+      {/* ---- Card: both states of each, because the interesting one is the
+           empty one. A market nobody has played and a card never started are
+           what the whole beta looks like for a month. ---------------------- */}
       <CommunityPanel market={parseMarket(MARKET_SAMPLE)} />
       <CommunityPanel market={parseMarket(MARKET_UNPLAYED)} />
 

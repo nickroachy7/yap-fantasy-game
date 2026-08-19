@@ -1,45 +1,61 @@
 /**
- * Card profile: ONE copy you own.
+ * Card profile — ONE copy you own.
  *
- * WHY THIS IS A SEPARATE ROUTE FROM /player/[id]
+ * ONE OF TWO PROFILES, AND THEY SHARE MORE THAN THEY DIFFER.
  *
- * They answer different questions and the answers do not fit on one screen
- * without one of them becoming a footnote.
+ * Same hero and the same three tabs as `/player/<player_id>`, because the
+ * football is the same football: a copy's Overview and Game log describe the
+ * footballer, and there is no version of "how many targets did he see" that is
+ * different because you happen to hold him. Both come from `usePlayerPage`, so
+ * the two screens cannot drift.
  *
- *   /player/<player_id>  — who is this man, what has he produced, how is he
- *                          used, what is coming up. Identical for every user.
- *                          Ownership appears only as community aggregate.
- *   /card/<instance_id>  — what is THIS copy worth to me. Its earned total, its
- *                          tier, the weeks it actually started, and where it
- *                          ranks against every other copy of him and against
- *                          every card in the game.
+ * ONLY THE CARD TAB DIFFERS, and it differs by ADDITION rather than by
+ * replacement: your copy's standing and its week-by-week earnings sit on top,
+ * and the same community view the directory page shows sits underneath. That
+ * ordering is the whole point of the split — here you came to look at a
+ * specific object, and the community is the context you judge it against.
  *
- * The route param is therefore the CARD INSTANCE id, never the player id — the
- * opposite of its sibling, and the reason both are named in every comment that
- * touches navigation. A player is one row; the copies of him are many, and two
- * of yours can be worth very different things.
+ * The route param is the CARD INSTANCE id, never the player id — the opposite
+ * of its sibling. A player is one row; the copies of him are many, and two of
+ * yours can be worth very different things.
  *
- * The player's own numbers are deliberately NOT duplicated here beyond a single
- * line of context. Everything about the footballer is one tap away and stays in
- * exactly one place, so the two screens can never disagree about him.
+ * WHAT DRIVES career_fp, RESTATED BECAUSE THIS IS THE SCREEN THAT SHOWS IT: a
+ * copy earns only in weeks it was STARTED. `StartLog` is the receipt — every
+ * row in it is a week this copy was in the lineup, and there is no other way
+ * for the total to have moved.
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { InjuryChip } from '@/components/cards/InjuryChip';
+import { TierBadge } from '@/components/cards/TierBadge';
 import { CardStanding } from '@/components/players/CardStanding';
+import { CommunityPanel } from '@/components/players/CommunityPanel';
+import { GameLogTab } from '@/components/players/GameLogTab';
+import { OverviewTab } from '@/components/players/OverviewTab';
+import { PlayerHero } from '@/components/players/PlayerHero';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { StartLog } from '@/components/players/StartLog';
 import { parseCardProfile, type CardProfile } from '@/components/players/card-profile';
 import { sellErrorMessage } from '@/components/players/sell';
+import { usePlayerPage } from '@/components/players/use-player-page';
 import { Gem } from '@/components/shell/AppHeader';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Tabs, type Tab } from '@/components/ui/Tabs';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
+
+type ProfileTab = 'overview' | 'card' | 'log';
+
+/** The same three, in the same order, as the player profile. */
+const TABS: Tab<ProfileTab>[] = [
+  { value: 'overview', label: 'Overview' },
+  { value: 'card', label: 'Card' },
+  { value: 'log', label: 'Game log' },
+];
 
 /** "4 Aug 2026". Short and unambiguous — no locale-dependent 8/4 vs 4/8. */
 function dateLabel(iso: string | null): string {
@@ -56,29 +72,32 @@ export default function CardDetailScreen() {
   const c = Colors[scheme];
   const { refresh: refreshWallet } = usePlayer();
 
-  const [profile, setProfile] = useState<CardProfile | null>(null);
+  const [card, setCard] = useState<CardProfile | null>(null);
+  const [tab, setTab] = useState<ProfileTab>('card');
   const [selling, setSelling] = useState(false);
   const [busy, setBusy] = useState(false);
   const [sellError, setSellError] = useState<string | null>(null);
 
-  const load = useCallback<Load>(
+  const loadCard = useCallback<Load>(
     async (live) => {
       if (!id) return;
-      const { data, error } = await supabase.rpc('card_profile', { p_card_instance_id: id });
+      const { data, error: err } = await supabase.rpc('card_profile', { p_card_instance_id: id });
       if (!live()) return;
-      if (error) return error.message;
-      // The RPC returns null for a card that is not the caller's, which is the
-      // same answer as "does not exist" — deliberately, so it cannot be used to
-      // probe whether an id is real.
-      setProfile(data ? parseCardProfile(data) : null);
+      if (err) return err.message;
+      // Null for a card that is not the caller's, which is the same answer as
+      // "does not exist" — deliberately, so this cannot be used to probe
+      // whether an id is real.
+      setCard(data ? parseCardProfile(data) : null);
     },
     [id],
   );
 
-  const { loading, error } = useLoader(load);
+  const { loading, error } = useLoader(loadCard);
 
-  /* `back()` is a DISMISSAL — the tabs are still mounted underneath. The
-     fallback matters for a cold deep link, which has nothing beneath it. */
+  /* The football, keyed by the PLAYER this copy is of. Null until the card
+     resolves, which is what makes this a two-phase load rather than one. */
+  const page = usePlayerPage(card?.card.playerId ?? null);
+
   const dismiss = useCallback(() => {
     if (router.canGoBack()) router.back();
     else router.replace('/collection');
@@ -87,19 +106,18 @@ export default function CardDetailScreen() {
   /**
    * Sell this copy.
    *
-   * On success the wallet is re-read from the server rather than patched here:
-   * the balance in the header is the number the user will check, and it must
-   * come from the same place the sale did. Then the sheet closes — the card is
-   * gone, and leaving its profile open would be showing a thing that no longer
-   * exists.
+   * The wallet is re-read from the server rather than patched here: the balance
+   * in the header is the number the user will check, and it must come from the
+   * same place the sale did. Then the sheet closes — the card is gone, and
+   * leaving its profile open would be showing a thing that no longer exists.
    */
   const confirmSell = useCallback(async () => {
-    if (!profile) return;
+    if (!card) return;
     setBusy(true);
     setSellError(null);
     try {
       const { error: err } = await supabase.rpc('sell_card', {
-        p_card_instance_id: profile.card.id,
+        p_card_instance_id: card.card.id,
       });
       if (err) throw new Error(sellErrorMessage(err.message));
       await refreshWallet();
@@ -112,7 +130,7 @@ export default function CardDetailScreen() {
     } finally {
       setBusy(false);
     }
-  }, [profile, refreshWallet, dismiss]);
+  }, [card, refreshWallet, dismiss]);
 
   const body = () => {
     if (loading || !id) {
@@ -134,7 +152,7 @@ export default function CardDetailScreen() {
         </View>
       );
     }
-    if (!profile) {
+    if (!card) {
       return (
         <View style={styles.centre}>
           <Text style={[Type.section, styles.centreText, { color: c.text }]}>Card not found</Text>
@@ -145,86 +163,96 @@ export default function CardDetailScreen() {
       );
     }
 
-    const { card, rank, starts } = profile;
+    const k = card.card;
 
     return (
       <>
-        {card.injuryStatus ? (
-          <View style={styles.injuryRow}>
-            <InjuryChip status={card.injuryStatus} size="detail" />
-          </View>
+        <PlayerHero
+          name={k.playerName}
+          bio={page.profile?.player ?? null}
+          team={k.teamAbbreviation}
+          position={k.positionAbbreviation}
+          injuryStatus={k.injuryStatus}
+          /* The copy's identity sits WITH the player's rather than a scroll
+             away — on this page the tier is half of what you came to see. */
+          accessory={<TierBadge tier={k.tier} size="detail" />}
+        />
+
+        <View style={[styles.tabBar, { borderColor: c.backgroundElement }]}>
+          <Tabs
+            tabs={TABS.map((t) =>
+              t.value === 'log' && page.sections.length > 0
+                ? { ...t, hint: String(page.sections.length) }
+                : t,
+            )}
+            value={tab}
+            onChange={setTab}
+          />
+        </View>
+
+        {/* Card is the DEFAULT tab here, unlike the player profile. You did not
+            arrive at a specific copy to read a bio. */}
+        {tab === 'card' ? (
+          <>
+            {/* A sold copy still resolves — history has to keep working — so
+                say so plainly rather than 404ing an old link. */}
+            {k.soldAt ? (
+              <View style={[styles.note, { backgroundColor: c.backgroundElement }]}>
+                <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
+                  {`You sold this copy on ${dateLabel(k.soldAt)}${k.soldFor === null ? '' : ` for ${k.soldFor} gems`}. It still counts in the lineups it started, but you no longer hold it.`}
+                </Text>
+              </View>
+            ) : null}
+
+            <Text style={[Type.fine, { color: c.textTertiary }]}>
+              {`${k.season ?? '—'} card · ${k.rarity ?? 'unknown'} · acquired ${dateLabel(k.acquiredAt)}${k.source ? ` from a ${k.source}` : ''}`}
+            </Text>
+
+            <CardStanding card={k} rank={card.rank} />
+            <StartLog starts={card.starts} playerName={k.playerName} />
+
+            {k.soldAt ? null : (
+              <Pressable
+                onPress={() => {
+                  setSellError(null);
+                  setSelling(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Sell this ${k.tier} card for ${k.sellValue} gems`}
+                style={({ pressed }) => [
+                  styles.sell,
+                  { borderColor: c.border, backgroundColor: c.backgroundElement },
+                  pressed && styles.pressed,
+                ]}>
+                <Text style={[Type.strong, { color: c.textSecondary }]}>SELL THIS COPY</Text>
+                <Gem color={TierColors[scheme].gold.accent} size={10} />
+                <Text style={[Type.strong, NUMERIC, { color: c.text }]}>{k.sellValue}</Text>
+              </Pressable>
+            )}
+
+            {/* The same community view the directory page shows, underneath the
+                copy it gives context to. Rank means nothing without the pool. */}
+            <CommunityPanel market={page.market} />
+          </>
         ) : null}
 
-        {/* A sold copy still resolves — history has to keep working — so say so
-            plainly rather than 404ing someone who followed an old link. */}
-        {card.soldAt ? (
-          <View style={[styles.note, { backgroundColor: c.backgroundElement }]}>
-            <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
-              {`You sold this copy on ${dateLabel(card.soldAt)}${card.soldFor === null ? '' : ` for ${card.soldFor} gems`}. It still counts in the lineups it started, but you no longer hold it.`}
-            </Text>
-          </View>
+        {tab === 'overview' ? (
+          page.player ? (
+            <OverviewTab player={page.player} profile={page.profile} market={page.market} />
+          ) : (
+            <View style={styles.centre}>
+              <ActivityIndicator />
+            </View>
+          )
         ) : null}
 
-        <Text style={[Type.fine, { color: c.textTertiary }]}>
-          {`Acquired ${dateLabel(card.acquiredAt)}${card.source ? ` from a ${card.source}` : ''}`}
-        </Text>
-
-        <CardStanding card={card} rank={rank} />
-
-        <StartLog starts={starts} playerName={card.playerName} />
-
-        {/* The bridge to the other profile. Named as what it is rather than
-            "view player", because the distinction between the man and the copy
-            is the thing these two screens exist to keep straight. */}
-        <Pressable
-          onPress={() =>
-            router.push({ pathname: '/player/[id]', params: { id: card.playerId } })
-          }
-          accessibilityRole="button"
-          accessibilityLabel={`Open the full player profile for ${card.playerName}`}
-          style={({ pressed }) => [
-            styles.link,
-            { borderColor: c.border, backgroundColor: c.surface },
-            pressed && styles.pressed,
-          ]}>
-          <View style={styles.linkText}>
-            <Text style={[Type.strong, { color: c.text }]}>
-              {`${card.playerName}’s full profile`}
-            </Text>
-            <Text style={[Type.fine, { color: c.textSecondary }]}>
-              Career, game log, usage and how the community holds him
-            </Text>
-          </View>
-          <Text style={[Type.section, { color: c.textTertiary }]}>›</Text>
-        </Pressable>
-
-        {/* Selling lives on this screen and not on the player profile, because
-            selling is per-copy and irreversible: this is the only surface that
-            shows WHICH copy — its tier, its starts, what it earned. */}
-        {card.soldAt ? null : (
-          <Pressable
-            onPress={() => {
-              setSellError(null);
-              setSelling(true);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`Sell this ${card.tier} card for ${card.sellValue} gems`}
-            style={({ pressed }) => [
-              styles.sell,
-              { borderColor: c.border, backgroundColor: c.backgroundElement },
-              pressed && styles.pressed,
-            ]}>
-            <Text style={[Type.strong, { color: c.textSecondary }]}>SELL THIS COPY</Text>
-            <Gem color={TierColors[scheme].gold.accent} size={10} />
-            <Text style={[Type.strong, NUMERIC, { color: c.text }]}>{card.sellValue}</Text>
-          </Pressable>
-        )}
+        {tab === 'log' ? <GameLogTab profile={page.profile} sections={page.sections} /> : null}
 
         <ConfirmDialog
           visible={selling}
-          title={`Sell this ${card.tier} card?`}
-          body={`${card.playerName} · ${card.season ?? '—'} card. You will receive ${card.sellValue} gems. The copy and everything it has earned — ${card.careerFp.toFixed(0)} FP over ${card.lineupStarts} start${card.lineupStarts === 1 ? '' : 's'} — are gone for good, and pulling him again starts a new card at bronze.`}
-          confirmLabel={`Sell for ${card.sellValue}`}
+          title={`Sell this ${k.tier} card?`}
+          body={`${k.playerName} · ${k.season ?? '—'} card. You will receive ${k.sellValue} gems. The copy and everything it has earned — ${k.careerFp.toFixed(0)} FP over ${k.lineupStarts} start${k.lineupStarts === 1 ? '' : 's'} — are gone for good, and pulling him again starts a new card at bronze.`}
+          confirmLabel={`Sell for ${k.sellValue}`}
           destructive
           busy={busy}
           error={sellError}
@@ -241,17 +269,17 @@ export default function CardDetailScreen() {
 
   return (
     <PlayerSheetFrame
-      title={profile?.card.playerName}
-      /* The card's identity, not the player's: which season's card, which
-         rarity, which tier. The player's team and position ride along because
-         without them the title is a name with no context. */
+      title={card?.card.playerName}
+      /* The CARD's identity, not the player's: which season, which rarity,
+         which tier. Team and position ride along because without them the
+         title is a name with no context. */
       subtitle={
-        profile
+        card
           ? [
-              profile.card.teamAbbreviation?.toUpperCase(),
-              profile.card.positionAbbreviation,
-              profile.card.season ? `${profile.card.season} CARD` : null,
-              profile.card.rarity?.toUpperCase(),
+              card.card.teamAbbreviation?.toUpperCase(),
+              card.card.positionAbbreviation,
+              card.card.season ? `${card.card.season} CARD` : null,
+              card.card.tier.toUpperCase(),
             ]
               .filter(Boolean)
               .join(' · ')
@@ -272,17 +300,8 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.six,
   },
   centreText: { textAlign: 'center' },
-  injuryRow: { flexDirection: 'row' },
+  tabBar: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 2 },
   note: { borderRadius: Radius.panel, padding: Spacing.two + 4 },
-  link: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.panel,
-    padding: Spacing.two + 4,
-  },
-  linkText: { flex: 1, minWidth: 0, gap: 2 },
   sell: {
     flexDirection: 'row',
     alignItems: 'center',
