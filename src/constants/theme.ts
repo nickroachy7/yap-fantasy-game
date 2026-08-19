@@ -465,8 +465,15 @@ export const CardSizes = {
     nameLines: 1,
     labelSize: 7,
     statSize: 10,
-    /** The one number the card leads with (career FP). */
-    figureSize: 22,
+    /**
+     * The one number the card leads with (career FP).
+     *
+     * 16, not 18: at 106pt the card's two bottom columns are "14 STARTS" and a
+     * four-digit total, and 18 pushed their sum past the usable width so the
+     * left one clipped to "14 STAR…". Still the largest thing on a compact
+     * card by some way — the name is 11 and the labels are 7.
+     */
+    figureSize: 16,
     glyph: 16,
     pip: 4,
   },
@@ -480,7 +487,7 @@ export const CardSizes = {
     nameLines: 1,
     labelSize: 9,
     statSize: 13,
-    figureSize: 30,
+    figureSize: 26,
     glyph: 22,
     pip: 5,
   },
@@ -493,7 +500,7 @@ export const CardSizes = {
     nameLines: 2,
     labelSize: 11,
     statSize: 20,
-    figureSize: 46,
+    figureSize: 38,
     glyph: 32,
     pip: 8,
   },

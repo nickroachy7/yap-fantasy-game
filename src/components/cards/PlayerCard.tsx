@@ -122,6 +122,23 @@ export type PlayerCardProps = {
   fixedWidth?: boolean;
 };
 
+/** The app's mark for "not reported", used here for the absent projection. */
+const DASH = '—';
+
+/**
+ * Ticks in the tier-progress rule.
+ *
+ * SEGMENTED, NOT SOLID, and that is the accessibility mechanism rather than a
+ * decoration. The rule carries no text — that is the point of moving it to the
+ * card's edge — so its fill can no longer be checked against a printed number.
+ * A segmented track stays readable in greyscale and to a fully colour-blind
+ * reader because the boundary falls at a COUNTABLE position: six of twelve is
+ * legible without perceiving the fill's hue at all. A solid bar at low contrast
+ * would not be. The exact figure is still in the card's accessibility label,
+ * and in full on the card profile.
+ */
+const SEGMENTS = 12;
+
 const fmt = (n: number) =>
   Math.round(n)
     .toString()
@@ -166,11 +183,6 @@ export function PlayerCard({
   const fixture =
     model.game === undefined ? null : `${team} ${matchupLabel(model.game)}`;
   const kickoff = model.game ? kickoffLabel(model.game) : null;
-
-  const nextLine =
-    toNext === null || !model.nextTierLabel
-      ? 'top tier'
-      : `${fmt(toNext)} to ${model.nextTierLabel.toUpperCase()}`;
 
   const a11yLabel =
     `${model.playerName}, ${t.label} tier, ` +
@@ -302,78 +314,91 @@ export function PlayerCard({
                 </Text>
               ) : null}
             </View>
-            {/* NOT a projection — the provider sells none and this app
-                fabricates none. What he has actually averaged, labelled as
-                that. See the model's `fpPerGame`. */}
-            {model.fpPerGame != null ? (
-              <View style={styles.rowRight}>
-                <Text
-                  numberOfLines={1}
-                  style={[styles.rowValue, { color: t.colors.text, fontSize: dims.labelSize + 2 }]}>
-                  {model.fpPerGame.toFixed(1)}
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={[styles.rowLabel, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
-                  FP/G
-                </Text>
-              </View>
-            ) : null}
+            {/* A DASH, not a number. balldontlie sells no projections —
+                verified 404s, recorded in docs/sleeper-spec-coverage.md — and
+                nothing here fabricates one. The em dash is the same mark this
+                app uses everywhere for "the provider did not report this",
+                so an empty projection reads as missing data rather than as a
+                forecast of nothing. The slot is drawn now so the layout does
+                not move on the day real projections arrive. */}
+            <View style={styles.rowRight}>
+              <Text
+                numberOfLines={1}
+                style={[styles.rowValue, { color: t.colors.textMuted, fontSize: dims.labelSize + 2 }]}>
+                {DASH}
+              </Text>
+              <Text
+                numberOfLines={1}
+                style={[styles.rowLabel, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
+                PROJ
+              </Text>
+            </View>
           </View>
         ) : null}
 
-        {/* What the COPY has earned. Distinct from FP/G above, which is the
-            player's: a card on 0 beside a 21.3 average is a good player you
-            have never started, not a contradiction. */}
-        <View style={styles.statRows}>
-          <View style={styles.statRow}>
+        {/* What the COPY has earned.
+            Starts reads as a phrase rather than a right-aligned figure, which
+            frees the whole right column for the one number that matters — a
+            column with two numbers in it makes neither of them the headline. */}
+        <View style={styles.row}>
+          {/* Sentence case, and no letter-spacing, unlike the caps labels
+              around it. It is a PHRASE rather than a column heading, and at
+              106pt the caps form plus tracking measured 42pt against the 42pt
+              left over once "CAREER FP" had sized the right column — so it
+              clipped to "14 STAR…". This reads better and fits. */}
+          <Text
+            numberOfLines={1}
+            style={[styles.startsText, { color: t.colors.textMuted, fontSize: dims.labelSize + 1 }]}>
+            {`${fmt(model.lineupStarts)} ${model.lineupStarts === 1 ? 'Start' : 'Starts'}`}
+          </Text>
+          <View style={styles.rowRight}>
+            <Text
+              numberOfLines={1}
+              style={[styles.figure, { color: t.colors.text, fontSize: dims.figureSize }]}>
+              {fmt(model.careerFp)}
+            </Text>
             <Text
               numberOfLines={1}
               style={[styles.rowLabel, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
               {compact ? 'CAREER FP' : 'CAREER POINTS'}
             </Text>
-            <Text
-              numberOfLines={1}
-              style={[styles.figure, { color: t.colors.text, fontSize: dims.statSize }]}>
-              {fmt(model.careerFp)}
-            </Text>
-          </View>
-          <View style={styles.statRow}>
-            <Text
-              numberOfLines={1}
-              style={[styles.rowLabel, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
-              {compact ? 'STARTS' : 'GAMES STARTED'}
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={[styles.figure, { color: t.colors.textMuted, fontSize: dims.statSize }]}>
-              {fmt(model.lineupStarts)}
-            </Text>
           </View>
         </View>
 
-        {/* Distance to the next tier. The bar is never the only source — the
-            number is printed beside it, which keeps this out of colour-alone. */}
-        <View style={styles.statRow}>
-          {progress === null ? (
-            <View style={styles.trackSpacer} />
-          ) : (
-            <View style={[styles.track, { backgroundColor: withAlpha(t.colors.accent, 0.18) }]}>
-              <View
-                style={[
-                  styles.fill,
-                  { width: `${progress * 100}%`, backgroundColor: t.colors.accent },
-                ]}
-              />
-            </View>
-          )}
-          <Text
-            numberOfLines={1}
-            style={[styles.rowLabel, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
-            {nextLine.toUpperCase()}
-          </Text>
-        </View>
       </View>
+
+      {/* ---- how close this copy is to its next tier --------------------- *
+        * A rule along the card's bottom edge, full bleed, carrying no label.  *
+        * It was a bar with "180 TO SILVER" beside it, which spent a whole row *
+        * and a line of type on a number you glance at rather than read. As an *
+        * edge it costs three points of height and still answers "am I nearly  *
+        * there" at arm's length across a grid.                                *
+        *                                                                      *
+        * Nothing is drawn at the top tier: there is no next threshold, and a  *
+        * full rule there would imply a level above that does not exist.       *
+        * ================================================================ */}
+      {progress === null ? null : (
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[
+            styles.tierRule,
+            { marginBottom: -dims.padding, marginHorizontal: -dims.padding },
+          ]}>
+          {Array.from({ length: SEGMENTS }, (_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.tierTick,
+                {
+                  backgroundColor:
+                    i / SEGMENTS < progress ? t.colors.accent : withAlpha(t.colors.accent, 0.16),
+                },
+              ]}
+            />
+          ))}
+        </View>
+      )}
     </View>
   );
 
@@ -455,6 +480,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.3,
   },
+  startsText: {
+    fontFamily: Fonts.sans,
+    fontWeight: '600',
+    flexShrink: 1,
+    minWidth: 0,
+  },
   artSlot: {
     alignSelf: 'stretch',
     alignItems: 'center',
@@ -495,11 +526,8 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
     flexShrink: 0,
   },
-  /* Holds the row's height at the top tier, where there is no bar to draw and
-     the card would otherwise be a few points shorter than its neighbours. */
-  trackSpacer: { flex: 1, height: 3 },
-  track: { flex: 1, height: 3, borderRadius: 2, overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: 2 },
+  tierRule: { flexDirection: 'row', gap: 1, height: 3 },
+  tierTick: { flex: 1 },
   pressed: {
     opacity: 0.82,
     transform: [{ scale: 0.985 }],
