@@ -1,10 +1,23 @@
 /**
- * Sub-navigation within a tab (Cards: Players/Shop, Collection: Inventory/Sets).
- * Plain RN so it behaves identically on web and iOS.
+ * A two- or three-way switch inside a page — the trend board's up/down, the
+ * shell gallery's view picker. Plain RN so it behaves identically on web and
+ * iOS.
+ *
+ * NOT navigation any more, despite the name and the original doc comment: every
+ * section's sub-pages moved into the action bar (see `SectionNav`), and what is
+ * left here is filtering.
+ *
+ * The selected segment is marked in the app's gold, not with a raised tile. It
+ * had the tile, and so did the action bar, and the two were the only controls
+ * in the app that said "you are here" by drawing a box. The bar's was removed
+ * for being louder than the thing it marked; leaving this one would have made
+ * the same word mean two different shapes on one screen — on the trend board
+ * they sit within a hundred points of each other. Both read `selectionAccent`
+ * so they cannot drift apart again.
  */
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 
-import { Colors, Radius, Spacing, Type } from '@/constants/theme';
+import { Colors, Radius, selectionAccent, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export type Segment<T extends string> = { value: T; label: string; badge?: string };
@@ -31,6 +44,7 @@ export function SegmentedControl<T extends string>({
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  const accent = selectionAccent(scheme);
 
   return (
     <View
@@ -51,14 +65,13 @@ export function SegmentedControl<T extends string>({
               styles.segment,
               /* Either/or, never layered. See `grow` and `compactSegment`. */
               compact ? styles.compactSegment : styles.grow,
-              active && { backgroundColor: c.background },
               pressed && !active && styles.pressed,
             ]}>
             <Text
               numberOfLines={1}
               style={[
                 compact ? [Type.label, styles.compactLabel] : styles.label,
-                { color: active ? c.text : c.textSecondary },
+                { color: active ? accent : c.textSecondary },
               ]}>
               {seg.label}
             </Text>

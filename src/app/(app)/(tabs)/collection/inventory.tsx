@@ -295,8 +295,8 @@ export default function InventoryScreen() {
                 The search FIELD cannot: a TextInput in a ListHeaderComponent is
                 remounted on every keystroke and loses focus after one
                 character, which is why it lives up here beside its chip. */}
+            <SectionNav section="/collection" />
             <View style={styles.toolbar}>
-              <SectionNav section="/collection" />
               <ChipRow>
                 <FilterChips items={facets} />
               </ChipRow>

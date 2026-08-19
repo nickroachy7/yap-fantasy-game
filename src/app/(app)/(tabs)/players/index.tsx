@@ -296,8 +296,11 @@ export default function TrendScreen() {
           supply its own, at the same 16 the rows use, or the controls sit two
           points inside every name below them. Same block as the directory's
           toolbar, down to the numbers. */}
+      {/* Outside `controls`, which supplies the 16pt gutter for the FILTERS.
+          The bar brings its own — see SectionNav — and nesting it here gave it
+          32. */}
+      <SectionNav section="/players" />
       <View style={styles.controls}>
-        <SectionNav section="/players" />
 
         {/* ONE ROW OF FILTERS, position on the left and direction on the right.
             

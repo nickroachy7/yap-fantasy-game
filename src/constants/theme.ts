@@ -449,6 +449,28 @@ export function getTierTheme(tier: CardTier, scheme: 'light' | 'dark'): TierThem
   return { ...TierTreatments[tier], colors: TierColors[scheme][tier] };
 }
 
+/**
+ * "You are here", for a control that switches between places.
+ *
+ * One function rather than a colour picked per control, because the app has two
+ * of these — the section bar and the segmented control — and when each chose
+ * its own treatment they drifted: both marked the selection with a raised tile,
+ * which is a lot of furniture to say one word, and neither could be changed
+ * without the other quietly disagreeing.
+ *
+ * It is the app's own gold: the rail's active marker, the gem, the avatar ring.
+ * A selected page is now the only warm thing in a grey bar, which reads faster
+ * than a box AND survives being small, where a few points of lightness between
+ * two greys does not.
+ *
+ * COLOUR IS NEVER THE ONLY SIGNAL. Every control using this also fills its
+ * glyph on selection, so the state is legible to a reader who cannot separate
+ * the two hues. Do not drop that half.
+ */
+export function selectionAccent(scheme: 'light' | 'dark'): string {
+  return TierColors[scheme].gold.accent;
+}
+
 /** Card geometry per size variant. Art slot keeps its box when real art lands. */
 export const CardSizes = {
   /**

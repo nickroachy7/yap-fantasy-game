@@ -24,13 +24,30 @@
  *
  * On wide web it renders nothing at all: the rail already lists every sub-page
  * as a row, and `ActionBar` drops items marked `nav`.
+ *
+ * IT OWNS ITS OWN GUTTER, and that is the fix for the thing that went wrong.
+ *
+ * `Screen` pads its content horizontally when it scrolls and NOT when it does
+ * not — a `scroll={false}` page hands the gutter to the virtualised list inside
+ * it, which needs to bleed. So whether this bar was inset depended on which
+ * kind of page it landed on, and every screen was left to make up the
+ * difference: Players wrapped it in a 16pt toolbar, Collection and Leaderboard
+ * rendered it bare and it ran edge to edge. The same control looked like two
+ * different components depending on which tab you were in.
+ *
+ * The gutter lives here now, so a screen cannot get it wrong by doing nothing.
+ * The one thing a CALLER must know: a page whose `Screen` already pads (i.e.
+ * `scroll` left on) has to bleed that padding back — see `leaderboard/scoring`,
+ * which is the only such page and says so at the call site.
  */
 import { usePathname, useRouter } from 'expo-router';
 import { useMemo } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { ActionBar, type Action } from '@/components/shell/ActionBar';
 import { childrenOf } from '@/components/shell/sections';
 import { useIsWide } from '@/components/shell/useResponsive';
+import { Spacing } from '@/constants/theme';
 
 export function SectionNav({ section }: { /** e.g. `/collection`. */ section: string }) {
   const router = useRouter();
@@ -52,5 +69,21 @@ export function SectionNav({ section }: { /** e.g. `/collection`. */ section: st
     return pages;
   }, [section, pathname, router]);
 
-  return <ActionBar actions={actions} wide={wide} />;
+  /* Early, before the wrapper. `ActionBar` would render nothing on wide anyway
+     — every item here is a nav item and it drops those — but the padded View
+     around it would still be in the tree, leaving a band of dead space at the
+     top of every wide page. */
+  if (wide) return null;
+
+  return (
+    <View style={styles.wrap}>
+      <ActionBar actions={actions} wide={wide} />
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  /* The same 16 the rows below use, so the bar lines up with the content it
+     navigates rather than sitting a few points inside or outside it. */
+  wrap: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
+});

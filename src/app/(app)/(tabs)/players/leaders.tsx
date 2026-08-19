@@ -150,8 +150,9 @@ export default function LeadersScreen() {
     <Screen title="Leaders" measure="table" context={context} scroll={false}>
       {/* The list runs edge to edge, so the chrome supplies the gutter the
           page does not. See the same block on the Trend board. */}
+      {/* Outside `controls` — the bar brings its own gutter. See the Trend board. */}
+      <SectionNav section="/players" />
       <View style={styles.controls}>
-        <SectionNav section="/players" />
 
         <PositionFilter value={pos} onChange={setPos} />
       </View>
