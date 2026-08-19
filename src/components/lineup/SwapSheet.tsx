@@ -155,38 +155,35 @@ export function SwapSheet({
 
           {request === null ? null : (
             <>
+              {/* Centred, and without a badge or a ✕ on a phone.
+                  The badge said the same thing as the badge on the subject row
+                  two lines below it, and the ✕ duplicated the Close button at
+                  the bottom — where a thumb already is. What is left is the one
+                  sentence the sheet is about. */}
               <View style={styles.header}>
-                {request.kind === 'slot' ? (
-                  <PositionBadge
-                    label={request.slot}
-                    positions={positionsForSlot(request.slot)}
-                    size={30}
-                  />
-                ) : (
-                  <PositionBadge label={request.card.position} size={30} />
-                )}
-                <View style={styles.headerText}>
-                  <Text numberOfLines={1} style={[Type.section, { color: c.text }]}>
-                    {title}
-                  </Text>
-                  <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
-                    {request.kind === 'slot'
-                      ? `${request.options.filter((o) => o.id !== request.current?.id).length} eligible ${request.eligiblePositions}`
-                      : `${request.card.team ?? DASH} · ${matchupLabel(request.card.game)}`}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={onClose}
-                  accessibilityRole="button"
-                  accessibilityLabel="Close"
-                  hitSlop={10}
-                  style={({ pressed }) => [
-                    styles.close,
-                    { borderColor: c.border },
-                    pressed && styles.pressed,
-                  ]}>
-                  <Text style={[Type.strong, { color: c.textSecondary }]}>✕</Text>
-                </Pressable>
+                <Text numberOfLines={1} style={[Type.section, styles.title, { color: c.text }]}>
+                  {title}
+                </Text>
+                <Text numberOfLines={1} style={[Type.fine, styles.title, { color: c.textTertiary }]}>
+                  {request.kind === 'slot'
+                    ? `${request.options.filter((o) => o.id !== request.current?.id).length} eligible ${request.eligiblePositions}`
+                    : `${request.card.team ?? DASH} · ${matchupLabel(request.card.game)}`}
+                </Text>
+                {/* A dialog has no drag and no bottom Close, so it keeps one. */}
+                {wide ? (
+                  <Pressable
+                    onPress={onClose}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close"
+                    hitSlop={10}
+                    style={({ pressed }) => [
+                      styles.close,
+                      { borderColor: c.border },
+                      pressed && styles.pressed,
+                    ]}>
+                    <Text style={[Type.strong, { color: c.textSecondary }]}>✕</Text>
+                  </Pressable>
+                ) : null}
               </View>
 
               <ScrollView
@@ -261,36 +258,36 @@ function SlotBody({
   return (
     <>
       {current ? (
-        <View style={styles.section}>
-          <SectionLabel>In this slot now</SectionLabel>
-          <View style={[styles.pinned, { backgroundColor: c.surfaceSunken, borderColor: c.border }]}>
-            <PlayerBand
+        <>
+          <PlayerBand
               card={current}
               badge={<PositionBadge label={current.position} size={26} />}
               lead={<Text style={[Type.micro, { color: c.positive }]}>IN</Text>}
               {...figureFor(current, sort)}
               selected
-              accessibilityLabel={`${current.name} is starting at ${slot}`}
-            />
-            <Pressable
-              onPress={() => onClear(slot)}
-              accessibilityRole="button"
-              accessibilityLabel={`Bench ${current.name} and leave ${slot} empty`}
-              style={({ pressed }) => [styles.clear, pressed && styles.pressed]}>
-              <Text style={[Type.fine, { color: c.negative }]}>
-                Bench {current.name} — leave {slot} empty
-              </Text>
-            </Pressable>
-          </View>
-        </View>
+            accessibilityLabel={`${current.name} is starting at ${slot}`}
+          />
+          <Pressable
+            onPress={() => onClear(slot)}
+            accessibilityRole="button"
+            accessibilityLabel={`Bench ${current.name} and leave ${slot} empty`}
+            style={({ pressed }) => [styles.clear, pressed && styles.pressed]}>
+            <Text style={[Type.fine, { color: c.negative }]}>
+              Bench {current.name} — leave {slot} empty
+            </Text>
+          </Pressable>
+        </>
       ) : null}
 
       <View style={styles.section}>
-        <SortBar
-          value={sort}
-          onChange={onSort}
-          hint={current ? 'REPLACE WITH' : `CHOOSE A ${eligiblePositions.toUpperCase()}`}
-        />
+        <Divider>
+          {current ? 'Choose a replacement' : `Choose a ${eligiblePositions}`}
+        </Divider>
+        {/* Only when there is something to sort. Three keys offered over a
+            list of one is the sheet describing its own machinery — and with a
+            single eligible card it was the widest, loudest thing on screen.
+            No hint either: the divider above already says what this list is. */}
+        {options.length > 2 ? <SortBar value={sort} onChange={onSort} /> : null}
         {options.length === 0 ? (
           <Text style={[Type.body, styles.empty, { color: c.textSecondary }]}>
             {current
@@ -355,22 +352,17 @@ function BenchBody({
     <>
       {/* The mirror of the slot mode's pinned incumbent: the player the sheet
           is about, in the same box, under the same kind of label. */}
-      <View style={styles.section}>
-        <SectionLabel>Moving</SectionLabel>
-        <View style={[styles.pinned, { backgroundColor: c.surfaceSunken, borderColor: c.border }]}>
-          <PlayerBand
+      <PlayerBand
             card={card}
             badge={<PositionBadge label={card.position} size={26} />}
             lead={<Text style={[Type.micro, { color: c.textSecondary }]}>OUT</Text>}
             {...figureFor(card, 'fp')}
             selected
-            accessibilityLabel={`${card.name} is on the bench`}
-          />
-        </View>
-      </View>
+        accessibilityLabel={`${card.name} is on the bench`}
+      />
 
       <View style={styles.section}>
-        <SectionLabel>Send him to</SectionLabel>
+        <Divider>Send him to</Divider>
         {/* Every legal slot, taken ones included. A bench player whose slots are
             all full is the ordinary case — three good running backs, two slots —
             and a sheet that showed nothing there would be answering a question
@@ -415,14 +407,25 @@ function figureFor(card: LineupCard | null, sort: SortKey) {
   return { figureLabel: 'FP', figureValue: card?.form ? card.form.seasonFp.toFixed(1) : null };
 }
 
-/** One label, one treatment, so both modes are read the same way. */
-function SectionLabel({ children }: { children: string }) {
+/**
+ * The break between the player the sheet is ABOUT and the list you are choosing
+ * from.
+ *
+ * A centred caption between two rules, rather than the left-aligned micro label
+ * that used to sit above each section. Two stacked labels plus a sort row made
+ * three bands of 9pt uppercase furniture between the subject and the first
+ * option; this is one, and being centred it reads as a divider rather than as
+ * another heading competing with the title.
+ */
+function Divider({ children }: { children: string }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   return (
-    <Text style={[Type.micro, styles.sectionLabel, { color: c.textTertiary }]}>
-      {children.toUpperCase()}
-    </Text>
+    <View style={styles.divider}>
+      <View style={[styles.rule, { backgroundColor: c.border }]} />
+      <Text style={[Type.micro, { color: c.textTertiary }]}>⇅ {children.toUpperCase()}</Text>
+      <View style={[styles.rule, { backgroundColor: c.border }]} />
+    </View>
   );
 }
 
@@ -449,15 +452,19 @@ const styles = StyleSheet.create({
     marginTop: Spacing.one + 2,
   },
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two + 2,
-    paddingHorizontal: Spacing.three,
+    gap: 2,
+    paddingHorizontal: Spacing.five,
     paddingTop: Spacing.two + 4,
-    paddingBottom: Spacing.two,
+    paddingBottom: Spacing.three,
   },
-  headerText: { flex: 1, minWidth: 0, gap: 1 },
+  title: { textAlign: 'center' },
+  /* Floated, so the centred title is centred on the SHEET rather than on
+     whatever space a control in the same row happens to leave it. */
   close: {
+    position: 'absolute',
+    right: Spacing.three,
+    top: Spacing.two,
     width: 30,
     height: 30,
     borderRadius: 15,
@@ -470,14 +477,16 @@ const styles = StyleSheet.create({
   scroll: { flexShrink: 1 },
   scrollBody: { paddingBottom: Spacing.two },
   section: { gap: Spacing.one },
-  sectionLabel: { paddingHorizontal: Spacing.two + 2, paddingTop: Spacing.two },
-  pinned: {
-    marginHorizontal: Spacing.two,
-    borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.one,
   },
-  clear: { paddingHorizontal: Spacing.two + 2, paddingVertical: Spacing.two },
+  rule: { flex: 1, height: StyleSheet.hairlineWidth },
+  clear: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
   empty: { padding: Spacing.three },
   footer: {
     borderTopWidth: StyleSheet.hairlineWidth,
