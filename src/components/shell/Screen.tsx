@@ -113,5 +113,12 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     alignSelf: 'center',
+    /* The same top gap the scrolling branch gets from its `padding`. Without
+       it a `scroll={false}` screen — the directory, the inventory — started its
+       first control flush against the header band, which read as the control
+       belonging to the header rather than to the page. Vertical only: the
+       horizontal gutter still belongs to the list inside, which measures its
+       own box to lay out a grid. */
+    paddingTop: Spacing.three,
   },
 });

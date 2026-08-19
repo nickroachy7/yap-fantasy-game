@@ -525,6 +525,15 @@ function Kit() {
                 { key: 'scoring', label: 'Scoring', icon: 'scoring', active: action === 'scoring', onPress: () => setAction('scoring') },
               ]}
             />
+            {/* Two items — the Players section. The cap on item width is what
+                stops this reading as the segmented control it replaced. */}
+            <ActionBar
+              wide={false}
+              actions={[
+                { key: 'dir2', label: 'Directory', icon: 'directory', active: action === 'dir2', onPress: () => setAction('dir2') },
+                { key: 'trend2', label: 'Trend', icon: 'trend', active: action === 'trend2', onPress: () => setAction('trend2') },
+              ]}
+            />
           </Section>
 
           <Section

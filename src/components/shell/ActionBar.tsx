@@ -416,8 +416,10 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
     // Grows to the full width when the items do not fill it, so the bar is a
-    // bar rather than a huddle of buttons on the left.
+    // bar rather than a huddle of buttons on the left; the items inside it are
+    // centred rather than left-packed, because a capped item cannot fill it.
     flexGrow: 1,
+    justifyContent: 'center',
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.one,
@@ -430,6 +432,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexBasis: 0,
     minWidth: 62,
+    /* Capped, or a two-item bar — Players is Directory and Trend — gives each
+       cell half a phone and the pair reads as the segmented control this
+       replaced. The cap plus a centred row keeps a short bar looking like a
+       row of buttons and a long one looking like a scroller. */
+    maxWidth: 104,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 3,

@@ -23,7 +23,7 @@ import { computeMovers, deltaText, type Mover } from '@/components/trend/movers'
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
 import { PositionBadge } from '@/components/ui/PositionBadge';
-import { Tabs, type Tab } from '@/components/ui/Tabs';
+import { Chip, ChipRow } from '@/components/ui/Chip';
 import { POSITION_ORDER, type PositionKey } from '@/constants/positions';
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -44,10 +44,8 @@ const MINIMUM_POINTS = 6;
 
 type PosFilter = PositionKey | 'ALL';
 
-const POS_TABS: Tab<PosFilter>[] = [
-  { value: 'ALL', label: 'All' },
-  ...POSITION_ORDER.map((p) => ({ value: p as PosFilter, label: p })),
-];
+/** Same control as the directory and the collection: chips, not underlines. */
+const POS_FILTERS: PosFilter[] = ['ALL', ...POSITION_ORDER];
 
 export default function TrendScreen() {
   const router = useRouter();
@@ -188,7 +186,17 @@ export default function TrendScreen() {
       context={comparison ?? `${season} season`}>
       <SectionNav section="/players" />
 
-      <Tabs tabs={POS_TABS} value={pos} onChange={setPos} />
+      <ChipRow>
+        {POS_FILTERS.map((p) => (
+          <Chip
+            key={p}
+            selected={pos === p}
+            label={p === 'ALL' ? 'ALL' : p}
+            onPress={() => setPos(p)}
+            accessibilityLabel={p === 'ALL' ? 'All positions' : p}
+          />
+        ))}
+      </ChipRow>
 
       {comparison ? (
         <Text style={[Type.fine, { color: c.textTertiary }]}>
