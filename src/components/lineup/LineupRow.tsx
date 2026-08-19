@@ -47,7 +47,7 @@
 import { useState } from 'react';
 import { StyleSheet, Pressable, Text, View } from 'react-native';
 
-import { TierRail } from '@/components/cards/TierRail';
+import { TierChip } from '@/components/cards/TierChip';
 import { DASH } from '@/components/ui/DataTable';
 import { PositionBadge, positionsForSlot } from '@/components/ui/PositionBadge';
 import { positionColors } from '@/constants/positions';
@@ -253,10 +253,6 @@ function Row({
         { backgroundColor: selected ? c.backgroundSelected : c.background },
         pressed && { backgroundColor: c.backgroundElement },
       ]}>
-      {/* In the gutter, not in the content — see TierRail. Only for a card an
-          owner actually holds; an empty slot has no tier to state. */}
-      {card ? <TierRail tier={card.tier} /> : null}
-
       <View style={styles.identity}>
         {canSwap ? (
           <Pressable
@@ -354,9 +350,15 @@ function Identity({
       <View style={styles.names}>
           {card ? (
             <>
-              <Text numberOfLines={1} style={[styles.name, { color: c.text }]}>
-                {card.name}
-              </Text>
+              {/* The tier sits in front of the name because the name is the
+                  first thing read in every row — see TierChip, which is fixed
+                  width so the names still start at the same x down the list. */}
+              <View style={styles.nameLine}>
+                <TierChip tier={card.tier} />
+                <Text numberOfLines={1} style={[styles.name, { color: c.text }]}>
+                  {card.name}
+                </Text>
+              </View>
               <View style={styles.meta}>
                 <Text numberOfLines={1} style={[Type.fine, { color: accent }]}>
                   {(card.position ?? '—').toUpperCase()}
@@ -466,7 +468,6 @@ export function PlayerBand({
         { backgroundColor: selected ? c.backgroundSelected : c.background },
         pressed && { backgroundColor: c.backgroundElement },
       ]}>
-      {card ? <TierRail tier={card.tier} height={6} /> : null}
       {lead ? <View style={styles.lead}>{lead}</View> : null}
       {badge}
       <Identity
@@ -505,7 +506,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: GUTTER,
   },
   names: { flex: 1, minWidth: 0, gap: 1 },
-  name: { fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },
+  nameLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2, minWidth: 0 },
+  /* `flexShrink` + `minWidth: 0`: the name now shares a ROW with the tier chip,
+     and without these a long one pushes past the row instead of ellipsising.
+     Ellipsis on a long name is by design here, overflow is not. */
+  name: { fontSize: 15, fontWeight: '700', letterSpacing: -0.2, flexShrink: 1, minWidth: 0 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
   figure: {
     alignItems: 'center',
