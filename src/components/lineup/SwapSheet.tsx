@@ -261,7 +261,7 @@ function SlotBody({
         <>
           <PlayerBand
               card={current}
-              badge={<PositionBadge label={current.position} size={26} />}
+              badge={<PositionBadge label={current.position} size={26} tone="neutral" />}
               lead={<Text style={[Type.micro, { color: c.positive }]}>IN</Text>}
               {...figureFor(current, sort)}
               selected
@@ -300,7 +300,7 @@ function SlotBody({
               <PlayerBand
                 key={card.id}
                 card={card}
-                badge={<PositionBadge label={card.position} size={26} />}
+                badge={<PositionBadge label={card.position} size={26} tone="neutral" />}
                 {...figureFor(card, sort)}
                 onPress={() => onPick(slot, card.id)}
                 accessibilityLabel={
@@ -354,7 +354,7 @@ function BenchBody({
           is about, in the same box, under the same kind of label. */}
       <PlayerBand
             card={card}
-            badge={<PositionBadge label={card.position} size={26} />}
+            badge={<PositionBadge label={card.position} size={26} tone="neutral" />}
             lead={<Text style={[Type.micro, { color: c.textSecondary }]}>OUT</Text>}
             {...figureFor(card, 'fp')}
             selected
@@ -375,7 +375,7 @@ function BenchBody({
           <PlayerBand
             key={slot}
             card={occupant}
-            badge={<PositionBadge label={slot} positions={positionsForSlot(slot)} size={26} />}
+            badge={<PositionBadge label={slot} positions={positionsForSlot(slot)} size={26} tone="neutral" />}
             {...figureFor(occupant, 'fp')}
             emptyPrimary={`${slot} is empty`}
             emptySecondary="Nothing is starting here yet"

@@ -107,7 +107,12 @@ export function StarterRow({
   return (
     <Row
       card={card}
-      badge={<PositionBadge label={slot} positions={positionsForSlot(slot)} size={26} />}
+      /* Neutral, not the position accent. This screen is about CARDS, and a
+         card's TIER is the colour that has to carry down this column — see the
+         note on PositionBadge's `tone`. The bench's BN badge stays FILLED, so
+         starter and bench are still told apart at a glance, by weight rather
+         than by hue. */
+      badge={<PositionBadge label={slot} positions={positionsForSlot(slot)} size={26} tone="neutral" />}
       figureLabel="WK"
       // Not "0.0". An unplayed week has no score, and a zero here would be
       // indistinguishable from a starter who blanked.

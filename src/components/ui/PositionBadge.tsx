@@ -27,7 +27,7 @@ import {
   positionKey,
   type Position,
 } from '@/constants/positions';
-import { Fonts } from '@/constants/theme';
+import { Colors, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export type PositionBadgeProps = {
@@ -43,6 +43,21 @@ export type PositionBadgeProps = {
   positions?: Position[];
   /** Box height in px. Width follows: square when solid, wider when split. */
   size?: number;
+  /**
+   * `position` (default) fills the badge with the position's accent.
+   *
+   * `neutral` draws it as a grey outline instead, and is what the LINEUP uses.
+   * That screen is about CARDS, not players: a card's tier is the colour that
+   * has to carry there, and a position accent on every badge is a second colour
+   * system competing with it down the same column. The player directory keeps
+   * the accent — it is a list of players, tier does not enter into it.
+   *
+   * Nothing is lost by dropping the colour. The abbreviation is always drawn
+   * (see `constants/positions.ts`); the accent is a scanning accelerator
+   * layered on text, never a substitute for it — which is exactly what makes it
+   * safe to take away when something else needs the attention more.
+   */
+  tone?: 'position' | 'neutral';
 };
 
 /** Resolves a slot code to its eligible positions, falling back to the label. */
@@ -50,10 +65,17 @@ export function positionsForSlot(slot: string): Position[] | undefined {
   return SLOT_POSITIONS[slot.toUpperCase()];
 }
 
-export function PositionBadge({ label, positions, size = 24 }: PositionBadgeProps) {
+export function PositionBadge({
+  label,
+  positions,
+  size = 24,
+  tone = 'position',
+}: PositionBadgeProps) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const theme = Colors[scheme];
   const text = (label ?? '--').toUpperCase();
   const split = positions && positions.length > 1;
+  const neutral = tone === 'neutral';
 
   if (split) {
     return (
@@ -61,13 +83,31 @@ export function PositionBadge({ label, positions, size = 24 }: PositionBadgeProp
         accessible
         accessibilityRole="text"
         accessibilityLabel={`${text} slot: ${positions.map((p) => POSITION_NAMES[p]).join(', ')}`}
-        style={[styles.split, { height: size, borderRadius: size * 0.22 }]}>
-        {positions.map((p) => {
+        style={[
+          styles.split,
+          { height: size, borderRadius: size * 0.22 },
+          neutral && { borderWidth: 1, borderColor: theme.borderStrong },
+        ]}>
+        {positions.map((p, i) => {
           const c = positionColors(p, scheme);
           return (
-            <View key={p} style={[styles.cell, { backgroundColor: c.accent, width: size * 0.58 }]}>
+            <View
+              key={p}
+              style={[
+                styles.cell,
+                { backgroundColor: neutral ? 'transparent' : c.accent, width: size * 0.58 },
+                /* Without fills the cells need a seam, or R W T reads as one
+                   three-letter word rather than three eligible positions. */
+                neutral && i > 0 && { borderLeftWidth: 1, borderLeftColor: theme.borderStrong },
+              ]}>
               <Text
-                style={[styles.text, { color: c.onAccent, fontSize: Math.max(8, size * 0.42) }]}>
+                style={[
+                  styles.text,
+                  {
+                    color: neutral ? theme.text : c.onAccent,
+                    fontSize: Math.max(8, size * 0.42),
+                  },
+                ]}>
                 {/* The initial, not the pair: three two-letter codes in a 42pt
                     box is unreadable, and R/W/T is unambiguous inside a set of
                     five positions. */}
@@ -96,12 +136,16 @@ export function PositionBadge({ label, positions, size = 24 }: PositionBadgeProp
           // string rather than stay square, or the 1 gets clipped.
           minWidth: text.length > 2 ? size * 1.25 : size,
           borderRadius: size * 0.22,
-          backgroundColor: c.accent,
+          backgroundColor: neutral ? 'transparent' : c.accent,
         },
+        neutral && { borderWidth: 1, borderColor: theme.borderStrong },
       ]}>
       <Text
         numberOfLines={1}
-        style={[styles.text, { color: c.onAccent, fontSize: Math.max(8, size * 0.4) }]}>
+        style={[
+          styles.text,
+          { color: neutral ? theme.text : c.onAccent, fontSize: Math.max(8, size * 0.4) },
+        ]}>
         {text}
       </Text>
     </View>
