@@ -49,18 +49,25 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
           return (
             <View key={item.href}>
               <NavRow href={item.href} label={item.label} active={active} accent={accent} />
+              {/* A section's first child shares the section's own href — the
+                  mobile segmented control needs a segment for the landing page.
+                  The rail does not: the parent row IS that link and already
+                  shows its active state, so rendering the child too puts two
+                  rows pointing at one destination directly under each other. */}
               {item.children && active
-                ? item.children.map((child) => (
-                    <NavRow
-                      key={child.href}
-                      href={child.href}
-                      label={child.label}
-                      badge={child.badge}
-                      active={pathname === child.href}
-                      accent={accent}
-                      nested
-                    />
-                  ))
+                ? item.children
+                    .filter((child) => child.href !== item.href)
+                    .map((child) => (
+                      <NavRow
+                        key={child.href}
+                        href={child.href}
+                        label={child.label}
+                        badge={child.badge}
+                        active={pathname === child.href}
+                        accent={accent}
+                        nested
+                      />
+                    ))
                 : null}
             </View>
           );

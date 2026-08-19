@@ -20,6 +20,7 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
 import { GameRow } from '@/components/scores/GameRow';
 import { LeadersPanel } from '@/components/scores/LeadersPanel';
 import type { Leader, ScoreGame } from '@/components/scores/scoreboard';
@@ -32,6 +33,8 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { POSITION_ORDER, POSITIONS } from '@/constants/positions';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+
+const TAB_ICONS: TabIconName[] = ['lineup', 'leaderboard', 'cards', 'collection', 'profile'];
 
 /** Every lineup slot the config ships with, so the split badge is exercised. */
 const SLOTS = ['QB', 'RB1', 'RB2', 'WR1', 'WR2', 'TE', 'FLEX', 'K'];
@@ -173,6 +176,28 @@ function Kit() {
         <ScrollView contentContainerStyle={styles.content}>
           <Text style={[Type.page, { color: c.text }]}>UI kit</Text>
 
+          <Section
+            title="Tab icons"
+            note="Inactive (hollow) above, active (solid) below — at bar size and at 3x.">
+            <View style={[styles.row, { gap: Spacing.four }]}>
+              {TAB_ICONS.map((n) => (
+                <View key={n} style={styles.iconCell}>
+                  <TabIcon name={n} color={c.textSecondary} focused={false} size={24} />
+                  <TabIcon name={n} color={c.text} focused size={24} />
+                  <Text style={[Type.micro, { color: c.textTertiary }]}>{n.toUpperCase()}</Text>
+                </View>
+              ))}
+            </View>
+            {/* Drawn large as well, because a glyph that survives 24pt can
+                still be misproportioned — and the bug is invisible until you
+                see it big. */}
+            <View style={[styles.row, { gap: Spacing.four }]}>
+              {TAB_ICONS.map((n) => (
+                <TabIcon key={`big-${n}`} name={n} color={c.text} focused size={72} />
+              ))}
+            </View>
+          </Section>
+
           <Section title="Position badges" note="Every position, then every lineup slot.">
             <View style={styles.row}>
               {POSITIONS.map((p) => (
@@ -313,4 +338,5 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.four, gap: Spacing.five, maxWidth: 760, width: '100%', alignSelf: 'center' },
   section: { gap: Spacing.two },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, alignItems: 'center' },
+  iconCell: { alignItems: 'center', gap: Spacing.two },
 });

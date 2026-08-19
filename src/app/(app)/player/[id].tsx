@@ -315,13 +315,19 @@ export default function PlayerDetailScreen() {
       context={player ? `${player.season ?? ''} game log`.trim() : 'Player'}
       refreshing={refreshing}
       onRefresh={() => void load('refresh')}>
+      {/* Says "Back", not "Cards". This page is now reachable from the
+          directory, the scoreboard's leader rows and the trend board, so a
+          label naming one of those three was wrong two times in three. The
+          destination is still the real history entry; /cards is only the
+          fallback for a cold deep link, which is the one case where there is
+          nothing to go back to. */}
       <Pressable
         onPress={goBack}
         accessibilityRole="button"
-        accessibilityLabel="Back to cards"
+        accessibilityLabel="Go back"
         hitSlop={8}
         style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-        <Text style={[styles.backText, { color: c.textSecondary }]}>‹ Cards</Text>
+        <Text style={[styles.backText, { color: c.textSecondary }]}>‹ Back</Text>
       </Pressable>
       {body()}
     </Screen>
