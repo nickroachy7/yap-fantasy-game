@@ -28,6 +28,16 @@ jobs:
 
       - run: npm ci
 
+      # `expo-env.d.ts` and `.expo/types/router.d.ts` are GENERATED and both
+      # gitignored, so a fresh clone has neither. Without them tsc cannot
+      # resolve `@/global.css` or the CSS modules, and — more quietly — every
+      # expo-router route string goes unchecked, which is the exact coverage
+      # this repo turned on deliberately. `customize tsconfig.json` is the
+      # documented way to regenerate both; it rewrites tsconfig.json to a
+      # byte-identical file, verified, so nothing here depends on it not.
+      - name: Generate Expo types (gitignored, so absent on a fresh clone)
+        run: npx expo customize tsconfig.json
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -43,7 +53,7 @@ jobs:
 
       - name: SQL suites — not run here
         run: |
-          echo "The five suites in supabase/tests/*.test.sql are SKIPPED in CI."
+          echo "The suites in supabase/tests/*.test.sql are SKIPPED in CI."
           echo "They need a live Postgres and a DATABASE_URL secret that is not set"
           echo "on this repository. Run them locally before a release:"
           echo
