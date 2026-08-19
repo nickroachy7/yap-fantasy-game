@@ -17,8 +17,23 @@ import { useEffect, useState } from 'react';
 import { kickoffLabel, matchupLabel, type GameContext } from '@/components/lineup/model';
 import { supabase } from '@/lib/supabase';
 
-/** Club abbreviation -> "Sun 1:05p vs BUF", or "BYE" when they are idle. */
-export type FixtureMap = Map<string, string>;
+/**
+ * Club abbreviation -> its game this week, or null when the club is idle.
+ *
+ * RAW rather than pre-formatted, because two callers now want different
+ * shapes from it: the directory row prints one string ("Sun 1:05p vs BUF"),
+ * and the card lays the same facts out across two lines with the club
+ * abbreviation folded in. Formatting here would have forced the card to parse
+ * a string back apart.
+ */
+export type FixtureMap = Map<string, GameContext | null>;
+
+/** The directory row's one-line form. "Sun 1:05p vs BUF", or "BYE". */
+export function fixtureLabel(game: GameContext | null | undefined): string {
+  if (!game) return 'BYE';
+  const kick = kickoffLabel(game);
+  return `${kick ? `${kick} ` : ''}${matchupLabel(game)}`;
+}
 
 export function useUpcomingFixtures(): FixtureMap {
   const [fixtures, setFixtures] = useState<FixtureMap>(new Map());
@@ -56,11 +71,9 @@ export function useUpcomingFixtures(): FixtureMap {
 
         const out: FixtureMap = new Map();
         for (const abbr of abbrOf.values()) {
-          const game = byTeam.get(abbr) ?? null;
           // A club absent from the week's schedule is on a bye — a real fact,
           // and the one this line is most worth showing.
-          const kick = kickoffLabel(game);
-          out.set(abbr, game ? `${kick ? `${kick} ` : ''}${matchupLabel(game)}` : 'BYE');
+          out.set(abbr, byTeam.get(abbr) ?? null);
         }
         if (live) setFixtures(out);
       } catch {

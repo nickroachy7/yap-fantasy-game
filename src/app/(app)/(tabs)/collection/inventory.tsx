@@ -51,6 +51,7 @@ import {
   type TierFilter,
 } from '@/components/collection/types';
 import { useCollection } from '@/components/collection/use-collection';
+import { useUpcomingFixtures } from '@/components/cards/use-fixtures';
 import { ChipRow, FilterChips, type FilterChip } from '@/components/ui/Chip';
 import { SearchField, SortChips } from '@/components/ui/Controls';
 import { Screen } from '@/components/shell/Screen';
@@ -86,6 +87,10 @@ export default function InventoryScreen() {
   const [listWidth, setListWidth] = useState(0);
 
   const { cards, error, loading, refreshing, refresh } = useCollection();
+  /* One read for the whole grid, not one per card. Decoration only: it
+     resolves to an empty map on any failure and the fixture line simply does
+     not render, which must never take the collection down with it. */
+  const fixtures = useUpcomingFixtures();
   const { cardCount, refresh: refreshPlayer } = usePlayer();
 
   const [query, setQuery] = useState('');
@@ -358,7 +363,12 @@ export default function InventoryScreen() {
               }
               ListEmptyComponent={<EmptyFilterResult onClear={clearFilters} hasFilters={filtered} />}
               renderItem={({ item }) => (
-                <InventoryCard card={item} width={itemWidth} onPress={openCard(item)} />
+                <InventoryCard
+                  card={item}
+                  width={itemWidth}
+                  game={item.team ? fixtures.get(item.team.toUpperCase()) : undefined}
+                  onPress={openCard(item)}
+                />
               )}
             />
           </>

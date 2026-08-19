@@ -9,7 +9,7 @@ import {
   type CardTier,
 } from '@/constants/theme';
 import type { Database } from '@/lib/database.types';
-import { PositionGlyph } from './PositionGlyph';
+import { kickoffLabel, matchupLabel, type GameContext } from '@/components/lineup/model';
 import { useTierTheme } from './use-tier-theme';
 
 /**
@@ -55,6 +55,20 @@ void _tierParity;
  * Likewise the progress track: the exact distance is always printed as text
  * next to it ("200 to SILVER"), so the bar is never the only source.
  *
+ * ART SITS AT THE VERY TOP, FULL BLEED. It used to be the second row, under a
+ * header carrying a position chip and the club abbreviation, which put a strip
+ * of chrome above the one region that will eventually hold a picture. Both of
+ * those facts found better homes and the header row went away entirely:
+ *
+ *   position  to the right of the name, where you read it in the same glance
+ *             as the name it qualifies.
+ *   club      folded into the fixture line, which needs it anyway — a matchup
+ *             is "my club against theirs", so `PHI @ CAR` says both in the
+ *             space one of them used to take.
+ *
+ * That trade is what pays for the fixture line: a row was removed and a row
+ * was added, so the card is no taller than before while saying more.
+ *
  * NO PHOTO, NO LOGO, NO JERSEY: unlicensed. The art slot is kept as reserved
  * space with its aspect ratio fixed, so dropping a real <Image> in later
  * changes nothing about the surrounding layout. Until then it holds a text
@@ -80,6 +94,13 @@ export type PlayerCardModel = {
   tierFloorFp?: number;
   /** OPTIONAL. Display name of the next tier, e.g. 'GOLD'. */
   nextTierLabel?: string;
+  /**
+   * OPTIONAL. This club's game in the upcoming week. `null` means we know the
+   * club is idle (a bye, which is worth saying); `undefined` means the caller
+   * did not load a schedule at all, and the line is omitted rather than
+   * claiming a bye nobody checked for.
+   */
+  game?: GameContext | null;
 };
 
 export type PlayerCardProps = {
@@ -129,6 +150,13 @@ export function PlayerCard({
   const toNext =
     model.nextTierAt === null ? null : Math.max(0, Math.round(model.nextTierAt - model.careerFp));
 
+  /* `PHI @ CAR` — the club and the opponent in one run, which is why the club
+     needs no separate home on the card. Undefined game means no schedule was
+     loaded, and the line is omitted rather than asserting a bye. */
+  const fixture =
+    model.game === undefined ? null : `${team} ${matchupLabel(model.game)}`;
+  const kickoff = model.game ? kickoffLabel(model.game) : null;
+
   const starts = `${fmt(model.lineupStarts)} ${model.lineupStarts === 1 ? 'start' : 'starts'}`;
   const nextLine =
     toNext === null || !model.nextTierLabel
@@ -161,34 +189,12 @@ export function PlayerCard({
         },
         style,
       ]}>
-      {/* ---- header: position + club, both quiet ---- */}
-      <View style={styles.headerRow}>
-        <PositionGlyph
-          position={model.positionAbbreviation}
-          size={dims.glyph}
-          color={t.colors.textMuted}
-          /* Transparent, so the glyph reads as an outline rather than a filled
-             chip. Its SHAPE still encodes the position group. */
-          background="transparent"
-          borderColor={withAlpha(t.colors.textMuted, 0.45)}
-        />
-        {/* NO team logo: we are not licensed for club marks, so the club is
-            rendered purely as its 3-letter abbreviation in text. */}
-        <Text
-          numberOfLines={1}
-          style={[
-            styles.team,
-            { color: t.colors.textMuted, fontSize: dims.labelSize + 2 },
-          ]}>
-          {team}
-        </Text>
-      </View>
-
       {/* ================= ART SLOT ===================================== *
-        * Reserved region for licensed/commissioned art. Its box is driven  *
-        * by `artAspect`, so dropping a real <Image> in here later changes  *
-        * NOTHING about the surrounding layout. Borderless now: the outline *
-        * was drawing a box around an absence.                              *
+        * Reserved region for licensed/commissioned art, now at the very top   *
+        * and full bleed — negative margins cancel the card's padding so the   *
+        * image will meet the card's own edges. Its box is driven by           *
+        * `artAspect`, so dropping a real <Image> in here later changes        *
+        * NOTHING about the surrounding layout.                                *
         * ================================================================ */}
       <View
         // Decorative placeholder: keep it out of the accessibility tree.
@@ -199,7 +205,9 @@ export function PlayerCard({
           {
             aspectRatio: dims.artAspect,
             backgroundColor: t.colors.surfaceAlt,
-            borderRadius: Radius.chip,
+            marginTop: -dims.padding,
+            marginHorizontal: -dims.padding,
+            width: undefined,
           },
         ]}>
         <Text
@@ -209,19 +217,15 @@ export function PlayerCard({
           ]}>
           {initialsOf(model.playerName)}
         </Text>
-      </View>
 
-      {/* ---- identity ---- */}
-      <View style={styles.nameBlock}>
-        <Text
-          numberOfLines={dims.nameLines}
-          ellipsizeMode="tail"
-          style={[styles.name, { color: t.colors.text, fontSize: dims.nameSize }]}>
-          {model.playerName}
-        </Text>
-        {/* The tier, as a word. See the note at the top: this is the
-            non-colour carrier now that pips and frames are gone. */}
-        <View style={styles.tierRow}>
+        {/* The tier rides in the art slot's top-left, where trading cards have
+            always put rarity and where this card had dead space. It buys the
+            figure below its full width back — at 106pt, "3,140" and "DIAMOND"
+            on one row clipped the number to "3…", which is the one thing on
+            the card that may not be abbreviated.
+
+            The scrim keeps it legible once real art lands underneath. */}
+        <View style={[styles.tierChip, { backgroundColor: withAlpha(t.colors.surface, 0.82) }]}>
           <View
             style={[
               styles.tierDot,
@@ -232,66 +236,108 @@ export function PlayerCard({
             numberOfLines={1}
             style={[
               styles.tierWord,
-              { color: t.colors.textMuted, fontSize: dims.labelSize, letterSpacing: 0.8 },
+              { color: t.colors.text, fontSize: dims.labelSize, letterSpacing: 0.8 },
             ]}>
             {t.label}
           </Text>
         </View>
       </View>
 
+      {/* ---- identity: name, with the position it qualifies beside it ---- */}
+      <View style={styles.identity}>
+        <View style={styles.nameRow}>
+          <Text
+            numberOfLines={dims.nameLines}
+            ellipsizeMode="tail"
+            style={[styles.name, { color: t.colors.text, fontSize: dims.nameSize, flex: 1 }]}>
+            {model.playerName}
+          </Text>
+          {/* NO team logo and no club mark: we are not licensed for either, so
+              position is plain text and the club is an abbreviation below. */}
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.position,
+              { color: t.colors.textMuted, fontSize: dims.labelSize + 1 },
+            ]}>
+            {model.positionAbbreviation?.toUpperCase() ?? '—'}
+          </Text>
+        </View>
+
+        {/* The club rides in here, because a matchup already names it. */}
+        {fixture ? (
+          <View style={compact ? styles.fixtureStack : styles.fixtureRow}>
+            <Text
+              numberOfLines={1}
+              style={[styles.fixture, { color: t.colors.textMuted, fontSize: dims.labelSize + 1 }]}>
+              {fixture}
+            </Text>
+            {kickoff ? (
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.fixtureWhen,
+                  { color: t.colors.textMuted, fontSize: dims.labelSize },
+                ]}>
+                {compact ? kickoff : `· ${kickoff}`}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+
       <View style={[styles.divider, { borderColor: withAlpha(t.colors.textMuted, 0.28) }]} />
 
-      {/* ---- the one number ---- */}
-      <View style={styles.figureBlock}>
+      {/* ---- what it has earned, and where that puts it ----------------- *
+        * Three rows of balanced pairs rather than five stacked lines. Each   *
+        * row reads left-to-right as value-then-qualifier, and the columns    *
+        * line up down the card, which is what makes a 106pt cell scannable   *
+        * next to eight others.                                              *
+        * ================================================================ */}
+      <View style={styles.earned}>
+        {/* Full width, so a four-digit total is never abbreviated. */}
         <Text
           numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
           style={[styles.figure, { color: t.colors.text, fontSize: dims.figureSize }]}>
           {fmt(model.careerFp)}
         </Text>
-        <Text
-          numberOfLines={1}
-          style={[styles.figureLabel, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
-          CAREER FP
-        </Text>
-      </View>
 
-      {/* ---- everything else, demoted ---- */}
-      <View style={styles.footer}>
-        {/* Stacked at compact, where 106pt cannot hold both halves on one line
-            and clipped them to "338 to GO…". This text is what keeps the bar
-            below out of colour-alone, so it is the one thing here that may not
-            truncate. */}
-        <View style={compact ? styles.metaStack : styles.metaRow}>
+        <View style={styles.pair}>
           <Text
             numberOfLines={1}
-            style={[styles.meta, { color: t.colors.textMuted, fontSize: dims.labelSize + 1 }]}>
-            {starts}
+            style={[styles.micro, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
+            CAREER FP
           </Text>
-          {compact ? null : (
-            <Text
-              numberOfLines={1}
-              style={[styles.meta, { color: t.colors.textMuted, fontSize: dims.labelSize + 1 }]}>
-              ·
-            </Text>
+          <Text
+            numberOfLines={1}
+            style={[styles.micro, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
+            {starts.toUpperCase()}
+          </Text>
+        </View>
+
+        {/* The bar is never the only source — the distance is printed beside
+            it, which is what keeps this out of colour-alone. */}
+        <View style={styles.pair}>
+          {progress === null ? (
+            <View style={styles.trackSpacer} />
+          ) : (
+            <View style={[styles.track, { backgroundColor: withAlpha(t.colors.accent, 0.18) }]}>
+              <View
+                style={[
+                  styles.fill,
+                  { width: `${progress * 100}%`, backgroundColor: t.colors.accent },
+                ]}
+              />
+            </View>
           )}
           <Text
             numberOfLines={1}
-            style={[styles.meta, { color: t.colors.textMuted, fontSize: dims.labelSize + 1 }]}>
-            {nextLine}
+            style={[styles.micro, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
+            {nextLine.toUpperCase()}
           </Text>
         </View>
-        {/* The bar is never the only source — `meta` above prints the exact
-            distance in text, which is what keeps this out of colour-alone. */}
-        {progress === null ? null : (
-          <View style={[styles.track, { backgroundColor: withAlpha(t.colors.accent, 0.18) }]}>
-            <View
-              style={[
-                styles.fill,
-                { width: `${progress * 100}%`, backgroundColor: t.colors.accent },
-              ]}
-            />
-          </View>
-        )}
       </View>
     </View>
   );
@@ -330,21 +376,31 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.two,
-  },
-  team: {
+  identity: { gap: 2 },
+  nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.one + 1 },
+  position: {
     fontFamily: Fonts.sans,
     fontWeight: '700',
     letterSpacing: 1,
-    flexShrink: 1,
-    textAlign: 'right',
+    flexShrink: 0,
+  },
+  /* Stacked at compact, where "PHI @ CAR · Sun 1:05p" does not fit 96pt of
+     usable width and clipped the kickoff — the half that tells you whether you
+     still have time to change your lineup. */
+  fixtureRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.one },
+  fixtureStack: { gap: 0 },
+  fixture: {
+    fontFamily: Fonts.sans,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+  },
+  fixtureWhen: {
+    fontFamily: Fonts.sans,
+    fontWeight: '500',
+    opacity: 0.85,
   },
   artSlot: {
-    width: '100%',
+    alignSelf: 'stretch',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -360,32 +416,47 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.sans,
     fontWeight: '700',
   },
-  tierRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1 },
+  tierChip: {
+    position: 'absolute',
+    top: Spacing.one + 1,
+    left: Spacing.one + 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.one + 1,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
   tierDot: { borderRadius: 999 },
   tierWord: {
     fontFamily: Fonts.sans,
     fontWeight: '700',
   },
   divider: { borderTopWidth: StyleSheet.hairlineWidth },
-  figureBlock: { alignItems: 'center', gap: 0 },
+  earned: { gap: 3 },
+  /* Value left, qualifier right, on every row — so the two columns align down
+     the whole block rather than each row finding its own edges. */
+  pair: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.one + 1,
+  },
   figure: {
     fontFamily: Fonts.sans,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
-  figureLabel: {
+  micro: {
     fontFamily: Fonts.sans,
     fontWeight: '700',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
+    flexShrink: 0,
   },
-  footer: { gap: Spacing.one },
-  metaRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.one },
-  metaStack: { gap: 1 },
-  meta: {
-    fontFamily: Fonts.sans,
-    fontWeight: '600',
-  },
-  track: { height: 3, borderRadius: 2, overflow: 'hidden' },
+  /* Holds the row's height at the top tier, where there is no bar to draw and
+     the card would otherwise be a few points shorter than its neighbours. */
+  trackSpacer: { flex: 1, height: 3 },
+  track: { flex: 1, height: 3, borderRadius: 2, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 2 },
   pressed: {
     opacity: 0.82,

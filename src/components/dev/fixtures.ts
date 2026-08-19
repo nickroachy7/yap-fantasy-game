@@ -5,10 +5,14 @@
  * two galleries disagree it is never clear whether a difference is the layout
  * or the data. Deliberately awkward on purpose: one name long enough to
  * ellipsise at every size, one apostrophe-and-hyphen name, a maxed card with no
- * next tier, and both injury weights.
+ * next tier, and both injury weights — plus all three fixture states the card
+ * can be in: a home game, an away game, a bye (`game: null`), and no schedule
+ * loaded at all (`game` omitted), which renders no fixture line rather than
+ * claiming a bye nobody checked for.
  */
 import type { PlayerCardModel } from '@/components/cards';
 import type { CollectionCard } from '@/components/collection/types';
+import type { GameContext } from '@/components/lineup/model';
 
 export const SAMPLE_CARDS: PlayerCardModel[] = [
   {
@@ -21,6 +25,7 @@ export const SAMPLE_CARDS: PlayerCardModel[] = [
     tierFloorFp: 0,
     nextTierAt: 200,
     nextTierLabel: 'SILVER',
+    game: { opponent: 'CAR', home: false, startsAt: '2026-09-13T17:05:00Z' },
   },
   {
     playerName: 'Amar Johnson',
@@ -32,6 +37,7 @@ export const SAMPLE_CARDS: PlayerCardModel[] = [
     tierFloorFp: 200,
     nextTierAt: 750,
     nextTierLabel: 'GOLD',
+    game: { opponent: 'BUF', home: true, startsAt: '2026-09-13T20:25:00Z' },
   },
   {
     playerName: 'Christian McCaffrey',
@@ -43,6 +49,7 @@ export const SAMPLE_CARDS: PlayerCardModel[] = [
     tierFloorFp: 750,
     nextTierAt: 2500,
     nextTierLabel: 'DIAMOND',
+    game: null,
   },
   {
     playerName: 'Ja"Marr Chase-Williamson',
@@ -94,3 +101,24 @@ export const OWNED_MANY: CollectionCard[] = Array.from({ length: 14 }, (_, i) =>
   const base = OWNED_CARDS[i % OWNED_CARDS.length];
   return { ...base, id: `many-${i}`, cardId: `many-card-${i}` };
 });
+
+/**
+ * Club -> this week's game, the shape `useUpcomingFixtures` returns.
+ *
+ * `OWNED_CARDS` is the `CollectionCard` shape and deliberately carries no
+ * fixture: in the product the schedule is a SEPARATE read on a different
+ * cadence, loaded once for the whole grid rather than per card. The galleries
+ * have to hand it in the same way, or the compact size — the one the inventory
+ * actually uses — would silently never exercise the fixture line.
+ *
+ * Clubs with no game are OMITTED rather than mapped to null, so `get()` returns
+ * undefined for them. That is the fourth state and a real one — the shop shows
+ * freshly pulled cards before any schedule is loaded — and mapping it to null
+ * would have made the gallery claim a bye for a week nobody looked up.
+ */
+export const SAMPLE_FIXTURES: Map<string, GameContext | null> = new Map(
+  SAMPLE_CARDS.filter((m) => m.game !== undefined).map((m) => [
+    m.teamAbbreviation?.toUpperCase() ?? '',
+    m.game ?? null,
+  ]),
+);

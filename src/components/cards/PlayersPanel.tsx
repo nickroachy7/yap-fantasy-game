@@ -37,7 +37,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { PLAYER_ROW_HEIGHT, PlayerRow, ROW_GUTTER } from './PlayerRow';
-import { useUpcomingFixtures } from './use-fixtures';
+import { fixtureLabel, useUpcomingFixtures } from './use-fixtures';
 import {
   DEFAULT_SORT_DIR,
   POSITION_FILTERS,
@@ -151,7 +151,7 @@ export function PlayersPanel({
       <PlayerRow
         player={item}
         onPress={open}
-        fixture={item.team ? fixtures.get(item.team.toUpperCase()) : undefined}
+        fixture={item.team ? fixtureLabel(fixtures.get(item.team.toUpperCase())) : undefined}
       />
     ),
     [open, fixtures],

@@ -12,6 +12,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PlayerCard } from '@/components/cards';
+import type { GameContext } from '@/components/lineup/model';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { injuryAbbr, injuryWeight, type InjuryWeight } from '@/lib/injury';
@@ -62,18 +63,26 @@ function InjuryFlag({ weight, status }: { weight: Exclude<InjuryWeight, null>; s
 export function InventoryCard({
   card,
   width,
+  game,
   onPress,
 }: {
   card: CollectionCard;
   /** Exact column width, so rows align and the last row does not stretch. */
   width: number;
+  /** This club's game this week. Undefined until the schedule lands. */
+  game?: GameContext | null;
   onPress?: () => void;
 }) {
   const weight = injuryWeight(card.injuryStatus);
 
   return (
     <View style={[styles.cell, { width }]}>
-      <PlayerCard model={toCardModel(card)} size="compact" fixedWidth={false} onPress={onPress} />
+      <PlayerCard
+        model={toCardModel(card, game)}
+        size="compact"
+        fixedWidth={false}
+        onPress={onPress}
+      />
       {weight && card.injuryStatus ? (
         <InjuryFlag weight={weight} status={card.injuryStatus} />
       ) : null}

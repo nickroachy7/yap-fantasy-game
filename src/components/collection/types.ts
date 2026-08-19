@@ -7,6 +7,7 @@
  * cannot prove otherwise through a join), so normalisation is not optional.
  */
 import type { PlayerCardModel } from '@/components/cards';
+import type { GameContext } from '@/components/lineup/model';
 import { TierOrder, type CardTier } from '@/constants/theme';
 import type { Database } from '@/lib/database.types';
 import { injuryWeight } from '@/lib/injury';
@@ -126,8 +127,16 @@ export function normaliseRow(row: CollectionViewRow): CollectionCard {
   };
 }
 
-/** Presentational view-model for <PlayerCard>. The card never touches Supabase. */
-export function toCardModel(c: CollectionCard): PlayerCardModel {
+/**
+ * Presentational view-model for <PlayerCard>. The card never touches Supabase.
+ *
+ * `game` is passed separately because it comes from a different read on a
+ * different cadence — the week's schedule, which is fixed months ahead and is
+ * loaded once for the whole grid rather than per card. Undefined means no
+ * schedule was loaded, which the card renders as "no fixture line" rather than
+ * as a bye.
+ */
+export function toCardModel(c: CollectionCard, game?: GameContext | null): PlayerCardModel {
   return {
     playerName: c.playerName,
     positionAbbreviation: c.position,
@@ -138,6 +147,7 @@ export function toCardModel(c: CollectionCard): PlayerCardModel {
     tierFloorFp: c.tierFloorFp,
     nextTierAt: c.nextTierAt,
     nextTierLabel: c.nextTierLabel,
+    game,
   };
 }
 
