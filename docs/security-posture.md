@@ -56,7 +56,7 @@ subtransaction does make assertion 1 fire.
 
 ---
 
-## Accepted by design: six SECURITY DEFINER functions callable by `authenticated`
+## Accepted by design: ten SECURITY DEFINER functions callable by `authenticated`
 
 The linter warns that a signed-in user can call these over `/rest/v1/rpc/…`.
 That is the intent — it is the whole server-authoritative design. Every one of
@@ -71,6 +71,10 @@ one is revoked from `anon` and pinned to `search_path = public, pg_temp`.
 | `leaderboard` | A *global* board has to read every user's score across RLS. Reading one row per user is exactly what the function is narrowed to. |
 | `player_profile` | Reads `player_season_ranks`, a materialized view. Matviews cannot carry RLS, so it is revoked from `authenticated` (`20260818130000`) and reachable only through this function — one player wide. |
 | `player_game_log` | Same reason. |
+| `median_record` | The weekly contest is *everybody against the field's median*, so the median has to be computed across every user's `lineups` row — which RLS scopes to its owner. An invoker-rights version would take the median of the caller's single row and return a confidently wrong number. What crosses the boundary is aggregates (`entrants`, `low`, `median`, `average`, `high`) plus the caller's own line, keyed on `auth.uid()`. No user ids, no display names — strictly less than `leaderboard` already exposes. |
+| `card_profile` | One card instance wide, and it reads the same rank matview `player_profile` does. |
+| `player_market` | Counts copies of one player across `card_instances`, which is RLS-scoped to its owner — so an invoker-rights version would report every count as 1. Counts and one maximum; nothing that names an owner. |
+| `player_card_market` | The same answer for the whole directory in one scan, deliberately narrower than `player_market`. Same boundary. |
 
 Eight further definer functions (`gameday_sweep`, `score_week`,
 `apply_injuries`, `grant_weekly_gems`, `award_score_gems`,
@@ -96,16 +100,28 @@ finding, not a warning.
 
 ---
 
-## Open, and it needs a dashboard click
+## Closed 2026-08-19: leaked password protection
 
-**Leaked password protection is disabled.** Supabase Auth can check new
-passwords against HaveIBeenPwned. Email+password exists as a secondary sign-in
-path alongside magic link, so this applies to real accounts.
+**Enabled**, and confirmed by re-running the advisor — the
+`auth_leaked_password_protection` warning is gone and the ten rows above are all
+that remain. Supabase Auth now checks new passwords against HaveIBeenPwned's
+Pwned Passwords API at sign-up and password change; it is a k-anonymity range
+query, so the password never leaves Supabase, only a hash prefix.
 
-Enable at: Authentication → Policies → Password strength. It cannot be set by
-migration — it is auth config, not schema.
+Set at **Authentication → Providers → Email**
+(`/dashboard/project/_/auth/providers?provider=Email`) — *not* under Policies,
+where an earlier version of this note sent people. It is auth config, not
+schema, so it cannot be set by migration.
 
-Worth doing before testers sign up, not after.
+**`supabase config push` is NOT the way to manage it.** It pushes the whole
+local `config.toml`, whose `[auth]` block still holds local-dev defaults
+(`site_url = "http://127.0.0.1:3000"`). Production's Site URL and redirect URLs
+were set by hand — see `docs/DEPLOY.md` — and pushing would overwrite both,
+breaking magic-link sign-in for every tester and the `yapfantasy://` deep link.
+
+No client change was needed: the login screen surfaces the Supabase error
+message directly, and the rejection reads *"Password is known to be weak and
+easy to guess, please choose a different one."*
 
 ---
 

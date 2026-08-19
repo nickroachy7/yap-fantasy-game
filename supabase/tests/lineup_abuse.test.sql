@@ -25,8 +25,24 @@ from (
 where (ranked.pos in ('RB','WR') and ranked.rn <= 3)
    or (ranked.pos in ('QB','TE','PK') and ranked.rn = 1);
 
-insert into public.card_instances (user_id, card_id)
-select c.id from public.cards c join public.players p on p.id = c.player_id
+-- B's card, which A will try to start.
+--
+-- Two things are load-bearing and both were wrong, which is why this suite has
+-- never reached an assertion:
+--
+--  1. The owner must be named. Selecting only `c.id` into (user_id, card_id) is
+--     two targets and one expression, and it aborted the file outright.
+--  2. The INSTANCE ID is pinned rather than looked up later. The DO block below
+--     runs as `authenticated` with A's jwt, and card_instances is RLS-scoped to
+--     its owner — so a `select ... where user_id = b` inside it returns nothing,
+--     leaving the "start another user's card" attack pointed at a null and
+--     failing on the malformed-payload check instead of the ownership one. It
+--     would have looked blocked while proving nothing about ownership.
+insert into public.card_instances (id, user_id, card_id)
+select 'bbbbbbbb-1111-0000-0000-00000000000b'::uuid,
+       'bbbbbbbb-0000-0000-0000-000000000002'::uuid,
+       c.id
+from public.cards c join public.players p on p.id = c.player_id
 where c.season = 2026 and p.position_abbreviation = 'QB'
   and c.id not in (select card_id from public.card_instances)
 order by c.id limit 1;
@@ -38,7 +54,9 @@ do $$
 declare
   a  constant uuid := 'aaaaaaaa-0000-0000-0000-000000000001';
   b  constant uuid := 'bbbbbbbb-0000-0000-0000-000000000002';
-  qb uuid; rb1 uuid; rb2 uuid; wr1 uuid; wr2 uuid; wr3 uuid; te uuid; pk uuid; foreign_qb uuid;
+  qb uuid; rb1 uuid; rb2 uuid; wr1 uuid; wr2 uuid; wr3 uuid; te uuid; pk uuid;
+  -- Pinned above rather than selected here; RLS would hide it from A. See there.
+  foreign_qb constant uuid := 'bbbbbbbb-1111-0000-0000-00000000000b';
   v_lineup uuid; v_slots int; v_lineups int; blocked int := 0;
 
   -- preseason wk1 kicked off 2026-08-07 (locked); wk3 starts 2026-08-21 (open)
@@ -53,7 +71,6 @@ begin
   select ci.id into wr3 from public.card_instances ci join public.cards c on c.id=ci.card_id join public.players p on p.id=c.player_id where ci.user_id=a and p.position_abbreviation='WR' order by ci.id offset 2 limit 1;
   select ci.id into te  from public.card_instances ci join public.cards c on c.id=ci.card_id join public.players p on p.id=c.player_id where ci.user_id=a and p.position_abbreviation='TE' order by ci.id limit 1;
   select ci.id into pk  from public.card_instances ci join public.cards c on c.id=ci.card_id join public.players p on p.id=c.player_id where ci.user_id=a and p.position_abbreviation='PK' order by ci.id limit 1;
-  select ci.id into foreign_qb from public.card_instances ci where ci.user_id=b limit 1;
 
   -- 1. a week that has already kicked off
   begin

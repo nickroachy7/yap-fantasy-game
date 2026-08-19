@@ -1,3 +1,10 @@
+-- NOTE ON THIS FILENAME'S TIMESTAMP. It is CLI-shaped (`20260819201414`) rather
+-- than the round hand-written kind used elsewhere because this migration was
+-- applied through the Supabase MCP, which stamps its own version on the way in.
+-- The file is NAMED to match the version the remote actually recorded. Do not
+-- "tidy" it to a round number: local and remote would drift, and `db push`
+-- would try to replay it. See the sibling note in the median_contest migration.
+
 -- Community ownership for EVERY player at once, for the directory row.
 --
 -- `player_market(uuid)` already answers this for one player, in far more depth,
