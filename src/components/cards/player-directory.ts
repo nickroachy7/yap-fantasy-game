@@ -4,6 +4,7 @@
  * Kept out of the screen so the one genuinely dangerous part of this feature —
  * paging past PostgREST's silent row cap — is in one readable place.
  */
+import type { CardTier } from '@/constants/theme';
 import type { Database } from '@/lib/database.types';
 import { fetchAllPages } from '@/lib/paged';
 import { supabase } from '@/lib/supabase';
@@ -31,8 +32,27 @@ export type DirectoryPlayer = {
   college: string | null;
   /** Seasons of NFL service. 0 is a rookie. Null when the feed omits it. */
   experience: number | null;
-  /* --- derived, see `assignPositionRanks` --- */
+  /* --- derived, see `assignRanks` --- */
   posRank: number | null;
+  /** Rank across EVERY position, by season points. Null until he has played. */
+  overallRank: number | null;
+  /* --- from `player_card_market()`, merged in by `fetchPlayerDirectory` --- */
+  market: PlayerCardMarket | null;
+};
+
+/**
+ * How many copies of this player exist in the game, and what the best one has
+ * earned. Null when NOBODY owns one — which is not the same as owning zero of
+ * every tier, and the row draws the two differently.
+ */
+export type PlayerCardMarket = {
+  copies: number;
+  bronze: number;
+  silver: number;
+  gold: number;
+  diamond: number;
+  /** Highest `career_fp` on any held copy. 0 when none has ever been started. */
+  bestFp: number;
 };
 
 export type DirectoryStats = {
@@ -115,6 +135,8 @@ export function normalise(row: DirectoryRow, bio?: PlayerBio): DirectoryPlayer {
     college: bio?.college ?? null,
     experience: bio?.experience ?? null,
     posRank: null,
+    overallRank: null,
+    market: null,
   };
 }
 
@@ -134,6 +156,8 @@ export type DirectoryFetch = {
   season: number | null;
   /** False when the bio read failed. The table still renders; AGE/YR go blank. */
   bios: boolean;
+  /** False when the ownership read failed. Rows draw dashes for the counts. */
+  market: boolean;
 };
 
 /** The newest season present in the directory. */
@@ -208,21 +232,59 @@ async function fetchPlayerBios(): Promise<Map<string, PlayerBio>> {
  * not, and it would make the RK column mostly noise in preseason, where 354 of
  * 968 players have not played.
  */
-function assignPositionRanks(players: DirectoryPlayer[]): void {
+function assignRanks(players: DirectoryPlayer[]): void {
+  const rank = (list: DirectoryPlayer[], set: (p: DirectoryPlayer, n: number) => void) => {
+    // Name is the tiebreak, so two players on identical points do not swap
+    // places between reads — a rank that moves on refresh reads as a bug.
+    list.sort((a, b) => b.seasonFp - a.seasonFp || a.name.localeCompare(b.name));
+    list.forEach((p, i) => set(p, i + 1));
+  };
+
+  const played = players.filter((p) => p.gamesPlayed > 0);
+
+  rank([...played], (p, n) => {
+    p.overallRank = n;
+  });
+
   const byPos = new Map<string, DirectoryPlayer[]>();
-  for (const p of players) {
-    if (p.gamesPlayed <= 0) continue;
+  for (const p of played) {
     const key = (p.position ?? '—').toUpperCase();
     const list = byPos.get(key);
     if (list) list.push(p);
     else byPos.set(key, [p]);
   }
   for (const list of byPos.values()) {
-    list.sort((a, b) => b.seasonFp - a.seasonFp || a.name.localeCompare(b.name));
-    list.forEach((p, i) => {
-      p.posRank = i + 1;
+    rank(list, (p, n) => {
+      p.posRank = n;
     });
   }
+}
+
+/**
+ * Community card counts for every player, in one call.
+ *
+ * Soft-failing on purpose, like the bios above it. These figures are context,
+ * not the subject: a directory that will not draw because nobody could count
+ * the cards is a worse outcome than a directory whose ownership strip is
+ * dashes. `player_card_market` is `security definer` and returns a row only for
+ * players some copy of whom is actually held — see the migration.
+ */
+async function fetchCardMarket(): Promise<Map<string, PlayerCardMarket>> {
+  const byPlayer = new Map<string, PlayerCardMarket>();
+  const { data, error } = await supabase.rpc('player_card_market');
+  if (error) throw new Error(error.message);
+  for (const row of data ?? []) {
+    if (!row.player_id) continue;
+    byPlayer.set(row.player_id, {
+      copies: num(row.copies),
+      bronze: num(row.bronze),
+      silver: num(row.silver),
+      gold: num(row.gold),
+      diamond: num(row.diamond),
+      bestFp: num(row.best_fp),
+    });
+  }
+  return byPlayer;
 }
 
 /**
@@ -266,6 +328,15 @@ export async function fetchPlayerDirectory(): Promise<DirectoryFetch> {
     return new Map<string, PlayerBio>();
   });
 
+  /* Started here for the same reason as the bios: one RPC over every player,
+     which overlaps the season probe and the pages rather than adding to them.
+     A failure degrades the ownership strip to dashes and nothing else. */
+  let marketOk = true;
+  const marketPromise = fetchCardMarket().catch(() => {
+    marketOk = false;
+    return new Map<string, PlayerCardMarket>();
+  });
+
   const season = await latestSeason();
 
   const countQuery = supabase
@@ -300,11 +371,23 @@ export async function fetchPlayerDirectory(): Promise<DirectoryFetch> {
     for (const row of page) rows.push(row);
   }
 
-  const bios = await biosPromise;
-  const players = rows.map((row) => normalise(row, bios.get(row.player_id ?? '')));
-  assignPositionRanks(players);
+  const [bios, market] = await Promise.all([biosPromise, marketPromise]);
+  const players = rows.map((row) => {
+    const p = normalise(row, bios.get(row.player_id ?? ''));
+    // Absent means "no copies in circulation", which the row draws as dashes.
+    p.market = market.get(p.playerId) ?? null;
+    return p;
+  });
+  assignRanks(players);
 
-  return { players, expected, complete: players.length === expected, season, bios: bioOk };
+  return {
+    players,
+    expected,
+    complete: players.length === expected,
+    season,
+    bios: bioOk,
+    market: marketOk,
+  };
 }
 
 export type PositionFilter = 'ALL' | 'QB' | 'RB' | 'WR' | 'TE' | 'PK';
@@ -511,3 +594,49 @@ export function formatStat(cell: StatCell): string {
   if (cell.label === 'FP/G') return cell.value.toFixed(1);
   return Math.round(cell.value).toLocaleString();
 }
+
+/**
+ * The ownership strip: how many copies of this player exist, split by tier.
+ *
+ * WHY THIS REPLACED THE SEASON STATS IN THE ROW
+ *
+ * The row already carries the season: the figure at the right is his points,
+ * and the line under his name is the rank those points earned. Receptions and
+ * targets underneath were a second telling of the same story in more detail
+ * than a row can use — and every one of them is on the player's own screen,
+ * one tap away, laid out with room to read.
+ *
+ * What is NOT anywhere else is the market. In a collection game "how many of
+ * these exist, and how good is the best one" is a different question from "how
+ * good is he", and it is the one that decides whether a card is worth pulling,
+ * holding or selling. `statStrip` stays exported and unchanged for surfaces
+ * that want the season line.
+ *
+ * NO TOTAL. There was a CARDS cell leading the strip and it has gone: it was
+ * the sum of the four beside it, printed a second time, and it cost a sixth of
+ * the band to say something the reader can see. A derivable figure has to earn
+ * its place against what else could stand there, and here nothing had to.
+ *
+ * THE TIERS ARE LETTERS, NOT WORDS. Six spelled-out headings never fitted: at
+ * 375pt `DIAMOND` ellipsised to `DIAMO…`, and a heading truncated is a column
+ * with no name. `B S G D` is not an abbreviation invented here to make it fit;
+ * it is the tier code this app already draws on every lineup row and every card
+ * (see `TierMark`, `TierBadge`), so the letters are ones a reader has met.
+ *
+ * The row colours them with their tier accent, which is what makes four bare
+ * capitals legible at a glance — and colour is safe to lean on for exactly the
+ * reason theme.ts gives: the LETTER carries the meaning and the accent only
+ * makes it faster, so nothing is lost in greyscale.
+ */
+export type TierCount = { tier: CardTier; letter: string; value: number };
+
+export function tierCounts(market: PlayerCardMarket): TierCount[] {
+  return [
+    { tier: 'bronze', letter: 'B', value: market.bronze },
+    { tier: 'silver', letter: 'S', value: market.silver },
+    { tier: 'gold', letter: 'G', value: market.gold },
+    { tier: 'diamond', letter: 'D', value: market.diamond },
+  ];
+}
+
+

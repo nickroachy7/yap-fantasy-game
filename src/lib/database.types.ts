@@ -1143,6 +1143,18 @@ export type Database = {
           team_abbreviation: string
         }[]
       }
+      player_card_market: {
+        Args: never
+        Returns: {
+          best_fp: number
+          bronze: number
+          copies: number
+          diamond: number
+          gold: number
+          player_id: string
+          silver: number
+        }[]
+      }
       player_game_log: { Args: { p_player_id: string }; Returns: Json }
       player_market: { Args: { p_player_id: string }; Returns: Json }
       player_profile: { Args: { p_player_id: string }; Returns: Json }

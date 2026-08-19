@@ -78,34 +78,30 @@
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { PositionBadge } from '@/components/ui/PositionBadge';
+import { PlayerAvatar, AVATAR_SIZE } from './PlayerAvatar';
 import { DASH } from '@/components/ui/DataTable';
 import { positionColors } from '@/constants/positions';
-import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
+import { Colors, NUMERIC, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { injuryCode, injuryWeight } from '@/lib/injury';
-import { formatStat, statStrip, type DirectoryPlayer } from './player-directory';
+import { tierCounts, type DirectoryPlayer } from './player-directory';
 
 /**
  * Row box, and the single most load-bearing constant in this file: it is handed
  * to `getItemLayout` verbatim, so a row that renders taller than this scrolls
  * out of alignment. 76 = identity band (44) + stat strip (32).
  */
-export const PLAYER_ROW_HEIGHT = 76;
+export const PLAYER_ROW_HEIGHT = 88;
 
 /** The two bands. They must sum to PLAYER_ROW_HEIGHT. */
-const IDENTITY_HEIGHT = 44;
+const IDENTITY_HEIGHT = 60;
 const STRIP_HEIGHT = PLAYER_ROW_HEIGHT - IDENTITY_HEIGHT;
 
 /**
- * The badge column, and the figure column. Both fixed, for the same reason the
- * lineup's are: nine rows of badges that each size themselves to their own
- * contents step the name column in and out down the page, and a figure column
- * that sizes itself to its own digits does the same at the other edge. See the
- * note on `PositionBadge`'s `width`.
+ * The figure column, fixed for the same reason the lineup's is: a column that
+ * sizes itself to its own digits steps in and out down the page as the numbers
+ * change length.
  */
-const BADGE_SIZE = 26;
-const BADGE_WIDTH = 26;
 const FIGURE_WIDTH = 52;
 
 /**
@@ -121,6 +117,14 @@ const FIGURE_WIDTH = 52;
 export const ROW_GUTTER = Spacing.three;
 
 const oneDp = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
+
+/**
+ * Only ever used to get the LABELS out of `cardStrip` for a player nobody
+ * owns — every value it carries is discarded and drawn as a dash. It exists so
+ * the strip's column headings live in one place rather than being written once
+ * for the populated case and again for the empty one.
+ */
+const EMPTY_MARKET = { copies: 0, bronze: 0, silver: 0, gold: 0, diamond: 0, bestFp: 0 };
 
 /**
  * A player with no games has no season total — not a total of zero. The
@@ -164,13 +168,17 @@ function PlayerRowInner({ player, onPress, fixture }: PlayerRowProps) {
         { backgroundColor: pressed ? c.backgroundElement : c.background },
       ]}>
       <View style={styles.identity}>
-        <PositionBadge label={player.position} size={BADGE_SIZE} width={BADGE_WIDTH} />
+        <View style={styles.avatar}>
+          <PlayerAvatar />
+        </View>
 
-        {/* Two lines, not three. Who he is, and when he plays.
-            The rank and the club used to hold a baseline of their own between
-            them, which cost a whole line to say six characters — and put the
-            fixture, the part that decides whether to start him this week, a
-            third of the way down a block it should have been leading. */}
+        {/* Three lines: who he is, when he plays, and where he places.
+            The middle one leads, not trails — the fixture is the part that
+            decides whether to start him this week, and it used to sit a third
+            of the way down a block that spent its first two baselines on six
+            characters of rank and club. Those now share the name's line, and
+            the baseline they freed went to the ranks, which had been hiding
+            inside the position label. */}
         <View style={styles.names}>
           <View style={styles.nameLine}>
             <Text numberOfLines={1} style={[styles.name, { color: c.text }]}>
@@ -179,8 +187,13 @@ function PlayerRowInner({ player, onPress, fixture }: PlayerRowProps) {
             {/* Position and rank as one token — `WR8`. Alone, either half is
                 worse: the position repeats the badge, and the rank floats free
                 of the pool it ranks within. */}
-            <Text numberOfLines={1} style={[styles.meta, NUMERIC, { color: accent }]}>
-              {`${(player.position ?? '—').toUpperCase()}${player.posRank ?? ''}`}
+            {/* The position ALONE. It used to carry the rank fused to it —
+                `WR8` — which was right while there was nowhere else to put a
+                rank, and became a rank hidden inside a label the moment there
+                was. The ranks now have a line of their own below, where both
+                of them fit and neither has to be decoded. */}
+            <Text numberOfLines={1} style={[styles.meta, { color: accent }]}>
+              {(player.position ?? '—').toUpperCase()}
             </Text>
             {player.team ? (
               <Text numberOfLines={1} style={[styles.meta, { color: c.textTertiary }]}>
@@ -208,6 +221,25 @@ function PlayerRowInner({ player, onPress, fixture }: PlayerRowProps) {
               </Text>
             ) : null}
           </View>
+
+          {/* WHERE HE PLACES, both ways round. The row already says what he
+              scored; this says what that was worth against everyone, and
+              against the only pool that decides a lineup — a receiver 40th
+              overall may be the 12th receiver, and those are two different
+              players to own.
+
+              Dashes for a man who has not played. `assignRanks` leaves him
+              unranked rather than tied at the bottom: 380th for someone who
+              has not taken a snap reads as information and is not, and in
+              preseason that is 354 of 968 rows. */}
+          <View style={styles.rankLine}>
+            <Rank label="RK" value={player.overallRank} />
+            {/* `PRK`, not the position. The heading names the KIND of rank, and
+                using `WR` for it made the pair read as two different subjects
+                rather than as one measure taken against two pools — which is
+                the entire reason both are here. */}
+            <Rank label="PRK" value={player.posRank} />
+          </View>
         </View>
 
         {/* Unboxed. The chip that used to be here was earning its keep against
@@ -231,30 +263,81 @@ function PlayerRowInner({ player, onPress, fixture }: PlayerRowProps) {
         </View>
       </View>
 
-      {/* The strip is drawn even for a player with no games, as labels over
+      {/* The strip is drawn even for a player nobody owns, as marks over
           dashes. Collapsing it would make rows different heights, which is
           exactly what getItemLayout forbids — and an empty strip is itself the
-          answer to "has he played". */}
+          answer to "is he in circulation".
+
+          DASHES, NOT NOUGHTS, and the distinction is the whole reason
+          `market` is nullable. A player with no copies has not been measured;
+          a player with six bronzes and no diamonds has, and the nought there
+          is a real and useful statement. Printing 0 for both would say the
+          same thing about a card nobody has pulled and a card everybody has.
+
+          INLINE PAIRS, NOT COLUMNS. The band used to be six label-over-value
+          cells on an even grid, which is the right shape for six quantities of
+          equal standing and the wrong one for these: `B 21` is one fact, not a
+          heading and a figure, and stacking it made four small numbers look
+          like a table of four different things. Read across, they read as the
+          histogram they are — and the space that saves is what lets the best
+          copy have a name rather than an abbreviation. */}
       {/* Full-bleed, so the tray runs edge to edge and the band reads as a
           band rather than an inset card. The gutter is on the contents. */}
       <View style={[styles.strip, { backgroundColor: tray }]}>
-        {statStrip(player).map((cell, i, all) => {
-          // The last cell is FP/G, and it sits directly under the season FP
-          // figure. Right-aligning it is what squares off the row.
-          const last = i === all.length - 1;
-          return (
-            <View key={cell.label} style={[styles.cell, last && styles.cellRight]}>
-              <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
-                {cell.label}
+        <View style={styles.tiers}>
+          {tierCounts(player.market ?? EMPTY_MARKET).map((t) => (
+            <View key={t.tier} style={styles.tierPair}>
+              <Text
+                numberOfLines={1}
+                style={[styles.tierLetter, { color: TierColors[scheme][t.tier].accent }]}>
+                {t.letter}
               </Text>
               <Text numberOfLines={1} style={[Type.body, NUMERIC, { color: c.textSecondary }]}>
-                {played ? formatStat(cell) : DASH}
+                {player.market ? t.value.toLocaleString() : DASH}
               </Text>
             </View>
-          );
-        })}
+          ))}
+        </View>
+
+        {/* The best copy in the game, named rather than headed. `BEST FP` was a
+            column title for a number; `BEST CARD … FPTS` is a sentence about an
+            object, which is what it actually is — and this screen is a card
+            directory before it is a stat table. */}
+        <View style={styles.best}>
+          <Text numberOfLines={1} style={[Type.micro, styles.unit, { color: c.textTertiary }]}>
+            BEST CARD
+          </Text>
+          <Text numberOfLines={1} style={[Type.body, NUMERIC, { color: c.textSecondary }]}>
+            {player.market ? player.market.bestFp.toFixed(1) : DASH}
+          </Text>
+          <Text numberOfLines={1} style={[Type.micro, styles.unit, { color: c.textTertiary }]}>
+            FPTS
+          </Text>
+        </View>
       </View>
     </Pressable>
+  );
+}
+
+/**
+ * One rank, as a label over nothing much. `OVR 12` / `WR 8`.
+ *
+ * The label is the POOL and the number is the place in it, which is why the
+ * position doubles as a heading here — `WR 8` says what `WR8` used to, with the
+ * two halves separable and a matching `OVR` beside it to be read against.
+ */
+function Rank({ label, value }: { label: string; value: number | null }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  return (
+    <View style={styles.rank}>
+      <Text numberOfLines={1} style={[Type.micro, styles.rankLabel, { color: c.textTertiary }]}>
+        {label}
+      </Text>
+      <Text numberOfLines={1} style={[styles.meta, NUMERIC, { color: c.textSecondary }]}>
+        {value === null ? DASH : `#${value}`}
+      </Text>
+    </View>
   );
 }
 
@@ -282,6 +365,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: ROW_GUTTER,
   },
   names: { flex: 1, minWidth: 0, gap: 2 },
+  /* Reserved at the portrait's size, so a licensed image drops in without the
+     row being redesigned around it. See PlayerAvatar. */
+  avatar: { width: AVATAR_SIZE, alignSelf: 'center' },
   /* `flexShrink` on the NAME only, and `flexShrink: 0` on everything beside it:
      left to share, `WR8` and `— BUF` collapsed to `W…` and `— …`, which is the
      rank and the club rendered as noise. The name is the one thing on the line
@@ -297,6 +383,11 @@ const styles = StyleSheet.create({
   },
   meta: { fontSize: 11, lineHeight: 15, fontWeight: '500', flexShrink: 0 },
   fixtureLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2, minWidth: 0 },
+  /* The two ranks sit closer to each other than to anything else on the line,
+     so they read as a pair being compared rather than as two facts in a row. */
+  rankLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, height: 15 },
+  rank: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  rankLabel: { lineHeight: 15 },
   fixture: { fontSize: 11, lineHeight: 15, fontWeight: '500', flexShrink: 1, minWidth: 0 },
   /* Never truncates: a designation cut to one character loses the warning, and
      it is two characters at most to begin with. */
@@ -310,14 +401,31 @@ const styles = StyleSheet.create({
      has played and one who has not — only the ink changes. */
   figureEmpty: { fontSize: 12, lineHeight: 20, fontWeight: '500' },
   figureLabel: { lineHeight: 15 },
+  /* Two groups pushed apart, not an even grid. The histogram is one object and
+     the best copy is another, and `space-between` is what says so — on a phone
+     and on a 940pt table alike, where an even grid would have stranded four
+     two-character pairs in the middle of four very wide columns. */
   strip: {
     height: STRIP_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
     paddingHorizontal: ROW_GUTTER,
   },
-  /* Equal shares rather than fixed widths: five cells across a phone and across
-     a 940pt table are the same five cells, just further apart. */
-  cell: { flex: 1, minWidth: 0, justifyContent: 'center' },
-  cellRight: { alignItems: 'flex-end' },
+  /* 8, not 16. The four pairs are already told apart by their own tighter
+     internal gap, and the 16 they used to sit on cost 24 points that a
+     four-figure best copy — `2741.0 FPTS` — needs on the same line. */
+  tiers: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  /* Letter and count tight together, so the four pairs separate from each
+     other by more than their own halves do. */
+  tierPair: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1 },
+  tierLetter: { fontSize: 11, lineHeight: 16, fontWeight: '800', letterSpacing: 0.2 },
+  /* Never gives way. If anything on this line has to break it should be the
+     histogram, which is four independent facts, rather than the best copy,
+     which is one fact in three parts and unreadable missing any of them. */
+  best: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1, flexShrink: 0 },
+  /* Never shrinks: these two name the figure between them, and a unit clipped
+     to `FPT…` is worse than a name clipped by a character. */
+  unit: { flexShrink: 0, lineHeight: 16 },
 });

@@ -223,7 +223,8 @@ const DIRECTORY_ROWS: { player: DirectoryPlayer; fixture?: string }[] = [
     player: {
       cardId: 'd1', playerId: 'd1', season: 2026, name: 'Nico Collins',
       position: 'WR', team: 'HOU', injuryStatus: null, rarity: 'common',
-      seasonFp: 236.4, gamesPlayed: 16, fpPerGame: 14.8, posRank: 8,
+      seasonFp: 236.4, gamesPlayed: 16, fpPerGame: 14.8, posRank: 8, overallRank: 12,
+      market: { copies: 34, bronze: 21, silver: 9, gold: 3, diamond: 1, bestFp: 812.4 },
       age: 27, college: 'Michigan', experience: 5,
       stats: { ...NO_STATS, receptions: 76, targets: 118, receivingYards: 1144, receivingTds: 7 },
     },
@@ -233,7 +234,9 @@ const DIRECTORY_ROWS: { player: DirectoryPlayer; fixture?: string }[] = [
     player: {
       cardId: 'd2', playerId: 'd2', season: 2026, name: 'Malik Nabers',
       position: 'WR', team: 'NYG', injuryStatus: 'Questionable', rarity: 'rare',
-      seasonFp: 232.6, gamesPlayed: 15, fpPerGame: 15.5, posRank: 11,
+      seasonFp: 232.6, gamesPlayed: 15, fpPerGame: 15.5, posRank: 11, overallRank: 15,
+      // Owned, but nobody has ever started one: the best copy has earned nothing.
+      market: { copies: 6, bronze: 6, silver: 0, gold: 0, diamond: 0, bestFp: 0 },
       age: 23, college: 'LSU', experience: 2,
       stats: { ...NO_STATS, receptions: 82, targets: 140, receivingYards: 1050, receivingTds: 7 },
     },
@@ -243,7 +246,8 @@ const DIRECTORY_ROWS: { player: DirectoryPlayer; fixture?: string }[] = [
     player: {
       cardId: 'd3', playerId: 'd3', season: 2026, name: 'Christian McCaffrey',
       position: 'RB', team: 'SF', injuryStatus: 'IR', rarity: 'legendary',
-      seasonFp: 198.2, gamesPlayed: 12, fpPerGame: 16.5, posRank: 4,
+      seasonFp: 198.2, gamesPlayed: 12, fpPerGame: 16.5, posRank: 4, overallRank: 31,
+      market: { copies: 112, bronze: 60, silver: 34, gold: 15, diamond: 3, bestFp: 2741.0 },
       age: 29, college: 'Stanford', experience: 9,
       stats: { ...NO_STATS, rushingAttempts: 214, rushingYards: 1002, rushingTds: 9, receptions: 44, receivingTds: 2 },
     },
@@ -253,7 +257,8 @@ const DIRECTORY_ROWS: { player: DirectoryPlayer; fixture?: string }[] = [
     player: {
       cardId: 'd4', playerId: 'd4', season: 2026, name: 'Caleb Williams',
       position: 'QB', team: 'CHI', injuryStatus: null, rarity: 'epic',
-      seasonFp: 288.1, gamesPlayed: 17, fpPerGame: 16.9, posRank: 5,
+      seasonFp: 288.1, gamesPlayed: 17, fpPerGame: 16.9, posRank: 5, overallRank: 2,
+      market: { copies: 88, bronze: 41, silver: 30, gold: 14, diamond: 3, bestFp: 1960.5 },
       age: 24, college: 'USC', experience: 2,
       stats: { ...NO_STATS, passingYards: 3541, passingTds: 24, interceptions: 9, rushingYards: 412 },
     },
@@ -263,7 +268,8 @@ const DIRECTORY_ROWS: { player: DirectoryPlayer; fixture?: string }[] = [
     player: {
       cardId: 'd5', playerId: 'd5', season: 2026, name: 'Ka’imi Fairbairn',
       position: 'PK', team: 'HOU', injuryStatus: null, rarity: 'common',
-      seasonFp: 141.0, gamesPlayed: 16, fpPerGame: 8.8, posRank: 3,
+      seasonFp: 141.0, gamesPlayed: 16, fpPerGame: 8.8, posRank: 3, overallRank: 96,
+      market: { copies: 4, bronze: 4, silver: 0, gold: 0, diamond: 0, bestFp: 118.0 },
       age: 31, college: 'UCLA', experience: 10,
       stats: { ...NO_STATS, fieldGoalsMade: 31, fieldGoalAttempts: 36, extraPointsMade: 42 },
     },
@@ -274,7 +280,9 @@ const DIRECTORY_ROWS: { player: DirectoryPlayer; fixture?: string }[] = [
     player: {
       cardId: 'd6', playerId: 'd6', season: 2026, name: 'Bartholomew Vandersteen III',
       position: 'TE', team: null, injuryStatus: null, rarity: 'common',
-      seasonFp: 0, gamesPlayed: 0, fpPerGame: 0, posRank: null,
+      seasonFp: 0, gamesPlayed: 0, fpPerGame: 0, posRank: null, overallRank: null,
+      // Nobody owns one. Not zero of every tier — dashes, not noughts.
+      market: null,
       age: 22, college: 'Rutgers', experience: 0,
       stats: NO_STATS,
     },
@@ -662,7 +670,7 @@ function Kit() {
 
           <Section
             title="Directory row"
-            note="Identity over a tinted stat tray, fixed 76pt. Last row has never played — dashes, not zeroes.">
+            note="Identity over the community’s card counts, fixed 88pt. Last row has never played and nobody owns one — dashes, not zeroes.">
             <SortChips
               options={[
                 { key: 'fp', label: 'FP' },
