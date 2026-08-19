@@ -20,7 +20,7 @@
  */
 import { Redirect } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View, useColorScheme, useWindowDimensions } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { InventoryCard } from '@/components/collection/InventoryCard';
 import { MCCAFFREY_GAME_LOG, MCCAFFREY_PROFILE, USAGE_SAMPLE } from '@/components/dev/profile-fixture';
@@ -40,6 +40,7 @@ import { Sidebar } from '@/components/shell/Sidebar';
 import { WIDE_BREAKPOINT, useIsWide } from '@/components/shell/useResponsive';
 import { Colors, Spacing, type Measure } from '@/constants/theme';
 import { PlayerContext, type PlayerState } from '@/context/PlayerContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const FIXTURE_PLAYER: PlayerState = {
   gems: 1240,

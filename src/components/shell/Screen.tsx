@@ -5,11 +5,12 @@
  * Every tab uses this so the chrome cannot drift between screens.
  */
 import type { ReactNode } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppHeader } from '@/components/shell/AppHeader';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, ContentMeasure, Spacing, type Measure } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 type Props = {
   /** Page name, e.g. "Leaderboard". Rendered as the page heading on wide web. */

@@ -5,6 +5,14 @@
  * — Players and Shop are separate rows here, where on mobile they collapse into
  * a segmented control because there is no room for eight targets.
  *
+ * EVERY sub-page is drawn, not just the ones inside the section you are in.
+ * The rail used to expand only the active section, which meant the shortest
+ * path from Inventory to Trend was two clicks with a guess in the middle: you
+ * could not see that Trend existed until you were already in Cards. Eleven rows
+ * fit a browser window comfortably, and being able to read the whole app at
+ * once is most of what a sidebar is for. The active section keeps its filled
+ * row and accent marker, so "where am I" is still answered at a glance.
+ *
  * Section rows carry the same glyphs as the bottom tab bar, from the same
  * `icon` field on NAV_SECTIONS. Without them the two presentations of one
  * navigation shared no visual vocabulary at all, so moving between a phone and
@@ -14,13 +22,14 @@
  */
 import { Link, usePathname } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Gem, initialsOf } from '@/components/shell/AppHeader';
 import { NAV_SECTIONS } from '@/components/shell/sections';
 import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
 import { RailWidth, TierColors } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const NUMERIC = { fontVariant: ['tabular-nums' as const] };
 const BAND = '#0E0F12';
@@ -55,7 +64,7 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
           // Cards lit as well as Shop.
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
-            <View key={item.href}>
+            <View key={item.href} style={styles.group}>
               <NavRow
                 href={item.href}
                 label={item.label}
@@ -68,7 +77,7 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
                   The rail does not: the parent row IS that link and already
                   shows its active state, so rendering the child too puts two
                   rows pointing at one destination directly under each other. */}
-              {item.children && active
+              {item.children
                 ? item.children
                     .filter((child) => child.href !== item.href)
                     .map((child) => (
@@ -206,7 +215,12 @@ const styles = StyleSheet.create({
   },
   balance: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   gemsLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '600' },
-  nav: { gap: 2, paddingHorizontal: 10, flex: 1 },
+  nav: { paddingHorizontal: 10, flex: 1 },
+  /* Sections need air between them now that every one is expanded: with a flat
+     2pt gap the whole rail read as eleven peers rather than four groups. The
+     space goes BELOW each group so the first section still sits tight under
+     the wordmark. */
+  group: { paddingBottom: 8 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

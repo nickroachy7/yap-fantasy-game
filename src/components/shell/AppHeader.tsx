@@ -7,11 +7,12 @@
  * everywhere and costs no dependency.
  */
 import { useRouter } from 'expo-router';
-import { Platform, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TierColors } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 /** Tabular figures stop the balance jittering as it changes. */
 const NUMERIC = { fontVariant: ['tabular-nums' as const] };

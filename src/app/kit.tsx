@@ -23,6 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
 import { ContestCard } from '@/components/lineup/ContestCard';
 import { StarterRow } from '@/components/lineup/StarterRow';
+import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
 import type { LineupCard } from '@/components/lineup/model';
 import { PlayerRow } from '@/components/cards/PlayerRow';
 import type { DirectoryPlayer } from '@/components/cards/player-directory';
@@ -31,6 +32,7 @@ import { CollectionSummary } from '@/components/collection/CollectionSummary';
 import { summarise } from '@/components/collection/types';
 import { OWNED_MANY } from '@/components/dev/fixtures';
 import { GameRow } from '@/components/scores/GameRow';
+import { ScoreStrip } from '@/components/scores/ScoreStrip';
 import { LeadersPanel } from '@/components/scores/LeadersPanel';
 import type { Leader, ScoreGame } from '@/components/scores/scoreboard';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -42,6 +44,7 @@ import { StatusChip } from '@/components/ui/StatusChip';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { POSITION_ORDER, POSITIONS } from '@/constants/positions';
 import { Colors, Spacing, Type } from '@/constants/theme';
+import { useIsWide } from '@/components/shell/useResponsive';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const TAB_ICONS: TabIconName[] = ['lineup', 'leaderboard', 'cards', 'collection', 'profile'];
@@ -111,6 +114,93 @@ const STARTERS: {
   },
   { slot: 'K', points: null, card: null },
 ];
+
+/**
+ * Bench candidates for the swap sheet — one clearly better than the incumbent,
+ * one clearly worse, one who has never played. The sheet's whole job is making
+ * that comparison, so a demo of three identical players proves nothing.
+ */
+const SWAP_OPTIONS: LineupCard[] = [
+  {
+    id: 'o1', playerId: 'o1', name: 'Bijan Robinson', position: 'RB', team: 'ATL',
+    injuryStatus: null, tier: 'gold', careerFp: 1420, season: 2026,
+    form: { seasonFp: 262.4, gamesPlayed: 16, fpPerGame: 16.4, recent: [18.2, 24.6, 11.0, 27.4, 9.8] },
+    game: { opponent: 'TB', home: true, startsAt: '2026-09-13T17:00:00Z' },
+  },
+  {
+    id: 'o2', playerId: 'o2', name: 'Tyjae Spears', position: 'RB', team: 'TEN',
+    injuryStatus: 'Questionable', tier: 'silver', careerFp: 402, season: 2026,
+    form: { seasonFp: 96.2, gamesPlayed: 14, fpPerGame: 6.9, recent: [4.1, 9.8, 2.6, 11.4, 6.6] },
+    game: { opponent: 'IND', home: false, startsAt: '2026-09-13T17:00:00Z' },
+  },
+  {
+    id: 'o3', playerId: 'o3', name: 'Rookie Nobody', position: 'RB', team: 'LV',
+    injuryStatus: null, tier: 'bronze', careerFp: 0, season: 2026,
+    form: null,
+    game: null,
+  },
+];
+
+const SWAP_SLOT: SwapRequest = {
+  kind: 'slot',
+  slot: 'RB1',
+  eligiblePositions: 'RB',
+  current: STARTERS[1].card,
+  options: SWAP_OPTIONS,
+};
+
+const SWAP_EMPTY_SLOT: SwapRequest = {
+  kind: 'slot',
+  slot: 'FLEX',
+  eligiblePositions: 'RB/WR/TE',
+  current: null,
+  options: SWAP_OPTIONS,
+};
+
+const SWAP_BENCH: SwapRequest = {
+  kind: 'bench',
+  card: SWAP_OPTIONS[0],
+  destinations: [
+    { slot: 'RB1', occupant: STARTERS[1].card },
+    { slot: 'RB2', occupant: null },
+    { slot: 'FLEX', occupant: STARTERS[2].card },
+  ],
+};
+
+/** A weekend: one finished, one being played, two still to come. */
+const STRIP_GAMES: ScoreGame[] = [
+  {
+    id: 'g1', season: 2026, seasonType: 1, week: 3,
+    home: { id: 'h1', abbreviation: 'BUF', name: 'Bills' },
+    away: { id: 'a1', abbreviation: 'NYJ', name: 'Jets' },
+    homeScore: 27, awayScore: 20, startsAt: '2026-09-13T17:00:00Z',
+    status: 'final', statusText: 'Final/OT',
+  },
+  {
+    id: 'g2', season: 2026, seasonType: 1, week: 3,
+    home: { id: 'h2', abbreviation: 'SF', name: '49ers' },
+    away: { id: 'a2', abbreviation: 'SEA', name: 'Seahawks' },
+    homeScore: 10, awayScore: 13, startsAt: '2026-09-13T20:05:00Z',
+    status: 'live', statusText: 'Q3 04:11',
+  },
+  {
+    id: 'g3', season: 2026, seasonType: 1, week: 3,
+    home: { id: 'h3', abbreviation: 'CAR', name: 'Panthers' },
+    away: { id: 'a3', abbreviation: 'CHI', name: 'Bears' },
+    homeScore: null, awayScore: null, startsAt: '2026-09-13T21:25:00Z',
+    status: 'scheduled', statusText: null,
+  },
+  {
+    id: 'g4', season: 2026, seasonType: 1, week: 3,
+    home: { id: 'h4', abbreviation: 'DAL', name: 'Cowboys' },
+    away: { id: 'a4', abbreviation: 'NYG', name: 'Giants' },
+    homeScore: null, awayScore: null, startsAt: null,
+    status: 'scheduled', statusText: null,
+  },
+];
+
+/** Two starters in the opener, one in the live game. */
+const STRIP_MINE = new Map([['NYJ', 1], ['BUF', 1], ['SF', 1]]);
 
 /** One of each position, plus the two states that are easy to get wrong. */
 const DIRECTORY_ROWS: { player: DirectoryPlayer; fixture?: string }[] = [
@@ -311,6 +401,10 @@ function Kit() {
   const [confirm, setConfirm] = useState(false);
   const [confirmErr, setConfirmErr] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>('g3');
+  const [swap, setSwap] = useState<SwapRequest | null>(null);
+  // The sheet changes shape at the same breakpoint the product uses, so this
+  // gallery shows whichever one the current window would get.
+  const wide = useIsWide();
 
   return (
     <View style={[styles.fill, { backgroundColor: c.background }]}>
@@ -390,6 +484,50 @@ function Kit() {
                 />
               ))}
             </Panel>
+          </Section>
+
+          <Section
+            title="Score strip"
+            note="This week across the top of the lineup. Final, live, timed and TBD; a dot marks games your starters are in.">
+            <ScoreStrip
+              games={STRIP_GAMES}
+              title="Preseason Wk 3"
+              startersByTeam={STRIP_MINE}
+              loading={false}
+              onOpenScores={() => {}}
+            />
+          </Section>
+
+          <Section
+            title="Swap sheet"
+            note="Bottom sheet under 900px, centred dialog above it — resize the window. Escape and the backdrop both close it.">
+            <View style={styles.row}>
+              {[
+                { label: 'Filled slot', request: SWAP_SLOT },
+                { label: 'Empty slot', request: SWAP_EMPTY_SLOT },
+                { label: 'From the bench', request: SWAP_BENCH },
+              ].map((demo) => (
+                <Pressable
+                  key={demo.label}
+                  onPress={() => setSwap(demo.request)}
+                  style={({ pressed }) => [
+                    styles.demoButton,
+                    { backgroundColor: c.backgroundElement },
+                    pressed && { opacity: 0.6 },
+                  ]}>
+                  <Text style={[Type.strong, { color: c.text }]}>{demo.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <SwapSheet
+              request={swap}
+              wide={wide}
+              sort="fp"
+              onSort={() => {}}
+              onPick={() => setSwap(null)}
+              onClear={() => setSwap(null)}
+              onClose={() => setSwap(null)}
+            />
           </Section>
 
           <Section

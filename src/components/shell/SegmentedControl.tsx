@@ -2,9 +2,10 @@
  * Sub-navigation within a tab (Cards: Players/Shop, Collection: Inventory/Sets).
  * Plain RN so it behaves identically on web and iOS.
  */
-import { StyleSheet, Text, View, Pressable, useColorScheme } from 'react-native';
+import { StyleSheet, Text, View, Pressable } from 'react-native';
 
 import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export type Segment<T extends string> = { value: T; label: string; badge?: string };
 

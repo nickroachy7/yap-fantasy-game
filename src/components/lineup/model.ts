@@ -151,3 +151,15 @@ export function sortCards(cards: LineupCard[], key: SortKey): LineupCard[] {
  * people actually lose weeks to, and no injury feed ever mentions it.
  */
 export type Alert = { card: LineupCard; slot: string; kind: 'blocking' | 'advisory' | 'no-game' };
+
+/**
+ * Every slot a card is legal for, in display order, taken ones included.
+ *
+ * `firstOpenSlotFor` answers "where would a tap put him"; this answers "where
+ * COULD he go", which is the question the swap sheet asks — a running back with
+ * both RB slots filled still has two destinations, they just cost whoever is
+ * standing in them.
+ */
+export function eligibleSlotsFor(card: LineupCard, slots: SlotConfig[]): SlotConfig[] {
+  return slots.filter((cfg) => isEligible(card, cfg));
+}

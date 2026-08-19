@@ -1,7 +1,7 @@
 import { Redirect, Tabs, type Href } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { StyleSheet, View, useColorScheme } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NAV_SECTIONS, routeNameOf } from '@/components/shell/sections';
@@ -11,6 +11,7 @@ import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, TabBarContentHeight } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { PlayerProvider } from '@/context/PlayerContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 /**
  * The five bottom tabs.

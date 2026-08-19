@@ -62,12 +62,13 @@
  * inferred from two hex values.
  */
 import { memo } from 'react';
-import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PositionBadge } from '@/components/ui/PositionBadge';
 import { DASH } from '@/components/ui/DataTable';
 import { positionColors } from '@/constants/positions';
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { injuryAbbr, injuryWeight } from '@/lib/injury';
 import { formatStat, statStrip, type DirectoryPlayer } from './player-directory';
 

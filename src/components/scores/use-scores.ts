@@ -274,3 +274,102 @@ function toLeaders(rows: StatRow[], teams: Map<string, ScoreTeam>): Leader[] {
   }
   return out;
 }
+
+/**
+ * One week's fixtures, for the strip at the top of the lineup screen.
+ *
+ * Deliberately not `useSeasonSchedule` filtered down. That hook reads ~340 game
+ * rows so its week picker can switch without a round trip, which is right for a
+ * screen whose whole job is browsing weeks and wrong for a strip that shows one
+ * week and never changes it — the lineup screen already makes two round trips
+ * before it can render a row, and a third that reads the whole season to draw
+ * sixteen tiles is the kind of cost that only shows up on someone else's phone.
+ *
+ * The teams table is small and read by nearly every screen; it is fetched here
+ * rather than threaded down so this hook stands alone.
+ */
+export function useSlateGames(slate: Slate | null): {
+  games: ScoreGame[];
+  loading: boolean;
+  error: string | null;
+} {
+  const [games, setGames] = useState<ScoreGame[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  /* Keyed on the slate's VALUE, not its identity: the lineup screen rebuilds
+     its slate object on every countdown tick, and depending on the object
+     itself would refetch this once a second. */
+  const key = slate ? slateKey(slate) : null;
+
+  useEffect(() => {
+    if (!slate || !key) return;
+    let live = true;
+    setLoading(true);
+    setError(null);
+
+    void (async () => {
+      try {
+        const [teamRows, gameRows] = await Promise.all([
+          supabase
+            .from('teams')
+            .select('id, abbreviation, name')
+            .then(({ data, error: e }) => {
+              if (e) throw new Error(e.message);
+              return (data ?? []) as TeamRow[];
+            }),
+          supabase
+            .from('games')
+            .select(
+              'id, season, season_type, week, home_team_id, visitor_team_id, home_score, visitor_score, starts_at, status, status_state',
+            )
+            .eq('season', slate.season)
+            .eq('season_type', slate.seasonType)
+            .eq('week', slate.week)
+            .then(({ data, error: e }) => {
+              if (e) throw new Error(e.message);
+              return (data ?? []) as GameRow[];
+            }),
+        ]);
+        if (!live) return;
+
+        const byId = new Map<string, ScoreTeam>(
+          teamRows.map((t) => [t.id, { id: t.id, abbreviation: t.abbreviation, name: t.name }]),
+        );
+        setGames(
+          gameRows
+            .map((g) => ({
+              id: g.id,
+              season: g.season,
+              seasonType: g.season_type,
+              week: g.week,
+              home: g.home_team_id ? (byId.get(g.home_team_id) ?? null) : null,
+              away: g.visitor_team_id ? (byId.get(g.visitor_team_id) ?? null) : null,
+              homeScore: g.home_score,
+              awayScore: g.visitor_score,
+              startsAt: g.starts_at,
+              status: statusOf(g.status_state),
+              statusText: g.status,
+            }))
+            // Kickoff order, untimed last, so the strip reads as a weekend.
+            .sort((a, b) => (a.startsAt ?? '9').localeCompare(b.startsAt ?? '9')),
+        );
+      } catch (e) {
+        if (live) setError(e instanceof Error ? e.message : 'Could not load this week’s games.');
+      } finally {
+        if (live) setLoading(false);
+      }
+    })();
+
+    return () => {
+      live = false;
+    };
+    // `slate` is read through `key`; see above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  /* With no slate there is nothing to wait for, so `loading` is false without
+     the effect having to say so — writing state from an effect body just to
+     report "nothing to do" is a cascading render for no information. */
+  return { games, loading: key !== null && loading, error };
+}

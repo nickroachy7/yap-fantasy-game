@@ -7,3 +7,22 @@
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
 }
+
+/**
+ * The web page itself, behind React.
+ *
+ * `Screen` paints `Colors.dark.background` on its own root, but that view does
+ * not cover the elastic overscroll area, the space above a short page before
+ * hydration, or the browser's own form controls and scrollbars. Without these
+ * two rules a dark app sat on a white document and flashed white on every hard
+ * reload; `color-scheme` is what makes the scrollbar and any native control
+ * render in their dark variants rather than as light widgets on a black page.
+ */
+:root {
+  color-scheme: dark;
+  background-color: #000000;
+}
+
+body {
+  background-color: #000000;
+}

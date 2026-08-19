@@ -11,11 +11,11 @@
  * CardRow's own header says one component must draw the starter and the bench,
  * because the bench only works if a candidate can be compared with the man
  * above him. That remains true, and this does not break it: the comparison
- * happens INSIDE the picker, which lists every eligible card in CardRow's
- * compact form with the incumbent marked `IN`. So the two rows answer two
+ * happens INSIDE the swap sheet, which lists every eligible card in CardRow's
+ * compact form with the incumbent pinned above them. So the two rows answer two
  * different questions at two densities — this one is the slot at rest, read
  * eight times down a page; CardRow is twenty candidates being scanned against
- * each other. Making the picker 90pt a row would put four options on a phone.
+ * each other. Making the sheet 90pt a row would put four options on a phone.
  *
  * Fixed height, like the directory row, for the same reason: nothing here may
  * wrap, and both bands have known heights.
@@ -146,6 +146,23 @@ export function StarterRow({
             </Text>
           )}
         </View>
+
+        {/* The swap mark.
+
+            A plain View inside the row's own Pressable, never a Pressable of
+            its own: react-native-web renders `accessibilityRole="button"` as a
+            real <button>, and one inside another is invalid HTML that React
+            rejects at runtime. So this is an affordance, not a second target —
+            it says the row opens something, and the whole row is what you press
+            to open it. Without it a tappable row looked exactly like the static
+            rows on every other screen in the app.
+
+            Absent when the lineup is locked, because then it does not. */}
+        {onPress && !disabled ? (
+          <View style={[styles.swap, { borderColor: c.border, backgroundColor: tray }]}>
+            <Text style={[Type.body, { color: c.textSecondary }]}>⇄</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={[styles.strip, { backgroundColor: tray }]}>
@@ -204,6 +221,14 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   figureValue: { fontSize: 17, fontWeight: '800', letterSpacing: -0.4 },
+  swap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   strip: {
     height: STRIP_HEIGHT,
     flexDirection: 'row',

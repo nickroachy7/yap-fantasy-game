@@ -20,7 +20,7 @@
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { InjuryChip } from '@/components/cards/InjuryChip';
 import { PositionGlyph } from '@/components/cards/PositionGlyph';
@@ -43,6 +43,7 @@ import { Tabs, type Tab } from '@/components/ui/Tabs';
 import { useTabBarInset } from '@/components/shell/useResponsive';
 import { Colors, Spacing, type CardTier } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
 
 const NUMERIC = { fontVariant: ['tabular-nums' as const] };

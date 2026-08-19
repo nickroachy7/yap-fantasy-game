@@ -6,16 +6,25 @@
  * the player has actually produced, and whether he is trending up — so the row
  * carries all of it and the bench is drawn in the same columns for comparison.
  *
+ * The screen reads top to bottom as the week does: what is on (the scoreboard
+ * strip), where you stand (the contest card), who needs a look (alerts), who is
+ * starting, and who is not. The starters and the bench used to be two tabs;
+ * they are now one scroll, because choosing between them is the entire task and
+ * a tab pair meant only ever seeing half of it.
+ *
  * Nothing here is a projection. Every number is either a clock or something
  * that has already happened.
  */
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BenchBoard } from '@/components/lineup/BenchBoard';
 import { ContestCard } from '@/components/lineup/ContestCard';
 import { SlotBoard } from '@/components/lineup/SlotBoard';
+import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
 import {
+  eligibleSlotsFor,
   firstOpenSlotFor,
   isEligible,
   lockCaption,
@@ -25,23 +34,31 @@ import {
   type SortKey,
 } from '@/components/lineup/model';
 import { useLineupData } from '@/components/lineup/use-lineup-data';
+import { ScoreStrip } from '@/components/scores/ScoreStrip';
+import { weekLabel } from '@/components/scores/scoreboard';
+import { useSlateGames } from '@/components/scores/use-scores';
 import { Screen } from '@/components/shell/Screen';
 import { SubNav } from '@/components/shell/SubNav';
 import { LINEUP_SEGMENTS } from '@/components/shell/sections';
 import { useIsWide } from '@/components/shell/useResponsive';
-import { Tabs } from '@/components/ui/Tabs';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { injuryWeight } from '@/lib/injury';
 import { usePlayer } from '@/context/PlayerContext';
 import { supabase } from '@/lib/supabase';
 
-type Pane = 'lineup' | 'bench';
+/**
+ * What the swap sheet is open on, held as an identity rather than as the sheet's
+ * whole contents: an edit made while it is open — clearing the slot, say — must
+ * change what it shows, and a snapshot taken at open time would not.
+ */
+type Swap = { kind: 'slot'; slot: string } | { kind: 'bench'; cardId: string };
 
 export default function LineupScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const wide = useIsWide();
+  const router = useRouter();
 
   const {
     slate,
@@ -65,8 +82,7 @@ export default function LineupScreen() {
    * to blank out changes you had already made. `null` means "cleared".
    */
   const [edits, setEdits] = useState<Record<string, string | null>>({});
-  const [openSlot, setOpenSlot] = useState<string | null>(null);
-  const [view, setView] = useState<Pane>('lineup');
+  const [swap, setSwap] = useState<Swap | null>(null);
   const [sort, setSort] = useState<SortKey>('fp');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
@@ -115,6 +131,12 @@ export default function LineupScreen() {
     return map;
   }, [slots, seasonCards, usedIds, picks, sort]);
 
+  /** What the empty rows advertise. The lists themselves live in the sheet. */
+  const eligibleCounts = useMemo(
+    () => new Map([...eligibleBySlot].map(([slot, list]) => [slot, list.length])),
+    [eligibleBySlot],
+  );
+
   const bench = useMemo(
     () => sortCards(seasonCards.filter((card) => !usedIds.has(card.id)), sort),
     [seasonCards, usedIds, sort],
@@ -157,39 +179,95 @@ export default function LineupScreen() {
     return JSON.stringify(a) !== JSON.stringify(b);
   }, [picks, savedPicks]);
 
+  /* The scoreboard reads its own week, in the scores module's vocabulary. Built
+     from the slate's VALUES rather than passing the slate object through, so the
+     once-a-second tick above cannot make it look like a new week. */
+  const scoreSlate = useMemo(
+    () =>
+      slate
+        ? { season: slate.season, seasonType: slate.season_type, week: slate.week }
+        : null,
+    [slate],
+  );
+  const { games: weekGames, loading: gamesLoading } = useSlateGames(scoreSlate);
+
+  /** Your starters per club, so the strip can mark the games you are in. */
+  const startersByTeam = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const { card } of starters) {
+      if (!card.team) continue;
+      map.set(card.team, (map.get(card.team) ?? 0) + 1);
+    }
+    return map;
+  }, [starters]);
+
   const setPick = useCallback((slot: string, cardId: string) => {
     setEdits((e) => ({ ...e, [slot]: cardId }));
-    setOpenSlot(null);
+    setSwap(null);
     setSaved(null);
   }, []);
 
   const clearPick = useCallback((slot: string) => {
     setEdits((e) => ({ ...e, [slot]: null }));
-    setOpenSlot(null);
+    setSwap(null);
     setSaved(null);
   }, []);
 
   // Stable identities so the memoised boards below are not defeated by a new
   // arrow function on every countdown tick.
-  const toggleSlot = useCallback(
-    (slot: string) => setOpenSlot((cur) => (cur === slot ? null : slot)),
+  const openSlot = useCallback((slot: string) => setSwap({ kind: 'slot', slot }), []);
+  const openBenchCard = useCallback(
+    (card: LineupCard) => setSwap({ kind: 'bench', cardId: card.id }),
     [],
   );
-
-  const placeFromBench = useCallback(
-    (slot: string, cardId: string) => {
-      setPick(slot, cardId);
-      // Jump back so the change is visible where it happened; leaving the user
-      // on the bench makes a successful tap look like a no-op.
-      setView('lineup');
-    },
-    [setPick],
-  );
+  const closeSwap = useCallback(() => setSwap(null), []);
+  const openScores = useCallback(() => router.push('/lineup/scores'), [router]);
 
   const targetSlotFor = useCallback(
     (card: LineupCard) => firstOpenSlotFor(card, slots, picks),
     [slots, picks],
   );
+
+  const startableFor = useCallback(
+    (card: LineupCard) => eligibleSlotsFor(card, slots).length > 0,
+    [slots],
+  );
+
+  /**
+   * The sheet's contents, rebuilt from current state on every render rather
+   * than captured when it opened — so clearing a slot from inside the sheet
+   * redraws it as an empty slot instead of leaving a stale incumbent pinned to
+   * the top of it.
+   */
+  const swapRequest = useMemo<SwapRequest | null>(() => {
+    /* Locked closes it, and does so here rather than in an effect: the
+       countdown re-renders this screen every second, so the lock is already
+       reflected in the derivation. An effect would have been a second source of
+       truth for the same instant. */
+    if (!swap || locked) return null;
+    if (swap.kind === 'slot') {
+      const cfg = slots.find((s) => s.slot === swap.slot);
+      if (!cfg) return null;
+      const pickedId = picks[cfg.slot];
+      return {
+        kind: 'slot',
+        slot: cfg.slot,
+        eligiblePositions: cfg.eligible_positions.join('/'),
+        current: pickedId ? (byId.get(pickedId) ?? null) : null,
+        options: eligibleBySlot.get(cfg.slot) ?? [],
+      };
+    }
+    const card = byId.get(swap.cardId);
+    if (!card) return null;
+    return {
+      kind: 'bench',
+      card,
+      destinations: eligibleSlotsFor(card, slots).map((cfg) => ({
+        slot: cfg.slot,
+        occupant: picks[cfg.slot] ? (byId.get(picks[cfg.slot]) ?? null) : null,
+      })),
+    };
+  }, [swap, locked, slots, picks, byId, eligibleBySlot]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -247,6 +325,17 @@ export default function LineupScreen() {
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}>
       <SubNav segments={LINEUP_SEGMENTS} inset={false} />
+
+      {slate ? (
+        <ScoreStrip
+          games={weekGames}
+          title={weekLabel(slate.season_type, slate.week)}
+          startersByTeam={startersByTeam}
+          loading={gamesLoading}
+          onOpenScores={openScores}
+        />
+      ) : null}
+
       <ContestCard
         displayName={displayName}
         weekLabel={context}
@@ -298,44 +387,41 @@ export default function LineupScreen() {
         </Text>
       ) : (
         <>
-          <Tabs<Pane>
-            value={view}
-            onChange={setView}
-            tabs={[
-              { value: 'lineup', label: 'Lineup', hint: `${filled}/${slots.length}` },
-              { value: 'bench', label: 'Bench', hint: String(bench.length) },
-            ]}
+          {/* Headings rather than tabs. Both boards are always on the page, so
+              what these have to do is name them and say how full each is. */}
+          <SectionHead
+            label="Starting lineup"
+            hint={`${filled}/${slots.length} filled`}
+            tone={filled < slots.length ? c.warning : c.textTertiary}
+          />
+          <SlotBoard
+            slots={slots}
+            byId={byId}
+            picks={picks}
+            eligibleCounts={eligibleCounts}
+            openSlot={swap?.kind === 'slot' ? swap.slot : null}
+            locked={locked}
+            savedPoints={savedPoints}
+            scored={scoredAt !== null}
+            onOpenSlot={openSlot}
           />
 
-          {view === 'lineup' ? (
-            <SlotBoard
-              slots={slots}
-              byId={byId}
-              picks={picks}
-              eligibleBySlot={eligibleBySlot}
-              openSlot={openSlot}
-              locked={locked}
-              savedPoints={savedPoints}
-              scored={scoredAt !== null}
-              wide={wide}
-              sort={sort}
-              onSort={setSort}
-              onToggleSlot={toggleSlot}
-              onPick={setPick}
-              onClear={clearPick}
-            />
-          ) : (
-            <BenchBoard
-              cards={bench}
-              targetSlotFor={targetSlotFor}
-              locked={locked}
-              wide={wide}
-              sort={sort}
-              onSort={setSort}
-              onPlace={placeFromBench}
-              offSeasonCount={offSeasonCount}
-            />
-          )}
+          <SectionHead
+            label="Bench"
+            hint={`${bench.length} card${bench.length === 1 ? '' : 's'}`}
+            tone={c.textTertiary}
+          />
+          <BenchBoard
+            cards={bench}
+            targetSlotFor={targetSlotFor}
+            startableFor={startableFor}
+            locked={locked}
+            wide={wide}
+            sort={sort}
+            onSort={setSort}
+            onOpen={openBenchCard}
+            offSeasonCount={offSeasonCount}
+          />
         </>
       )}
 
@@ -374,7 +460,29 @@ export default function LineupScreen() {
           {submitError ?? loadError}
         </Text>
       ) : null}
+
+      <SwapSheet
+        request={swapRequest}
+        wide={wide}
+        sort={sort}
+        onSort={setSort}
+        onPick={setPick}
+        onClear={clearPick}
+        onClose={closeSwap}
+      />
     </Screen>
+  );
+}
+
+/** A board's name and its count, on one baseline. */
+function SectionHead({ label, hint, tone }: { label: string; hint: string; tone: string }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  return (
+    <View style={styles.sectionHead}>
+      <Text style={[Type.section, { color: c.text }]}>{label}</Text>
+      <Text style={[Type.micro, { color: tone }]}>{hint.toUpperCase()}</Text>
+    </View>
   );
 }
 
@@ -394,6 +502,16 @@ const styles = StyleSheet.create({
   },
   alertSlot: { width: 30 },
   alertText: { flex: 1 },
+  /* Negative top margin against `Screen`'s 14pt content gap: a heading belongs
+     to the board under it, and an even 14 above and below made it float
+     between the two. */
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    marginBottom: -Spacing.one - 2,
+  },
   submit: {
     borderRadius: 10,
     alignItems: 'center',

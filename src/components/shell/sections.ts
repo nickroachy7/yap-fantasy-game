@@ -12,8 +12,13 @@
  * code, and adding a sub-page meant remembering to edit two files. The sidebar
  * now derives from here, which is what makes that claim true.
  *
- * Order is deliberate: the weekly decision first, standings second, acquisition
- * third, what you own fourth, identity last.
+ * Order is deliberate, and it follows what a week actually looks like: set the
+ * lineup, look at what you own, go and get more, then see where that put you.
+ * Identity last, as it is everywhere else.
+ *
+ * Standings used to sit second, which put the one screen you cannot act on
+ * between the two you use together — the lineup and the collection it is drawn
+ * from. They are now neighbours.
  *
  * A section's FIRST child deliberately shares the section's own href. The
  * segmented control needs a segment for the landing page or there is no way
@@ -59,13 +64,15 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    href: '/leaderboard',
-    label: 'Leaderboard',
-    tabLabel: 'Board',
-    icon: 'leaderboard',
+    href: '/collection',
+    label: 'Collection',
+    icon: 'collection',
     children: [
-      { href: '/leaderboard', label: 'Standings' },
-      { href: '/leaderboard/scoring', label: 'Scoring' },
+      { href: '/collection/inventory', label: 'Inventory' },
+      // Sets is a designed empty state until Week 3; the badge says so rather
+      // than the screen looking broken.
+      { href: '/collection/sets', label: 'Sets', badge: 'Soon' },
+      { href: '/collection/shop', label: 'Shop' },
     ],
   },
   {
@@ -78,15 +85,13 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    href: '/collection',
-    label: 'Collection',
-    icon: 'collection',
+    href: '/leaderboard',
+    label: 'Leaderboard',
+    tabLabel: 'Board',
+    icon: 'leaderboard',
     children: [
-      { href: '/collection/inventory', label: 'Inventory' },
-      // Sets is a designed empty state until Week 3; the badge says so rather
-      // than the screen looking broken.
-      { href: '/collection/sets', label: 'Sets', badge: 'Soon' },
-      { href: '/collection/shop', label: 'Shop' },
+      { href: '/leaderboard', label: 'Standings' },
+      { href: '/leaderboard/scoring', label: 'Scoring' },
     ],
   },
   { href: '/profile', label: 'Profile', icon: 'profile' },

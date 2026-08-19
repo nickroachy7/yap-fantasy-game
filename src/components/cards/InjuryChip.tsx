@@ -8,8 +8,9 @@
  * Never colour alone — blocking carries a filled chip AND a bullet mark AND the
  * status text, so it survives greyscale and colour blindness.
  */
-import { StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { injuryWeight } from '@/lib/injury';
 
 /**

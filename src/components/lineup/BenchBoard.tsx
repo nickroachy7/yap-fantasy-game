@@ -3,10 +3,16 @@
  * above it, so a bench player can be read against a starter without switching
  * units or re-learning the layout.
  *
- * The leftmost column is the destination slot rather than a decoration: tapping
- * a bench row starts that player, and the row says up front exactly where he
- * would land. A tap that silently chose one of RB1/RB2/FLEX for you is how
- * people end up submitting a lineup they did not intend.
+ * It now sits directly beneath the starters rather than behind a tab. The tab
+ * pair was hiding the comparison the screen exists to support: you cannot weigh
+ * a bench receiver against the one starting if looking at either means the
+ * other is gone. Two boards in one scroll costs a swipe and answers the
+ * question.
+ *
+ * The leftmost column is the destination slot rather than a decoration: it says
+ * up front where a tap would land this player. Where every slot he is legal for
+ * is taken, it says SWAP instead of FULL, because the sheet a tap opens now
+ * offers to replace whoever is in one — a tap used to be a dead end there.
  */
 import { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -21,21 +27,25 @@ import { matchupLabel, type LineupCard, type SortKey } from './model';
 function BenchBoardImpl({
   cards,
   targetSlotFor,
+  startableFor,
   locked,
   wide,
   sort,
   onSort,
-  onPlace,
+  onOpen,
   offSeasonCount,
 }: {
   cards: LineupCard[];
-  /** Null when every slot this player is legal for is already taken. */
+  /** The first EMPTY slot this player is legal for, or null when all are taken. */
   targetSlotFor: (card: LineupCard) => string | null;
+  /** Whether any slot at all accepts him — a taken slot still counts. */
+  startableFor: (card: LineupCard) => boolean;
   locked: boolean;
   wide: boolean;
   sort: SortKey;
   onSort: (next: SortKey) => void;
-  onPlace: (slot: string, cardId: string) => void;
+  /** Opens the swap sheet for this card. */
+  onOpen: (card: LineupCard) => void;
   /** Cards for a different season. `set_lineup` rejects them, so they are hidden. */
   offSeasonCount: number;
 }) {
@@ -60,24 +70,24 @@ function BenchBoardImpl({
         ) : (
           cards.map((card) => {
             const target = targetSlotFor(card);
-            const canPlace = !locked && target !== null;
+            const startable = startableFor(card);
             return (
               <CardRow
                 key={card.id}
                 wide={wide}
                 card={card}
-                disabled={!canPlace}
-                onPress={canPlace ? () => onPlace(target, card.id) : undefined}
+                disabled={locked || !startable}
+                onPress={!locked && startable ? () => onOpen(card) : undefined}
                 accessibilityLabel={
-                  canPlace
-                    ? `Start ${card.name} at ${target}. ${card.team ?? 'No team'} ${matchupLabel(card.game)}.`
-                    : `${card.name} has no open slot. ${card.team ?? 'No team'} ${matchupLabel(card.game)}.`
+                  startable
+                    ? `${card.name}, ${card.team ?? 'no team'} ${matchupLabel(card.game)}. Tap to choose a slot.`
+                    : `${card.name} cannot start in this lineup. ${card.team ?? 'No team'} ${matchupLabel(card.game)}.`
                 }
                 lead={
                   <Text
                     numberOfLines={1}
                     style={[Type.micro, { color: target ? c.text : c.textTertiary }]}>
-                    {target ?? 'FULL'}
+                    {target ?? (startable ? 'SWAP' : '—')}
                   </Text>
                 }
               />
