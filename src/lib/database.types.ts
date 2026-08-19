@@ -1098,6 +1098,7 @@ export type Database = {
         }
         Returns: Json
       }
+      card_profile: { Args: { p_card_instance_id: string }; Returns: Json }
       current_slate: {
         Args: never
         Returns: {
@@ -1142,6 +1143,7 @@ export type Database = {
         }[]
       }
       player_game_log: { Args: { p_player_id: string }; Returns: Json }
+      player_market: { Args: { p_player_id: string }; Returns: Json }
       player_profile: { Args: { p_player_id: string }; Returns: Json }
       refresh_player_season_ranks: { Args: never; Returns: undefined }
       score_week: {
