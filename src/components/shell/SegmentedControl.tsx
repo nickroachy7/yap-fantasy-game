@@ -49,7 +49,8 @@ export function SegmentedControl<T extends string>({
             accessibilityState={{ selected: active }}
             style={({ pressed }) => [
               styles.segment,
-              compact && styles.compactSegment,
+              /* Either/or, never layered. See `grow` and `compactSegment`. */
+              compact ? styles.compactSegment : styles.grow,
               active && { backgroundColor: c.background },
               pressed && !active && styles.pressed,
             ]}>
@@ -83,13 +84,14 @@ const styles = StyleSheet.create({
    * `Radius.chip` inset by that padding is what makes the outer corner sit
    * concentric with a chip's rather than a point tighter or looser.
    *
-   * NOT `flex: 0`, which is the obvious way to stop a segment growing and is
-   * wrong on web: react-native-web expands the shorthand to
-   * `flexGrow: 0; flexShrink: 0; flexBasis: 0%`, so each segment got a zero
-   * base width, never grew back, and rendered as 20pt of padding around a
-   * label clipped to nothing. The three properties are spelled out instead,
-   * with `flexBasis: 'auto'` — size to your contents — which is what `flex: 0`
-   * means everywhere except in the shorthand.
+   * IT SETS NO FLEX AT ALL, which is the fix that finally held. Two earlier
+   * attempts to say "do not grow" both broke, in opposite directions and on
+   * opposite platforms: `flex: 0` collapsed the segments on web, because
+   * react-native-web expands the shorthand to `flexBasis: 0%`; spelling out
+   * `flexGrow/flexShrink/flexBasis` fixed web and left iOS broken, because
+   * Yoga got that alongside the base style's `flex: 1` and kept the shorthand.
+   * A segment that sets nothing sizes to its contents on both, and the base
+   * style no longer has a `flex` to argue with — see `segment` and `grow`.
    *
    * No `alignSelf` here either. It reads as "make it small" in a column, where
    * the cross axis is horizontal; in the row this now lives in, the cross axis
@@ -98,14 +100,19 @@ const styles = StyleSheet.create({
    * nothing to keep it narrow.
    */
   compactTrack: {
+    /* Never shrinks. The row it lives in gives the chips `flex: 1`, so at any
+       width where the pair together exceed the line the chips are the side that
+       is supposed to give — they scroll, and this does not. Without it the
+       track is squeezed and the labels go first, which is the failure that
+       looks like the control is broken rather than merely narrow. */
+    flexShrink: 0,
     borderRadius: Radius.chip + 2,
     padding: 2,
     gap: 2,
   },
+  /** Full width, divided evenly — the ordinary segmented control. */
+  grow: { flex: 1 },
   compactSegment: {
-    flexGrow: 0,
-    flexShrink: 0,
-    flexBasis: 'auto',
     minHeight: 24,
     paddingVertical: 0,
     paddingHorizontal: Spacing.two + 2,
@@ -114,9 +121,25 @@ const styles = StyleSheet.create({
   /* Chips uppercase their labels in the component rather than at the call site,
      so a control sitting among them has to do the same or the row reads in two
      casings — the exact thing Chip's own note warns about. */
-  compactLabel: { textTransform: 'uppercase' },
+  /* `flexShrink: 0` here too, and it is the belt to the track's braces: a label
+     is the entire content of a segment, so a squeezed one does not render
+     smaller, it renders as nothing at all. */
+  compactLabel: { textTransform: 'uppercase', flexShrink: 0 },
+  /* NO `flex` HERE. It used to carry `flex: 1`, with the compact variant
+     layering `flexGrow/flexShrink/flexBasis` over the top to switch it off —
+     which works on web and does not work on iOS, and is the whole of the bug
+     where the compact toggle rendered as an empty pill.
+     
+     react-native-web resolves styles to CSS, where a longhand after a shorthand
+     wins, so `flexBasis: 'auto'` reliably beat `flex: 1`. Yoga is handed both in
+     ONE merged style object and does not promise that ordering: `flex: 1`
+     survived, the segments took a zero basis and grew into the track, and the
+     labels — the entire content of a segment — clipped to nothing.
+     
+     So the two are mutually exclusive branches rather than a base and an
+     override. Neither can silently win over the other because they are never
+     both present. */
   segment: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
