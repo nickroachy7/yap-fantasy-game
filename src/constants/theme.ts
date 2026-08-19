@@ -232,16 +232,24 @@ export const SheetDialogInset = 40;
  * left untouched. Everything below is additive.
  *
  * Tier is EARNED by accumulating fantasy points, so tier - not team - is the
- * primary visual identity of a card. Each tier is separated on FOUR
- * independent axes so it never depends on hue alone:
+ * primary visual identity of a card.
  *
- *   1. colour      - the palette below
- *   2. frame       - border weight, corner radius, inner ring, corner ticks
- *   3. rank pips   - COUNT (1..4) and SHAPE (square/pill/circle/diamond)
- *   4. motif       - the geometric pattern drawn in the art slot
+ * THE RULE, WHICH HAS NOT CHANGED: tier is never signalled by hue alone. A
+ * user with full colour blindness must be able to read it, and a greyscale
+ * screenshot must stay legible.
  *
- * A user with full colour blindness can still read tier from pip count,
- * pip shape, border weight and motif. A greyscale screenshot stays legible.
+ * WHAT CARRIES IT, WHICH HAS. The tokens below still describe four non-colour
+ * axes - frame weight and radius, inner ring and corner ticks, rank pips by
+ * COUNT (1..4) and SHAPE, and a geometric motif - and `TierBadge`, `TierChip`
+ * and `TierMotif` still use them. `PlayerCard` no longer does. Applied all at
+ * once they turned a 106pt grid cell into five nested boxes around three
+ * numbers, which read as busy rather than precious. The card now prints the
+ * tier NAME instead, which is a stronger accessible signal than any of them:
+ * it needs no legend, survives greyscale, and cannot be confused at 4pt. The
+ * accent only makes the reading faster.
+ *
+ * Do not reintroduce a tier cue to the card without either keeping the word or
+ * replacing it with something equally readable without colour.
  * ------------------------------------------------------------------------- */
 
 /** Mirrors the `card_tier` enum in the database. */
@@ -457,7 +465,9 @@ export const CardSizes = {
     nameLines: 1,
     labelSize: 7,
     statSize: 10,
-    glyph: 18,
+    /** The one number the card leads with (career FP). */
+    figureSize: 22,
+    glyph: 16,
     pip: 4,
   },
   grid: {
@@ -470,7 +480,8 @@ export const CardSizes = {
     nameLines: 1,
     labelSize: 9,
     statSize: 13,
-    glyph: 26,
+    figureSize: 30,
+    glyph: 22,
     pip: 5,
   },
   detail: {
@@ -482,7 +493,8 @@ export const CardSizes = {
     nameLines: 2,
     labelSize: 11,
     statSize: 20,
-    glyph: 40,
+    figureSize: 46,
+    glyph: 32,
     pip: 8,
   },
 } as const;

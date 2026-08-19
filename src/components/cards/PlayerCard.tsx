@@ -3,16 +3,13 @@ import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import {
   CardSizes,
   Fonts,
+  Radius,
   Spacing,
   type CardSize,
   type CardTier,
-  type TierTheme,
 } from '@/constants/theme';
 import type { Database } from '@/lib/database.types';
 import { PositionGlyph } from './PositionGlyph';
-import { TierBadge } from './TierBadge';
-import { TierMotif } from './TierMotif';
-import { TierProgress } from './TierProgress';
 import { useTierTheme } from './use-tier-theme';
 
 /**
@@ -26,9 +23,44 @@ const _tierParity: TierParity = true;
 void _tierParity;
 
 /**
- * The presentational view-model for a card.
+ * A collectible card.
  *
- * This component is PURE - it never touches Supabase. Callers join
+ * WHAT THIS REDESIGN REMOVED, AND WHY
+ *
+ * The card used to signal tier on four simultaneous axes: a 1-3pt coloured
+ * frame, an inset inner ring, L-shaped corner ticks, a filled tier badge with
+ * rank pips, a geometric motif behind the art, and a shadow whose depth rose
+ * with tier. Each was defensible alone. Together they made a 106pt grid cell
+ * that was mostly CHROME — five nested boxes around three numbers — and the
+ * effect was busy rather than precious. A card should feel valuable because of
+ * what it says, not because of how much is drawn around it.
+ *
+ * So the frame is now a hairline, the rings and ticks are gone, the art slot
+ * has lost its border and its motif, and the tier badge is a dot and a word.
+ *
+ * ONE NUMBER, NOT FOUR. Career FP is what the card IS — it is the thing that
+ * accrues, the thing that drives tier, and the thing you compare two copies by.
+ * It now sits alone and centred at figure size, with everything else demoted to
+ * a single meta line beneath. Starts and the distance to the next tier are
+ * still there; they are simply no longer competing for the same attention.
+ *
+ * TIER IS STILL NEVER COLOUR ALONE — the rule is unchanged, the carrier is not.
+ * Pip count, pip shape, border weight and motif were four non-colour signals,
+ * and stripping them for subtlety would have left hue doing the work on its
+ * own. The tier NAME is now printed on every card at every size, which is a
+ * stronger accessible signal than any of them: it survives greyscale, every
+ * form of colour blindness, and needing to have learned what three pips mean.
+ * The accent dot beside it only makes the reading faster.
+ *
+ * Likewise the progress track: the exact distance is always printed as text
+ * next to it ("200 to SILVER"), so the bar is never the only source.
+ *
+ * NO PHOTO, NO LOGO, NO JERSEY: unlicensed. The art slot is kept as reserved
+ * space with its aspect ratio fixed, so dropping a real <Image> in later
+ * changes nothing about the surrounding layout. Until then it holds a text
+ * monogram, quietly.
+ *
+ * This component is PURE — it never touches Supabase. Callers join
  * card_instances -> cards -> players -> teams (and tier_thresholds for
  * `nextTierAt`) and pass the flattened result in.
  */
@@ -72,6 +104,15 @@ function initialsOf(name: string): string {
   return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
 }
 
+/** Fraction through the CURRENT tier band, 0-1. Null at the top tier. */
+function progressOf(model: PlayerCardModel): number | null {
+  if (model.nextTierAt === null) return null;
+  const floor = model.tierFloorFp ?? 0;
+  const span = model.nextTierAt - floor;
+  if (span <= 0) return null;
+  return Math.min(1, Math.max(0, (model.careerFp - floor) / span));
+}
+
 export function PlayerCard({
   model,
   size = 'grid',
@@ -81,77 +122,74 @@ export function PlayerCard({
 }: PlayerCardProps) {
   const t = useTierTheme(model.tier);
   const dims = CardSizes[size];
-  const detail = size === 'detail';
+  const compact = size === 'compact';
 
   const team = model.teamAbbreviation?.toUpperCase() ?? '—';
+  const progress = progressOf(model);
+  const toNext =
+    model.nextTierAt === null ? null : Math.max(0, Math.round(model.nextTierAt - model.careerFp));
+
+  const starts = `${fmt(model.lineupStarts)} ${model.lineupStarts === 1 ? 'start' : 'starts'}`;
+  const nextLine =
+    toNext === null || !model.nextTierLabel
+      ? 'top tier'
+      : `${fmt(toNext)} to ${model.nextTierLabel.toUpperCase()}`;
+
   const a11yLabel =
     `${model.playerName}, ${t.label} tier, ` +
     `${model.positionAbbreviation ?? 'unknown position'}, ` +
     `${model.teamAbbreviation ?? 'no team'}, ` +
     `${fmt(model.careerFp)} career fantasy points, ` +
-    `${fmt(model.lineupStarts)} lineup starts`;
+    `${fmt(model.lineupStarts)} lineup starts` +
+    (toNext === null ? ', top tier' : `, ${fmt(toNext)} points to ${model.nextTierLabel ?? 'the next tier'}`);
 
   const body = (
     <View
       style={[
         styles.card,
-        shadowFor(t),
         {
           width: fixedWidth ? dims.width : undefined,
           alignSelf: fixedWidth ? 'flex-start' : 'stretch',
           padding: dims.padding,
           gap: dims.gap,
-          borderWidth: t.borderWidth,
-          borderRadius: t.radius,
-          borderColor: t.colors.frame,
+          borderRadius: Radius.panel,
+          /* One hairline at every tier, tinted rather than weighted. The old
+             card went 1pt -> 3pt across the tiers, which read as four
+             different components rather than one component in four states. */
+          borderColor: withAlpha(t.colors.accent, 0.35),
           backgroundColor: t.colors.surface,
         },
         style,
       ]}>
-      {/* Gold + diamond gain a second inset outline - a non-colour frame cue. */}
-      {t.innerRing ? (
-        <View
-          style={[
-            styles.innerRing,
-            { borderColor: t.colors.accent, borderRadius: Math.max(0, t.radius - 4) },
-          ]}
-        />
-      ) : null}
-
-      {/* ---- header: position glyph + team abbreviation ---- */}
+      {/* ---- header: position + club, both quiet ---- */}
       <View style={styles.headerRow}>
         <PositionGlyph
           position={model.positionAbbreviation}
           size={dims.glyph}
-          color={t.colors.text}
-          background={t.colors.surfaceAlt}
-          borderColor={t.colors.frame}
+          color={t.colors.textMuted}
+          /* Transparent, so the glyph reads as an outline rather than a filled
+             chip. Its SHAPE still encodes the position group. */
+          background="transparent"
+          borderColor={withAlpha(t.colors.textMuted, 0.45)}
         />
-        {/*
-          NO team logo: we are not licensed for club marks, so the club is
-          rendered purely as its 3-letter abbreviation in text.
-        */}
+        {/* NO team logo: we are not licensed for club marks, so the club is
+            rendered purely as its 3-letter abbreviation in text. */}
         <Text
           numberOfLines={1}
           style={[
             styles.team,
-            {
-              color: t.colors.textMuted,
-              fontSize: detail ? 18 : 13,
-              letterSpacing: detail ? 2 : 1.2,
-            },
+            { color: t.colors.textMuted, fontSize: dims.labelSize + 2 },
           ]}>
           {team}
         </Text>
       </View>
 
-      {/* ================= ART SLOT =================================== *
-        * Reserved region for licensed/commissioned card art.            *
-        * Its box is driven by `artAspect`, so dropping a real <Image>   *
-        * in here later changes NOTHING about the surrounding layout.    *
-        * Until then it holds an abstract tier motif + a text monogram - *
-        * no player photo, no team logo, no jersey.                      *
-        * ============================================================== */}
+      {/* ================= ART SLOT ===================================== *
+        * Reserved region for licensed/commissioned art. Its box is driven  *
+        * by `artAspect`, so dropping a real <Image> in here later changes  *
+        * NOTHING about the surrounding layout. Borderless now: the outline *
+        * was drawing a box around an absence.                              *
+        * ================================================================ */}
       <View
         // Decorative placeholder: keep it out of the accessibility tree.
         accessibilityElementsHidden
@@ -161,20 +199,16 @@ export function PlayerCard({
           {
             aspectRatio: dims.artAspect,
             backgroundColor: t.colors.surfaceAlt,
-            borderColor: t.colors.accentSoft,
-            borderRadius: Math.max(2, t.radius - 6),
+            borderRadius: Radius.chip,
           },
         ]}>
-        <TierMotif motif={t.motif} color={t.colors.accentSoft} />
         <Text
           style={[
             styles.monogram,
-            { color: t.colors.frame, fontSize: detail ? 56 : 30, letterSpacing: 2 },
+            { color: t.colors.textMuted, fontSize: compact ? 26 : dims.figureSize },
           ]}>
           {initialsOf(model.playerName)}
         </Text>
-        {/* Corner ticks: an extra frame treatment for the top two tiers. */}
-        {t.cornerTicks ? <CornerTicks color={t.colors.frame} /> : null}
       </View>
 
       {/* ---- identity ---- */}
@@ -185,30 +219,80 @@ export function PlayerCard({
           style={[styles.name, { color: t.colors.text, fontSize: dims.nameSize }]}>
           {model.playerName}
         </Text>
-        <TierBadge tier={model.tier} size={size} />
+        {/* The tier, as a word. See the note at the top: this is the
+            non-colour carrier now that pips and frames are gone. */}
+        <View style={styles.tierRow}>
+          <View
+            style={[
+              styles.tierDot,
+              { backgroundColor: t.colors.accent, width: dims.pip, height: dims.pip },
+            ]}
+          />
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.tierWord,
+              { color: t.colors.textMuted, fontSize: dims.labelSize, letterSpacing: 0.8 },
+            ]}>
+            {t.label}
+          </Text>
+        </View>
       </View>
 
-      {/* ---- stats ---- */}
-      <View style={[styles.statRow, { gap: dims.gap }]}>
-        <Stat
-          label="CAREER FP"
-          value={fmt(model.careerFp)}
-          theme={t}
-          size={size}
-          emphasise
-        />
-        <Stat label="STARTS" value={fmt(model.lineupStarts)} theme={t} size={size} />
+      <View style={[styles.divider, { borderColor: withAlpha(t.colors.textMuted, 0.28) }]} />
+
+      {/* ---- the one number ---- */}
+      <View style={styles.figureBlock}>
+        <Text
+          numberOfLines={1}
+          style={[styles.figure, { color: t.colors.text, fontSize: dims.figureSize }]}>
+          {fmt(model.careerFp)}
+        </Text>
+        <Text
+          numberOfLines={1}
+          style={[styles.figureLabel, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
+          CAREER FP
+        </Text>
       </View>
 
-      {/* ---- progression ---- */}
-      <TierProgress
-        theme={t}
-        size={size}
-        careerFp={model.careerFp}
-        nextTierAt={model.nextTierAt}
-        floorFp={model.tierFloorFp}
-        nextLabel={model.nextTierLabel}
-      />
+      {/* ---- everything else, demoted ---- */}
+      <View style={styles.footer}>
+        {/* Stacked at compact, where 106pt cannot hold both halves on one line
+            and clipped them to "338 to GO…". This text is what keeps the bar
+            below out of colour-alone, so it is the one thing here that may not
+            truncate. */}
+        <View style={compact ? styles.metaStack : styles.metaRow}>
+          <Text
+            numberOfLines={1}
+            style={[styles.meta, { color: t.colors.textMuted, fontSize: dims.labelSize + 1 }]}>
+            {starts}
+          </Text>
+          {compact ? null : (
+            <Text
+              numberOfLines={1}
+              style={[styles.meta, { color: t.colors.textMuted, fontSize: dims.labelSize + 1 }]}>
+              ·
+            </Text>
+          )}
+          <Text
+            numberOfLines={1}
+            style={[styles.meta, { color: t.colors.textMuted, fontSize: dims.labelSize + 1 }]}>
+            {nextLine}
+          </Text>
+        </View>
+        {/* The bar is never the only source — `meta` above prints the exact
+            distance in text, which is what keeps this out of colour-alone. */}
+        {progress === null ? null : (
+          <View style={[styles.track, { backgroundColor: withAlpha(t.colors.accent, 0.18) }]}>
+            <View
+              style={[
+                styles.fill,
+                { width: `${progress * 100}%`, backgroundColor: t.colors.accent },
+              ]}
+            />
+          </View>
+        )}
+      </View>
     </View>
   );
 
@@ -231,66 +315,6 @@ export function PlayerCard({
   );
 }
 
-function Stat({
-  label,
-  value,
-  theme,
-  size,
-  emphasise = false,
-}: {
-  label: string;
-  value: string;
-  theme: TierTheme;
-  size: CardSize;
-  emphasise?: boolean;
-}) {
-  const dims = CardSizes[size];
-
-  return (
-    <View style={styles.stat}>
-      <Text
-        numberOfLines={1}
-        style={[styles.statLabel, { color: theme.colors.textMuted, fontSize: dims.labelSize }]}>
-        {label}
-      </Text>
-      <Text
-        numberOfLines={1}
-        style={[
-          styles.statValue,
-          {
-            color: emphasise ? theme.colors.text : theme.colors.textMuted,
-            fontSize: emphasise ? dims.statSize : dims.statSize - 2,
-          },
-        ]}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-/** L-shaped ticks in each corner of the art slot (gold + diamond only). */
-function CornerTicks({ color }: { color: string }) {
-  return (
-    <>
-      <View style={[styles.tick, styles.tickTL, { borderColor: color }]} />
-      <View style={[styles.tick, styles.tickTR, { borderColor: color }]} />
-      <View style={[styles.tick, styles.tickBL, { borderColor: color }]} />
-      <View style={[styles.tick, styles.tickBR, { borderColor: color }]} />
-    </>
-  );
-}
-
-/** Elevation rises with tier - another non-hue separator. */
-function shadowFor(t: TierTheme): ViewStyle {
-  if (t.lift === 0) return {};
-
-  const y = Math.round(t.lift / 2);
-
-  // `boxShadow` is the cross-platform shadow API in RN 0.86 (the older
-  // `shadow*` props are deprecated on web and Android-only via `elevation`).
-  return { boxShadow: `0px ${y}px ${t.lift}px ${withAlpha(t.colors.frame, 0.28)}` };
-}
-
 /** '#RRGGBB' -> 'rgba(r, g, b, a)'. */
 function withAlpha(hex: string, alpha: number): string {
   const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
@@ -300,22 +324,11 @@ function withAlpha(hex: string, alpha: number): string {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
-const TICK = 10;
-
 const styles = StyleSheet.create({
   card: {
     position: 'relative',
     overflow: 'hidden',
-  },
-  innerRing: {
-    position: 'absolute',
-    pointerEvents: 'none',
-    top: 3,
-    left: 3,
-    right: 3,
-    bottom: 3,
-    borderWidth: 1,
-    opacity: 0.7,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   headerRow: {
     flexDirection: 'row',
@@ -325,7 +338,8 @@ const styles = StyleSheet.create({
   },
   team: {
     fontFamily: Fonts.sans,
-    fontWeight: '800',
+    fontWeight: '700',
+    letterSpacing: 1,
     flexShrink: 1,
     textAlign: 'right',
   },
@@ -334,48 +348,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    borderWidth: 1,
   },
   monogram: {
     fontFamily: Fonts.sans,
     fontWeight: '800',
-    opacity: 0.55,
+    letterSpacing: 1,
+    opacity: 0.35,
   },
-  nameBlock: {
-    gap: Spacing.one + 2,
-  },
+  nameBlock: { gap: 3 },
   name: {
     fontFamily: Fonts.sans,
     fontWeight: '700',
   },
-  statRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+  tierRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1 },
+  tierDot: { borderRadius: 999 },
+  tierWord: {
+    fontFamily: Fonts.sans,
+    fontWeight: '700',
   },
-  stat: {
-    flexShrink: 1,
-    gap: 1,
+  divider: { borderTopWidth: StyleSheet.hairlineWidth },
+  figureBlock: { alignItems: 'center', gap: 0 },
+  figure: {
+    fontFamily: Fonts.sans,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
-  statLabel: {
+  figureLabel: {
     fontFamily: Fonts.sans,
     fontWeight: '700',
     letterSpacing: 0.8,
   },
-  statValue: {
-    fontFamily: Fonts.mono,
-    fontWeight: '700',
+  footer: { gap: Spacing.one },
+  metaRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.one },
+  metaStack: { gap: 1 },
+  meta: {
+    fontFamily: Fonts.sans,
+    fontWeight: '600',
   },
+  track: { height: 3, borderRadius: 2, overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: 2 },
   pressed: {
     opacity: 0.82,
     transform: [{ scale: 0.985 }],
   },
-  tick: {
-    position: 'absolute',
-    width: TICK,
-    height: TICK,
-  },
-  tickTL: { top: 4, left: 4, borderTopWidth: 2, borderLeftWidth: 2 },
-  tickTR: { top: 4, right: 4, borderTopWidth: 2, borderRightWidth: 2 },
-  tickBL: { bottom: 4, left: 4, borderBottomWidth: 2, borderLeftWidth: 2 },
-  tickBR: { bottom: 4, right: 4, borderBottomWidth: 2, borderRightWidth: 2 },
 });
