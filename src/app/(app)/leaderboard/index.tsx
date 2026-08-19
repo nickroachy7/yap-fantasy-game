@@ -12,7 +12,7 @@
  * show an em dash rather than a wrong number, and movement shows unknown rather
  * than "new".
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -39,6 +39,7 @@ import { Tabs, type Tab } from '@/components/ui/Tabs';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
 
 // Fallback only — the live slate comes from current_slate().
@@ -59,29 +60,23 @@ export default function LeaderboardScreen() {
   const [entries, setEntries] = useState<Entry[] | null>(null);
   /** Null means "not fetched yet", which is not the same as "no scored weeks". */
   const [weeks, setWeeks] = useState<WeekBoards | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
   const [scope, setScope] = useState('season');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Loading is two-phase, so a slow pull-to-refresh can land after a fast one.
-  // Without a token the older response wins and the board goes stale.
-  const run = useRef(0);
   const loadedSlate = useRef<string | null>(null);
 
-  const load = useCallback(async () => {
-    const token = ++run.current;
-    setError(null);
-
+  // Loading is two-phase, so a slow pull-to-refresh can land after a fast one.
+  // `live()` is the token that keeps the older response from winning.
+  const load = useCallback<Load>(async (live) => {
     // Follow whatever slate is actually being played. Hardcoding season_type 2
     // (regular season) made the board render empty for the whole preseason
     // validation window, which reads as "the leaderboard is broken".
     const slateRes = await supabase.rpc('current_slate');
-    if (token !== run.current) return;
-    if (slateRes.error) return setError(slateRes.error.message);
-    const live = (slateRes.data as Slate[] | null)?.[0] ?? null;
-    const season = live?.season ?? SEASON;
-    const seasonType = live?.season_type ?? 2;
+    if (!live()) return;
+    if (slateRes.error) return slateRes.error.message;
+    const current = (slateRes.data as Slate[] | null)?.[0] ?? null;
+    const season = current?.season ?? SEASON;
+    const seasonType = current?.season_type ?? 2;
 
     const boardRes = await supabase.rpc('leaderboard', {
       p_season: season,
@@ -89,10 +84,10 @@ export default function LeaderboardScreen() {
       p_week: undefined, // omitted -> SQL default null -> season to date
       p_limit: BOARD_LIMIT,
     });
-    if (token !== run.current) return;
-    if (boardRes.error) return setError(boardRes.error.message);
+    if (!live()) return;
+    if (boardRes.error) return boardRes.error.message;
 
-    setSlate(live);
+    setSlate(current);
     setEntries(normaliseEntries(boardRes.data as Entry[] | null));
 
     // Discard the week detail only when the SLATE itself moved. A pull to
@@ -103,20 +98,12 @@ export default function LeaderboardScreen() {
       setWeeks(null);
     }
 
-    const boards = await fetchWeekBoards(season, seasonType, live?.week ?? 0);
-    if (token !== run.current) return;
+    const boards = await fetchWeekBoards(season, seasonType, current?.week ?? 0);
+    if (!live()) return;
     setWeeks(boards);
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }, [load]);
+  const { refreshing, error, refresh } = useLoader(load);
 
   const seasonType = slate?.season_type ?? 2;
   const boards = weeks ?? NO_WEEKS;
@@ -225,7 +212,9 @@ export default function LeaderboardScreen() {
           extraData={listExtra}
           keyExtractor={(r) => r.userId}
           contentContainerStyle={[styles.list, { paddingBottom: tabInset + Spacing.four }]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />
+          }
           ListHeaderComponent={listHeader}
           ListEmptyComponent={<EmptyBoard slate={slate} />}
           renderItem={({ item }) => (

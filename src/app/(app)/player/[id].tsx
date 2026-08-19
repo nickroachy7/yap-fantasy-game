@@ -19,7 +19,7 @@
  * No photo, no logo, no jersey: unlicensed. Club is text, position is a glyph.
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { InjuryChip } from '@/components/cards/InjuryChip';
@@ -44,6 +44,7 @@ import { useTabBarInset } from '@/components/shell/useResponsive';
 import { Colors, Spacing, type CardTier } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
 
 const NUMERIC = { fontVariant: ['tabular-nums' as const] };
@@ -105,16 +106,10 @@ export default function PlayerDetailScreen() {
   const [owned, setOwned] = useState<OwnedCard[]>([]);
   const [ownedLoading, setOwnedLoading] = useState(true);
   const [tab, setTab] = useState<PlayerTab>('overview');
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(
-    async (mode: 'initial' | 'refresh') => {
+  const load = useCallback<Load>(
+    async (live) => {
       if (!id) return;
-      if (mode === 'refresh') setRefreshing(true);
-      else setLoading(true);
-      setError(null);
 
       const [directoryRes, profileRes, gameLogRes, ownedRes] = await Promise.all([
         supabase
@@ -139,13 +134,8 @@ export default function PlayerDetailScreen() {
           .order('acquired_at', { ascending: false }),
       ]);
 
-      const failure = directoryRes.error;
-      if (failure) {
-        setError(failure.message);
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
+      if (!live()) return;
+      if (directoryRes.error) return directoryRes.error.message;
 
       setPlayer(directoryRes.data ? normalise(directoryRes.data) : null);
       // A profile failure is non-fatal on purpose: the directory row and the
@@ -178,16 +168,11 @@ export default function PlayerDetailScreen() {
             })),
       );
       setOwnedLoading(false);
-
-      setLoading(false);
-      setRefreshing(false);
     },
     [id],
   );
 
-  useEffect(() => {
-    void load('initial');
-  }, [load]);
+  const { loading, refreshing, error, refresh } = useLoader(load);
 
   /**
    * Sell one copy.
@@ -203,9 +188,9 @@ export default function PlayerDetailScreen() {
         p_card_instance_id: card.id,
       });
       if (err) throw new Error(sellErrorMessage(err.message));
-      await Promise.all([load('refresh'), refreshWallet()]);
+      await Promise.all([refresh(), refreshWallet()]);
     },
-    [load, refreshWallet],
+    [refresh, refreshWallet],
   );
 
   const goBack = useCallback(() => {
@@ -214,7 +199,10 @@ export default function PlayerDetailScreen() {
   }, [router]);
 
   const body = () => {
-    if (loading) {
+    // `!id` cannot happen on this route, but if it ever did the loader would
+    // settle immediately with nothing read — a spinner is the honest answer to
+    // that, not "player not found".
+    if (loading || !id) {
       return (
         <View style={styles.centre}>
           <ActivityIndicator />
@@ -348,7 +336,7 @@ export default function PlayerDetailScreen() {
       measure="table"
       context={player ? `${player.season ?? ''} game log`.trim() : 'Player'}
       refreshing={refreshing}
-      onRefresh={() => void load('refresh')}>
+      onRefresh={() => void refresh()}>
       {/* Says "Back", not "Cards". This page is now reachable from the
           directory, the scoreboard's leader rows and the trend board, so a
           label naming one of those three was wrong two times in three. The

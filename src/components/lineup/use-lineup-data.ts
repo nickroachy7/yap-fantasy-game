@@ -7,9 +7,10 @@
  * lately. All four come from tables the client can already read, so this is a
  * wider query rather than a new RPC.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import type { CardTier } from '@/constants/theme';
+import { useLoader, type Load } from '@/hooks/use-loader';
 import { fetchAllPages } from '@/lib/paged';
 import { supabase } from '@/lib/supabase';
 
@@ -192,12 +193,8 @@ export function useLineupData(): LineupData {
   const [savedPoints, setSavedPoints] = useState<Record<string, number | null>>({});
   const [totalPoints, setTotalPoints] = useState<number | null>(null);
   const [scoredAt, setScoredAt] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setError(null);
-
+  const load = useCallback<Load>(async (live) => {
     // upcoming_slate(), not current_slate(): the latter returns the week already
     // in progress, whose lock time is by definition in the past — which made this
     // screen render as permanently locked.
@@ -220,16 +217,18 @@ export function useLineupData(): LineupData {
       supabase.from('teams').select('id, abbreviation'),
     ]);
 
-    if (slateRes.error) {
-      setError(slateRes.error.message);
-      setLoading(false);
-      return;
-    }
+    if (!live()) return;
+    if (slateRes.error) return slateRes.error.message;
+
     const s = (slateRes.data as Slate[] | null)?.[0] ?? null;
     setSlate(s);
-    if (cfg.error) setError(cfg.error.message);
+    /* Same precedence as before: the collection's failure is the one reported
+       if both the slot config and the collection fail, because it is the one
+       that empties the screen. */
+    let failure: string | null = null;
+    if (cfg.error) failure = cfg.error.message;
     else setSlots((cfg.data ?? []) as SlotConfig[]);
-    if (coll.error) setError(coll.error);
+    if (coll.error) failure = coll.error;
 
     const owned = coll.data.filter((r): r is CollectionRow & { id: string } => Boolean(r.id));
     const playerIds = [...new Set(owned.map((r) => r.player_id).filter((id): id is string => Boolean(id)))];
@@ -264,6 +263,7 @@ export function useLineupData(): LineupData {
         : Promise.resolve([] as StatRow[]),
     ]);
 
+    if (!live()) return;
     if (!lock.error && lock.data) setLockAt(String(lock.data));
 
     const schedule = buildSchedule(
@@ -314,12 +314,12 @@ export function useLineupData(): LineupData {
     );
     setTotalPoints(prior?.total_points === null || prior?.total_points === undefined ? null : Number(prior.total_points));
     setScoredAt(prior?.scored_at ?? null);
-    setLoading(false);
+    return failure;
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // Quiet, like the old `reload`: it cleared the error and re-read, but never
+  // put the screen back into its first-load spinner.
+  const { loading, error, refresh } = useLoader(load);
 
   return {
     slate,
@@ -332,6 +332,6 @@ export function useLineupData(): LineupData {
     scoredAt,
     loading,
     error,
-    reload: load,
+    reload: refresh,
   };
 }

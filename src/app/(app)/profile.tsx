@@ -1,5 +1,5 @@
 import { Link } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { GemLedger, type LedgerEntry } from '@/components/account/GemLedger';
@@ -22,6 +22,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useLoader, type Load } from '@/hooks/use-loader';
 import { fetchAllPages } from '@/lib/paged';
 import { supabase } from '@/lib/supabase';
 
@@ -85,23 +86,32 @@ export default function ProfileScreen() {
   const [savingName, setSavingName] = useState(false);
   const [nameNotice, setNameNotice] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => setName(displayName), [displayName]);
+  /* The field mirrors the loaded name, which arrives a moment after the first
+     render and changes again after a save. Adjusting it here rather than from
+     an effect is React's own answer to "reset state when a prop changes": the
+     reset lands in the render that noticed, instead of a second commit after
+     the field has already drawn the old value. */
+  const [mirrored, setMirrored] = useState(displayName);
+  if (mirrored !== displayName) {
+    setMirrored(displayName);
+    setName(displayName);
+  }
 
   const userId = session?.user.id;
 
-  const load = useCallback(async () => {
-    setError(null);
+  const load = useCallback<Load>(async (live) => {
     // Follow the slate actually being played rather than assuming the regular
     // season — during the preseason validation window a hardcoded season_type
     // renders every number here as zero, which reads as a broken account.
     const slateRes = await supabase.rpc('current_slate');
-    if (slateRes.error) return setError(slateRes.error.message);
-    const live = slateRes.data?.[0] ?? null;
-    const season = live?.season ?? FALLBACK_SEASON;
-    const seasonType = live?.season_type ?? 2;
+    if (!live()) return;
+    if (slateRes.error) return slateRes.error.message;
+    const current = slateRes.data?.[0] ?? null;
+    const season = current?.season ?? FALLBACK_SEASON;
+    const seasonType = current?.season_type ?? 2;
 
     try {
       const [ledgerRes, weekRes, boardRes, collection] = await Promise.all([
@@ -140,11 +150,12 @@ export default function ProfileScreen() {
         ),
       ]);
 
+      if (!live()) return;
       const failure = ledgerRes.error ?? weekRes.error ?? boardRes.error;
-      if (failure) return setError(failure.message);
+      if (failure) return failure.message;
 
       const board = boardRes.data ?? [];
-      setSlate(live);
+      setSlate(current);
       setLedger(ledgerRes.data ?? []);
       setWeeks(weekRes.data ?? []);
       setOwned(collection);
@@ -152,19 +163,20 @@ export default function ProfileScreen() {
       setRankPool(board.length < RANK_DEPTH ? board.length : null);
     } catch (err) {
       // fetchAllPages throws rather than returning an error, unlike the rest.
-      setError(err instanceof Error ? err.message : 'Could not load your season.');
+      return err instanceof Error ? err.message : 'Could not load your season.';
     }
   }, [userId]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { error: loadError, refresh: reloadSeason } = useLoader(load);
 
+  /* This screen's own `refreshing`, not the loader's: the pull refreshes the
+     season AND the wallet, and the indicator should stay up until both are
+     back — the loader can only speak for its own read. */
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([load(), refresh()]);
+    await Promise.all([reloadSeason(), refresh()]);
     setRefreshing(false);
-  }, [load, refresh]);
+  }, [reloadSeason, refresh]);
 
   const season = useMemo(() => {
     // A submitted-but-unscored week is not a week played: counting it drags the
@@ -235,15 +247,19 @@ export default function ProfileScreen() {
 
   async function handleSignOut() {
     setSigningOut(true);
-    setError(null);
+    setSignOutError(null);
     try {
       await signOut();
       // The (app) layout redirects to /login the moment the session clears.
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not sign out.');
+      setSignOutError(err instanceof Error ? err.message : 'Could not sign out.');
       setSigningOut(false);
     }
   }
+
+  /* One error line, two sources. A failed sign-out is the thing that just
+     happened, so it speaks over a load failure that is already on screen. */
+  const error = signOutError ?? loadError;
 
   const typeLabel = slate?.season_type === 1 ? 'Preseason' : 'Season';
   const seasonLabel = `${typeLabel} ${slate?.season ?? FALLBACK_SEASON}`;

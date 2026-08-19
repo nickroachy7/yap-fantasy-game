@@ -15,7 +15,7 @@
  * does not currently keep.
  */
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Gem } from '@/components/shell/AppHeader';
@@ -30,6 +30,7 @@ import {
 } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useLoader, type Load } from '@/hooks/use-loader';
 import type { Json } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
 import { PlayerCard, type PlayerCardModel } from './PlayerCard';
@@ -109,7 +110,10 @@ export function ShopPanel() {
   const [pulled, setPulled] = useState<Pulled[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  /* This one reports its own failures rather than handing them to useLoader:
+     the shelf and the pack-opening share a single error line, and splitting
+     them into two states would leave one of them stale on screen. */
+  const load = useCallback<Load>(async (live) => {
     const [packRes, openedRes, tierRes] = await Promise.all([
       supabase
         .from('packs')
@@ -125,8 +129,9 @@ export function ShopPanel() {
       // 200 into the client and having the card lie after a balance change.
       supabase.from('tier_thresholds').select('min_career_fp').eq('tier', 'silver').maybeSingle(),
     ]);
-    if (packRes.error) return setError(packRes.error.message);
-    if (openedRes.error) return setError(openedRes.error.message);
+    if (!live()) return;
+    if (packRes.error) return void setError(packRes.error.message);
+    if (openedRes.error) return void setError(openedRes.error.message);
 
     setError(null);
     setPacks(packRes.data as Pack[]);
@@ -138,9 +143,9 @@ export function ShopPanel() {
     if (!tierRes.error && tierRes.data) setSilverAt(Number(tierRes.data.min_career_fp));
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // Quiet by design: the shelf that is already drawn stays drawn while it is
+  // re-read after a pack is opened.
+  const { refresh: reloadShelf } = useLoader(load);
 
   const open = useCallback(
     async (code: string) => {
@@ -155,11 +160,11 @@ export function ShopPanel() {
         setPulled((data ?? []) as Pulled[]);
         // Both matter: `load` re-reads the openings so a one-per-player pack
         // flips to Claimed, `refresh` re-reads the balance the header shows.
-        await Promise.all([load(), refresh()]);
+        await Promise.all([reloadShelf(), refresh()]);
       }
       setOpeningCode(null);
     },
-    [load, refresh],
+    [reloadShelf, refresh],
   );
 
   const toModel = useCallback(
@@ -222,7 +227,7 @@ export function ShopPanel() {
               that cannot succeed until the balance changes. */}
           {packs === null ? (
             <Pressable
-              onPress={() => void load()}
+              onPress={() => void reloadShelf()}
               accessibilityRole="button"
               style={({ pressed }) => [
                 styles.retry,

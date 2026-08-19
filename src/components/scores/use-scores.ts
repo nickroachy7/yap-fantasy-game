@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { positionKey } from '@/constants/positions';
+import { useLoader, type Load } from '@/hooks/use-loader';
 import { fetchAllPages } from '@/lib/paged';
 import { supabase } from '@/lib/supabase';
 
@@ -49,11 +50,8 @@ export type SeasonSchedule = {
 export function useSeasonSchedule(season: number): SeasonSchedule {
   const [games, setGames] = useState<ScoreGame[]>([]);
   const [teams, setTeams] = useState<Map<string, ScoreTeam>>(new Map());
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setError(null);
+  const load = useCallback<Load>(async (live) => {
     try {
       const [teamRows, gameRows] = await Promise.all([
         supabase
@@ -76,6 +74,7 @@ export function useSeasonSchedule(season: number): SeasonSchedule {
             .range(from, to),
         ),
       ]);
+      if (!live()) return;
 
       const byId = new Map<string, ScoreTeam>(
         teamRows.map((t) => [t.id, { id: t.id, abbreviation: t.abbreviation, name: t.name }]),
@@ -97,15 +96,14 @@ export function useSeasonSchedule(season: number): SeasonSchedule {
         })),
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load the schedule.');
-    } finally {
-      setLoading(false);
+      return e instanceof Error ? e.message : 'Could not load the schedule.';
     }
   }, [season]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // `reload` is quiet by design: the scores screen keeps the fixtures it has
+  // on screen while it re-reads them, which is what the old reload did too —
+  // it cleared the error and never raised `loading` a second time.
+  const { loading, error, refresh } = useLoader(load);
 
   const slates = useMemo(() => {
     const seen = new Map<string, Slate>();
@@ -119,7 +117,7 @@ export function useSeasonSchedule(season: number): SeasonSchedule {
     );
   }, [games]);
 
-  return { games, slates, teams, loading, error, reload: load };
+  return { games, slates, teams, loading, error, reload: refresh };
 }
 
 type StatRow = {
@@ -294,21 +292,15 @@ export function useSlateGames(slate: Slate | null): {
   error: string | null;
 } {
   const [games, setGames] = useState<ScoreGame[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   /* Keyed on the slate's VALUE, not its identity: the lineup screen rebuilds
      its slate object on every countdown tick, and depending on the object
      itself would refetch this once a second. */
   const key = slate ? slateKey(slate) : null;
 
-  useEffect(() => {
-    if (!slate || !key) return;
-    let live = true;
-    setLoading(true);
-    setError(null);
-
-    void (async () => {
+  const load = useCallback<Load>(
+    async (live) => {
+      if (!slate || !key) return;
       try {
         const [teamRows, gameRows] = await Promise.all([
           supabase
@@ -331,7 +323,7 @@ export function useSlateGames(slate: Slate | null): {
               return (data ?? []) as GameRow[];
             }),
         ]);
-        if (!live) return;
+        if (!live()) return;
 
         const byId = new Map<string, ScoreTeam>(
           teamRows.map((t) => [t.id, { id: t.id, abbreviation: t.abbreviation, name: t.name }]),
@@ -355,18 +347,16 @@ export function useSlateGames(slate: Slate | null): {
             .sort((a, b) => (a.startsAt ?? '9').localeCompare(b.startsAt ?? '9')),
         );
       } catch (e) {
-        if (live) setError(e instanceof Error ? e.message : 'Could not load this week’s games.');
-      } finally {
-        if (live) setLoading(false);
+        return e instanceof Error ? e.message : 'Could not load this week’s games.';
       }
-    })();
-
-    return () => {
-      live = false;
-    };
-    // `slate` is read through `key`; see above.
+    },
+    // `slate` is read through `key`; see above. The loader's identity is what
+    // starts a new read, so keying it here is what keys the read.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+    [key],
+  );
+
+  const { loading, error } = useLoader(load);
 
   /* With no slate there is nothing to wait for, so `loading` is false without
      the effect having to say so — writing state from an effect body just to

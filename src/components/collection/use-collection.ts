@@ -17,8 +17,9 @@
  *    non-fatal: if it fails the grid still renders, cards just are not tappable
  *    rather than navigating somewhere that does not exist.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
+import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
 import { normaliseRow, type CollectionCard, type CollectionViewRow } from './types';
 
@@ -84,39 +85,27 @@ async function fetchPlayerIds(cardIds: string[]): Promise<Map<string, string>> {
 export function useCollection(): CollectionState {
   const [cards, setCards] = useState<CollectionCard[] | null>(null);
   const [playerIds, setPlayerIds] = useState<Map<string, string>>(() => new Map());
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
-    setError(null);
+  const load = useCallback<Load>(async (live) => {
     try {
       const rows = await fetchAllRows();
+      if (!live()) return;
       setCards(rows);
 
       const ids = [...new Set(rows.map((r) => r.cardId).filter((id): id is string => Boolean(id)))];
       try {
-        setPlayerIds(await fetchPlayerIds(ids));
+        const map = await fetchPlayerIds(ids);
+        if (live()) setPlayerIds(map);
       } catch {
         // Non-fatal: the grid is still correct, it just stops being tappable.
-        setPlayerIds(new Map());
+        if (live()) setPlayerIds(new Map());
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load your collection.');
-    } finally {
-      setLoading(false);
+      return e instanceof Error ? e.message : 'Could not load your collection.';
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const refresh = useCallback(async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }, [load]);
+  const { loading, refreshing, error, refresh } = useLoader(load);
 
   return { cards, playerIds, error, loading, refreshing, refresh };
 }

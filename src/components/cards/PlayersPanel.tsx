@@ -19,7 +19,7 @@
  * ~1,000 rows, so the list is virtualised from day one rather than "later",
  * and the read is paged and count-checked rather than trusted.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -35,6 +35,7 @@ import { Chip, ChipRow, FilterChips, type FilterChip } from '@/components/ui/Chi
 import { SearchField, SortChips } from '@/components/ui/Controls';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
+import { useLoader, type Load } from '@/hooks/use-loader';
 import { PLAYER_ROW_HEIGHT, PlayerRow, ROW_GUTTER } from './PlayerRow';
 import { useUpcomingFixtures } from './use-fixtures';
 import {
@@ -64,9 +65,6 @@ export function PlayersPanel({
   const tabInset = useTabBarInset();
 
   const [result, setResult] = useState<DirectoryFetch | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [query, setQuery] = useState('');
   const [position, setPosition] = useState<PositionFilter>('ALL');
@@ -85,28 +83,21 @@ export function PlayersPanel({
      flexible name — so nothing here needs to know how wide it is. */
   const fixtures = useUpcomingFixtures();
 
-  const load = useCallback(
-    async (mode: 'initial' | 'refresh') => {
-      if (mode === 'refresh') setRefreshing(true);
-      else setLoading(true);
-      setError(null);
+  const load = useCallback<Load>(
+    async (live) => {
       try {
         const next = await loadPlayerDirectory();
+        if (!live()) return;
         setResult(next);
         onLoaded?.(next);
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not load the player directory.');
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
+        return e instanceof Error ? e.message : 'Could not load the player directory.';
       }
     },
     [onLoaded],
   );
 
-  useEffect(() => {
-    void load('initial');
-  }, [load]);
+  const { loading, refreshing, error, reload, refresh } = useLoader(load);
 
   const players = result?.players;
   const visible = useMemo(
@@ -234,7 +225,7 @@ export function PlayersPanel({
           title="Could not load players"
           body={error}
           actionLabel="Try again"
-          onAction={() => void load('initial')}
+          onAction={reload}
         />
       ) : (
         <>
@@ -265,7 +256,7 @@ export function PlayersPanel({
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               refreshing={refreshing}
-              onRefresh={() => void load('refresh')}
+              onRefresh={() => void refresh()}
               style={styles.fill}
               contentContainerStyle={{ paddingBottom: tabInset + Spacing.four }}
             />

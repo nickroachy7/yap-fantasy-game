@@ -15,7 +15,7 @@
  * it. It does not restate the constants the edge function ships with — see
  * `components/scoring/rules.ts` for why that distinction matters.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '@/components/shell/Screen';
@@ -32,6 +32,7 @@ import { StatusChip } from '@/components/ui/StatusChip';
 import { useTabBarInset } from '@/components/shell/useResponsive';
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
 
 export default function ScoringScreen() {
@@ -40,15 +41,8 @@ export default function ScoringScreen() {
   const tabInset = useTabBarInset();
 
   const [sheet, setSheet] = useState<ScoringSheet | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (mode: 'initial' | 'refresh') => {
-    if (mode === 'refresh') setRefreshing(true);
-    else setLoading(true);
-    setError(null);
-
+  const load = useCallback<Load>(async (live) => {
     const { data, error: err } = await supabase
       .from('scoring_rules')
       .select('version, name, rules')
@@ -60,17 +54,12 @@ export default function ScoringScreen() {
       .limit(1)
       .maybeSingle();
 
-    if (err) setError(err.message);
-    else if (!data) setError(null);
+    if (!live()) return;
     setSheet(data ? parseScoringSheet(data.rules, data.version, data.name) : null);
-
-    setLoading(false);
-    setRefreshing(false);
+    return err ? err.message : null;
   }, []);
 
-  useEffect(() => {
-    void load('initial');
-  }, [load]);
+  const { loading, refreshing, error, reload, refresh } = useLoader(load);
 
   const body = () => {
     if (loading) return <ActivityIndicator style={styles.pad} />;
@@ -80,7 +69,7 @@ export default function ScoringScreen() {
           title="Could not load the scoring rules"
           body={error}
           actionLabel="Try again"
-          onAction={() => void load('initial')}
+          onAction={reload}
         />
       );
     }
@@ -140,7 +129,7 @@ export default function ScoringScreen() {
       measure="form"
       context="How a fantasy point is earned"
       refreshing={refreshing}
-      onRefresh={() => void load('refresh')}>
+      onRefresh={() => void refresh()}>
       <SectionNav section="/leaderboard" />
       {body()}
       <View style={{ height: tabInset }} />
