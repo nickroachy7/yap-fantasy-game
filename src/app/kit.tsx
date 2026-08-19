@@ -294,11 +294,10 @@ function Kit() {
             note="Two bands at a fixed 76pt. Last row has never played — dashes, not zeroes.">
             <SortBar sort={{ key: 'fp', dir: 'desc' }} onSort={() => {}} />
             <Panel>
-              {DIRECTORY_ROWS.map((r, i) => (
+              {DIRECTORY_ROWS.map((r) => (
                 <PlayerRow
                   key={r.player.cardId}
                   player={r.player}
-                  index={i}
                   onPress={() => {}}
                   fixture={r.fixture}
                 />

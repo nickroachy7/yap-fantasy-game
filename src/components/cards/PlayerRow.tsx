@@ -46,6 +46,20 @@
  *
  * 4. Zebra striping AND a hairline under every row. Either separates rows;
  *    both together is a grid, and it read as noise in light mode.
+ *
+ * ...and then zebra went too, superseded by something better. The two bands
+ * now carry DIFFERENT fills: the identity sits on the page, the stat strip on
+ * a tray one step in from it. That does three jobs at once where zebra did
+ * one — it binds a player's name to his own numbers, it tells you where a row
+ * begins without a rule, and it separates adjacent rows for free, because
+ * every boundary is a tray meeting a page. Alternating whole rows on top of
+ * that would be a third fill competing with the two that carry meaning.
+ *
+ * "One step in" is a direction, not a colour: away from the page background,
+ * which is darker in light mode and lighter in dark. There is no single token
+ * for that because `background` is at the extreme in both schemes, so the
+ * tray is picked per scheme and the reason is written down here rather than
+ * inferred from two hex values.
  */
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
@@ -63,6 +77,10 @@ import { formatStat, statStrip, type DirectoryPlayer } from './player-directory'
  * out of alignment. 76 = identity band (44) + stat strip (32).
  */
 export const PLAYER_ROW_HEIGHT = 76;
+
+/** The two bands. They must sum to PLAYER_ROW_HEIGHT. */
+const IDENTITY_HEIGHT = 44;
+const STRIP_HEIGHT = PLAYER_ROW_HEIGHT - IDENTITY_HEIGHT;
 
 /**
  * Side margin for the row AND for the controls above it, so the search field,
@@ -84,16 +102,23 @@ const oneDp = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
 export type PlayerRowProps = {
   player: DirectoryPlayer;
-  index: number;
   onPress: (player: DirectoryPlayer) => void;
   /** "Sun 1:05p vs BUF" or "BYE". Absent when the schedule has not loaded. */
   fixture?: string | null;
 };
 
-function PlayerRowInner({ player, index, onPress, fixture }: PlayerRowProps) {
+function PlayerRowInner({ player, onPress, fixture }: PlayerRowProps) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const accent = positionColors(player.position, scheme).accent;
+
+  /**
+   * The stat tray. One step in from the page background — `surfaceSunken` is
+   * a hair darker than white, `surface` a hair lighter than black, and both
+   * are the theme's own "this is a distinct surface" step rather than a value
+   * invented here.
+   */
+  const tray = scheme === 'dark' ? c.surface : c.surfaceSunken;
 
   const weight = injuryWeight(player.injuryStatus);
   const played = player.gamesPlayed > 0;
@@ -105,11 +130,7 @@ function PlayerRowInner({ player, index, onPress, fixture }: PlayerRowProps) {
       accessibilityLabel={describe(player)}
       style={({ pressed }) => [
         styles.row,
-        // Zebra alone. Every boundary is a colour change because the fill
-        // alternates, so a hairline as well is a second separator doing the
-        // same job — and at this row height that reads as a grid.
-        index % 2 === 1 && { backgroundColor: c.surfaceSunken },
-        pressed && { backgroundColor: c.backgroundElement },
+        { backgroundColor: pressed ? c.backgroundElement : c.background },
       ]}>
       <View style={styles.identity}>
         <PositionBadge label={player.position} size={26} />
@@ -167,7 +188,9 @@ function PlayerRowInner({ player, index, onPress, fixture }: PlayerRowProps) {
           dashes. Collapsing it would make rows different heights, which is
           exactly what getItemLayout forbids — and an empty strip is itself the
           answer to "has he played". */}
-      <View style={styles.strip}>
+      {/* Full-bleed, so the tray runs edge to edge and the band reads as a
+          band rather than an inset card. The gutter is on the contents. */}
+      <View style={[styles.strip, { backgroundColor: tray }]}>
         {statStrip(player).map((cell, i, all) => {
           // The last cell is FP/G, and it sits directly under the season FP
           // figure. Right-aligning it is what squares off the row.
@@ -200,13 +223,17 @@ function describe(p: DirectoryPlayer): string {
 export const PlayerRow = memo(PlayerRowInner);
 
 const styles = StyleSheet.create({
-  row: {
-    height: PLAYER_ROW_HEIGHT,
+  /* No padding and no gap on the row itself: the two bands are flush, and each
+     insets its own contents. Their heights sum to PLAYER_ROW_HEIGHT exactly,
+     which is what getItemLayout is promised. */
+  row: { height: PLAYER_ROW_HEIGHT },
+  identity: {
+    height: IDENTITY_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
     paddingHorizontal: ROW_GUTTER,
-    justifyContent: 'center',
-    gap: 4,
   },
-  identity: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   names: { flex: 1, minWidth: 0, gap: 1 },
   name: { fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
@@ -215,9 +242,14 @@ const styles = StyleSheet.create({
   fixture: { flexShrink: 1 },
   figure: { alignItems: 'flex-end', minWidth: 54, paddingLeft: Spacing.two },
   figureValue: { fontSize: 19, fontWeight: '800', letterSpacing: -0.4 },
-  strip: { flexDirection: 'row', alignItems: 'flex-end' },
+  strip: {
+    height: STRIP_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: ROW_GUTTER,
+  },
   /* Equal shares rather than fixed widths: five cells across a phone and across
      a 940pt table are the same five cells, just further apart. */
-  cell: { flex: 1, minWidth: 0, gap: 1 },
+  cell: { flex: 1, minWidth: 0, justifyContent: 'center' },
   cellRight: { alignItems: 'flex-end' },
 });

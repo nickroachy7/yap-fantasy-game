@@ -138,10 +138,9 @@ export function PlayersPanel({
   const filtering = query.trim().length > 0 || position !== 'ALL';
 
   const renderItem = useCallback(
-    ({ item, index }: { item: DirectoryPlayer; index: number }) => (
+    ({ item }: { item: DirectoryPlayer }) => (
       <PlayerRow
         player={item}
-        index={index}
         onPress={open}
         fixture={item.team ? fixtures.get(item.team.toUpperCase()) : undefined}
       />
