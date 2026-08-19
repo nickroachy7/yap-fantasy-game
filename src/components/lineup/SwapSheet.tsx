@@ -37,10 +37,17 @@
  * used to be a different object — taller rows, its own typography, its own
  * FP/G pair written as a sentence — so the same decision looked like two
  * unrelated screens depending on which end you started from. Now a destination
- * is drawn by the same `CardRow` as a candidate, with the slot in the lead
- * column where the `IN` mark sits on the other side, and an unoccupied slot
- * uses the row's own empty state. You are always comparing like with like down
- * the same columns.
+ * is drawn by the same `PlayerBand` as a candidate, with the slot as the badge
+ * — exactly where the lineup board puts it — and an unoccupied slot uses the
+ * band's own empty state. You are always comparing like with like.
+ *
+ * AND THEY ARE THE SAME ROWS YOU CAME FROM
+ *
+ * The sheet lists `PlayerBand`: the lineup row's identity band, without the
+ * stat strip under it. It used to draw its own compact table row, so opening a
+ * swap re-rendered the same eight players in a second format at the exact
+ * moment you were comparing them. One figure survives the loss of the columns,
+ * and it follows the sort — see `figureFor`.
  *
  * The Modal-with-sibling-backdrop construction is the same as `DropdownChip`
  * and `ConfirmDialog` — a Pressable WRAPPING the sheet renders a <button>
@@ -55,7 +62,7 @@ import { PositionBadge, positionsForSlot } from '@/components/ui/PositionBadge';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-import { CardRow, CardRowHeader } from './CardRow';
+import { PlayerBand } from './LineupRow';
 import { SortBar } from './SortBar';
 import { matchupLabel, type LineupCard, type SortKey } from './model';
 
@@ -257,12 +264,13 @@ function SlotBody({
         <View style={styles.section}>
           <SectionLabel>In this slot now</SectionLabel>
           <View style={[styles.pinned, { backgroundColor: c.surfaceSunken, borderColor: c.border }]}>
-            <CardRow
-              wide={wide}
+            <PlayerBand
               card={current}
+              badge={<PositionBadge label={current.position} size={26} />}
+              lead={<Text style={[Type.micro, { color: c.positive }]}>IN</Text>}
+              {...figureFor(current, sort)}
               selected
               accessibilityLabel={`${current.name} is starting at ${slot}`}
-              lead={<Text style={[Type.micro, { color: c.positive }]}>IN</Text>}
             />
             <Pressable
               onPress={() => onClear(slot)}
@@ -291,12 +299,12 @@ function SlotBody({
           </Text>
         ) : (
           <>
-            <CardRowHeader wide={wide} leadLabel="" />
             {options.map((card) => (
-              <CardRow
+              <PlayerBand
                 key={card.id}
-                wide={wide}
                 card={card}
+                badge={<PositionBadge label={card.position} size={26} />}
+                {...figureFor(card, sort)}
                 onPress={() => onPick(slot, card.id)}
                 accessibilityLabel={
                   current
@@ -350,12 +358,13 @@ function BenchBody({
       <View style={styles.section}>
         <SectionLabel>Moving</SectionLabel>
         <View style={[styles.pinned, { backgroundColor: c.surfaceSunken, borderColor: c.border }]}>
-          <CardRow
-            wide={wide}
+          <PlayerBand
             card={card}
+            badge={<PositionBadge label={card.position} size={26} />}
+            lead={<Text style={[Type.micro, { color: c.textSecondary }]}>OUT</Text>}
+            {...figureFor(card, 'fp')}
             selected
             accessibilityLabel={`${card.name} is on the bench`}
-            lead={<Text style={[Type.micro, { color: c.textSecondary }]}>OUT</Text>}
           />
         </View>
       </View>
@@ -367,12 +376,15 @@ function BenchBody({
             and a sheet that showed nothing there would be answering a question
             nobody asked. What it shows instead is who he would replace, in the
             columns you would compare them in. */}
-        <CardRowHeader wide={wide} leadLabel="SLOT" />
         {destinations.map(({ slot, occupant }) => (
-          <CardRow
+          /* The badge IS the slot here, exactly as it is on the lineup board —
+             so "where would he go" is answered by the same mark that answers
+             "where is this player now" one screen back. */
+          <PlayerBand
             key={slot}
-            wide={wide}
             card={occupant}
+            badge={<PositionBadge label={slot} positions={positionsForSlot(slot)} size={26} />}
+            {...figureFor(occupant, 'fp')}
             emptyPrimary={`${slot} is empty`}
             emptySecondary="Nothing is starting here yet"
             onPress={() => onPick(slot, card.id)}
@@ -381,18 +393,26 @@ function BenchBody({
                 ? `Start ${card.name} at ${slot} in place of ${occupant.name}`
                 : `Start ${card.name} at ${slot}, which is empty`
             }
-            lead={
-              <Text
-                numberOfLines={1}
-                style={[Type.micro, { color: occupant ? c.text : c.textSecondary }]}>
-                {slot}
-              </Text>
-            }
           />
         ))}
       </View>
     </>
   );
+}
+
+/**
+ * The one figure a band shows, chosen to agree with the SORT.
+ *
+ * The band has room for a single number where the old table row had three
+ * columns. Pinning it to season FP while the list was sorted by FP/G would put
+ * the rows in an order the numbers on them do not explain, which is worse than
+ * showing less.
+ */
+function figureFor(card: LineupCard | null, sort: SortKey) {
+  if (sort === 'fppg') {
+    return { figureLabel: 'FP/G', figureValue: card?.form ? card.form.fpPerGame.toFixed(1) : null };
+  }
+  return { figureLabel: 'FP', figureValue: card?.form ? card.form.seasonFp.toFixed(1) : null };
 }
 
 /** One label, one treatment, so both modes are read the same way. */

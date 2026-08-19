@@ -8,8 +8,8 @@
  *
  * ONE COMPONENT FOR BOTH BOARDS
  *
- * It was two. Starters got this row and the bench got the compact table row
- * from `CardRow`, which was defensible when the bench lived behind its own tab
+ * It was two. Starters got this row and the bench got a compact table row,
+ * which was defensible when the bench lived behind its own tab
  * and indefensible once the two boards were stacked in one scroll: the whole
  * point of that stacking is reading a bench player against the starter above
  * him, and at 375pt the compact row could not do it — a 30pt lead column
@@ -17,9 +17,11 @@
  * columns, cut "Xavier Weathersby" to "Xavier We…". Two rows of different
  * heights, densities and column orders is not a comparison.
  *
- * So the bench is drawn by this, and `CardRow` keeps the job it is actually
- * good at: twenty candidates being scanned inside the swap sheet, where the
- * question is "which of these" rather than "is this one better than him".
+ * So the bench is drawn by this — and so, now, is the swap sheet: `PlayerBand`
+ * below exports the identity band alone, without the stat strip, which is what
+ * that sheet lists. The compact table row it used to use is gone. Twenty
+ * candidates and eight starters are the same players, and reading them in two
+ * different row formats at the moment you are comparing them was the cost.
  *
  * The two variants differ in three places, and nowhere else:
  *   - the badge is the SLOT for a starter (`FLEX` splits into its eligible
@@ -222,11 +224,9 @@ function Row({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const tray = scheme === 'dark' ? c.surface : c.surfaceSunken;
-  const accent = positionColors(card?.position, scheme).accent;
-
-  const weight = injuryWeight(card?.injuryStatus);
+  // Identity computes its own colours and labels now; the strip below still
+  // needs the form.
   const form = card?.form ?? null;
-  const kick = kickoffLabel(card?.game ?? null);
 
   const canSwap = Boolean(onSwap) && !disabled;
   /* An EMPTY slot has no profile to open, so the whole row is the swap — a row
@@ -272,7 +272,76 @@ function Row({
           accessibilityLabel={accessibilityLabel}
           style={styles.body}
           {...press}>
-          <View style={styles.names}>
+          <Identity
+            card={card}
+            figureLabel={figureLabel}
+            figureValue={figureValue}
+            emptyPrimary={emptyPrimary}
+            emptySecondary={emptySecondary}
+          />
+        </Pressable>
+      </View>
+
+      {/* The stat strip shares the body's target: it is part of the same row and
+          answers the same question, so pressing it opens the same player. */}
+      <Pressable
+        onPress={openBody}
+        disabled={!openBody}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        style={[styles.strip, { backgroundColor: tray }]}
+        {...press}>
+        <Cell label="FP/G" value={form ? form.fpPerGame.toFixed(1) : DASH} />
+        <Cell label="SEASON" value={form ? form.seasonFp.toFixed(0) : DASH} />
+        <Cell label="GP" value={form ? String(form.gamesPlayed) : DASH} />
+        <View style={styles.formCell}>
+          <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
+            LAST {form?.recent.length ?? 0}
+          </Text>
+          {form && form.recent.length > 0 ? (
+            <FormBars values={form.recent} width={48} />
+          ) : (
+            <Text style={[Type.body, { color: c.textTertiary }]}>{DASH}</Text>
+          )}
+        </View>
+      </Pressable>
+    </View>
+  );
+}
+
+
+/**
+ * The contents of the identity band: who he is, then one figure.
+ *
+ * Extracted because the swap sheet draws the SAME band without the stat strip
+ * under it — see `PlayerBand`. It used to draw its own compact table row
+ * instead, and a sheet whose rows were a different object from the rows it was
+ * opened from made you re-read the same eight players in a second format at the
+ * exact moment you were comparing them.
+ */
+function Identity({
+  card,
+  figureLabel,
+  figureValue,
+  emptyPrimary,
+  emptySecondary,
+}: {
+  card: LineupCard | null;
+  figureLabel: string;
+  figureValue: string | null;
+  emptyPrimary?: string;
+  emptySecondary?: string;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const tray = scheme === 'dark' ? c.surface : c.surfaceSunken;
+  const accent = positionColors(card?.position, scheme).accent;
+  const weight = injuryWeight(card?.injuryStatus);
+  const kick = kickoffLabel(card?.game ?? null);
+
+  return (
+    <>
+      <View style={styles.names}>
           {card ? (
             <>
               <Text numberOfLines={1} style={[styles.name, { color: c.text }]}>
@@ -313,47 +382,81 @@ function Row({
               </Text>
             </>
           )}
-        </View>
-
-        <View style={[styles.figure, { backgroundColor: tray, borderColor: c.border }]}>
-          <Text style={[Type.micro, { color: c.textTertiary }]}>{figureLabel}</Text>
-          {figureValue !== null ? (
-            <Text numberOfLines={1} style={[styles.figureValue, NUMERIC, { color: c.text }]}>
-              {figureValue}
-            </Text>
-          ) : (
-            <Text numberOfLines={1} style={[Type.body, NUMERIC, { color: c.textTertiary }]}>
-              {DASH}
-            </Text>
-          )}
-        </View>
-      </Pressable>
       </View>
 
-      {/* The stat strip shares the body's target: it is part of the same row and
-          answers the same question, so pressing it opens the same player. */}
-      <Pressable
-        onPress={openBody}
-        disabled={!openBody}
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-        style={[styles.strip, { backgroundColor: tray }]}
-        {...press}>
-        <Cell label="FP/G" value={form ? form.fpPerGame.toFixed(1) : DASH} />
-        <Cell label="SEASON" value={form ? form.seasonFp.toFixed(0) : DASH} />
-        <Cell label="GP" value={form ? String(form.gamesPlayed) : DASH} />
-        <View style={styles.formCell}>
-          <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
-            LAST {form?.recent.length ?? 0}
+      <View style={[styles.figure, { backgroundColor: tray, borderColor: c.border }]}>
+        <Text style={[Type.micro, { color: c.textTertiary }]}>{figureLabel}</Text>
+        {figureValue !== null ? (
+          <Text numberOfLines={1} style={[styles.figureValue, NUMERIC, { color: c.text }]}>
+            {figureValue}
           </Text>
-          {form && form.recent.length > 0 ? (
-            <FormBars values={form.recent} width={48} />
-          ) : (
-            <Text style={[Type.body, { color: c.textTertiary }]}>{DASH}</Text>
-          )}
-        </View>
-      </Pressable>
-    </View>
+        ) : (
+          <Text numberOfLines={1} style={[Type.body, NUMERIC, { color: c.textTertiary }]}>
+            {DASH}
+          </Text>
+        )}
+      </View>
+    </>
+  );
+}
+
+/**
+ * The identity band on its own — no stat strip under it.
+ *
+ * What the swap sheet lists. One press target, because in a sheet the whole row
+ * IS the choice; the lineup board's two-target split would be meaningless here.
+ *
+ * `lead` is the mark in front of the badge — `IN` for the incumbent, `OUT` for
+ * the player being moved.
+ */
+export function PlayerBand({
+  card,
+  badge,
+  lead,
+  figureLabel,
+  figureValue,
+  emptyPrimary,
+  emptySecondary,
+  selected,
+  onPress,
+  accessibilityLabel,
+}: {
+  card: LineupCard | null;
+  badge: React.ReactNode;
+  lead?: React.ReactNode;
+  figureLabel: string;
+  figureValue: string | null;
+  emptyPrimary?: string;
+  emptySecondary?: string;
+  selected?: boolean;
+  onPress?: () => void;
+  accessibilityLabel: string;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: Boolean(selected) }}
+      accessibilityLabel={accessibilityLabel}
+      style={({ pressed }) => [
+        styles.band,
+        { backgroundColor: selected ? c.backgroundSelected : c.background },
+        pressed && { backgroundColor: c.backgroundElement },
+      ]}>
+      {lead ? <View style={styles.lead}>{lead}</View> : null}
+      {badge}
+      <Identity
+        card={card}
+        figureLabel={figureLabel}
+        figureValue={figureValue}
+        emptyPrimary={emptyPrimary}
+        emptySecondary={emptySecondary}
+      />
+    </Pressable>
   );
 }
 
@@ -400,6 +503,17 @@ const styles = StyleSheet.create({
      pixels. */
   badgeHit: { alignItems: 'center', justifyContent: 'center' },
   badgePressed: { opacity: 0.55 },
+  /* The identity band standing alone, in the swap sheet. Same geometry as the
+     band inside a row, so a player looks identical in both places. */
+  band: {
+    height: IDENTITY_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: GUTTER,
+  },
+  /* Fixed, so IN / OUT / a slot code all start at the same x down the list. */
+  lead: { width: 30, alignItems: 'flex-start', justifyContent: 'center' },
   /* Everything except the badge, as one target: name, fixture and figure. */
   body: {
     flex: 1,

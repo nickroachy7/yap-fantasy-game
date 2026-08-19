@@ -8,7 +8,7 @@
  * bench receiver against the one starting if looking at either means the other
  * is gone.
  *
- * It used to be drawn by `CardRow` — the compact table row — inside a bordered
+ * It used to be drawn by a compact table row inside a bordered
  * board. Both are gone. See `LineupRow` for why the row changed, and
  * `SlotBoard` for why the border did.
  */
