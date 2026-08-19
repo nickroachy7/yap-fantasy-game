@@ -43,6 +43,7 @@ import {
   POSITION_FILTERS,
   SORT_OPTIONS,
   filterAndSort,
+  invalidatePlayerDirectory,
   loadPlayerDirectory,
   positionCounts,
   type DirectoryFetch,
@@ -98,6 +99,26 @@ export function PlayersPanel({
   );
 
   const { loading, refreshing, error, reload, refresh } = useLoader(load);
+
+  /**
+   * Pull-to-refresh has to DROP THE CACHE first, and did not.
+   *
+   * `loadPlayerDirectory` memoises its promise for the session, which is the
+   * whole point of it — Players and Shop are separate routes, so switching
+   * between them would otherwise re-read ~1,000 rows over three round trips
+   * every time. But it made the refresh control inert: it re-awaited the same
+   * settled promise and re-rendered identical data, so the one gesture whose
+   * entire meaning is "go and look again" was the one gesture that could not.
+   * It went unnoticed because the directory only changes when the nightly sync
+   * runs, and now it changes whenever anybody opens a pack.
+   *
+   * Only the pull invalidates. `reload` is the retry after a failure, and a
+   * failed read is never cached in the first place.
+   */
+  const pullToRefresh = useCallback(() => {
+    invalidatePlayerDirectory();
+    void refresh();
+  }, [refresh]);
 
   const players = result?.players;
   const visible = useMemo(
@@ -256,7 +277,7 @@ export function PlayersPanel({
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               refreshing={refreshing}
-              onRefresh={() => void refresh()}
+              onRefresh={pullToRefresh}
               style={styles.fill}
               contentContainerStyle={{ paddingBottom: tabInset + Spacing.four }}
             />
@@ -283,9 +304,15 @@ function summarise(result: DirectoryFetch, shown: number, filtering: boolean): s
   const loaded = result.players.length;
   if (!result.complete) return `${loaded} of ${result.expected} loaded`;
   const base = filtering ? `${shown} of ${loaded}` : `${loaded} players`;
-  // Bios are a separate read that is allowed to fail on its own; say so rather
-  // than let two columns of em dashes read as missing data.
-  return result.bios ? base : `${base} · no bios`;
+  /* Bios and the card market are separate reads, each allowed to fail on its
+     own. Both are SAID rather than left to speak for themselves, because both
+     degrade to em dashes — and a row of dashes because nobody owns this player
+     and a row of dashes because the count could not be read look exactly the
+     same. That ambiguity is the whole reason these flags exist. */
+  const missing = [result.bios ? null : 'no bios', result.market ? null : 'no card counts']
+    .filter(Boolean)
+    .join(' · ');
+  return missing ? `${base} · ${missing}` : base;
 }
 
 const styles = StyleSheet.create({
