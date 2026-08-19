@@ -20,7 +20,7 @@
  */
 import { Redirect } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { InventoryCard } from '@/components/collection/InventoryCard';
 import {
@@ -34,8 +34,10 @@ import {
 } from '@/components/dev/profile-fixture';
 import { OWNED_MANY } from '@/components/dev/fixtures';
 import { PlayerHero } from '@/components/players/PlayerHero';
+import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { CardStanding } from '@/components/players/CardStanding';
 import { GameLogTab } from '@/components/players/GameLogTab';
+import { startKey } from '@/components/players/GameLog';
 import { CommunityPanel } from '@/components/players/CommunityPanel';
 import { StartLog } from '@/components/players/StartLog';
 import { parseCardProfile } from '@/components/players/card-profile';
@@ -50,7 +52,7 @@ import { Screen } from '@/components/shell/Screen';
 import { SegmentedControl, type Segment } from '@/components/shell/SegmentedControl';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { WIDE_BREAKPOINT, useIsWide } from '@/components/shell/useResponsive';
-import { Colors, Spacing, type Measure } from '@/constants/theme';
+import { Colors, Spacing, Type, type Measure } from '@/constants/theme';
 import { PlayerContext, type PlayerState } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -190,6 +192,9 @@ function LineupFixture() {
  */
 function ProfileFixture() {
   const [pt, setPt] = useState<'overview' | 'card' | 'log'>('overview');
+  const [sheet, setSheet] = useState(false);
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
   const profile = parseProfile(MCCAFFREY_PROFILE);
   if (!profile) return null;
 
@@ -200,6 +205,37 @@ function ProfileFixture() {
 
   return (
     <View style={styles.profile}>
+      {/* The real sheet, with the real frame. Both profiles are presented in it
+          and nothing else in the app is, so its scroll-reveal title — absent
+          while the hero is on screen, faded in once the hero has gone under the
+          header — had no other surface it could be looked at on. */}
+      <Pressable
+        onPress={() => setSheet(true)}
+        accessibilityRole="button"
+        accessibilityLabel="Open the profile sheet"
+        style={({ pressed }: { pressed: boolean }) => [
+          styles.sheetButton,
+          pressed && styles.pressed,
+        ]}>
+        <Text style={[Type.strong, { color: c.text }]}>Open the profile sheet →</Text>
+      </Pressable>
+
+      {sheet ? (
+        <PlayerSheetFrame
+          title={profile.player.name}
+          subtitle="SF · RB · LEGENDARY"
+          onClose={() => setSheet(false)}>
+          <PlayerHero
+            name={profile.player.name}
+            bio={profile.player}
+            team={profile.player.teamAbbreviation}
+            position={profile.player.positionAbbreviation}
+            injuryStatus={profile.player.injuryStatus}
+          />
+          <GameLogTab profile={profile} sections={parseGameLog(MCCAFFREY_GAME_LOG)} />
+        </PlayerSheetFrame>
+      ) : null}
+
       {/* The shared hero, exactly as BOTH profiles draw it. */}
       <PlayerHero
         name={profile.player.name}
@@ -242,6 +278,21 @@ function ProfileFixture() {
 
       {/* ---- Game log: career folded in, season summary above per-game ---- */}
       <GameLogTab profile={profile} sections={parseGameLog(MCCAFFREY_GAME_LOG)} />
+
+      {/* The CARD profile's variant of the same tab: every week marked with
+          whether this copy was started. The player profile passes nothing and
+          the column disappears, so both states need looking at. */}
+      <GameLogTab
+        profile={profile}
+        sections={parseGameLog(MCCAFFREY_GAME_LOG)}
+        startedWeeks={
+          new Set(
+            (parseCardProfile(CARD_PROFILE_SAMPLE)?.starts ?? []).map((st) =>
+              startKey(st.season, st.seasonType, st.week),
+            ),
+          )
+        }
+      />
 
       {/* ---- Card: both states of each, because the interesting one is the
            empty one. A market nobody has played and a card never started are
@@ -323,6 +374,8 @@ const styles = StyleSheet.create({
   banner: { fontSize: 11, letterSpacing: 0.3, fontVariant: ['tabular-nums'] },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, alignItems: 'flex-start' },
   profile: { gap: Spacing.three },
+  sheetButton: { alignSelf: 'flex-start' },
+  pressed: { opacity: 0.6 },
   rows: { gap: 1 },
   row: {
     flexDirection: 'row',

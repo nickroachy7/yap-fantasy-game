@@ -25,7 +25,7 @@
  * for the total to have moved.
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TierBadge } from '@/components/cards/TierBadge';
@@ -36,6 +36,7 @@ import { OverviewTab } from '@/components/players/OverviewTab';
 import { PlayerHero } from '@/components/players/PlayerHero';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { StartLog } from '@/components/players/StartLog';
+import { startKey } from '@/components/players/GameLog';
 import { parseCardProfile, type CardProfile } from '@/components/players/card-profile';
 import { sellErrorMessage } from '@/components/players/sell';
 import { usePlayerPage } from '@/components/players/use-player-page';
@@ -50,7 +51,11 @@ import { supabase } from '@/lib/supabase';
 
 type ProfileTab = 'overview' | 'card' | 'log';
 
-/** The same three, in the same order, as the player profile. */
+/**
+ * The same three, in the same order and position, as the player profile.
+ * SINGULAR here — this tab is about one copy. The player page says "Cards",
+ * because its equivalent is about every copy of him. See the note there.
+ */
 const TABS: Tab<ProfileTab>[] = [
   { value: 'overview', label: 'Overview' },
   { value: 'card', label: 'Card' },
@@ -97,6 +102,15 @@ export default function CardDetailScreen() {
   /* The football, keyed by the PLAYER this copy is of. Null until the card
      resolves, which is what makes this a two-phase load rather than one. */
   const page = usePlayerPage(card?.card.playerId ?? null);
+
+  /* Which weeks THIS copy was in the lineup, so the game log can mark them.
+     The player's log and the copy's earnings are otherwise two lists you have
+     to reconcile by eye — and the gap between them IS the bench rule. */
+  const startedWeeks = useMemo(
+    () =>
+      new Set((card?.starts ?? []).map((s) => startKey(s.season, s.seasonType, s.week))),
+    [card],
+  );
 
   const dismiss = useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -238,7 +252,20 @@ export default function CardDetailScreen() {
 
         {tab === 'overview' ? (
           page.player ? (
-            <OverviewTab player={page.player} profile={page.profile} market={page.market} />
+            <OverviewTab
+              player={page.player}
+              profile={page.profile}
+              market={page.market}
+              /* Names the copy without duplicating card content into a player
+                 tab — otherwise this tab is a dead end on a card page. */
+              lead={
+                <Text style={[Type.fine, { color: c.textTertiary }]}>
+                  {`Viewing your ${k.season ?? ''} ${k.tier} card${
+                    page.owned.length > 1 ? ` — one of ${page.owned.length} copies you hold` : ''
+                  }. Everything below is about the player.`}
+                </Text>
+              }
+            />
           ) : (
             <View style={styles.centre}>
               <ActivityIndicator />
@@ -246,7 +273,13 @@ export default function CardDetailScreen() {
           )
         ) : null}
 
-        {tab === 'log' ? <GameLogTab profile={page.profile} sections={page.sections} /> : null}
+        {tab === 'log' ? (
+          <GameLogTab
+            profile={page.profile}
+            sections={page.sections}
+            startedWeeks={startedWeeks}
+          />
+        ) : null}
 
         <ConfirmDialog
           visible={selling}

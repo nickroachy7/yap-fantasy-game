@@ -25,6 +25,15 @@
  *
  * Season summaries count PLAYED games only. An upcoming fixture is not a zero,
  * and averaging it in would drag every in-progress season toward nothing.
+ *
+ * `startedWeeks` is passed only by the CARD profile, and is the whole reason
+ * the bench rule is legible: it marks the weeks THIS copy was in the lineup, so
+ * a 30-point week your card earned nothing from is visibly a week you sat him
+ * rather than a number that does not add up. The player profile passes nothing
+ * and the column disappears — there is no "your copy" on a page about a person.
+ *
+ * The mark is a glyph AND a screen-reader phrase, never colour: it has to
+ * survive greyscale like every other status in this app.
  */
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -60,12 +69,20 @@ function resultOf(g: GameLogGame): { label: string; tone: 'win' | 'loss' | 'tie'
 const int = (n: number | null | undefined) =>
   n === null || n === undefined ? DASH : Math.round(n).toLocaleString();
 
+/** `season-seasonType-week`, the key both sides build from. */
+export function startKey(season: number, seasonType: number, week: number | null): string {
+  return `${season}-${seasonType}-${week ?? 'x'}`;
+}
+
 export function GameLog({
   sections,
   position,
+  startedWeeks,
 }: {
   sections: GameLogSection[];
   position: string | null;
+  /** Weeks the viewer's copy started. Card profile only; omitted elsewhere. */
+  startedWeeks?: Set<string>;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -120,6 +137,7 @@ export function GameLog({
           key={section.key}
           section={section}
           position={position}
+          startedWeeks={startedWeeks}
           open={open[section.key] ?? false}
           onToggle={() =>
             setOpen((prev) => ({ ...prev, [section.key]: !(prev[section.key] ?? false) }))
@@ -133,11 +151,13 @@ export function GameLog({
 function SeasonSection({
   section,
   position,
+  startedWeeks,
   open,
   onToggle,
 }: {
   section: GameLogSection;
   position: string | null;
+  startedWeeks?: Set<string>;
   open: boolean;
   onToggle: () => void;
 }) {
@@ -186,6 +206,13 @@ function SeasonSection({
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View>
               <View style={[styles.row, styles.headRow, { borderColor: c.border }]}>
+                {startedWeeks ? (
+                  <Text
+                    numberOfLines={1}
+                    style={[Type.micro, styles.started, { color: c.textTertiary }]}>
+                    YOU
+                  </Text>
+                ) : null}
                 <Text style={[Type.micro, styles.wk, { color: c.textTertiary }]}>WK</Text>
                 <Text style={[Type.micro, styles.opp, { color: c.textTertiary }]}>OPP</Text>
                 <Text style={[Type.micro, styles.result, { color: c.textTertiary }]}>RESULT</Text>
@@ -210,6 +237,25 @@ function SeasonSection({
                   <View
                     key={g.gameId}
                     style={[styles.row, { borderColor: c.border }, !g.played && styles.upcoming]}>
+                    {startedWeeks ? (
+                      <Text
+                        accessibilityLabel={
+                          startedWeeks.has(startKey(g.season, g.seasonType, g.week))
+                            ? 'You started your copy this week'
+                            : 'Your copy was benched this week'
+                        }
+                        style={[
+                          Type.body,
+                          styles.started,
+                          {
+                            color: startedWeeks.has(startKey(g.season, g.seasonType, g.week))
+                              ? c.positive
+                              : c.textTertiary,
+                          },
+                        ]}>
+                        {startedWeeks.has(startKey(g.season, g.seasonType, g.week)) ? '●' : '○'}
+                      </Text>
+                    ) : null}
                     <Text style={[Type.body, styles.wk, NUMERIC, { color: c.textSecondary }]}>
                       {weekLabel(g.seasonType, g.week)}
                     </Text>
@@ -242,6 +288,12 @@ function SeasonSection({
               })}
             </View>
           </ScrollView>
+
+          {startedWeeks ? (
+            <Text style={[Type.fine, styles.note, { color: c.textTertiary }]}>
+              ● you started your copy that week · ○ it was on your bench and earned nothing
+            </Text>
+          ) : null}
 
           {section.upcomingCount > 0 ? (
             <Text style={[Type.fine, styles.note, { color: c.textTertiary }]}>
@@ -297,6 +349,7 @@ const styles = StyleSheet.create({
   },
   /** Dimmed so the eye skims past what has not happened yet. */
   upcoming: { opacity: 0.55 },
+  started: { width: 24, textAlign: 'center' },
   wk: { width: 30 },
   opp: { width: 62 },
   result: { width: 62 },

@@ -5,12 +5,19 @@
  * so the answer cannot differ between the page about the player and the page
  * about your copy of him. Anything that differs belongs in the Card tab.
  *
+ * `lead` is the one seam. Overview being identical on both pages is correct,
+ * but it means the tab says nothing about the copy when you reached it from a
+ * card — a dead end on a page you opened to look at one specific object. The
+ * card profile passes a single line naming which copy this is; it does not
+ * duplicate card CONTENT into a player tab, which would undo the split.
+ *
  * The stat band is the reference's `PLAYER RANK / OWNERSHIP / FPTS-GAME` strip.
  * Ownership is a COUNT rather than the percentage the reference prints: a
  * percentage of a beta-sized user base reads 0% or 100% and teaches people to
  * distrust the column, where "12 copies held by 3 people" is exactly as true at
  * every scale.
  */
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
@@ -51,10 +58,13 @@ export function OverviewTab({
   player,
   profile,
   market,
+  lead,
 }: {
   player: DirectoryPlayer;
   profile: PlayerProfile | null;
   market: PlayerMarket | null;
+  /** A line of card context, on the card profile only. */
+  lead?: ReactNode;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -62,6 +72,8 @@ export function OverviewTab({
 
   return (
     <>
+      {lead}
+
       {/* This season, scored from per-game rows — so unlike the career table
           these DO include the per-game bonuses. The two are not the same kind
           of number and are deliberately not shown side by side. */}

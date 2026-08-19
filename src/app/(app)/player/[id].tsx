@@ -43,14 +43,18 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 type ProfileTab = 'overview' | 'card' | 'log';
 
 /**
- * The same three tabs as the card profile, in the same order, deliberately.
- * Two views of one thing should not reshuffle their navigation between them —
- * "Card" means "the collectible side of this" on both, and only its contents
- * change.
+ * The same three tabs as the card profile, in the same order and the same
+ * position — two views of one thing should not reshuffle their navigation.
+ *
+ * The one word that differs is the NUMBER: this page says "Cards", because its
+ * card tab is about every copy of him in the game, yours among them. The card
+ * page says "Card", because its is about one. Singular versus plural carries
+ * the scope without the rail changing shape, which a different word entirely
+ * (Community, Ownership) would have done.
  */
 const TABS: Tab<ProfileTab>[] = [
   { value: 'overview', label: 'Overview' },
-  { value: 'card', label: 'Card' },
+  { value: 'card', label: 'Cards' },
   { value: 'log', label: 'Game log' },
 ];
 

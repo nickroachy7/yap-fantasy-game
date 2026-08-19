@@ -22,6 +22,19 @@
  *                 deployed site is the plan's kickoff insurance and testers
  *                 will open it on phones before TestFlight exists.
  *
+ * WHY THE TITLE IS NOT DRAWN UNTIL YOU SCROLL
+ *
+ * Both profiles open with a hero carrying the player's name at full size. A
+ * sticky header printing the same name 20pt below it says the name twice on the
+ * surface where vertical space is scarcest — but simply deleting the header
+ * title is worse, because after a screen of game log there is then nothing at
+ * all saying whose page this is.
+ *
+ * So the title behaves the way a large title does everywhere else: absent while
+ * its full-size counterpart is on screen, faded in once that has scrolled under
+ * the header. The threshold is a little past the name's own height, so the two
+ * never both read as headings at once.
+ *
  * WHY THE BACKDROP IS A SIBLING, NOT A PARENT
  *
  * A Pressable WRAPPING the card renders a <button> containing <button>s on
@@ -29,8 +42,18 @@
  * `ConfirmDialog` all hit this; the fix is the same one — the backdrop is laid
  * behind the card, not around it.
  */
-import { useEffect, type ReactNode } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState, type ReactNode } from 'react';
+import {
+  Animated,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -74,6 +97,29 @@ export function PlayerSheetFrame({
      and same rule as SwapSheet, so the two cannot diverge. */
   const wide = useIsWide();
 
+  /* Only ever flips twice, so this is a cheap piece of state rather than a
+     per-frame re-render: the comparison is done on every scroll event but
+     setState is called only on a crossing. */
+  const [titleShown, setTitleShown] = useState(false);
+  /* useState, not useRef: reading `.current` during render trips React 19's
+     refs rule, and the lazy initialiser gives the same once-per-mount value. */
+  const [titleFade] = useState(() => new Animated.Value(0));
+
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const past = e.nativeEvent.contentOffset.y > TITLE_REVEAL_AT;
+    if (past !== titleShown) setTitleShown(past);
+  };
+
+  useEffect(() => {
+    Animated.timing(titleFade, {
+      toValue: titleShown ? 1 : 0,
+      duration: 140,
+      /* react-native-web drives opacity through the JS animator and warns when
+         asked for the native one. */
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [titleShown, titleFade]);
+
   /* Escape closes it. `onRequestClose` covers Android's back button and nothing
      else — react-native-web does not map the key — so without this a keyboard
      user on a desktop browser has no way out but the mouse. Same omission
@@ -104,7 +150,10 @@ export function PlayerSheetFrame({
      * free, and the failure it prevents is expensive to diagnose.
      */
     <View collapsable={false} style={[styles.header, { borderBottomColor: c.border }]}>
-      <View style={styles.headerText}>
+      {/* `pointerEvents="none"` so the invisible title never eats a tap meant
+          for the sheet behind it. Kept mounted rather than conditionally
+          rendered: mounting on scroll would resize the header mid-gesture. */}
+      <Animated.View pointerEvents="none" style={[styles.headerText, { opacity: titleFade }]}>
         {title ? (
           <Text numberOfLines={1} style={[Type.section, { color: c.text }]}>
             {title}
@@ -115,7 +164,7 @@ export function PlayerSheetFrame({
             {subtitle}
           </Text>
         ) : null}
-      </View>
+      </Animated.View>
 
       {/* A named control, not just a gesture. The swipe exists on a phone and
           nothing announces it, and on web there is no swipe at all. */}
@@ -142,6 +191,8 @@ export function PlayerSheetFrame({
         // web dialog has no safe area to respect.
         { paddingBottom: (isWeb ? 0 : bottom) + Spacing.four },
       ]}
+      onScroll={onScroll}
+      scrollEventThrottle={32}
       keyboardShouldPersistTaps="handled">
       {children}
     </ScrollView>
@@ -192,6 +243,15 @@ export function PlayerSheetFrame({
     </View>
   );
 }
+
+/**
+ * How far the content scrolls before the header title appears.
+ *
+ * A little past the hero name's own line height, so the full-size name is
+ * genuinely leaving the viewport before its small copy arrives — crossing early
+ * puts two headings on screen at once, which is the thing this exists to avoid.
+ */
+const TITLE_REVEAL_AT = 44;
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },

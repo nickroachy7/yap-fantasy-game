@@ -23,9 +23,12 @@ import type { PlayerProfile } from './profile';
 export function GameLogTab({
   profile,
   sections,
+  startedWeeks,
 }: {
   profile: PlayerProfile | null;
   sections: GameLogSection[];
+  /** Card profile only — marks the weeks the viewer's copy was started. */
+  startedWeeks?: Set<string>;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -51,7 +54,7 @@ export function GameLogTab({
       ) : null}
 
       <View style={styles.gap}>
-        <GameLog sections={sections} position={position} />
+        <GameLog sections={sections} position={position} startedWeeks={startedWeeks} />
       </View>
     </>
   );
