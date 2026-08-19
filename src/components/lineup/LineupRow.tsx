@@ -77,7 +77,8 @@ export type LineupRowProps = {
   card: LineupCard | null;
   /** Opens the swap sheet. The BADGE is the control for this, not the row. */
   onSwap?: () => void;
-  /** Opens the player profile. Everything except the badge does this. */
+  /** Opens the CARD profile — this row is one copy you own, and the
+   *  collection grid opens the same screen. Everything except the badge. */
   onOpenProfile?: () => void;
   selected?: boolean;
   disabled?: boolean;
@@ -127,7 +128,7 @@ export function StarterRow({
       swapLabel={card ? `Change who starts at ${slot}` : `Choose a ${eligiblePositions} for ${slot}`}
       accessibilityLabel={
         card
-          ? `${slot}: ${card.name}, ${card.team ?? 'no team'} ${matchupLabel(card.game)}. Tap for his profile.`
+          ? `${slot}: ${card.name}, ${card.team ?? 'no team'} ${matchupLabel(card.game)}. Tap to open this card.`
           : `${slot} is empty. ${eligibleCount} eligible ${eligiblePositions} cards. Tap to choose.`
       }
     />
@@ -176,7 +177,7 @@ export function BenchRow({
           ? `Start ${card.name} at ${destination}, or choose another slot`
           : `Choose a slot for ${card.name}`
       }
-      accessibilityLabel={`${card.name}, ${card.team ?? 'no team'} ${matchupLabel(card.game)}. Tap for his profile.`}
+      accessibilityLabel={`${card.name}, ${card.team ?? 'no team'} ${matchupLabel(card.game)}. Tap to open this card.`}
     />
   );
 }
@@ -193,7 +194,7 @@ export function BenchRow({
  * as a real <button>, and a button inside a button is invalid HTML that React
  * rejects at runtime — the same trap `SwapSheet` and `ConfirmDialog` document.
  * So the row itself is a plain View and the two Pressables sit side by side
- * inside it, with the strip a third that shares the profile's press.
+ * inside it, with the strip a third that shares the card's press.
  *
  * Which means the pressed highlight has to be lifted to the row, or pressing a
  * name would light only the top band of an object that reads as one row.
@@ -235,7 +236,7 @@ function Row({
   const form = card?.form ?? null;
 
   const canSwap = Boolean(onSwap) && !disabled;
-  /* An EMPTY slot has no profile to open, so the whole row is the swap — a row
+  /* An EMPTY slot has no card to open, so the whole row is the swap — a row
      that says "Choose a RB" must do that wherever you press it. A card with no
      player id behind it falls the same way rather than becoming inert. */
   const openBody = onOpenProfile ?? (canSwap ? onSwap : undefined);

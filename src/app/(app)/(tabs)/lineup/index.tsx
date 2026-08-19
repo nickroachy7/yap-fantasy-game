@@ -233,17 +233,24 @@ export default function LineupScreen() {
   const closeSwap = useCallback(() => setSwap(null), []);
 
   /**
-   * Open the player, not the slot.
+   * Open the card, not the slot.
    *
-   * The badge on the left of a row changes the lineup; the rest of the row asks
-   * about the PLAYER, which is a different question and now has a different
-   * answer. `/player/[id]` wants the player id, never the card instance id —
-   * the same distinction `set_lineup` cares about in the other direction.
+   * The badge on the left of a row changes the lineup; the rest of the row
+   * opens what the row IS — one copy you own — which is the same object the
+   * collection grid opens, so both reach the same screen. A lineup row and a
+   * grid cell are two doors into the same card, and sending them to different
+   * profiles made the app feel like it had two ideas about what you tapped.
+   *
+   * This wants the CARD INSTANCE id, never the player id — the opposite of the
+   * directory's links, and the same distinction `set_lineup` cares about in the
+   * other direction. `LineupCard.id` is the instance; `playerId` is the man.
+   *
+   * Nothing is lost for start/sit: the card profile carries the same Overview
+   * and Game log as the player profile, and links across to it.
    */
   const openProfile = useCallback(
     (card: LineupCard) => {
-      if (!card.playerId) return;
-      router.push({ pathname: '/player/[id]', params: { id: card.playerId } });
+      router.push({ pathname: '/card/[id]', params: { id: card.id } });
     },
     [router],
   );

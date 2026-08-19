@@ -60,9 +60,12 @@ function SlotBoardImpl({
           eligibleCount={eligibleCounts.get(cfg.slot) ?? 0}
           eligiblePositions={cfg.eligible_positions.join('/')}
           onSwap={locked ? undefined : () => onOpenSlot(cfg.slot)}
+          /* An EMPTY slot has no card to open and stays undefined; a filled
+             one always can. The guard used to be on `playerId`, needed only
+             while this opened the PLAYER rather than the copy. */
           onOpenProfile={(() => {
             const card = picks[cfg.slot] ? byId.get(picks[cfg.slot]) : undefined;
-            return card?.playerId ? () => onOpenProfile(card) : undefined;
+            return card ? () => onOpenProfile(card) : undefined;
           })()}
         />
       ))}

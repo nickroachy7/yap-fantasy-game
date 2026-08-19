@@ -66,7 +66,11 @@ function BenchBoardImpl({
             destination={targetSlotFor(card)}
             disabled={locked || !startableFor(card)}
             onSwap={!locked && startableFor(card) ? () => onOpen(card) : undefined}
-            onOpenProfile={card.playerId ? () => onOpenProfile(card) : undefined}
+            /* Every owned card has an instance id, which is all the card
+               profile needs — the old guard was on `playerId`, required only
+               while this opened the PLAYER, and would now make a row dead for
+               a field the destination no longer reads. */
+            onOpenProfile={() => onOpenProfile(card)}
           />
         ))
       )}
