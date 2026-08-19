@@ -24,6 +24,28 @@ type Props = {
   measure?: Measure;
   /** Secondary line in the header, e.g. "Preseason · Week 3". */
   context?: string;
+  /**
+   * A full-bleed band pinned between the chrome and the page, outside the
+   * scroll — the score strip is the one that exists.
+   *
+   * It is a slot on the frame rather than the first child of `children` because
+   * of where it has to sit, which is different on each platform and is not
+   * expressible from inside the content box:
+   *
+   *  - narrow: FLUSH against the bottom of the header band, with no page gutter
+   *    and no content gap. Passed as content it inherited `styles.content`'s
+   *    16pt padding and 14pt gap, so it floated below the header with a stripe
+   *    of page background above it and read as the first item on the page
+   *    rather than as part of the chrome.
+   *  - wide: across the top of the page, above the heading, running the full
+   *    width of the content column — past both the frame's wide gutter and the
+   *    `maxWidth` measure, which is what makes it a ticker rather than another
+   *    boxed panel.
+   *
+   * Outside the ScrollView on purpose: it is the state of the week, so it must
+   * not scroll away from the decision it is context for.
+   */
+  banner?: ReactNode;
   children: ReactNode;
   /** Set false when the screen owns its own list (FlatList virtualises itself). */
   scroll?: boolean;
@@ -35,6 +57,7 @@ export function Screen({
   title,
   measure = 'grid',
   context,
+  banner,
   children,
   scroll = true,
   refreshing,
@@ -69,21 +92,34 @@ export function Screen({
     <View
       style={[styles.fill, isWide && styles.wideGutter, { backgroundColor: c.background }]}>
       {isWide ? (
-        /* Dropping AppHeader on wide is right — the rail already carries the
-         * wordmark, balance and account. But what replaced it was a 12pt grey
-         * context line and nothing else, so web pages had no heading at all and
-         * "Leaderboard" appeared only on a segmented control. The rail says
-         * which section you are in; the page should still say what it is. */
-        <View style={[styles.pageHeader, { maxWidth }]}>
-          {title ? <Text style={[styles.title, { color: c.text }]}>{title}</Text> : null}
-          {context ? (
-            <Text style={[styles.context, { color: c.textSecondary }]}>{context}</Text>
-          ) : null}
-        </View>
+        <>
+          {/* Across the top of the page, before the heading. The negative
+              margin cancels the frame's wide gutter so the band reaches the
+              rail on one side and the window on the other; capped at the
+              measure it would be a panel with the page's shoulders around it,
+              which is the one thing a ticker must not look like. */}
+          {banner ? <View style={styles.wideBanner}>{banner}</View> : null}
+          {/* Dropping AppHeader on wide is right — the rail already carries the
+           * wordmark, balance and account. But what replaced it was a 12pt grey
+           * context line and nothing else, so web pages had no heading at all and
+           * "Leaderboard" appeared only on a segmented control. The rail says
+           * which section you are in; the page should still say what it is. */}
+          <View style={[styles.pageHeader, { maxWidth }]}>
+            {title ? <Text style={[styles.title, { color: c.text }]}>{title}</Text> : null}
+            {context ? (
+              <Text style={[styles.context, { color: c.textSecondary }]}>{context}</Text>
+            ) : null}
+          </View>
+        </>
       ) : (
-        /* Narrow keeps the header as-is: the tab bar already names the screen,
-         * and vertical space is the scarce resource on a phone. */
-        <AppHeader context={context} />
+        <>
+          {/* Narrow keeps the header as-is: the tab bar already names the screen,
+           * and vertical space is the scarce resource on a phone. */}
+          <AppHeader context={context} />
+          {/* Immediately under it, with nothing between the two: the band's own
+              top hairline becomes the header's bottom edge. */}
+          {banner}
+        </>
       )}
       {body}
     </View>
@@ -93,6 +129,9 @@ export function Screen({
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   wideGutter: { paddingHorizontal: Spacing.three },
+  /* Cancels `wideGutter`. Inert on narrow, where the frame has no gutter to
+     give back and the banner is already flush. */
+  wideBanner: { marginHorizontal: -Spacing.three },
   content: {
     padding: Spacing.three,
     gap: 14,

@@ -46,6 +46,8 @@ import { parseGameLog } from '@/components/players/game-log';
 import { TeamContext } from '@/components/players/TeamContext';
 import { UsagePanel } from '@/components/players/UsagePanel';
 import { parseProfile } from '@/components/players/profile';
+import { ScoreStrip } from '@/components/scores/ScoreStrip';
+import type { ScoreGame, ScoreTeam } from '@/components/scores/scoreboard';
 import { Panel } from '@/components/ui/Panel';
 import { Tabs } from '@/components/ui/Tabs';
 import { Screen } from '@/components/shell/Screen';
@@ -64,6 +66,45 @@ const FIXTURE_PLAYER: PlayerState = {
   error: null,
   refresh: async () => {},
 };
+
+/**
+ * A week of fixtures for the score band, in every state it draws: one final,
+ * one live, one still to kick off. Enough of them that the band scrolls and the
+ * web build's paging arrows have something to page.
+ */
+const GALLERY_TEAMS: Record<string, ScoreTeam> = Object.fromEntries(
+  ['BUF', 'MIA', 'KC', 'LV', 'SF', 'SEA', 'DAL', 'PHI', 'GB', 'CHI', 'CIN', 'BAL'].map((a) => [
+    a,
+    { id: a, abbreviation: a, name: a },
+  ]),
+);
+
+const GALLERY_GAMES: ScoreGame[] = [
+  ['MIA', 'BUF', 17, 24, 'final'],
+  ['LV', 'KC', 10, 31, 'final'],
+  ['SEA', 'SF', 14, 13, 'live'],
+  ['PHI', 'DAL', null, null, 'scheduled'],
+  ['CHI', 'GB', null, null, 'scheduled'],
+  ['BAL', 'CIN', null, null, 'scheduled'],
+].map(([away, home, awayScore, homeScore, status], i) => ({
+  id: `g${i}`,
+  season: 2026,
+  seasonType: 1,
+  week: 3,
+  home: GALLERY_TEAMS[home as string],
+  away: GALLERY_TEAMS[away as string],
+  homeScore: homeScore as number | null,
+  awayScore: awayScore as number | null,
+  startsAt: `2026-08-2${1 + Math.floor(i / 3)}T17:0${i}:00Z`,
+  status: status as ScoreGame['status'],
+  statusText: status === 'final' ? 'Final' : null,
+}));
+
+/** Two of yours in the opener, one in the live game — the band's own mark. */
+const GALLERY_STARTERS_BY_TEAM = new Map([
+  ['BUF', 2],
+  ['SF', 1],
+]);
 
 type View_ = 'inventory' | 'leaderboard' | 'lineup' | 'profile';
 const VIEWS: Segment<View_>[] = [
@@ -356,7 +397,25 @@ function GalleryBody() {
     <View style={[styles.shell, isWide && styles.shellWide, { backgroundColor: c.background }]}>
       {isWide ? <Sidebar pathnameOverride={VIEW_PATH[view]} /> : null}
       <View style={styles.content}>
-        <Screen title={VIEW_TITLE[view]} measure={VIEW_MEASURE[view]} context="Preseason · Week 3">
+        <Screen
+          title={VIEW_TITLE[view]}
+          measure={VIEW_MEASURE[view]}
+          context="Preseason · Week 3"
+          /* The score band, in the slot the lineup screen puts it in. This is
+             the whole reason it is a slot on the frame: it renders flush under
+             the header on a phone and across the top of the page on the web,
+             and neither placement is reachable from inside the content box.
+             Only on the lineup view, which is the only screen that has one. */
+          banner={
+            view === 'lineup' ? (
+              <ScoreStrip
+                games={GALLERY_GAMES}
+                week="Pre Wk 3"
+                startersByTeam={GALLERY_STARTERS_BY_TEAM}
+                loading={false}
+              />
+            ) : null
+          }>
           {/* A live read-out of what the layout thinks it is. The single most
               useful thing to see while resizing: which branch is rendering. */}
           <Text style={[styles.banner, { color: c.textSecondary }]}>{banner}</Text>

@@ -7,9 +7,10 @@
  * carries all of it and the bench is drawn in the same columns for comparison.
  *
  * The screen reads top to bottom as the week does: what is on (the scoreboard
- * strip), where you stand (the contest card, which COUNTS who needs a look
- * rather than listing them — the rows say which), who is
- * starting, and who is not. The starters and the bench used to be two tabs;
+ * strip), where you stand (the contest card, which places your score inside the
+ * whole community's range rather than against an opponent — there are no
+ * pairings in this game), who is starting, and who is not.
+ * The starters and the bench used to be two tabs;
  * they are now one scroll, because choosing between them is the entire task and
  * a tab pair meant only ever seeing half of it.
  *
@@ -39,6 +40,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 
 import { BenchBoard } from '@/components/lineup/BenchBoard';
 import { ContestCard } from '@/components/lineup/ContestCard';
+import { useFieldRecord } from '@/components/lineup/field';
 import { SlotBoard } from '@/components/lineup/SlotBoard';
 import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
 import {
@@ -48,7 +50,6 @@ import {
   lockCaption,
   sortByPosition,
   sortCards,
-  type Alert,
   type LineupCard,
   type SortKey,
 } from '@/components/lineup/model';
@@ -60,7 +61,6 @@ import { Screen } from '@/components/shell/Screen';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { injuryWeight } from '@/lib/injury';
 import { usePlayer } from '@/context/PlayerContext';
 import { supabase } from '@/lib/supabase';
 
@@ -188,38 +188,19 @@ export default function LineupScreen() {
   );
 
   /**
-   * The lineup's weekly worth: the starters' FP per game added up. Not a
-   * forecast — it is what these eight have averaged, which is the only honest
-   * single number this screen can put next to the clock.
-   */
-  const lineupFpPerGame = useMemo(() => {
-    const scored = starters.filter((s) => s.card.form !== null);
-    if (scored.length === 0) return null;
-    return scored.reduce((sum, s) => sum + (s.card.form?.fpPerGame ?? 0), 0);
-  }, [starters]);
-
-  /**
-   * Counted, not listed.
+   * Not counted, and not listed.
    *
-   * There was a panel here that named every flagged starter above the boards.
-   * It is gone: the rows themselves carry the designation chip and say BYE in
-   * the negative colour, so the panel was the same warning a second time, in a
-   * different vocabulary, twenty points further from the player it was about.
-   * What survives is the NUMBER on the contest card — "two of your eight want
-   * looking at" — which sends you to the rows rather than trying to replace
-   * them.
+   * There was a panel here naming every flagged starter, then a count of them
+   * on the contest card. Both are gone. The panel was the same warning twice in
+   * two vocabularies, twenty points from the player it was about; the count was
+   * a number you could not act on, sitting on a card that is now about one
+   * thing — where your score sits in the field.
+   *
+   * The signal survives where it belongs: each ROW carries its own designation
+   * chip and says BYE in the negative colour, next to the name and the swap
+   * that fixes it. A bye is the failure people actually lose weeks to and no
+   * injury feed ever mentions it, which is why the row draws it at all.
    */
-  const alerts = useMemo<Alert[]>(
-    () =>
-      starters.flatMap<Alert>(({ slot, card }) => {
-        // A team with no game this week is the failure people actually lose
-        // weeks to, and no injury feed ever mentions it.
-        if (!card.game?.opponent) return [{ slot, card, kind: 'no-game' as const }];
-        const weight = injuryWeight(card.injuryStatus);
-        return weight ? [{ slot, card, kind: weight }] : [];
-      }),
-    [starters],
-  );
 
   const dirty = useMemo(() => {
     const a = Object.entries(picks).sort();
@@ -238,6 +219,15 @@ export default function LineupScreen() {
     [slate],
   );
   const { games: weekGames, loading: gamesLoading } = useSlateGames(scoreSlate);
+
+  /**
+   * The opponent: the whole base, reduced to its median score.
+   *
+   * Keyed off the slate's values for the same reason the score strip is — this
+   * screen rebuilds `slate` on every countdown tick, and a hook that depended
+   * on the object would re-read the season once a second.
+   */
+  const { current: field, record, reload: reloadField } = useFieldRecord(slate);
 
   /** Your starters per club, so the strip can mark the games you are in. */
   const startersByTeam = useMemo(() => {
@@ -345,9 +335,13 @@ export default function LineupScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await reload();
+    // Together, not in sequence: your total and the field's median are two
+    // halves of one fixture, and refreshing them a round trip apart is a
+    // visible moment where the margin on the card is arithmetic between two
+    // different instants.
+    await Promise.all([reload(), reloadField()]);
     setRefreshing(false);
-  }, [reload]);
+  }, [reload, reloadField]);
 
   const submit = useCallback(async () => {
     if (!slate) return;
@@ -425,9 +419,13 @@ export default function LineupScreen() {
      there is a visible second where an edit has been made and the screen says
      it is saved. */
   const pending = dirty && !locked && !blocked;
-  const context = slate
-    ? `${slate.season_type === 1 ? 'Preseason' : 'Season'} · Week ${slate.week}${locked ? ' · Locked' : ''}`
+  /* The week, without the lock state. The contest card carries the lock in its
+     own tile and its own chip, so repeating it here put "Locked" on the card
+     three times. */
+  const week = slate
+    ? `${slate.season_type === 1 ? 'Preseason' : 'Season'} · Week ${slate.week}`
     : 'No slate scheduled';
+  const context = slate && locked ? `${week} · Locked` : week;
 
   return (
     <Screen
@@ -435,30 +433,29 @@ export default function LineupScreen() {
       measure="table"
       context={context}
       refreshing={refreshing}
-      onRefresh={() => void onRefresh()}>
-      {slate ? (
-        <View style={styles.bleed}>
+      onRefresh={() => void onRefresh()}
+      banner={
+        slate ? (
           <ScoreStrip
             games={weekGames}
             week={shortWeekLabel(slate.season_type, slate.week)}
             startersByTeam={startersByTeam}
             loading={gamesLoading}
           />
-        </View>
-      ) : null}
-
+        ) : null
+      }>
       <ContestCard
         displayName={displayName}
-        weekLabel={context}
+        weekLabel={week}
         lockAt={lockAt}
         locked={locked}
         now={now}
-        filled={filled}
-        slotCount={slots.length}
-        fpPerGame={lineupFpPerGame}
-        totalPoints={totalPoints}
-        scored={scoredAt !== null}
-        alerts={alerts.length}
+        /* Passed raw. Whether a nought is a SCORE or just an unswept row is a
+           question about the field, not about this lineup, so the card decides
+           it from `field.high` — see the note there. */
+        myPoints={totalPoints}
+        field={field}
+        record={record}
       />
 
       {lockCaption(lockAt, locked) ? (

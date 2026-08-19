@@ -23,6 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActionBar } from '@/components/shell/ActionBar';
 import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
 import { ContestCard } from '@/components/lineup/ContestCard';
+import type { FieldWeek } from '@/components/lineup/field';
 import { BADGE_SIZE, BADGE_WIDTH, BenchRow, StarterRow } from '@/components/lineup/LineupRow';
 import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
@@ -81,6 +82,36 @@ type KitDirection = 'up' | 'down';
 const DEMO_NOW = Date.parse('2026-09-12T12:00:00Z');
 const DEMO_LOCK_SOON = '2026-09-12T15:00:00Z';
 const DEMO_LOCK_PAST = '2026-09-12T11:00:00Z';
+
+/**
+ * Four fields, one per state the contest card has to draw.
+ *
+ * The numbers are deliberately median-shaped rather than tidy: the median sits
+ * well below the mean in every one of them, because that is what a real week
+ * looks like and it is the whole reason the median is the opponent.
+ */
+const DEMO_FIELD_UNPLAYED: FieldWeek = {
+  week: 3, entrants: 26, low: 0, median: 0, average: 0, high: 0, final: false,
+  myPoints: null, myRank: null, ahead: null, result: null,
+};
+const DEMO_FIELD_AHEAD: FieldWeek = {
+  week: 3, entrants: 26, low: 41.2, median: 97.6, average: 112.4, high: 208.3, final: false,
+  myPoints: 118.4, myRank: 7, ahead: 19, result: null,
+};
+const DEMO_FIELD_BEHIND: FieldWeek = {
+  week: 2, entrants: 24, low: 38.4, median: 88.2, average: 101.7, high: 176.5, final: true,
+  myPoints: 71.9, myRank: 18, ahead: 6, result: 'L',
+};
+/**
+ * One entrant is their own low, median AND high, so there is no range to place
+ * anybody in. Deliberately given real points: with everything at zero this
+ * would trip the earlier "no games played yet" branch and stop demonstrating
+ * the case it exists for.
+ */
+const DEMO_FIELD_ALONE: FieldWeek = {
+  week: 1, entrants: 1, low: 88.2, median: 88.2, average: 88.2, high: 88.2, final: true,
+  myPoints: 88.2, myRank: 1, ahead: 0, result: null,
+};
 
 const STARTERS: {
   slot: string;
@@ -467,19 +498,26 @@ function Kit() {
 
           <Section
             title="Contest card"
-            note="Unscored shows the starters' average pace; a swept week shows the real total.">
+            note="Your score placed inside the whole field, low to high, with the median marked. Deliberately NOT a head-to-head — there is no opponent in this game. Two scopes, kept apart by the bar so neither borrows the other: the SEASON record under the name, THIS WEEK’s rank under the bar it summarises. The rank is withheld only while the whole field is tied on nought — before kickoff rank() hands every manager first place — which is why card one says “26 in the field” while card four, a field of one whose rank is never in doubt, says “Ranked #1 of 1”. Four states: nobody has played yet; live and past the median; final and short of it; and a field of one, which is its own median and has no range.">
             <ContestCard
               displayName="nickroachy"
               weekLabel="Preseason · Week 3"
               lockAt={DEMO_LOCK_SOON}
               locked={false}
               now={DEMO_NOW}
-              filled={7}
-              slotCount={8}
-              fpPerGame={104.2}
-              totalPoints={null}
-              scored={false}
-              alerts={2}
+              myPoints={null}
+              field={DEMO_FIELD_UNPLAYED}
+              record={{ wins: 1, losses: 1, ties: 0 }}
+            />
+            <ContestCard
+              displayName="nickroachy"
+              weekLabel="Preseason · Week 3"
+              lockAt={DEMO_LOCK_PAST}
+              locked
+              now={DEMO_NOW}
+              myPoints={118.4}
+              field={DEMO_FIELD_AHEAD}
+              record={{ wins: 2, losses: 1, ties: 0 }}
             />
             <ContestCard
               displayName="nickroachy"
@@ -487,12 +525,19 @@ function Kit() {
               lockAt={DEMO_LOCK_PAST}
               locked
               now={DEMO_NOW}
-              filled={8}
-              slotCount={8}
-              fpPerGame={104.2}
-              totalPoints={118.4}
-              scored
-              alerts={0}
+              myPoints={71.9}
+              field={DEMO_FIELD_BEHIND}
+              record={{ wins: 2, losses: 2, ties: 1 }}
+            />
+            <ContestCard
+              displayName="nickroachy"
+              weekLabel="Preseason · Week 1"
+              lockAt={DEMO_LOCK_SOON}
+              locked={false}
+              now={DEMO_NOW}
+              myPoints={88.2}
+              field={DEMO_FIELD_ALONE}
+              record={{ wins: 0, losses: 0, ties: 0 }}
             />
           </Section>
 
