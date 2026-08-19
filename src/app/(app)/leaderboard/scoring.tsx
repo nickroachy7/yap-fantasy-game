@@ -30,13 +30,15 @@ import {
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
 import { StatusChip } from '@/components/ui/StatusChip';
-import { BottomTabInset, Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
+import { useTabBarInset } from '@/components/shell/useResponsive';
+import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
 
 export default function ScoringScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  const tabInset = useTabBarInset();
 
   const [sheet, setSheet] = useState<ScoringSheet | null>(null);
   const [loading, setLoading] = useState(true);
@@ -142,7 +144,7 @@ export default function ScoringScreen() {
       onRefresh={() => void load('refresh')}>
       <SubNav segments={LEADERBOARD_SEGMENTS} inset={false} />
       {body()}
-      <View style={styles.tail} />
+      <View style={{ height: tabInset }} />
     </Screen>
   );
 }
@@ -197,5 +199,4 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   rowText: { flexShrink: 1, gap: 1 },
-  tail: { height: BottomTabInset },
 });

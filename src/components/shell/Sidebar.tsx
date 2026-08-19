@@ -4,6 +4,13 @@
  * The point of the rail is that it can show the sub-pages as real destinations
  * — Players and Shop are separate rows here, where on mobile they collapse into
  * a segmented control because there is no room for eight targets.
+ *
+ * Section rows carry the same glyphs as the bottom tab bar, from the same
+ * `icon` field on NAV_SECTIONS. Without them the two presentations of one
+ * navigation shared no visual vocabulary at all, so moving between a phone and
+ * a desktop meant relearning the app by its labels. Sub-page rows stay
+ * text-only: they are children of a row that is already marked, and five more
+ * glyphs would flatten the hierarchy the indent exists to show.
  */
 import { Link, usePathname } from 'expo-router';
 import { useState } from 'react';
@@ -11,6 +18,7 @@ import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native'
 
 import { Gem, initialsOf } from '@/components/shell/AppHeader';
 import { NAV_SECTIONS } from '@/components/shell/sections';
+import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
 import { RailWidth, TierColors } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 
@@ -48,7 +56,13 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <View key={item.href}>
-              <NavRow href={item.href} label={item.label} active={active} accent={accent} />
+              <NavRow
+                href={item.href}
+                label={item.label}
+                icon={item.icon}
+                active={active}
+                accent={accent}
+              />
               {/* A section's first child shares the section's own href — the
                   mobile segmented control needs a segment for the landing page.
                   The rail does not: the parent row IS that link and already
@@ -97,6 +111,7 @@ function NavRow({
   href,
   label,
   badge,
+  icon,
   active,
   accent,
   nested,
@@ -105,6 +120,8 @@ function NavRow({
   label: string;
   /** e.g. "Soon" on Sets — the same signal the mobile segmented control gives. */
   badge?: string;
+  /** Section rows only. Sub-pages are text, see the header. */
+  icon?: TabIconName;
   active: boolean;
   accent: string;
   nested?: boolean;
@@ -144,6 +161,18 @@ function NavRow({
             <View
               style={[styles.marker, active && { backgroundColor: accent }]}
             />
+            {icon ? (
+              /* The rail is a fixed dark band in both schemes, so these are
+                 the band's own white ramp rather than theme colours — the same
+                 two values the label below uses, so icon and text always agree
+                 about whether the row is active. */
+              <TabIcon
+                name={icon}
+                color={active ? '#FFFFFF' : 'rgba(255,255,255,0.62)'}
+                focused={active}
+                size={18}
+              />
+            ) : null}
             <Text
               numberOfLines={1}
               style={[
@@ -181,13 +210,16 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 9,
     paddingVertical: 10,
     paddingHorizontal: 10,
     borderRadius: 9,
     minHeight: 40,
   },
-  nestedRow: { paddingVertical: 7, paddingLeft: 22, minHeight: 32 },
+  /* Indented past the marker and the icon column, so a sub-page sits visibly
+     INSIDE its parent rather than aligning with it. Aligning the two labels
+     exactly reads as two peers, which is the relationship this row is not in. */
+  nestedRow: { paddingVertical: 7, paddingLeft: 40, minHeight: 32 },
   marker: { width: 3, height: 14, borderRadius: 2, backgroundColor: 'transparent' },
   activeRow: { backgroundColor: 'rgba(255,255,255,0.07)' },
   hoveredRow: { backgroundColor: 'rgba(255,255,255,0.035)' },

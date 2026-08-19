@@ -19,8 +19,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Gem } from '@/components/shell/AppHeader';
+import { useTabBarInset } from '@/components/shell/useResponsive';
 import {
-  BottomTabInset,
   Colors,
   NUMERIC,
   Spacing,
@@ -178,10 +178,14 @@ export function ShopPanel() {
     [silverAt],
   );
 
+  const tabInset = useTabBarInset();
+
   const pulledPositions = useMemo(() => (pulled ? countPositions(pulled) : []), [pulled]);
 
   return (
-    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      contentContainerStyle={[styles.content, { paddingBottom: tabInset + Spacing.four }]}
+      keyboardShouldPersistTaps="handled">
       {packs === null && !error ? <ActivityIndicator /> : null}
 
       <View style={styles.shelf}>
@@ -424,7 +428,6 @@ function PackCard({
 const styles = StyleSheet.create({
   content: {
     padding: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.four,
     gap: Spacing.three,
   },
   // Packs sit side by side wherever there is room. maxWidth stops two packs

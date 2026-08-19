@@ -2,11 +2,13 @@ import { Redirect, Tabs, type Href } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { StyleSheet, View, useColorScheme } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { NAV_SECTIONS, routeNameOf } from '@/components/shell/sections';
 import { Sidebar } from '@/components/shell/Sidebar';
-import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
+import { TabIcon } from '@/components/shell/TabIcon';
 import { useIsWide } from '@/components/shell/useResponsive';
-import { Colors } from '@/constants/theme';
+import { Colors, TabBarContentHeight } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { PlayerProvider } from '@/context/PlayerContext';
 
@@ -26,22 +28,18 @@ import { PlayerProvider } from '@/context/PlayerContext';
  * returning from another tab, and pressing the tab you are already on. Verified
  * against expo-router 57 rather than assumed.
  *
- * Order is deliberate and matches NAV_SECTIONS: the weekly decision first,
- * standings second, acquisition third, what you own fourth, identity last.
+ * The tabs themselves come from NAV_SECTIONS rather than a list kept here.
+ * That file is the single declaration of the navigation — its own header warns
+ * about exactly this — and the first version of this layout carried a parallel
+ * array of five sections that had already begun to drift from it.
  */
-const TABS: { name: string; href: Href; title: string; icon: TabIconName }[] = [
-  { name: 'lineup', href: '/lineup', title: 'Lineup', icon: 'lineup' },
-  { name: 'leaderboard', href: '/leaderboard', title: 'Leaderboard', icon: 'leaderboard' },
-  { name: 'cards', href: '/cards', title: 'Cards', icon: 'cards' },
-  { name: 'collection', href: '/collection', title: 'Collection', icon: 'collection' },
-  { name: 'profile', href: '/profile', title: 'Profile', icon: 'profile' },
-];
 
 export default function AppLayout() {
   const { session, initialising } = useAuth();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const isWide = useIsWide();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!initialising) void SplashScreen.hideAsync();
@@ -67,17 +65,32 @@ export default function AppLayout() {
               tabBarLabelStyle: styles.tabLabel,
               tabBarStyle: isWide
                 ? { display: 'none' }
-                : { backgroundColor: c.background, borderTopColor: c.backgroundElement },
+                : {
+                    backgroundColor: c.background,
+                    borderTopColor: c.backgroundElement,
+                    /* The height is imposed rather than left to the navigator's
+                       default, which is the whole reason `useTabBarInset()` can
+                       promise screens an exact number to reserve. Content sits
+                       in TabBarContentHeight; the safe area is padding beneath
+                       it, so the bar's background still runs to the bottom of
+                       the screen instead of floating above the home indicator. */
+                    height: TabBarContentHeight + insets.bottom,
+                    paddingBottom: insets.bottom,
+                    paddingTop: 6,
+                  },
             }}>
-            {TABS.map((tab) => (
+            {NAV_SECTIONS.map((section) => (
               <Tabs.Screen
-                key={tab.name}
-                name={tab.name}
+                key={section.href}
+                name={routeNameOf(section)}
                 options={{
-                  title: tab.title,
-                  href: tab.href,
+                  // `title` stays the full name — it is the route's name, not
+                  // just the bar's. Only the bar shortens, via tabBarLabel.
+                  title: section.label,
+                  tabBarLabel: section.tabLabel ?? section.label,
+                  href: section.href as Href,
                   tabBarIcon: ({ color, focused }) => (
-                    <TabIcon name={tab.icon} color={color} focused={focused} size={24} />
+                    <TabIcon name={section.icon} color={color} focused={focused} size={24} />
                   ),
                 }}
               />
@@ -98,5 +111,9 @@ const styles = StyleSheet.create({
   shell: { flex: 1 },
   shellWide: { flexDirection: 'row' },
   content: { flex: 1 },
-  tabLabel: { fontSize: 11, fontWeight: '600' },
+  /* 10, not 11. At 11 both "Leaderboard" and "Collection" truncated on a
+     320pt viewport once icons were sitting above them. 10 clears every label
+     at 320 except Leaderboard, which gets a shorter word instead. Measured,
+     not guessed. */
+  tabLabel: { fontSize: 10, fontWeight: '600' },
 });

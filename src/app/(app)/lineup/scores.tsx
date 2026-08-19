@@ -28,14 +28,14 @@ import { slateKey, useSeasonSchedule, useWeekLeaders, type Slate } from '@/compo
 import { Screen } from '@/components/shell/Screen';
 import { SubNav } from '@/components/shell/SubNav';
 import { LINEUP_SEGMENTS } from '@/components/shell/sections';
-import { useIsWide } from '@/components/shell/useResponsive';
+import { useIsWide, useTabBarInset } from '@/components/shell/useResponsive';
 import { DropdownChip, type DropdownOption } from '@/components/ui/DropdownChip';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
 import { POSITION_ORDER, type PositionKey } from '@/constants/positions';
-import { BottomTabInset, Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
+import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
 
@@ -57,6 +57,7 @@ export default function ScoresScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const wide = useIsWide();
+  const tabInset = useTabBarInset();
 
   /* The season and the opening week come from the database rather than the
      clock: `current_slate()` already encodes what "now" means for this game
@@ -292,7 +293,7 @@ export default function ScoresScreen() {
         <View style={wide ? styles.leadersCol : undefined}>{leadersPanel}</View>
       </View>
 
-      <View style={styles.tail} />
+      <View style={{ height: tabInset }} />
     </Screen>
   );
 }
@@ -363,5 +364,4 @@ const styles = StyleSheet.create({
   bannerSide: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two, flex: 1 },
   bannerRight: { justifyContent: 'flex-end' },
   bannerMid: { alignItems: 'center' },
-  tail: { height: BottomTabInset },
 });

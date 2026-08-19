@@ -34,10 +34,10 @@ import { YourStanding } from '@/components/leaderboard/YourStanding';
 import { Screen } from '@/components/shell/Screen';
 import { SubNav } from '@/components/shell/SubNav';
 import { LEADERBOARD_SEGMENTS } from '@/components/shell/sections';
-import { useIsWide } from '@/components/shell/useResponsive';
+import { useIsWide, useTabBarInset } from '@/components/shell/useResponsive';
 import { Panel } from '@/components/ui/Panel';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
-import { BottomTabInset, Colors, Spacing, Type } from '@/constants/theme';
+import { Colors, Spacing, Type } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
@@ -54,6 +54,7 @@ export default function LeaderboardScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const isWide = useIsWide();
+  const tabInset = useTabBarInset();
 
   const [slate, setSlate] = useState<Slate | null>(null);
   const [entries, setEntries] = useState<Entry[] | null>(null);
@@ -224,7 +225,7 @@ export default function LeaderboardScreen() {
           data={rows}
           extraData={listExtra}
           keyExtractor={(r) => r.userId}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: tabInset + Spacing.four }]}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           ListHeaderComponent={listHeader}
           ListEmptyComponent={<EmptyBoard slate={slate} />}
@@ -278,10 +279,7 @@ function EmptyBoard({ slate }: { slate: Slate | null }) {
 
 const styles = StyleSheet.create({
   head: { gap: 14, paddingBottom: Spacing.two },
-  list: {
-    padding: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.four,
-  },
+  list: { padding: Spacing.three },
   centred: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four },
   empty: {
     gap: Spacing.one,

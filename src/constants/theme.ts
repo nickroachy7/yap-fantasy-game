@@ -122,7 +122,24 @@ export const Spacing = {
   six: 64,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+/**
+ * Height of the bottom tab bar's CONTENT, excluding the safe-area inset.
+ *
+ * This is not a measurement of react-navigation's default bar — it is a height
+ * we impose on it (see `(app)/_layout.tsx`), which is what makes it safe for
+ * screens to reserve exactly this much tail room. The number it replaced was a
+ * guess per platform, `{ ios: 50, android: 80 }`, and it was wrong in three
+ * ways at once: it had no web value, so on a narrow browser — where the bar is
+ * very much visible — every screen padded its tail by nothing and the last row
+ * sat underneath it; it ignored the safe-area inset, so on a device with a home
+ * indicator it fell ~34pt short; and it was applied on wide web too, where
+ * there is no bar at all.
+ *
+ * 54 fits a 24pt icon over a 10pt label with breathing room either side.
+ * Do not read this directly for padding — use `useTabBarInset()`, which knows
+ * about the safe area and about the bar not existing on wide web.
+ */
+export const TabBarContentHeight = 54;
 
 /**
  * Content measures.

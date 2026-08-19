@@ -25,7 +25,8 @@ import {
 } from 'react-native';
 
 import { Tabs, type Tab } from '@/components/ui/Tabs';
-import { BottomTabInset, Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
+import { useTabBarInset } from '@/components/shell/useResponsive';
+import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import {
   CELL_GAP,
   COL,
@@ -60,6 +61,7 @@ export function PlayersPanel({
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  const tabInset = useTabBarInset();
 
   const [result, setResult] = useState<DirectoryFetch | null>(null);
   const [loading, setLoading] = useState(true);
@@ -237,7 +239,7 @@ export function PlayersPanel({
               refreshing={refreshing}
               onRefresh={() => void load('refresh')}
               style={styles.fill}
-              contentContainerStyle={styles.listContent}
+              contentContainerStyle={{ paddingBottom: tabInset + Spacing.four }}
             />
           )}
         </>
@@ -439,7 +441,6 @@ const styles = StyleSheet.create({
   headCell: { flexDirection: 'row', alignItems: 'center', gap: 1, flexShrink: 0 },
   headCellRight: { justifyContent: 'flex-end' },
   caret: { letterSpacing: 0 },
-  listContent: { paddingBottom: BottomTabInset + Spacing.four },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two, padding: Spacing.four },
   middle: { textAlign: 'center' },
   button: { paddingHorizontal: Spacing.four, paddingVertical: Spacing.two, borderRadius: 8, marginTop: Spacing.two },

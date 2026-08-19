@@ -39,7 +39,8 @@ import { parseGameLog, type GameLogSection } from '@/components/players/game-log
 import { parseProfile, type PlayerProfile } from '@/components/players/profile';
 import { Screen } from '@/components/shell/Screen';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
-import { BottomTabInset, Colors, Spacing, type CardTier } from '@/constants/theme';
+import { useTabBarInset } from '@/components/shell/useResponsive';
+import { Colors, Spacing, type CardTier } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
 const NUMERIC = { fontVariant: ['tabular-nums' as const] };
@@ -92,6 +93,7 @@ export default function PlayerDetailScreen() {
   const router = useRouter();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  const tabInset = useTabBarInset();
 
   const [player, setPlayer] = useState<DirectoryPlayer | null>(null);
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
@@ -303,7 +305,7 @@ export default function PlayerDetailScreen() {
           <GameLog sections={sections} position={profile?.player.positionAbbreviation ?? null} />
         ) : null}
 
-        <View style={styles.tailSpace} />
+        <View style={{ height: tabInset }} />
       </>
     );
   };
@@ -409,5 +411,4 @@ const styles = StyleSheet.create({
   logStatText: { fontSize: 12, lineHeight: 16 },
   logStatus: { fontSize: 10, fontWeight: '700', letterSpacing: 0.6 },
   logPoints: { fontSize: 18, fontWeight: '800', width: 56, textAlign: 'right', flexShrink: 0 },
-  tailSpace: { height: BottomTabInset },
 });

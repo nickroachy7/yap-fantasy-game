@@ -19,14 +19,14 @@ import { useSeasonSchedule, useWeekLeaders, type Slate } from '@/components/scor
 import { Screen } from '@/components/shell/Screen';
 import { SubNav } from '@/components/shell/SubNav';
 import { CARDS_SEGMENTS } from '@/components/shell/sections';
-import { useIsWide } from '@/components/shell/useResponsive';
+import { useIsWide, useTabBarInset } from '@/components/shell/useResponsive';
 import { computeMovers, deltaText, type Mover } from '@/components/trend/movers';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
 import { PositionBadge } from '@/components/ui/PositionBadge';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
 import { POSITION_ORDER, type PositionKey } from '@/constants/positions';
-import { BottomTabInset, Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
+import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
 
@@ -55,6 +55,7 @@ export default function TrendScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const wide = useIsWide();
+  const tabInset = useTabBarInset();
 
   const [season, setSeason] = useState(FALLBACK_SEASON);
   const [seeded, setSeeded] = useState(false);
@@ -198,7 +199,7 @@ export default function TrendScreen() {
 
       {body()}
 
-      <View style={styles.tail} />
+      <View style={{ height: tabInset }} />
     </Screen>
   );
 }
@@ -298,5 +299,4 @@ const styles = StyleSheet.create({
   owned: { width: 6, height: 6, borderRadius: 3 },
   delta: { width: 54, textAlign: 'right' },
   pressed: { opacity: 0.6 },
-  tail: { height: BottomTabInset },
 });
