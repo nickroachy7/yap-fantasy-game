@@ -28,6 +28,8 @@ building it.
 | §1.5 player rankings strip | `POS RANK` tile on the player page |
 | §1.5 career heat map | `players/CareerTable`, shaded column-relative |
 | §1.5 transaction history | `players/CardHistory` — reinterpreted, see below |
+| §2.2 / §4.2 / §5 ownership block | `players/CommunityPanel` + the `COPIES HELD` tile — reinterpreted as counts, see below |
+| §1.5 player page, second variant | `/card/<card_instance_id>` — `CardStanding`, `StartLog` |
 | §10 empty-state shape | `ui/EmptyState`, replacing four divergent hand-rolled copies |
 
 **Note on the grouped headers.** They were added for a Cards table that has
@@ -47,6 +49,9 @@ Two were deliberately re-pointed rather than copied:
   drafts to list. The equivalent question — what is my relationship to this
   player — is answered by the card instances you hold, when each arrived, and
   what each has *earned*, which is not the same as what the player has scored.
+  It is now a set of LINKS into the card profile rather than a place to act;
+  selling moved there, where the copy being sold is actually shown.
+- **Ownership** became **counts, not percentages** — see the reversal below.
 
 One decoration was added that the spec does not have: leaders and movers carry a
 green dot when you own a card for that player. It replaces Sleeper's "which
@@ -113,11 +118,20 @@ established rule for card art; the spec's chrome leans on it heavily.
 
 ### 5. Real, but meaningless at this scale
 
-- `OWN %`, `START %`, `Rostered 56%` (§2.2, §4.2, §5). `card_instances` is
-  RLS-scoped to its owner, so a global ownership percentage needs a new
-  server-side aggregate — and with a beta-sized user base it would read 0% or
-  100% and teach people to distrust the column. Worth building once there are
-  enough users for it to mean something.
+- ~~`OWN %`, `START %`, `Rostered 56%` (§2.2, §4.2, §5).~~ **Built, as counts.**
+  Both halves of the original objection were real and both were answerable:
+
+  The aggregate now exists — `player_market()`, `security definer` because
+  `card_instances` is RLS-scoped to its owner, exposing counts plus exactly one
+  display name (the holder of the best copy) on the same reviewed basis as
+  `leaderboard()`.
+
+  The scale objection was answered by dropping the percentage rather than by
+  waiting for users. "12 copies held by 3 people" is exactly as true at three
+  users as at thirty thousand, where "Rostered 100%" is noise at one scale and
+  information at the other. The one percentage kept — *ever started* — is
+  always printed with the fraction it came from (`78%` over `21 of 27`), so it
+  cannot be read without its denominator.
 - §4.1 `LEAGUEMATE` filter — same reason as §1.
 
 ### 6. Declined on design grounds
@@ -153,7 +167,8 @@ than quietly dropped.
 
 ## Follow-ups worth taking
 
-1. Global ownership percentage, once the user base makes it meaningful (§5).
+1. ~~Global ownership percentage, once the user base makes it meaningful.~~
+   Done as `players/CommunityPanel`, in counts rather than percentages (§5).
 2. Player-to-player comparison overlay with a keyboard shortcut (§1.5).
 3. Faceted directory filters — team, rookie, bye week (§4.1), if search proves
    insufficient.

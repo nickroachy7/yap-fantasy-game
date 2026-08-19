@@ -67,7 +67,9 @@ that moves the app aside and gives you a blank one.
 ```
 src/app/                expo-router routes — the file tree is the URL structure
   (app)/                signed-in app: lineup · collection · players · leaderboard · profile
-  (app)/player/[id]     player profile, deliberately a sibling of the tabs
+  (app)/player/[id]     player profile (the footballer), a sibling of the tabs
+  (app)/card/[id]       card profile (one copy you own) — same surface, and the
+                        param is the card_instance id, never the player id
   (auth)/login          magic link, with email+password as a secondary path
   legal/                /legal/privacy + /legal/support — public, App Review reads them cold
   preview · gallery · kit   dev galleries (see below)

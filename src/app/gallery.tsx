@@ -23,10 +23,23 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { InventoryCard } from '@/components/collection/InventoryCard';
-import { MCCAFFREY_GAME_LOG, MCCAFFREY_PROFILE, USAGE_SAMPLE } from '@/components/dev/profile-fixture';
+import {
+  CARD_PROFILE_NEVER_STARTED,
+  CARD_PROFILE_SAMPLE,
+  MARKET_SAMPLE,
+  MARKET_UNPLAYED,
+  MCCAFFREY_GAME_LOG,
+  MCCAFFREY_PROFILE,
+  USAGE_SAMPLE,
+} from '@/components/dev/profile-fixture';
 import { OWNED_MANY } from '@/components/dev/fixtures';
 import { BioStrip } from '@/components/players/BioStrip';
+import { CardStanding } from '@/components/players/CardStanding';
 import { CareerTable } from '@/components/players/CareerTable';
+import { CommunityPanel } from '@/components/players/CommunityPanel';
+import { StartLog } from '@/components/players/StartLog';
+import { parseCardProfile } from '@/components/players/card-profile';
+import { parseMarket } from '@/components/players/market';
 import { GameLog } from '@/components/players/GameLog';
 import { parseGameLog } from '@/components/players/game-log';
 import { TeamContext } from '@/components/players/TeamContext';
@@ -222,7 +235,31 @@ function ProfileFixture() {
         sections={parseGameLog(MCCAFFREY_GAME_LOG)}
         position={profile.player.positionAbbreviation}
       />
+
+      {/* ---- the two profiles' distinguishing panels --------------------- *
+       * Both states of each, because the interesting one is the empty one.
+       * A market where nobody has started a copy, and a card that has never
+       * been started, are what the whole beta will look like for a month —
+       * and they are the two the panels have to be honest about rather than
+       * dressing up. */}
+      <CommunityPanel market={parseMarket(MARKET_SAMPLE)} />
+      <CommunityPanel market={parseMarket(MARKET_UNPLAYED)} />
+
+      <CardFixture payload={CARD_PROFILE_SAMPLE} />
+      <CardFixture payload={CARD_PROFILE_NEVER_STARTED} />
     </View>
+  );
+}
+
+/** The card profile's own panels, which the player profile never draws. */
+function CardFixture({ payload }: { payload: typeof CARD_PROFILE_SAMPLE }) {
+  const card = parseCardProfile(payload);
+  if (!card) return null;
+  return (
+    <>
+      <CardStanding card={card.card} rank={card.rank} />
+      <StartLog starts={card.starts} playerName={card.card.playerName} />
+    </>
   );
 }
 

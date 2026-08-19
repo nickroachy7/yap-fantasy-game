@@ -123,3 +123,143 @@ export const MCCAFFREY_GAME_LOG: Json = [
     season_type: 2, status_state: 'final',
     stats: { rushing_attempts: 17, rushing_yards: 49, rushing_touchdowns: 0, receptions: 6, receiving_yards: 92 } },
 ];
+
+/* -------------------------------------------------------------------------- *
+ * Community ownership + the card profile.
+ *
+ * Shaped by hand rather than captured, for the one reason that beats capture:
+ * these describe a user base that does not exist yet. What matters is that the
+ * gallery shows the cases that will actually be common in the beta, and the
+ * common case early on is "hardly anybody has one, and nobody has played it".
+ * A fixture full of diamonds would make the panel look finished and hide the
+ * two states every real player will be in for the first month.
+ * -------------------------------------------------------------------------- */
+
+/** The mature case: copies spread across tiers, one standout, some sold back. */
+export const MARKET_SAMPLE: Json = {
+  player_id: 'f6d6132d-2900-4a30-8cb9-8d9030a5a562',
+  totals: {
+    minted: 31,
+    held: 27,
+    sold: 4,
+    owners: 19,
+    started: 21,
+    total_fp: 14204.5,
+    avg_fp: 526.1,
+  },
+  tiers: [
+    { tier: 'bronze', copies: 9, owners: 9, best_fp: 148.2 },
+    { tier: 'silver', copies: 11, owners: 10, best_fp: 702.0 },
+    { tier: 'gold', copies: 6, owners: 6, best_fp: 2311.4 },
+    { tier: 'diamond', copies: 1, owners: 1, best_fp: 3180.9 },
+  ],
+  top: {
+    display_name: 'wideleft',
+    is_you: false,
+    tier: 'diamond',
+    career_fp: 3180.9,
+    lineup_starts: 41,
+    season: 2025,
+    acquired_at: '2025-09-04T18:22:10.114Z',
+  },
+  yours: { copies: 2, best_fp: 702.0, best_tier: 'silver', best_rank: 8 },
+  seasons: [
+    { season: 2026, held: 18, minted: 21 },
+    { season: 2025, held: 9, minted: 10 },
+  ],
+};
+
+/**
+ * The one that will be far more common at launch, and the one worth looking at
+ * hardest: copies exist, every one is bronze, and `top` is null because nobody
+ * has started one. The panel must say that rather than crown an arbitrary row.
+ */
+export const MARKET_UNPLAYED: Json = {
+  player_id: 'f6d6132d-2900-4a30-8cb9-8d9030a5a562',
+  totals: {
+    minted: 3,
+    held: 3,
+    sold: 0,
+    owners: 3,
+    started: 0,
+    total_fp: 0,
+    avg_fp: 0,
+  },
+  tiers: [
+    { tier: 'bronze', copies: 3, owners: 3, best_fp: 0 },
+    { tier: 'silver', copies: 0, owners: 0, best_fp: null },
+    { tier: 'gold', copies: 0, owners: 0, best_fp: null },
+    { tier: 'diamond', copies: 0, owners: 0, best_fp: null },
+  ],
+  top: null,
+  yours: null,
+  seasons: [{ season: 2026, held: 3, minted: 3 }],
+};
+
+/** A copy partway up silver, with a mixed start log including an unswept week. */
+export const CARD_PROFILE_SAMPLE: Json = {
+  card: {
+    id: '7c0a6f2e-1111-4d55-9a10-2f8b4c3e0a91',
+    card_id: '2b1e5d90-2222-4a77-b3c1-6e9f0d4a1c22',
+    player_id: 'f6d6132d-2900-4a30-8cb9-8d9030a5a562',
+    player_name: 'Christian McCaffrey',
+    position_abbreviation: 'RB',
+    team_abbreviation: 'SF',
+    injury_status: null,
+    season: 2026,
+    rarity: 'legendary',
+    tier: 'silver',
+    career_fp: 702.0,
+    lineup_starts: 33,
+    fp_per_start: 21.3,
+    acquired_at: '2026-08-04T14:02:55.001Z',
+    source: 'pack',
+    sold_at: null,
+    sold_for: null,
+    sell_value: 40,
+    tier_floor_fp: 200,
+    next_tier_at: 750,
+    next_tier_label: 'gold',
+  },
+  rank: { among_player: 8, player_pool: 27, overall: 214, overall_pool: 9418 },
+  starts: [
+    { season: 2026, season_type: 2, week: 3, slot: 'RB1', points: null, scored: false, lineup_total: 0 },
+    { season: 2026, season_type: 2, week: 2, slot: 'RB1', points: 27.4, scored: true, lineup_total: 141.2 },
+    { season: 2026, season_type: 2, week: 1, slot: 'FLEX', points: 8.1, scored: true, lineup_total: 96.7 },
+    { season: 2025, season_type: 2, week: 18, slot: 'RB1', points: 31.9, scored: true, lineup_total: 152.0 },
+  ],
+};
+
+/**
+ * The bench case, and the whole reason the card profile exists: a copy that has
+ * never been started has earned nothing, sits at bronze, and ranks last of
+ * everything. The screen must make it obvious that this is a consequence of not
+ * playing it, not a bug.
+ */
+export const CARD_PROFILE_NEVER_STARTED: Json = {
+  card: {
+    id: '9e4b1a70-3333-4c11-8f22-7a5c9d2e6b04',
+    card_id: '2b1e5d90-2222-4a77-b3c1-6e9f0d4a1c22',
+    player_id: 'f6d6132d-2900-4a30-8cb9-8d9030a5a562',
+    player_name: 'Christian McCaffrey',
+    position_abbreviation: 'RB',
+    team_abbreviation: 'SF',
+    injury_status: 'Questionable',
+    season: 2026,
+    rarity: 'legendary',
+    tier: 'bronze',
+    career_fp: 0,
+    lineup_starts: 0,
+    fp_per_start: null,
+    acquired_at: '2026-08-18T09:41:12.500Z',
+    source: 'pack',
+    sold_at: null,
+    sold_for: null,
+    sell_value: 8,
+    tier_floor_fp: 0,
+    next_tier_at: 200,
+    next_tier_label: 'silver',
+  },
+  rank: { among_player: 20, player_pool: 27, overall: 7733, overall_pool: 9418 },
+  starts: [],
+};
