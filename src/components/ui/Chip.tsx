@@ -18,7 +18,7 @@
  */
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
+import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export function Chip({
@@ -58,14 +58,18 @@ export function Chip({
             backgroundColor: selected ? c.backgroundSelected : c.backgroundElement,
             borderColor: selected ? c.text : c.border,
             borderWidth: selected ? 1.5 : StyleSheet.hairlineWidth,
-            // Keep the box identical either way so nothing shifts on press.
-            paddingHorizontal: selected ? Spacing.two - 1 : Spacing.two,
-            paddingVertical: selected ? 3.5 : 4,
+            // Keep the box identical either way so nothing shifts on press:
+            // the heavier selected border eats half a point on each side, so
+            // the padding gives it back.
+            paddingHorizontal: selected ? Spacing.two + 1 : Spacing.two + 2,
+            paddingVertical: selected ? 4.5 : 5,
           },
         ]}>
         {children}
         {label ? (
-          <Text style={[Type.label, { color: selected ? c.text : c.textSecondary }]}>{label}</Text>
+          <Text style={[Type.label, styles.label, { color: selected ? c.text : c.textSecondary }]}>
+            {label}
+          </Text>
         ) : null}
         {count === undefined ? null : (
           <Text
@@ -94,7 +98,20 @@ export function ChipRow({ children }: { children: React.ReactNode }) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2, paddingRight: Spacing.two },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1, borderRadius: 7 },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one + 1,
+    borderRadius: Radius.chip,
+    // One height for every chip on the page, whatever it holds — a label, a
+    // count, a tier badge — so a row of them has a single baseline.
+    minHeight: 28,
+  },
+  /* Uppercased HERE rather than by each caller, which is how the row ended up
+     reading "ALL · QB · Career FP · SEARCH" — three casings in one strip.
+     `Type.label` is specified as a 10pt uppercase style; this is what makes
+     that true of every chip. */
+  label: { textTransform: 'uppercase' },
   count: { fontWeight: '600' },
   divider: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', marginHorizontal: Spacing.one },
   pressed: { opacity: 0.7 },

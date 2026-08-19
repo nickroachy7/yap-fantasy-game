@@ -27,14 +27,13 @@ import {
 import {
   PositionFilterRow,
   ResultLine,
-  SearchField,
-  SortRow,
   TierFilterRow,
 } from '@/components/collection/CollectionFilters';
 import { CollectionSummary } from '@/components/collection/CollectionSummary';
 import { EmptyCollection, EmptyFilterResult } from '@/components/collection/EmptyInventory';
 import { InventoryCard } from '@/components/collection/InventoryCard';
 import {
+  SORT_OPTIONS,
   SortDefaultDir,
   countByPosition,
   countByTier,
@@ -53,6 +52,7 @@ import {
 } from '@/components/collection/types';
 import { useCollection } from '@/components/collection/use-collection';
 import { ChipRow, FilterChips, type FilterChip } from '@/components/ui/Chip';
+import { SearchField, SortChips } from '@/components/ui/Controls';
 import { Screen } from '@/components/shell/Screen';
 import { SectionNav } from '@/components/shell/SectionNav';
 import { Colors, Spacing, Type } from '@/constants/theme';
@@ -185,6 +185,12 @@ export default function InventoryScreen() {
   }, []);
   const toggleDir = useCallback(() => setDir((d) => (d === 'desc' ? 'asc' : 'desc')), []);
 
+  /** A new key takes its own natural direction; the active key reverses. */
+  const pressSort = useCallback(
+    (next: SortKey) => (next === sort ? toggleDir() : changeSort(next)),
+    [sort, toggleDir, changeSort],
+  );
+
   const onRefresh = useCallback(async () => {
     await Promise.all([refresh(), refreshPlayer()]);
   }, [refresh, refreshPlayer]);
@@ -217,7 +223,7 @@ export default function InventoryScreen() {
         ? [
             {
               key: 'search',
-              label: 'SEARCH',
+              label: 'Search',
               active: showSearch || needle.length > 0,
               onPress: () => setShowSearch((v) => !v),
             },
@@ -225,19 +231,19 @@ export default function InventoryScreen() {
         : []),
       {
         key: 'tiers',
-        label: 'TIERS',
+        label: 'Tiers',
         active: showTiers || tier !== 'ALL',
         onPress: () => setShowTiers((v) => !v),
       },
       {
         key: 'available',
-        label: 'AVAILABLE',
+        label: 'Available',
         // Not a disclosure — this one IS the filter. Pressing it hides the
         // cards that are already in a lineup.
         active: availability === 'AVAILABLE',
         onPress: () => setAvailability((a) => (a === 'ALL' ? 'AVAILABLE' : 'ALL')),
       },
-      { key: 'sort', label: 'SORT', active: showSort, onPress: () => setShowSort((v) => !v) },
+      { key: 'sort', label: 'Sort', active: showSort, onPress: () => setShowSort((v) => !v) },
     ],
     [searchable, showSearch, needle, showTiers, tier, availability, showSort],
   );
@@ -286,7 +292,14 @@ export default function InventoryScreen() {
                 <FilterChips items={facets} />
               </ChipRow>
               {searchable && showSearch ? (
-                <SearchField value={query} onChange={setQuery} hint={`${total} OWNED`} />
+                <SearchField
+                  value={query}
+                  onChange={setQuery}
+                  placeholder="Search name, team or position"
+                  hint={`${total} OWNED`}
+                  accessibilityLabel="Search your collection"
+                  autoFocus
+                />
               ) : null}
             </View>
 
@@ -326,7 +339,7 @@ export default function InventoryScreen() {
                     counts={positionCounts}
                   />
                   {showSort ? (
-                    <SortRow value={sort} dir={dir} onChange={changeSort} onToggleDir={toggleDir} />
+                    <SortChips options={SORT_OPTIONS} value={sort} dir={dir} onPress={pressSort} />
                   ) : null}
                   <ResultLine
                     shown={visible.length}
@@ -353,6 +366,7 @@ export default function InventoryScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  /* Mirrors PlayersPanel's `controls`. See the note there. */
   toolbar: { paddingHorizontal: GUTTER, paddingBottom: Spacing.two, gap: Spacing.two },
   list: { paddingHorizontal: GUTTER, paddingBottom: Spacing.six, gap: GAP },
   row: { gap: GAP },

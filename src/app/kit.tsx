@@ -28,8 +28,8 @@ import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
 import type { LineupCard } from '@/components/lineup/model';
 import { PlayerRow } from '@/components/cards/PlayerRow';
 import type { DirectoryPlayer } from '@/components/cards/player-directory';
-import { SortBar } from '@/components/cards/SortBar';
 import { CollectionSummary } from '@/components/collection/CollectionSummary';
+import { SearchField, SortChips } from '@/components/ui/Controls';
 import { summarise } from '@/components/collection/types';
 import { OWNED_MANY } from '@/components/dev/fixtures';
 import { GameRow } from '@/components/scores/GameRow';
@@ -502,6 +502,28 @@ function Kit() {
           </Section>
 
           <Section
+            title="Page controls"
+            note="One search field and one sort strip, shared by both browsing screens. The active sort key carries its own direction.">
+            <SearchField
+              value=""
+              onChange={() => {}}
+              placeholder="Search name, team or college"
+              hint="968 PLAYERS"
+              accessibilityLabel="Search players"
+            />
+            <SortChips
+              options={[
+                { key: 'fp', label: 'Career FP' },
+                { key: 'tier', label: 'Tier' },
+                { key: 'name', label: 'Name' },
+              ]}
+              value="tier"
+              dir="asc"
+              onPress={() => {}}
+            />
+          </Section>
+
+          <Section
             title="Action bar"
             note="A section's pages, and nothing else — same strip on every page of the section, only the highlight moves. Every glyph, hollow then solid.">
             <ActionBar
@@ -582,7 +604,17 @@ function Kit() {
           <Section
             title="Directory row"
             note="Identity over a tinted stat tray, fixed 90pt. Last row has never played — dashes, not zeroes.">
-            <SortBar sort={{ key: 'fp', dir: 'desc' }} onSort={() => {}} />
+            <SortChips
+              options={[
+                { key: 'fp', label: 'FP' },
+                { key: 'fpg', label: 'FP/G' },
+                { key: 'games', label: 'GP' },
+                { key: 'name', label: 'Name' },
+              ]}
+              value="fp"
+              dir="desc"
+              onPress={() => {}}
+            />
             <Panel>
               {DIRECTORY_ROWS.map((r) => (
                 <PlayerRow

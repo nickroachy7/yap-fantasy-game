@@ -29,7 +29,7 @@
  */
 import { ScrollView, StyleSheet, Pressable, Text, View, type ColorValue } from 'react-native';
 
-import { Colors, Spacing, Type } from '@/constants/theme';
+import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export type ActionIconName =
@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
     // centred rather than left-packed, because a capped item cannot fill it.
     flexGrow: 1,
     justifyContent: 'center',
-    borderRadius: 12,
+    borderRadius: Radius.panel,
     borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.one,
     gap: Spacing.one,
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 3,
     paddingVertical: Spacing.one + 2,
-    borderRadius: 9,
+    borderRadius: Radius.control,
   },
   label: { letterSpacing: 0.4 },
   badge: { fontSize: 7, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },

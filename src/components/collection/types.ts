@@ -73,6 +73,11 @@ export const SortLabels: Record<SortKey, string> = {
   recent: 'Acquired',
 };
 
+/** The same labels in reading order, as the shared sort strip wants them. */
+export const SORT_OPTIONS: { key: SortKey; label: string }[] = (
+  Object.keys(SortLabels) as SortKey[]
+).map((key) => ({ key, label: SortLabels[key] }));
+
 /**
  * The direction each key is worth reading FIRST. Pressing "Name" and getting
  * Z–A, or "Career FP" and getting your worst card, reads as a broken control

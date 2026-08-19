@@ -112,6 +112,25 @@ export const Type = {
 /** Tabular figures. Columns of numbers must not jitter as values change. */
 export const NUMERIC = { fontVariant: ['tabular-nums' as const] };
 
+/**
+ * Corner radii, so controls that sit next to each other agree about how round
+ * they are.
+ *
+ * There were five values in play across the filter controls alone — 7 on a
+ * chip, 8 on the directory's sort chip and its search field, 9 on a bar item,
+ * 10 on a panel, 12 on the bar — which is why a row of them never looked like
+ * one control. Three steps, and they nest: a chip sits inside a bar, a bar
+ * sits on a panel.
+ */
+export const Radius = {
+  /** Chips, sort keys, anything the size of a word. */
+  chip: 8,
+  /** Search fields, bar items, buttons. */
+  control: 10,
+  /** The container something else sits inside. */
+  panel: 12,
+} as const;
+
 export const Spacing = {
   half: 2,
   one: 4,

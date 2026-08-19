@@ -25,7 +25,6 @@ import {
   FlatList,
   StyleSheet,
   Text,
-  TextInput,
   View,
   useColorScheme,
 } from 'react-native';
@@ -33,14 +32,15 @@ import {
 import { SectionNav } from '@/components/shell/SectionNav';
 import { useTabBarInset } from '@/components/shell/useResponsive';
 import { Chip, ChipRow, FilterChips, type FilterChip } from '@/components/ui/Chip';
+import { SearchField, SortChips } from '@/components/ui/Controls';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { PLAYER_ROW_HEIGHT, PlayerRow, ROW_GUTTER } from './PlayerRow';
-import { SortBar } from './SortBar';
 import { useUpcomingFixtures } from './use-fixtures';
 import {
   DEFAULT_SORT_DIR,
   POSITION_FILTERS,
+  SORT_OPTIONS,
   filterAndSort,
   loadPlayerDirectory,
   positionCounts,
@@ -143,14 +143,14 @@ export function PlayersPanel({
     () => [
       {
         key: 'search',
-        label: 'SEARCH',
+        label: 'Search',
         // Active when the field is open OR when a query is narrowing the list
         // from behind a closed one — a filter you cannot see is the one that
         // most needs saying.
         active: showSearch || query.trim().length > 0,
         onPress: () => setShowSearch((v) => !v),
       },
-      { key: 'sort', label: 'SORT', active: showSort, onPress: () => setShowSort((v) => !v) },
+      { key: 'sort', label: 'Sort', active: showSort, onPress: () => setShowSort((v) => !v) },
     ],
     [showSearch, showSort, query],
   );
@@ -174,25 +174,13 @@ export function PlayersPanel({
         <SectionNav section="/players" />
 
         {showSearch ? (
-          <View style={styles.searchRow}>
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search name, team or college"
-              placeholderTextColor={c.textTertiary}
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoFocus
-              returnKeyType="search"
-              clearButtonMode="while-editing"
-              accessibilityLabel="Search players by name, team or college"
-              style={[
-                styles.search,
-                Type.body,
-                { backgroundColor: c.backgroundElement, color: c.text, borderColor: c.border },
-              ]}
-            />
-          </View>
+          <SearchField
+            value={query}
+            onChange={setQuery}
+            placeholder="Search name, team or college"
+            accessibilityLabel="Search players by name, team or college"
+            autoFocus
+          />
         ) : null}
 
         {/* One line: the position facets, then this page's own toggles behind
@@ -212,12 +200,16 @@ export function PlayersPanel({
           <FilterChips items={facets} divided />
         </ChipRow>
 
-        {showSort ? <SortBar sort={sort} onSort={pressSort} /> : null}
+        {showSort ? (
+          <SortChips options={SORT_OPTIONS} value={sort.key} dir={sort.dir} onPress={pressSort} />
+        ) : null}
 
         {/* The count line always shows, open field or not: it is the answer to
             "am I looking at everything", and hiding it with the search box made
             a narrowed list look like the whole directory. */}
-        <Text numberOfLines={1} style={[Type.fine, NUMERIC, { color: c.textTertiary }]}>
+        {/* Same weight and colour as the collection's result line — they are
+            the same sentence about two different lists. */}
+        <Text numberOfLines={1} style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
           {result ? summarise(result, visible.length, filtering) : ' '}
         </Text>
 
@@ -307,15 +299,10 @@ function summarise(result: DirectoryFetch, shown: number, filtering: boolean): s
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  /* Same block as the inventory's toolbar, down to the numbers: one gutter,
+     one gap between controls, one gap before the list. Two screens with the
+     same controls at different rhythms is the thing this pass was for. */
   controls: { paddingHorizontal: ROW_GUTTER, paddingBottom: Spacing.two, gap: Spacing.two },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  search: {
-    flex: 1,
-    height: 32,
-    borderRadius: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.two,
-  },
   count: { flexShrink: 0 },
   warning: { padding: Spacing.two, borderRadius: 6, overflow: 'hidden' },
   headCell: { flexDirection: 'row', alignItems: 'center', gap: 1, flexShrink: 0 },

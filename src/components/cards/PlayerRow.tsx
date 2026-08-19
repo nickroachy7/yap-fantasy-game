@@ -85,10 +85,15 @@ const STRIP_HEIGHT = PLAYER_ROW_HEIGHT - IDENTITY_HEIGHT;
 
 /**
  * Side margin for the row AND for the controls above it, so the search field,
- * the tabs and every name share one left edge. 10pt sat the first character
+ * the chips and every name share one left edge. 10pt sat the first character
  * almost on the bezel.
+ *
+ * `Spacing.three`, which is what the Collection, the lineup rows and every
+ * `Screen` gutter use. It was 14 — two points in from everything else, which is
+ * exactly the sort of difference nobody can name and everybody can see when the
+ * two screens are flipped between.
  */
-export const ROW_GUTTER = 14;
+export const ROW_GUTTER = Spacing.three;
 
 const oneDp = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
