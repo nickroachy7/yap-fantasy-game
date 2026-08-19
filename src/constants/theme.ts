@@ -145,7 +145,7 @@ export const Spacing = {
  * Height of the bottom tab bar's CONTENT, excluding the safe-area inset.
  *
  * This is not a measurement of react-navigation's default bar — it is a height
- * we impose on it (see `(app)/_layout.tsx`), which is what makes it safe for
+ * we impose on it (see `(app)/(tabs)/_layout.tsx`), which is what makes it safe for
  * screens to reserve exactly this much tail room. The number it replaced was a
  * guess per platform, `{ ios: 50, android: 80 }`, and it was wrong in three
  * ways at once: it had no web value, so on a narrow browser — where the bar is
@@ -191,6 +191,39 @@ export const MaxContentWidth = ContentMeasure.grid;
 
 /** The wide-web sidebar's width, shared so layout arithmetic can subtract it. */
 export const RailWidth = 236;
+
+/* ------------------------------------------------------------------------- *
+ * Sheets
+ *
+ * The player profile is presented over the app rather than instead of it: a
+ * native sheet on a phone, a centred dialog on a wide browser window. These
+ * are the numbers both presentations share, so the two cannot drift.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Where the native sheet rests, as fractions of screen height.
+ *
+ * Two, not three. The large one is the profile; the small one is somewhere to
+ * drag it down to when you have read the name and the numbers at the top and
+ * are on your way out. A middle detent sounds generous and in practice just
+ * adds a stop you have to drag through. Android caps at three; iOS does not.
+ */
+/* Not `as const`: react-native-screens types this option as a MUTABLE
+   `number[]`, and a readonly tuple is not assignable to it. */
+export const SheetDetents: number[] = [0.55, 0.94];
+
+/** Matched by the web dialog so the two presentations feel like one object. */
+export const SheetCorner = 20;
+
+/**
+ * The web dialog's cap. Narrower than `table` (940) on purpose: a profile read
+ * in a dialog is a glance, and a dialog stretched to a full reading measure
+ * stops reading as something laid OVER the page and starts reading as the page.
+ */
+export const SheetDialogWidth = 720;
+
+/** How far the dialog stays clear of the top and bottom of the viewport. */
+export const SheetDialogInset = 40;
 
 /* ------------------------------------------------------------------------- *
  * Card tier design tokens (Yap Fantasy)

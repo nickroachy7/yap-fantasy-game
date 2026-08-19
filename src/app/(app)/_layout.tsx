@@ -1,46 +1,38 @@
-import { Redirect, Tabs, type Href } from 'expo-router';
+import { Redirect, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Platform } from 'react-native';
 
-import { NAV_SECTIONS, routeNameOf } from '@/components/shell/sections';
-import { Sidebar } from '@/components/shell/Sidebar';
-import { TabIcon } from '@/components/shell/TabIcon';
 import { useIsWide } from '@/components/shell/useResponsive';
-import { Colors, TabBarContentHeight } from '@/constants/theme';
+import { SheetCorner, SheetDetents } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { PlayerProvider } from '@/context/PlayerContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
 /**
- * The five bottom tabs.
+ * The signed-in shell: a Stack whose only ordinary screen is the tab navigator.
  *
- * `href` is the load-bearing part, not decoration. Four of these five routes
- * are FOLDERS with sub-pages, and a tab whose route is a nested navigator
- * restores that navigator's last state when you return to it — so after a trip
- * to Scores, pressing "Lineup" put you back on Scores, and the tab labelled
- * Lineup never showed the lineup again. `popToTopOnBlur` does not fix it
- * either: `SectionNav` navigates with `replace`, so the sub-page IS the stack root
- * and there is nothing to pop.
+ * WHY A STACK SITS ABOVE THE TABS
  *
- * Naming the href makes the tab button a link to that exact path rather than a
- * "switch to this navigator" action, which resets the section in both cases —
- * returning from another tab, and pressing the tab you are already on. Verified
- * against expo-router 57 rather than assumed.
+ * The player profile used to be a hidden sixth tab (`href: null`). That worked,
+ * but it meant opening a player REPLACED the whole screen — the directory you
+ * were scanning vanished, and coming back was a navigation rather than a
+ * dismissal. A profile is a thing you glance at and put down again, so it is
+ * now presented over the tabs instead of instead of them.
  *
- * The tabs themselves come from NAV_SECTIONS rather than a list kept here.
- * That file is the single declaration of the navigation — its own header warns
- * about exactly this — and the first version of this layout carried a parallel
- * array of five sections that had already begun to drift from it.
+ * A modal presentation needs a Stack; a Tabs navigator has no concept of one.
+ * Hence this layer. The tabs moved into the `(tabs)` group, which is a GROUP —
+ * it does not appear in any URL, so `/lineup`, `/collection/shop` and
+ * `/player/<id>` are all exactly the paths they were before. Nothing that links
+ * to them changed.
+ *
+ * `PlayerProvider` stays HERE rather than in `(tabs)`, because the sheet is a
+ * sibling of the tabs and not a child: the profile reads the collection and the
+ * wallet (selling a card refreshes both), and a provider inside `(tabs)` would
+ * be outside the sheet's tree.
  */
-
 export default function AppLayout() {
   const { session, initialising } = useAuth();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
   const isWide = useIsWide();
-  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!initialising) void SplashScreen.hideAsync();
@@ -52,83 +44,55 @@ export default function AppLayout() {
 
   return (
     <PlayerProvider>
-      {/* One navigator either way. Swapping between a Tabs and a Drawer
-          navigator on resize would remount every screen and lose scroll
-          position, so the tab bar is hidden and the rail rendered beside it. */}
-      <View style={[styles.shell, isWide && styles.shellWide, { backgroundColor: c.background }]}>
-        {isWide ? <Sidebar /> : null}
-        <View style={styles.content}>
-          <Tabs
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="player/[id]"
+          options={{
             /**
-             * Back returns to the tab you CAME FROM, not to the first one.
+             * Three presentations, because "a sheet" means three different
+             * things on three platforms.
              *
-             * react-navigation defaults to `firstRoute`, which meant backing
-             * out of a player profile always landed on Lineup — the profile is
-             * an href:null sibling of the five tabs, so leaving it popped to
-             * the navigator's initial route rather than to the directory you
-             * opened it from. Verified with a probe: default lands on tab one,
-             * `history` lands where you were.
+             * iOS/Android get `formSheet`, which is the real thing: a native
+             * sheet that rises from the bottom edge, rests at a detent, and is
+             * dismissed by dragging down. The gesture is the platform's, not
+             * ours, so it behaves exactly like every other sheet on the device.
              *
-             * It also makes Android's hardware back walk the tabs you actually
-             * visited, which is what people expect of it everywhere else.
+             * Web gets `transparentModal`, which renders the route OVER the
+             * page without a card background of its own — the screen then draws
+             * its own centred dialog and backdrop (see PlayerSheetFrame). A
+             * full-width bar sliding up under a 1400pt browser window is a
+             * phone gesture wearing a desktop's clothes, which is the same
+             * reasoning SwapSheet already follows at the same breakpoint.
+             *
+             * A narrow BROWSER window still gets the web treatment rather than
+             * formSheet: react-native-screens has no native sheet to hand there,
+             * and `isWide` is what the rest of the app switches on.
              */
-            backBehavior="history"
-            screenOptions={{
-              headerShown: false,
-              tabBarActiveTintColor: c.text,
-              tabBarInactiveTintColor: c.textSecondary,
-              tabBarLabelStyle: styles.tabLabel,
-              tabBarStyle: isWide
-                ? { display: 'none' }
-                : {
-                    backgroundColor: c.background,
-                    borderTopColor: c.backgroundElement,
-                    /* The height is imposed rather than left to the navigator's
-                       default, which is the whole reason `useTabBarInset()` can
-                       promise screens an exact number to reserve. Content sits
-                       in TabBarContentHeight; the safe area is padding beneath
-                       it, so the bar's background still runs to the bottom of
-                       the screen instead of floating above the home indicator. */
-                    height: TabBarContentHeight + insets.bottom,
-                    paddingBottom: insets.bottom,
-                    paddingTop: 6,
-                  },
-            }}>
-            {NAV_SECTIONS.map((section) => (
-              <Tabs.Screen
-                key={section.href}
-                name={routeNameOf(section)}
-                options={{
-                  // `title` stays the full name — it is the route's name, not
-                  // just the bar's. Only the bar shortens, via tabBarLabel.
-                  title: section.label,
-                  tabBarLabel: section.tabLabel ?? section.label,
-                  href: section.href as Href,
-                  tabBarIcon: ({ color, focused }) => (
-                    <TabIcon name={section.icon} color={color} focused={focused} size={24} />
-                  ),
-                }}
-              />
-            ))}
+            presentation: Platform.OS === 'web' ? 'transparentModal' : 'formSheet',
 
-            {/* `/` resolves so the deployed domain root and every
-                <Redirect href="/" /> land somewhere; hidden from the bar. */}
-            <Tabs.Screen name="index" options={{ href: null }} />
-            <Tabs.Screen name="player/[id]" options={{ href: null }} />
-          </Tabs>
-        </View>
-      </View>
+            /* Two rests: a large one that shows the profile, and a smaller one
+               to drag down to when you only wanted the name and the numbers at
+               the top. Opening at the LARGER one (index 1) is deliberate — the
+               profile is tabbed, and opening at a peek would mean every visit
+               started with a drag. Android caps at three detents; we use two. */
+            sheetAllowedDetents: SheetDetents,
+            sheetInitialDetentIndex: 1,
+            sheetGrabberVisible: true,
+            sheetCornerRadius: SheetCorner,
+
+            /* The tab bar and rail stay visible behind the sheet, which is the
+               point: you can see where you will land when you flick it away. */
+            sheetExpandsWhenScrolledToEdge: false,
+
+            /* No card background on web — the screen paints its own dialog and
+               dimmed backdrop, and a card here would show as a second panel
+               behind it. Inert on native, where formSheet draws the surface. */
+            contentStyle: isWide || Platform.OS === 'web' ? { backgroundColor: 'transparent' } : undefined,
+            animation: Platform.OS === 'web' ? 'fade' : undefined,
+          }}
+        />
+      </Stack>
     </PlayerProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  shell: { flex: 1 },
-  shellWide: { flexDirection: 'row' },
-  content: { flex: 1 },
-  /* 10, not 11. At 11 both "Leaderboard" and "Collection" truncated on a
-     320pt viewport once icons were sitting above them. 10 clears every label
-     at 320 except Leaderboard, which gets a shorter word instead. Measured,
-     not guessed. */
-  tabLabel: { fontSize: 10, fontWeight: '600' },
-});

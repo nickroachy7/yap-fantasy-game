@@ -20,7 +20,7 @@
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { InjuryChip } from '@/components/cards/InjuryChip';
 import { PositionGlyph } from '@/components/cards/PositionGlyph';
@@ -38,9 +38,8 @@ import { GameLog } from '@/components/players/GameLog';
 import { parseGameLog, type GameLogSection } from '@/components/players/game-log';
 import { parseProfile, type PlayerProfile } from '@/components/players/profile';
 import { sellErrorMessage } from '@/components/players/sell';
-import { Screen } from '@/components/shell/Screen';
+import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
-import { useTabBarInset } from '@/components/shell/useResponsive';
 import { Colors, Spacing, type CardTier } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -97,7 +96,6 @@ export default function PlayerDetailScreen() {
   const router = useRouter();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const tabInset = useTabBarInset();
   const { refresh: refreshWallet } = usePlayer();
 
   const [player, setPlayer] = useState<DirectoryPlayer | null>(null);
@@ -172,7 +170,12 @@ export default function PlayerDetailScreen() {
     [id],
   );
 
-  const { loading, refreshing, error, refresh } = useLoader(load);
+  /* No `refreshing`, deliberately. Pull-to-refresh is gone from this screen:
+     inside a native formSheet a downward drag is the DISMISS gesture, so a
+     RefreshControl competing for it would make the sheet feel broken at the
+     top of the scroll. `refresh()` is still here and still used — selling a
+     card re-reads both this profile and the wallet. */
+  const { loading, error, refresh } = useLoader(load);
 
   /**
    * Sell one copy.
@@ -193,7 +196,16 @@ export default function PlayerDetailScreen() {
     [refresh, refreshWallet],
   );
 
-  const goBack = useCallback(() => {
+  /**
+   * Dismiss the sheet.
+   *
+   * `back()` is a DISMISSAL now, not a navigation — the tabs are still mounted
+   * underneath, so this puts the profile down and leaves you exactly where you
+   * were, mid-scroll. The fallback still matters and is still not /players:
+   * a cold deep link to /player/<id> opens the sheet with nothing beneath it,
+   * and `replace` is what gives that visitor an app rather than a dead end.
+   */
+  const dismiss = useCallback(() => {
     if (router.canGoBack()) router.back();
     else router.replace('/players');
   }, [router]);
@@ -325,34 +337,21 @@ export default function PlayerDetailScreen() {
           <GameLog sections={sections} position={profile?.player.positionAbbreviation ?? null} />
         ) : null}
 
-        <View style={{ height: tabInset }} />
       </>
     );
   };
 
   return (
-    <Screen
+    <PlayerSheetFrame
       title={player?.name}
-      measure="table"
-      context={player ? `${player.season ?? ''} game log`.trim() : 'Player'}
-      refreshing={refreshing}
-      onRefresh={() => void refresh()}>
-      {/* Says "Back", not "Cards". This page is now reachable from the
-          directory, the scoreboard's leader rows and the trend board, so a
-          label naming one of those three was wrong two times in three. The
-          destination is still the real history entry; /cards is only the
-          fallback for a cold deep link, which is the one case where there is
-          nothing to go back to. */}
-      <Pressable
-        onPress={goBack}
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-        hitSlop={8}
-        style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-        <Text style={[styles.backText, { color: c.textSecondary }]}>‹ Back</Text>
-      </Pressable>
+      subtitle={
+        player
+          ? [player.team?.toUpperCase(), player.position].filter(Boolean).join(' · ')
+          : undefined
+      }
+      onClose={dismiss}>
       {body()}
-    </Screen>
+    </PlayerSheetFrame>
   );
 }
 
@@ -391,9 +390,6 @@ function StatTile({
 }
 
 const styles = StyleSheet.create({
-  back: { alignSelf: 'flex-start', paddingVertical: 4, minHeight: 32, justifyContent: 'center' },
-  backText: { fontSize: 15, fontWeight: '600' },
-  pressed: { opacity: 0.6 },
   centre: { alignItems: 'center', justifyContent: 'center', gap: Spacing.two, paddingVertical: Spacing.six },
   emptyTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
   emptyBody: { fontSize: 14, lineHeight: 20, textAlign: 'center' },

@@ -17,7 +17,7 @@
  */
 import { Redirect } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionBar } from '@/components/shell/ActionBar';
@@ -25,6 +25,7 @@ import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
 import { ContestCard } from '@/components/lineup/ContestCard';
 import { BenchRow, StarterRow } from '@/components/lineup/LineupRow';
 import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
+import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import type { LineupCard } from '@/components/lineup/model';
 import { PlayerRow } from '@/components/cards/PlayerRow';
 import type { DirectoryPlayer } from '@/components/cards/player-directory';
@@ -408,6 +409,7 @@ function Kit() {
   const [confirmErr, setConfirmErr] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>('g3');
   const [swap, setSwap] = useState<SwapRequest | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [action, setAction] = useState('search');
   // The sheet changes shape at the same breakpoint the product uses, so this
   // gallery shows whichever one the current window would get.
@@ -599,6 +601,53 @@ function Kit() {
               onClear={() => setSwap(null)}
               onClose={() => setSwap(null)}
             />
+          </Section>
+
+          <Section
+            title="Player sheet"
+            note="The frame the player profile is presented in. On iOS and Android the route is a native formSheet and the OS draws the surface, so only what is inside it is ours. On web it is drawn here: a bottom sheet under 900px, a centred dialog above it — resize the window. Escape, the backdrop and the ✕ all close it.">
+            <View style={styles.row}>
+              <Pressable
+                onPress={() => setSheetOpen(true)}
+                style={({ pressed }) => [
+                  styles.demoButton,
+                  { backgroundColor: c.backgroundElement },
+                  pressed && { opacity: 0.6 },
+                ]}>
+                <Text style={[Type.strong, { color: c.text }]}>Open player sheet</Text>
+              </Pressable>
+            </View>
+            {/* The real route gets its full-screen container from
+                `presentation: 'transparentModal'`. Nothing supplies one here,
+                so a plain Modal stands in for it — without it the frame would
+                lay itself out inline and the dialog would not be centred on
+                anything. */}
+            {/* `animationType="none"` on purpose. react-native-web's Modal
+                drives `pointer-events` from its fade animation, and while that
+                animation is in flight the whole subtree is untouchable — which
+                in a gallery, where the sheet is opened and closed repeatedly,
+                leaves it stuck. The real route gets its container from
+                expo-router's `transparentModal` and has no RN Modal at all, so
+                this is scaffold, not behaviour. */}
+            <Modal
+              visible={sheetOpen}
+              transparent
+              animationType="none"
+              onRequestClose={() => setSheetOpen(false)}>
+              <PlayerSheetFrame
+                title="Christian McCaffrey"
+                subtitle="SF · RB"
+                onClose={() => setSheetOpen(false)}>
+                {Array.from({ length: 8 }, (_, i) => (
+                  <Panel key={i} title={i === 0 ? 'This season' : `Section ${i + 1}`}>
+                    <Text style={[Type.body, { color: c.textSecondary }]}>
+                      Filler, so the sheet is tall enough to scroll and to prove the dialog
+                      stops growing at the viewport instead of pushing its own header off.
+                    </Text>
+                  </Panel>
+                ))}
+              </PlayerSheetFrame>
+            </Modal>
           </Section>
 
           <Section
