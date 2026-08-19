@@ -85,7 +85,7 @@ export default function InventoryScreen() {
   /** 0 until the list has been laid out; the grid waits rather than guess. */
   const [listWidth, setListWidth] = useState(0);
 
-  const { cards, playerIds, error, loading, refreshing, refresh } = useCollection();
+  const { cards, error, loading, refreshing, refresh } = useCollection();
   const { cardCount, refresh: refreshPlayer } = usePlayer();
 
   const [query, setQuery] = useState('');
@@ -196,18 +196,22 @@ export default function InventoryScreen() {
   }, [refresh, refreshPlayer]);
 
   /* ---- navigation ------------------------------------------------------ *
-   * `my_collection` exposes card_id, not player_id, so the id is resolved
-   * through the `cards` catalogue (see use-collection.ts). If that lookup
-   * has not landed the card simply is not pressable — better than a tap
-   * that navigates nowhere.                                                */
-  const openPlayer = useCallback(
-    (card: CollectionCard) => {
-      const playerId = card.cardId ? playerIds.get(card.cardId) : undefined;
-      if (!playerId) return undefined;
-
-      return () => router.push({ pathname: '/player/[id]', params: { id: playerId } });
-    },
-    [playerIds, router],
+   * A cell in this grid is a COPY you own, not a player, so it opens
+   * `/card/<card_instance_id>` — the copy's own tier, what it has earned, the
+   * weeks it started, and where it ranks against every other copy of him. The
+   * footballer is one more tap from there, and is the same page for everyone.
+   *
+   * This used to resolve card_id -> player_id and open the player instead,
+   * which threw away the one thing the tap actually identified: WHICH of your
+   * copies was pressed. Someone holding three Caleb Williams cards got the same
+   * screen from all three.
+   *
+   * `card.id` is the instance id and is always present, so unlike the old
+   * player lookup there is nothing to wait on and no unpressable cell.        */
+  const openCard = useCallback(
+    (card: CollectionCard) => () =>
+      router.push({ pathname: '/card/[id]', params: { id: card.id } }),
+    [router],
   );
 
   // cardCount is the header's count and lands before the grid does, so it is
@@ -354,7 +358,7 @@ export default function InventoryScreen() {
               }
               ListEmptyComponent={<EmptyFilterResult onClear={clearFilters} hasFilters={filtered} />}
               renderItem={({ item }) => (
-                <InventoryCard card={item} width={itemWidth} onPress={openPlayer(item)} />
+                <InventoryCard card={item} width={itemWidth} onPress={openCard(item)} />
               )}
             />
           </>

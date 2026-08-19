@@ -1,21 +1,22 @@
 /**
  * Loads the signed-in player's owned cards.
  *
- * Two things here are deliberate and load-bearing:
+ * PAGING is the one load-bearing thing left here. PostgREST silently caps a
+ * `.select()` at 1000 rows and returns no error when it truncates, so a large
+ * collection would quietly lose its tail and nothing would look wrong. Every
+ * page is fetched via `.range()` until a short page proves the end. The order
+ * is `career_fp desc, id asc` — the id tiebreak matters, because paging over a
+ * non-unique sort key can repeat or skip rows between requests.
  *
- * 1. PAGING. PostgREST silently caps a `.select()` at 1000 rows and returns no
- *    error when it truncates, so a large collection would quietly lose its tail
- *    and nothing would look wrong. Every page is fetched via `.range()` until a
- *    short page proves the end. The order is `career_fp desc, id asc` — the id
- *    tiebreak matters, because paging over a non-unique sort key can repeat or
- *    skip rows between requests.
+ * WHAT WAS REMOVED, AND WHY IT WAS ALREADY DEAD
  *
- * 2. PLAYER IDS. `my_collection` exposes `card_id` (the catalogue entry) but not
- *    `player_id`, and the player detail route is keyed by player. Rather than
- *    add a migration we resolve card_id -> player_id against `cards`, which is
- *    readable by any authenticated user. It is a second round trip, so it is
- *    non-fatal: if it fails the grid still renders, cards just are not tappable
- *    rather than navigating somewhere that does not exist.
+ * This used to make a second, chunked round trip resolving card_id -> player_id
+ * against `cards`, so a grid cell could open the player. Two things ended it.
+ * The grid now opens the CARD (`/card/<card_instance_id>`) rather than the
+ * player, because a cell is one copy you own and the tap should say which one.
+ * And the lookup had in any case been redundant since the migration that added
+ * `player_id` to `my_collection` — the comment justifying it went stale without
+ * anyone noticing, which is exactly how a per-load round trip survives review.
  */
 import { useCallback, useState } from 'react';
 
@@ -30,14 +31,10 @@ const COLUMNS =
 const PAGE_SIZE = 500;
 /** A runaway loop against a paginated API is worse than a truncated grid. */
 const MAX_PAGES = 60;
-/** `.in()` becomes a query string, so the id list has to stay URL-sized. */
-const LOOKUP_CHUNK = 150;
 
 export type CollectionState = {
   /** Null until the first load resolves. */
   cards: CollectionCard[] | null;
-  /** card_id -> player_id. Empty when the lookup has not landed or failed. */
-  playerIds: Map<string, string>;
   error: string | null;
   loading: boolean;
   refreshing: boolean;
@@ -68,38 +65,14 @@ async function fetchAllRows(): Promise<CollectionCard[]> {
   return out;
 }
 
-async function fetchPlayerIds(cardIds: string[]): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
-
-  for (let i = 0; i < cardIds.length; i += LOOKUP_CHUNK) {
-    const chunk = cardIds.slice(i, i + LOOKUP_CHUNK);
-    const { data, error } = await supabase.from('cards').select('id, player_id').in('id', chunk);
-
-    if (error) throw new Error(error.message);
-    for (const row of data ?? []) map.set(row.id, row.player_id);
-  }
-
-  return map;
-}
-
 export function useCollection(): CollectionState {
   const [cards, setCards] = useState<CollectionCard[] | null>(null);
-  const [playerIds, setPlayerIds] = useState<Map<string, string>>(() => new Map());
 
   const load = useCallback<Load>(async (live) => {
     try {
       const rows = await fetchAllRows();
       if (!live()) return;
       setCards(rows);
-
-      const ids = [...new Set(rows.map((r) => r.cardId).filter((id): id is string => Boolean(id)))];
-      try {
-        const map = await fetchPlayerIds(ids);
-        if (live()) setPlayerIds(map);
-      } catch {
-        // Non-fatal: the grid is still correct, it just stops being tappable.
-        if (live()) setPlayerIds(new Map());
-      }
     } catch (e) {
       return e instanceof Error ? e.message : 'Could not load your collection.';
     }
@@ -107,5 +80,5 @@ export function useCollection(): CollectionState {
 
   const { loading, refreshing, error, refresh } = useLoader(load);
 
-  return { cards, playerIds, error, loading, refreshing, refresh };
+  return { cards, error, loading, refreshing, refresh };
 }
