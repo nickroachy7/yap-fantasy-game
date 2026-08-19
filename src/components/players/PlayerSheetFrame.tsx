@@ -48,12 +48,20 @@ export function PlayerSheetFrame({
   title,
   subtitle,
   onClose,
+  closeLabel = 'Close player profile',
   children,
 }: {
   /** The player's name once known; undefined while loading. */
   title?: string;
   subtitle?: string;
   onClose: () => void;
+  /**
+   * What the close control announces. The frame is shared by the player
+   * profile and the card profile, and a screen reader saying "close player
+   * profile" on a card is simply wrong — the two are deliberately different
+   * objects everywhere else in the app.
+   */
+  closeLabel?: string;
   children: ReactNode;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -114,7 +122,7 @@ export function PlayerSheetFrame({
       <Pressable
         onPress={onClose}
         accessibilityRole="button"
-        accessibilityLabel="Close player profile"
+        accessibilityLabel={closeLabel}
         hitSlop={10}
         style={({ pressed }) => [
           styles.close,
@@ -165,7 +173,7 @@ export function PlayerSheetFrame({
       <Pressable
         style={StyleSheet.absoluteFill}
         accessibilityRole="button"
-        accessibilityLabel="Close player profile"
+        accessibilityLabel={closeLabel}
         onPress={onClose}
       />
       <View
