@@ -1,0 +1,62 @@
+-- Standard pack odds: validated against real bands, deliberately UNCHANGED.
+--
+-- 20260818050000 shipped {"common":70,"uncommon":20,"rare":7,"epic":2.5,
+-- "legendary":0.5} at a time when every card was common, so the weights were
+-- inert — open_pack() rolled a band, found it empty, and fell through to "any
+-- mintable card". Every pull was uniform. 20260819100000 populated the bands,
+-- which is the first moment these numbers do anything at all. They therefore
+-- needed checking against the realised population before kickoff, not assuming.
+--
+-- REALISED BANDS (season 2026, 968 mintable cards):
+--
+--     band        cards   % of pool   pack odds   odds / population
+--     common        679      70.1%        70%          1.00
+--     uncommon      143      14.8%        20%          1.35
+--     rare           86       8.9%         7%          0.79
+--     epic           40       4.1%       2.5%          0.61
+--     legendary      20       2.1%       0.5%          0.24
+--
+-- The right-hand column is the test. It descends monotonically, which is exactly
+-- what a rarity system is for: the better the band, the more the odds suppress
+-- it relative to how many such cards exist. A band whose ratio rose as the band
+-- improved would mean the "rare" tiers were actually easier to hit than chance,
+-- and that is the failure this table rules out. Nothing here is clearly wrong,
+-- so nothing is changed — the guidance is that you can always grant more and
+-- never claw back, and loosening odds on a hunch is how you end up clawing back.
+--
+-- SIMULATED PULL EXPERIENCE (200,000 packs against the realised bands, and the
+-- closed form, which agree):
+--
+--     41.0% of packs contain at least one rare-or-better
+--     14.2% contain at least one epic-or-better
+--      2.45% contain a legendary  ->  ~41 packs (4,100 gems) to expect one
+--
+--     after the 500-gem signup grant (5 packs, 25 cards):
+--       92.8% have seen a rare+, 53.3% an epic+, 11.8% a legendary
+--
+-- That is a good first thirty minutes: a rare is near-certain, an epic is a
+-- coin-flip, and a legendary stays a genuine chase rather than a formality.
+--
+-- The specific trap this was checked against: a 0.5% roll is a different promise
+-- depending on how many cards sit behind it. Legendary is 20 cards, not 8 — so a
+-- legendary pull is 1-of-20 elite players (McCaffrey, Josh Allen, Puka Nacua,
+-- Trey McBride, Jason Myers...), which is a coherent chase. At 8 it would have
+-- been a lottery on specific individuals and 0.5% would have been too tight.
+--
+-- Duplicate pressure was checked too and is not a problem at any band: over a
+-- full 18-week season (~45 packs, 225 cards) a player draws ~157 commons from
+-- 679, ~16 rares from 86, ~5.6 epics from 40 and ~1.1 legendaries from 20.
+--
+-- POSITION COVERAGE IS UNAFFECTED, which is the point worth stating explicitly
+-- because it is the one place these two axes could have collided. Weighting by
+-- rarity leaves the position mix of a pack essentially identical to the old
+-- uniform draw (kicker in 19.29% of packs, against 19.46% uniform), because the
+-- bands are built within position and so carry roughly the position mix of the
+-- whole set. Rarity neither creates nor fixes the kicker-coverage problem;
+-- `packs.guaranteed_positions` remains the mechanism for that.
+
+comment on column public.packs.odds is
+  'Weights per rarity band, summing to 100. Inert until 20260819100000 populated '
+  'cards.rarity; validated against the realised band sizes on 2026-08-19 and left '
+  'unchanged. See docs/rarity-and-pack-odds.md before tuning — the odds/population '
+  'ratio must stay monotonically decreasing as the band improves.';
