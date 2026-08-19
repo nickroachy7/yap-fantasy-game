@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A second push to the same branch cancels the first: the older run's answer is
+# already stale.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: typecheck, lint, unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Unit tests (Deno)
+        run: npm run test:unit
+
+      - name: SQL suites — not run here
+        run: |
+          echo "The five suites in supabase/tests/*.test.sql are SKIPPED in CI."
+          echo "They need a live Postgres and a DATABASE_URL secret that is not set"
+          echo "on this repository. Run them locally before a release:"
+          echo
+          echo "  export DATABASE_URL='postgresql://postgres.<ref>:<password>@...pooler.supabase.com:5432/postgres'"
+          echo "  npm run test:sql"
+          echo
+          echo "See docs/testing.md."

@@ -45,9 +45,9 @@
     "typecheck": "tsc --noEmit",
     "build:web": "expo export --platform web",
     "check:functions": "deno check supabase/functions/**/index.ts supabase/tests/*.ts",
-    "test:rls": "echo \"psql \\\"$DATABASE_URL\\\" -v ON_ERROR_STOP=1 -f supabase/tests/rls_isolation.test.sql\"",
-    "test:slate": "echo \"psql \\\"$DATABASE_URL\\\" -v ON_ERROR_STOP=1 -f supabase/tests/slate_transition.test.sql\"",
-    "test:sell": "echo \"psql \\\"$DATABASE_URL\\\" -v ON_ERROR_STOP=1 -f supabase/tests/sell_card.test.sql\"",
+    "test": "npm run typecheck && npm run lint && npm run test:unit && npm run test:sql -- --skip-without-db",
+    "test:unit": "node scripts/run-deno-tests.mjs",
+    "test:sql": "node scripts/run-sql-tests.mjs",
     "smoke:provider": "deno run --allow-net --allow-env --allow-read supabase/tests/provider_smoke.ts",
     "gen:types": "supabase gen types typescript --linked > src/lib/database.types.ts"
   },
