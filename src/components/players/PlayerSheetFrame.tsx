@@ -3,11 +3,11 @@
  *
  * TWO PRESENTATIONS, ONE OBJECT
  *
- * On a phone the route is a native `formSheet`: the platform draws the surface,
- * the rounded top edge, the grabber and the drag-to-dismiss gesture, so this
- * component adds only what sits INSIDE it — a title bar and the scroll
- * container. Reimplementing any of the rest would be a worse copy of a gesture
- * the device already does perfectly.
+ * On a phone the route is a native page sheet (`presentation: 'modal'`): the
+ * platform draws the surface, the rounded top edge and the drag-to-dismiss
+ * gesture, so this component adds only what sits INSIDE it — a title bar and
+ * the scroll container. Reimplementing any of the rest would be a worse copy of
+ * a gesture the device already does perfectly.
  *
  * On web the route is a `transparentModal`, which renders over the page and
  * paints nothing, so the surface is ours to draw — and it is drawn TWO ways,
@@ -85,13 +85,15 @@ export function PlayerSheetFrame({
      *
      * React Native drops layout-only Views from the native tree as an
      * optimisation, hoisting their children into the parent. react-native-screens'
-     * formSheet counts its subviews to decide how to lay a sheet out and expects
-     * at most two — a header and a scroll view — so once this View was collapsed
-     * the sheet saw six loose subviews, gave the header no height, and painted it
-     * on top of the scrolling content. It looked like three separate bugs
-     * (overlapping text, content past the sheet edge, a dead top area) and was
-     * this one flag. The library says so out loud in a warning worth reading:
-     * "FormSheet with ScrollView expects at most 2 subviews. Got 6".
+     * sheet presentations count their subviews to decide how to lay out, and
+     * expect at most two — a header and a scroll view — so once this View was
+     * collapsed the sheet saw six loose subviews, gave the header no height, and
+     * painted it on top of the scrolling content. It looked like three separate
+     * bugs (overlapping text, content past the sheet edge, a dead top area) and
+     * was this one flag. The library says so out loud in a warning worth
+     * reading: "FormSheet with ScrollView expects at most 2 subviews. Got 6".
+     * Kept after the move from formSheet to a page sheet: still correct, still
+     * free, and the failure it prevents is expensive to diagnose.
      */
     <View collapsable={false} style={[styles.header, { borderBottomColor: c.border }]}>
       <View style={styles.headerText}>
@@ -138,7 +140,7 @@ export function PlayerSheetFrame({
   );
 
   if (!isWeb) {
-    // The formSheet already IS the surface — draw on it, do not draw another.
+    // The page sheet already IS the surface — draw on it, do not draw another.
     return (
       <View collapsable={false} style={[styles.sheetRoot, { backgroundColor: c.background }]}>
         {header}
@@ -188,9 +190,9 @@ const styles = StyleSheet.create({
   /**
    * `height: '100%'`, not just `flex: 1`.
    *
-   * A formSheet sizes itself to its detent, and react-native-screens does not
-   * hand the screen's root view a definite height — so `flex: 1` alone resolves
-   * against nothing and the root measures ZERO. The children still PAINT, which
+   * A sheet sizes itself to its presentation, and react-native-screens does not
+   * always hand the screen's root view a definite height — so `flex: 1` alone
+   * can resolve against nothing and the root measure ZERO. The children still PAINT, which
    * is what made this so confusing to look at: the header rendered on top of
    * the scroll content instead of above it, and the content ran past the
    * sheet's own edge. It reads as three unrelated glitches and is one missing

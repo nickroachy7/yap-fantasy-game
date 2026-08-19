@@ -201,18 +201,17 @@ export const RailWidth = 236;
  * ------------------------------------------------------------------------- */
 
 /**
- * Where the native sheet rests, as fractions of screen height.
+ * The web sheet's corner radius.
  *
- * Two, not three. The large one is the profile; the small one is somewhere to
- * drag it down to when you have read the name and the numbers at the top and
- * are on your way out. A middle detent sounds generous and in practice just
- * adds a stop you have to drag through. Android caps at three; iOS does not.
+ * There were resting detents here too, for a native `formSheet`. That
+ * presentation is gone: on iOS 26 a formSheet is INSET on iPhone, leaving a
+ * margin down each side through which the page underneath stays visible, and a
+ * sheet you can see the page around reads as a card dropped on the screen
+ * rather than as the screen. The profile now uses `modal` — UIKit's page sheet,
+ * full width — which has one height and no detents to configure. iOS draws its
+ * own corner; this number is the web dialog's, kept so the two presentations
+ * still feel like one object.
  */
-/* Not `as const`: react-native-screens types this option as a MUTABLE
-   `number[]`, and a readonly tuple is not assignable to it. */
-export const SheetDetents: number[] = [0.55, 0.94];
-
-/** Matched by the web dialog so the two presentations feel like one object. */
 export const SheetCorner = 20;
 
 /**

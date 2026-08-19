@@ -4,7 +4,6 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 
 import { useIsWide } from '@/components/shell/useResponsive';
-import { SheetCorner, SheetDetents } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { PlayerProvider } from '@/context/PlayerContext';
 
@@ -50,44 +49,38 @@ export default function AppLayout() {
           name="player/[id]"
           options={{
             /**
-             * Three presentations, because "a sheet" means three different
-             * things on three platforms.
+             * Two presentations, because "a sheet" means different things on a
+             * phone and in a browser.
              *
-             * iOS/Android get `formSheet`, which is the real thing: a native
-             * sheet that rises from the bottom edge, rests at a detent, and is
-             * dismissed by dragging down. The gesture is the platform's, not
-             * ours, so it behaves exactly like every other sheet on the device.
+             * iOS/Android get `modal`, which on iPhone is UIKit's page sheet:
+             * **full width**, rounded top, the page behind scaling back, and
+             * drag-down to dismiss.
+             *
+             * It was `formSheet` first, for its resting detents. That was the
+             * wrong trade. On iOS 26 a formSheet is INSET on iPhone — a margin
+             * down each side through which the list underneath stays visible —
+             * and it is the presentation style that does that, not our layout,
+             * so no width on any View inside can close it. A sheet you can see
+             * the page around reads as a card dropped on the screen rather than
+             * as the screen. Losing the 0.55 detent is the price; it was a nice
+             * extra, and edge-to-edge is the thing that makes it feel native.
              *
              * Web gets `transparentModal`, which renders the route OVER the
-             * page without a card background of its own — the screen then draws
-             * its own centred dialog and backdrop (see PlayerSheetFrame). A
-             * full-width bar sliding up under a 1400pt browser window is a
-             * phone gesture wearing a desktop's clothes, which is the same
+             * page painting nothing — the screen then draws its own surface
+             * (see PlayerSheetFrame): a centred dialog at >=900, a bottom sheet
+             * below it. A full-width bar sliding up under a 1400pt browser
+             * window is a phone gesture wearing a desktop's clothes, the same
              * reasoning SwapSheet already follows at the same breakpoint.
              *
-             * A narrow BROWSER window still gets the web treatment rather than
-             * formSheet: react-native-screens has no native sheet to hand there,
-             * and `isWide` is what the rest of the app switches on.
+             * A narrow BROWSER window gets the web treatment rather than a
+             * native sheet, because react-native-screens has none to hand
+             * there, and `isWide` is what the rest of the app switches on.
              */
-            presentation: Platform.OS === 'web' ? 'transparentModal' : 'formSheet',
-
-            /* Two rests: a large one that shows the profile, and a smaller one
-               to drag down to when you only wanted the name and the numbers at
-               the top. Opening at the LARGER one (index 1) is deliberate — the
-               profile is tabbed, and opening at a peek would mean every visit
-               started with a drag. Android caps at three detents; we use two. */
-            sheetAllowedDetents: SheetDetents,
-            sheetInitialDetentIndex: 1,
-            sheetGrabberVisible: true,
-            sheetCornerRadius: SheetCorner,
-
-            /* The tab bar and rail stay visible behind the sheet, which is the
-               point: you can see where you will land when you flick it away. */
-            sheetExpandsWhenScrolledToEdge: false,
+            presentation: Platform.OS === 'web' ? 'transparentModal' : 'modal',
 
             /* No card background on web — the screen paints its own dialog and
                dimmed backdrop, and a card here would show as a second panel
-               behind it. Inert on native, where formSheet draws the surface. */
+               behind it. Inert on native, where the page sheet is the surface. */
             contentStyle: isWide || Platform.OS === 'web' ? { backgroundColor: 'transparent' } : undefined,
             animation: Platform.OS === 'web' ? 'fade' : undefined,
           }}
