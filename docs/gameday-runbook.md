@@ -401,6 +401,44 @@ select * from public.leaderboard(2026, 1::smallint, 3, 10);
 1 | e1c60623-… | nickroachy | 0.00 | 1
 ```
 
+### D5b. Is the median contest tracking?
+
+The contest card at the top of the lineup screen scores everybody against the
+field's median, and every figure on it is derived from the same `lineups` rows
+D5 just checked — so if `total_points` is moving, this moves with it.
+
+```sql
+select * from public.median_record(2026, 1::smallint);
+```
+
+`my_points`, `my_rank`, `ahead` and `result` are all **null when read as
+`postgres`**, and that is correct rather than a fault: they are scoped to
+`auth.uid()`, which a superuser session does not have. To see a real manager's
+line, set the claim first:
+
+```sql
+set local request.jwt.claims = '{"sub":"<user uuid>","role":"authenticated"}';
+select * from public.median_record(2026, 1::smallint);
+```
+
+What to expect during the week:
+
+- `entrants` counts lineups **with at least one slot**. A manager who opened the
+  screen and picked nobody is not in the field and does not drag the median down.
+- `low`/`median`/`high` are live and will all be 0.00 until the first box score
+  lands — the whole field genuinely is on nought. The card draws that as "—"
+  rather than as a score, using `high > 0` as the test for whether anybody has
+  played; `low` and `high` are the two ends of its bar, and `median` the mark on
+  it.
+- `result` stays **null until every fixture in the week is `final`**. A W
+  appearing mid-Sunday would be wrong, and this is the guard against it.
+- `entrants < 2` also yields a null result: one manager is their own median.
+  Through the beta this is the normal state, not a fault.
+
+The invariant worth spot-checking once the week closes: wins and losses across
+the whole base must balance. `supabase/tests/median_contest.test.sql` asserts it
+by walking nine synthetic managers, and it is the property the contest rests on.
+
 ### D6. Manual kick
 
 If a tick is missed or you want to force one:

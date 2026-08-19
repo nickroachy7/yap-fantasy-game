@@ -1133,6 +1133,22 @@ export type Database = {
           weeks_played: number
         }[]
       }
+      median_record: {
+        Args: { p_season: number; p_season_type?: number }
+        Returns: {
+          ahead: number
+          average: number
+          entrants: number
+          final: boolean
+          high: number
+          low: number
+          median: number
+          my_points: number
+          my_rank: number
+          result: string
+          week: number
+        }[]
+      }
       open_pack: {
         Args: { p_pack_code: string }
         Returns: {
