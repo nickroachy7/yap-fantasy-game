@@ -18,7 +18,8 @@
  */
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
+import { Gem } from '@/components/shell/AppHeader';
+import { Colors, NUMERIC, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import type { CollectionStats } from './types';
 
@@ -56,6 +57,31 @@ export function CollectionSummary({ stats }: { stats: CollectionStats }) {
       {stats.uncertain > 0 ? (
         <Pair label="UNCERTAIN" value={stats.uncertain} tone={c.warning} />
       ) : null}
+      {/* What the whole collection is worth if sold. It earns its place twice:
+          it is the only figure here denominated in gems rather than cards, and
+          it is how anyone finds out selling exists at all — the action itself
+          lives on the player page, where there is room to show what a copy has
+          earned before you give it up. */}
+      {stats.sellValue > 0 ? <SellValuePair value={stats.sellValue} /> : null}
+    </View>
+  );
+}
+
+/** Same shape as `Pair`, but the value carries the gem mark. */
+function SellValuePair({ value }: { value: number }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const accent = TierColors[scheme].gold.accent;
+
+  return (
+    <View
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={`Worth ${value} gems if every card were sold`}
+      style={styles.pair}>
+      <Text style={[Type.micro, { color: c.textTertiary }]}>SELLS FOR</Text>
+      <Gem color={accent} size={8} />
+      <Text style={[Type.strong, NUMERIC, { color: c.text }]}>{value.toLocaleString()}</Text>
     </View>
   );
 }

@@ -59,6 +59,18 @@ export const SAMPLE_CARDS: PlayerCardModel[] = [
 /** Statuses run alongside the tiers so both injury weights are exercised. */
 const INJURIES: (string | null)[] = [null, 'Questionable', 'Out', null];
 
+/**
+ * Mirrors `tier_thresholds.sell_value`. A fixture, so it is allowed to restate
+ * the server's numbers — but only here, and only so the gallery shows realistic
+ * figures. Product code reads `sell_value` off `my_collection`.
+ */
+const FIXTURE_SELL_VALUE: Record<CollectionCard['tier'], number> = {
+  bronze: 8,
+  silver: 40,
+  gold: 150,
+  diamond: 500,
+};
+
 export const OWNED_CARDS: CollectionCard[] = SAMPLE_CARDS.map((m, i) => ({
   id: `sample-${i}`,
   cardId: `card-${i}`,
@@ -67,6 +79,7 @@ export const OWNED_CARDS: CollectionCard[] = SAMPLE_CARDS.map((m, i) => ({
   team: m.teamAbbreviation,
   injuryStatus: INJURIES[i] ?? null,
   tier: m.tier,
+  sellValue: FIXTURE_SELL_VALUE[m.tier],
   careerFp: m.careerFp,
   lineupStarts: m.lineupStarts,
   tierFloorFp: m.tierFloorFp,

@@ -37,10 +37,12 @@ import { UsagePanel } from '@/components/players/UsagePanel';
 import { GameLog } from '@/components/players/GameLog';
 import { parseGameLog, type GameLogSection } from '@/components/players/game-log';
 import { parseProfile, type PlayerProfile } from '@/components/players/profile';
+import { sellErrorMessage } from '@/components/players/sell';
 import { Screen } from '@/components/shell/Screen';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
 import { useTabBarInset } from '@/components/shell/useResponsive';
 import { Colors, Spacing, type CardTier } from '@/constants/theme';
+import { usePlayer } from '@/context/PlayerContext';
 import { supabase } from '@/lib/supabase';
 
 const NUMERIC = { fontVariant: ['tabular-nums' as const] };
@@ -94,6 +96,7 @@ export default function PlayerDetailScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const tabInset = useTabBarInset();
+  const { refresh: refreshWallet } = usePlayer();
 
   const [player, setPlayer] = useState<DirectoryPlayer | null>(null);
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
@@ -129,7 +132,7 @@ export default function PlayerDetailScreen() {
         supabase
           .from('my_collection')
           .select(
-            'id, tier, career_fp, lineup_starts, season, acquired_at, tier_floor_fp, next_tier_at, next_tier_label',
+            'id, tier, career_fp, lineup_starts, season, acquired_at, tier_floor_fp, next_tier_at, next_tier_label, sell_value',
           )
           .eq('player_id', id)
           .order('acquired_at', { ascending: false }),
@@ -167,6 +170,10 @@ export default function PlayerDetailScreen() {
               tierFloorFp: r.tier_floor_fp === null ? null : Number(r.tier_floor_fp),
               nextTierAt: r.next_tier_at === null ? null : Number(r.next_tier_at),
               nextTierLabel: r.next_tier_label,
+              // Priced by the server, never derived here — a client that
+              // computes its own price will eventually disagree with the
+              // balance the user actually receives.
+              sellValue: Number(r.sell_value ?? 0),
             })),
       );
       setOwnedLoading(false);
@@ -180,6 +187,25 @@ export default function PlayerDetailScreen() {
   useEffect(() => {
     void load('initial');
   }, [load]);
+
+  /**
+   * Sell one copy.
+   *
+   * Rejects rather than swallowing, so the dialog can stay open and say why.
+   * On success both the collection and the wallet are re-read from the server
+   * instead of being patched locally: the balance in the header is the number
+   * the user will check, and it must come from the same place the sale did.
+   */
+  const sellCard = useCallback(
+    async (card: OwnedCard) => {
+      const { error: err } = await supabase.rpc('sell_card', {
+        p_card_instance_id: card.id,
+      });
+      if (err) throw new Error(sellErrorMessage(err.message));
+      await Promise.all([load('refresh'), refreshWallet()]);
+    },
+    [load, refreshWallet],
+  );
 
   const goBack = useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -282,7 +308,12 @@ export default function PlayerDetailScreen() {
 
             {/* Before the league-wide context, because "what do I hold" is the
                 question that brought most people to this page from a pack. */}
-            <CardHistory cards={owned} loading={ownedLoading} />
+            <CardHistory
+              cards={owned}
+              loading={ownedLoading}
+              playerName={player.name}
+              onSell={sellCard}
+            />
 
             {profile ? (
               <>

@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.15"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       card_instances: {
@@ -22,6 +47,8 @@ export type Database = {
           id: string
           lineup_starts: number
           pack_opening_id: string | null
+          sold_at: string | null
+          sold_for: number | null
           source: Database["public"]["Enums"]["acquisition_source"]
           tier: Database["public"]["Enums"]["card_tier"]
           user_id: string
@@ -33,6 +60,8 @@ export type Database = {
           id?: string
           lineup_starts?: number
           pack_opening_id?: string | null
+          sold_at?: string | null
+          sold_for?: number | null
           source?: Database["public"]["Enums"]["acquisition_source"]
           tier?: Database["public"]["Enums"]["card_tier"]
           user_id: string
@@ -44,6 +73,8 @@ export type Database = {
           id?: string
           lineup_starts?: number
           pack_opening_id?: string | null
+          sold_at?: string | null
+          sold_for?: number | null
           source?: Database["public"]["Enums"]["acquisition_source"]
           tier?: Database["public"]["Enums"]["card_tier"]
           user_id?: string
@@ -829,16 +860,19 @@ export type Database = {
       tier_thresholds: {
         Row: {
           min_career_fp: number
+          sell_value: number
           sort_order: number
           tier: Database["public"]["Enums"]["card_tier"]
         }
         Insert: {
           min_career_fp: number
+          sell_value?: number
           sort_order: number
           tier: Database["public"]["Enums"]["card_tier"]
         }
         Update: {
           min_career_fp?: number
+          sell_value?: number
           sort_order?: number
           tier?: Database["public"]["Enums"]["card_tier"]
         }
@@ -860,6 +894,7 @@ export type Database = {
           player_name: string | null
           position_abbreviation: string | null
           season: number | null
+          sell_value: number | null
           team_abbreviation: string | null
           tier: Database["public"]["Enums"]["card_tier"] | null
           tier_floor_fp: number | null
@@ -1005,6 +1040,7 @@ export type Database = {
         Args: { p_raw: Json; p_rules_version?: number }
         Returns: number
       }
+      sell_card: { Args: { p_card_instance_id: string }; Returns: Json }
       set_lineup: {
         Args: {
           p_season: number
@@ -1038,6 +1074,7 @@ export type Database = {
         | "weekly_score_reward"
         | "pack_purchase"
         | "admin_adjust"
+        | "card_sale"
       rarity: "common" | "uncommon" | "rare" | "epic" | "legendary"
     }
     CompositeTypes: {
@@ -1164,6 +1201,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       acquisition_source: ["pack", "grant", "admin"],
@@ -1174,6 +1214,7 @@ export const Constants = {
         "weekly_score_reward",
         "pack_purchase",
         "admin_adjust",
+        "card_sale",
       ],
       rarity: ["common", "uncommon", "rare", "epic", "legendary"],
     },

@@ -17,13 +17,17 @@
  */
 import { Redirect } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
+import { CollectionSummary } from '@/components/collection/CollectionSummary';
+import { summarise } from '@/components/collection/types';
+import { OWNED_MANY } from '@/components/dev/fixtures';
 import { GameRow } from '@/components/scores/GameRow';
 import { LeadersPanel } from '@/components/scores/LeadersPanel';
 import type { Leader, ScoreGame } from '@/components/scores/scoreboard';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DropdownChip } from '@/components/ui/DropdownChip';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
@@ -168,6 +172,8 @@ function Kit() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const [week, setWeek] = useState('2');
+  const [confirm, setConfirm] = useState(false);
+  const [confirmErr, setConfirmErr] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>('g3');
 
   return (
@@ -296,6 +302,59 @@ function Kit() {
             </Panel>
           </Section>
 
+          <Section
+            title="Collection summary"
+            note="The gem figure is how selling is discovered from the inventory.">
+            <Panel>
+              <View style={styles.summaryPad}>
+                <CollectionSummary stats={summarise(OWNED_MANY)} />
+              </View>
+            </Panel>
+          </Section>
+
+          <Section
+            title="Confirm dialog"
+            note="Destructive action is rightmost and the only coloured button. Backdrop cancels.">
+            <View style={styles.row}>
+              <Pressable
+                onPress={() => {
+                  setConfirmErr(null);
+                  setConfirm(true);
+                }}
+                style={({ pressed }) => [
+                  styles.demoButton,
+                  { backgroundColor: c.backgroundElement },
+                  pressed && { opacity: 0.6 },
+                ]}>
+                <Text style={[Type.strong, { color: c.text }]}>Open</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  setConfirmErr(
+                    'This card is in a lineup that has not been scored yet. You can sell it once the week is settled.',
+                  );
+                  setConfirm(true);
+                }}
+                style={({ pressed }) => [
+                  styles.demoButton,
+                  { backgroundColor: c.backgroundElement },
+                  pressed && { opacity: 0.6 },
+                ]}>
+                <Text style={[Type.strong, { color: c.text }]}>Open with refusal</Text>
+              </Pressable>
+            </View>
+            <ConfirmDialog
+              visible={confirm}
+              title="Sell this gold card?"
+              body="Christian McCaffrey · 2026 card. You will receive 150 gems. The copy and everything it has earned — 1,285 FP over 41 starts — are gone for good, and buying the player again starts a new card at bronze."
+              confirmLabel="Sell for 150"
+              destructive
+              error={confirmErr}
+              onConfirm={() => setConfirm(false)}
+              onCancel={() => setConfirm(false)}
+            />
+          </Section>
+
           <Section title="Empty state" note="Bold line, quiet line, at most one action.">
             <Panel>
               <EmptyState
@@ -339,4 +398,10 @@ const styles = StyleSheet.create({
   section: { gap: Spacing.two },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, alignItems: 'center' },
   iconCell: { alignItems: 'center', gap: Spacing.two },
+  summaryPad: { padding: Spacing.two + 2 },
+  demoButton: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderRadius: 8,
+  },
 });

@@ -28,6 +28,7 @@ export type CollectionViewRow = Pick<
   | 'next_tier_label'
   | 'season'
   | 'acquired_at'
+  | 'sell_value'
 >;
 
 /** One owned card instance, with every null resolved to something renderable. */
@@ -49,6 +50,8 @@ export type CollectionCard = {
   season: number | null;
   /** Epoch ms. 0 when the view gave us nothing, which sorts oldest-last. */
   acquiredAt: number;
+  /** Gems this copy sells for. Priced by the server from its tier. */
+  sellValue: number;
 };
 
 /** Lineup-eligible positions, in the order the lineup screen lists them. */
@@ -114,6 +117,7 @@ export function normaliseRow(row: CollectionViewRow): CollectionCard {
     nextTierLabel: row.next_tier_label?.toUpperCase(),
     season: row.season,
     acquiredAt: Number.isNaN(acquired) ? 0 : acquired,
+    sellValue: Number(row.sell_value ?? 0),
   };
 }
 
@@ -219,6 +223,8 @@ export type CollectionStats = {
   unavailable: number;
   /** Designation makes them a question mark — Questionable, DTD, limited. */
   uncertain: number;
+  /** What the whole collection would fetch if every copy were sold. */
+  sellValue: number;
 };
 
 /**
@@ -235,10 +241,12 @@ export function summarise(cards: CollectionCard[]): CollectionStats {
   const teams = new Set<string>();
   let unavailable = 0;
   let uncertain = 0;
+  let sellValue = 0;
 
   for (const c of cards) {
     players.add(c.cardId ?? c.playerName);
     if (c.team) teams.add(c.team);
+    sellValue += c.sellValue;
     const weight = injuryWeight(c.injuryStatus);
     if (weight === 'blocking') unavailable += 1;
     else if (weight === 'advisory') uncertain += 1;
@@ -251,5 +259,6 @@ export function summarise(cards: CollectionCard[]): CollectionStats {
     teams: teams.size,
     unavailable,
     uncertain,
+    sellValue,
   };
 }
