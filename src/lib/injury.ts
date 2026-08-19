@@ -84,3 +84,44 @@ export function injuryAbbr(status: string): string {
   // worst failure mode for an injury warning, and the a11y label still has it.
   return upper.length <= 6 ? upper : upper.slice(0, 5);
 }
+
+/**
+ * The shortest form that is still a designation: `Q`, `O`, `D`, `IR`.
+ *
+ * Separate from `injuryAbbr` rather than replacing it, because the two answer
+ * different questions. The collection card and the player directory print the
+ * flag as a WORD beside a name that has room for one, and `QUES` there is
+ * self-explanatory to someone who has never seen the app. The lineup row puts
+ * it at the end of a fixture line — "Sat 4:00p @ MIA  Q" — where it is a mark
+ * on a matchup rather than a label in its own right, and four characters there
+ * competes with the matchup it is qualifying.
+ *
+ * NOT ALWAYS ONE LETTER, and the exceptions are the point. `D` is doubtful, so
+ * day-to-day cannot also be `D` — the two are on opposite sides of the
+ * blocking/advisory line and collapsing them would tell someone their starter
+ * is fine when he is not. `IR`, `PUP` and `NFI` are already how people say
+ * them, and shortening those to a letter would invent a code nobody uses.
+ *
+ * Prefix-matched against the same vocabulary as `injuryWeight`, for the same
+ * reason: two screens must never disagree about what a designation is. The FULL
+ * status stays in the accessibility label at every call site.
+ */
+export function injuryCode(status: string): string {
+  const s = status.trim().toLowerCase();
+
+  if (s.startsWith('questionable')) return 'Q';
+  if (s.startsWith('doubtful')) return 'D';
+  if (s.startsWith('probable')) return 'P';
+  if (s.startsWith('limited')) return 'L';
+  if (s.startsWith('day')) return 'DTD';
+  if (s.startsWith('out')) return 'O';
+  if (s === 'ir' || s.startsWith('injured reserve')) return 'IR';
+  if (s.startsWith('suspend') || s.startsWith('reserve-sus')) return 'SUS';
+  if (s.startsWith('reserve')) return 'RES';
+  if (s.startsWith('pup')) return 'PUP';
+  if (s.startsWith('nfi')) return 'NFI';
+
+  // An unrecognised designation is clipped rather than dropped: silence is the
+  // worst failure mode for an injury warning, and the a11y label still has it.
+  return status.trim().toUpperCase().slice(0, 3);
+}

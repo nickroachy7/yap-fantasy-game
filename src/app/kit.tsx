@@ -23,7 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActionBar } from '@/components/shell/ActionBar';
 import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
 import { ContestCard } from '@/components/lineup/ContestCard';
-import { BenchRow, StarterRow } from '@/components/lineup/LineupRow';
+import { BADGE_SIZE, BADGE_WIDTH, BenchRow, StarterRow } from '@/components/lineup/LineupRow';
 import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import type { LineupCard } from '@/components/lineup/model';
@@ -41,7 +41,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DropdownChip } from '@/components/ui/DropdownChip';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
-import { PositionBadge, positionsForSlot } from '@/components/ui/PositionBadge';
+import { PositionBadge, positionsForSlot, slotBadgeLabel } from '@/components/ui/PositionBadge';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { POSITION_ORDER, POSITIONS } from '@/constants/positions';
@@ -89,7 +89,8 @@ const STARTERS: {
     card: {
       id: 's1', playerId: 's1', name: 'Caleb Williams', position: 'QB', team: 'CHI',
       injuryStatus: null, tier: 'gold', careerFp: 812, season: 2026,
-      form: { seasonFp: 288.1, gamesPlayed: 17, fpPerGame: 16.9, recent: [12.4, 22.1, 8.6, 26.9, 19.2] },
+      nextTierAt: 2500, nextTierLabel: 'diamond',
+      form: { seasonFp: 288.1, gamesPlayed: 17, fpPerGame: 16.9, recent: [12.4, 22.1, 8.6, 26.9, 19.2], weekFp: 24.6 },
       game: { opponent: 'CAR', home: false, startsAt: '2026-09-13T17:00:00Z' },
     },
   },
@@ -99,7 +100,9 @@ const STARTERS: {
     card: {
       id: 's2', playerId: 's2', name: 'Christian McCaffrey', position: 'RB', team: 'SF',
       injuryStatus: 'IR', tier: 'diamond', careerFp: 2610, season: 2026,
-      form: { seasonFp: 198.2, gamesPlayed: 12, fpPerGame: 16.5, recent: [21.0, 4.2, 18.8] },
+      // Top tier: no threshold above it, so the row says so instead of a ratio.
+      nextTierAt: null, nextTierLabel: null,
+      form: { seasonFp: 198.2, gamesPlayed: 12, fpPerGame: 16.5, recent: [21.0, 4.2, 18.8], weekFp: null },
       // No game: the bye case, which is the one people lose weeks to.
       game: null,
     },
@@ -110,6 +113,7 @@ const STARTERS: {
     card: {
       id: 's3', playerId: 's3', name: 'Bartholomew Vandersteen III', position: 'TE', team: 'NYJ',
       injuryStatus: 'Questionable', tier: 'bronze', careerFp: 14, season: 2026,
+      nextTierAt: 200, nextTierLabel: 'silver',
       form: null,
       game: { opponent: 'BUF', home: true, startsAt: '2026-09-13T17:00:00Z' },
     },
@@ -126,18 +130,22 @@ const SWAP_OPTIONS: LineupCard[] = [
   {
     id: 'o1', playerId: 'o1', name: 'Bijan Robinson', position: 'RB', team: 'ATL',
     injuryStatus: null, tier: 'gold', careerFp: 1420, season: 2026,
-    form: { seasonFp: 262.4, gamesPlayed: 16, fpPerGame: 16.4, recent: [18.2, 24.6, 11.0, 27.4, 9.8] },
+    nextTierAt: 2500, nextTierLabel: 'diamond',
+    form: { seasonFp: 262.4, gamesPlayed: 16, fpPerGame: 16.4, recent: [18.2, 24.6, 11.0, 27.4, 9.8], weekFp: 18.4 },
     game: { opponent: 'TB', home: true, startsAt: '2026-09-13T17:00:00Z' },
   },
   {
     id: 'o2', playerId: 'o2', name: 'Tyjae Spears', position: 'RB', team: 'TEN',
     injuryStatus: 'Questionable', tier: 'silver', careerFp: 402, season: 2026,
-    form: { seasonFp: 96.2, gamesPlayed: 14, fpPerGame: 6.9, recent: [4.1, 9.8, 2.6, 11.4, 6.6] },
+    nextTierAt: 750, nextTierLabel: 'gold',
+    // Not yet swept, which is every row before kickoff.
+    form: { seasonFp: 96.2, gamesPlayed: 14, fpPerGame: 6.9, recent: [4.1, 9.8, 2.6, 11.4, 6.6], weekFp: null },
     game: { opponent: 'IND', home: false, startsAt: '2026-09-13T17:00:00Z' },
   },
   {
     id: 'o3', playerId: 'o3', name: 'Rookie Nobody', position: 'RB', team: 'LV',
     injuryStatus: null, tier: 'bronze', careerFp: 0, season: 2026,
+    nextTierAt: 200, nextTierLabel: 'silver',
     form: null,
     game: null,
   },
@@ -654,7 +662,7 @@ function Kit() {
 
           <Section
             title="Directory row"
-            note="Identity over a tinted stat tray, fixed 90pt. Last row has never played — dashes, not zeroes.">
+            note="Identity over a tinted stat tray, fixed 76pt. Last row has never played — dashes, not zeroes.">
             <SortChips
               options={[
                 { key: 'fp', label: 'FP' },
@@ -678,7 +686,9 @@ function Kit() {
             </Panel>
           </Section>
 
-          <Section title="Position badges" note="Every position, then every lineup slot.">
+          <Section
+            title="Position badges"
+            note="Every position; then every lineup slot as the lineup draws it — one fixed width, no ordinals — and the same slots at their natural widths.">
             <View style={styles.row}>
               {POSITIONS.map((p) => (
                 <PositionBadge key={p} label={p} size={28} />
@@ -688,9 +698,11 @@ function Kit() {
               {SLOTS.map((slot) => (
                 <PositionBadge
                   key={slot}
-                  label={slot}
+                  label={slotBadgeLabel(slot)}
                   positions={positionsForSlot(slot)}
-                  size={28}
+                  size={BADGE_SIZE}
+                  width={BADGE_WIDTH}
+                  tone="neutral"
                 />
               ))}
             </View>

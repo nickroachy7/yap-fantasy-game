@@ -240,8 +240,8 @@ export const SheetDialogInset = 40;
  *
  * WHAT CARRIES IT, WHICH HAS. The tokens below still describe four non-colour
  * axes - frame weight and radius, inner ring and corner ticks, rank pips by
- * COUNT (1..4) and SHAPE, and a geometric motif - and `TierBadge`, `TierChip`
- * and `TierMotif` still use them. `PlayerCard` no longer does. Applied all at
+ * COUNT (1..4) and SHAPE, and a geometric motif - and `TierBadge` and
+ * `TierMotif` still use them. `TierMark` uses the accent and the initial only. `PlayerCard` no longer does. Applied all at
  * once they turned a 106pt grid cell into five nested boxes around three
  * numbers, which read as busy rather than precious. The card now prints the
  * tier NAME instead, which is a stronger accessible signal than any of them:

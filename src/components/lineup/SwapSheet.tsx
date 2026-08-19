@@ -58,11 +58,11 @@ import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from '
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DASH } from '@/components/ui/DataTable';
-import { PositionBadge, positionsForSlot } from '@/components/ui/PositionBadge';
+import { PositionBadge, positionsForSlot, slotBadgeLabel } from '@/components/ui/PositionBadge';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-import { PlayerBand } from './LineupRow';
+import { BADGE_SIZE, BADGE_WIDTH, BandFigure, PlayerBand } from './LineupRow';
 import { SortBar } from './SortBar';
 import { matchupLabel, type LineupCard, type SortKey } from './model';
 
@@ -261,9 +261,9 @@ function SlotBody({
         <>
           <PlayerBand
               card={current}
-              badge={<PositionBadge label={current.position} size={26} tone="neutral" />}
+              badge={<PositionBadge label={current.position} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />}
               lead={<Text style={[Type.micro, { color: c.positive }]}>IN</Text>}
-              {...figureFor(current, sort)}
+              right={<BandFigure {...figureFor(current, sort)} />}
               selected
             accessibilityLabel={`${current.name} is starting at ${slot}`}
           />
@@ -300,8 +300,8 @@ function SlotBody({
               <PlayerBand
                 key={card.id}
                 card={card}
-                badge={<PositionBadge label={card.position} size={26} tone="neutral" />}
-                {...figureFor(card, sort)}
+                badge={<PositionBadge label={card.position} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />}
+                right={<BandFigure {...figureFor(card, sort)} />}
                 onPress={() => onPick(slot, card.id)}
                 accessibilityLabel={
                   current
@@ -354,9 +354,9 @@ function BenchBody({
           is about, in the same box, under the same kind of label. */}
       <PlayerBand
             card={card}
-            badge={<PositionBadge label={card.position} size={26} tone="neutral" />}
+            badge={<PositionBadge label={card.position} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />}
             lead={<Text style={[Type.micro, { color: c.textSecondary }]}>OUT</Text>}
-            {...figureFor(card, 'fp')}
+            right={<BandFigure {...figureFor(card, 'fp')} />}
             selected
         accessibilityLabel={`${card.name} is on the bench`}
       />
@@ -375,8 +375,16 @@ function BenchBody({
           <PlayerBand
             key={slot}
             card={occupant}
-            badge={<PositionBadge label={slot} positions={positionsForSlot(slot)} size={26} tone="neutral" />}
-            {...figureFor(occupant, 'fp')}
+            badge={
+              <PositionBadge
+                label={slotBadgeLabel(slot)}
+                positions={positionsForSlot(slot)}
+                size={BADGE_SIZE}
+                width={BADGE_WIDTH}
+                tone="neutral"
+              />
+            }
+            right={<BandFigure {...figureFor(occupant, 'fp')} />}
             emptyPrimary={`${slot} is empty`}
             emptySecondary="Nothing is starting here yet"
             onPress={() => onPick(slot, card.id)}
@@ -402,9 +410,9 @@ function BenchBody({
  */
 function figureFor(card: LineupCard | null, sort: SortKey) {
   if (sort === 'fppg') {
-    return { figureLabel: 'FP/G', figureValue: card?.form ? card.form.fpPerGame.toFixed(1) : null };
+    return { label: 'FP/G', value: card?.form ? card.form.fpPerGame.toFixed(1) : null };
   }
-  return { figureLabel: 'FP', figureValue: card?.form ? card.form.seasonFp.toFixed(1) : null };
+  return { label: 'FP', value: card?.form ? card.form.seasonFp.toFixed(1) : null };
 }
 
 /**

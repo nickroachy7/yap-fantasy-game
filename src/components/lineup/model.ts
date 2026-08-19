@@ -6,6 +6,7 @@
  * the week's decision is made out of these derivations, so they need to be
  * readable on their own and not buried in JSX.
  */
+import { POSITION_ORDER } from '@/constants/positions';
 import type { CardTier } from '@/constants/theme';
 
 export type Slate = { season: number; season_type: number; week: number };
@@ -26,6 +27,15 @@ export type SeasonForm = {
   fpPerGame: number;
   /** Points per game, oldest first, capped to the last few. */
   recent: number[];
+  /**
+   * THIS week's points for the player, or null when his game has not been
+   * scored — which is every row before kickoff, and is not the same as a
+   * nought. It is the PLAYER's line, not the card's credit: a starter's row
+   * shows what the contest actually awarded the slot (`savedPoints`), and this
+   * is what fills the same column for a card on the bench, whose game is being
+   * played whether or not you started him.
+   */
+  weekFp: number | null;
 };
 
 export type LineupCard = {
@@ -43,11 +53,39 @@ export type LineupCard = {
    * actually started, so a great player you never played reads as bronze.
    */
   careerFp: number;
+  /**
+   * Career FP at which this card promotes, and what it promotes TO — straight
+   * from `tier_thresholds` via `my_collection`, never recomputed here. Both are
+   * null at diamond, where there is no next tier.
+   */
+  nextTierAt: number | null;
+  nextTierLabel: string | null;
   /** Which season's card this is. Must match the slate or `set_lineup` rejects it. */
   season: number | null;
   form: SeasonForm | null;
   game: GameContext | null;
 };
+
+/**
+ * "1/200 to Silver Tier" — how far this copy is from promotion.
+ *
+ * The numerator is the card's OWN earned total rather than its progress within
+ * the current tier, because 200, 750 and 2500 are the thresholds the game
+ * states and the ones an owner learns. Measuring inside the tier instead would
+ * print a denominator (550 from silver to gold) that appears nowhere in the
+ * rules and that nobody could check.
+ *
+ * FLOORED, not rounded: a card on 199.7 has not promoted, and "200/200 to
+ * Silver Tier" beside a bronze chip reads as a bug in the promotion trigger.
+ *
+ * Null at diamond — there is no tier above it, so there is no distance to one.
+ */
+export function tierProgressLabel(card: LineupCard): string | null {
+  if (card.nextTierAt === null || !card.nextTierLabel) return null;
+  const next = card.nextTierLabel;
+  const titled = next.charAt(0).toUpperCase() + next.slice(1).toLowerCase();
+  return `${Math.floor(card.careerFp)}/${Math.round(card.nextTierAt)} to ${titled} Tier`;
+}
 
 /** How many games the FORM column shows. Five is a month of NFL football. */
 export const FORM_GAMES = 5;
@@ -143,6 +181,39 @@ export function sortCards(cards: LineupCard[], key: SortKey): LineupCard[] {
     return bv - av || a.name.localeCompare(b.name);
   });
   return out;
+}
+
+/**
+ * The bench's order, which is not a choice the reader makes any more.
+ *
+ * It had a sort bar — FP, FP/G, name — and the bar was answering a question the
+ * bench does not ask. You do not scan a bench for its best card in the
+ * abstract; you scan it for the best card AT A POSITION, because that is the
+ * only swap the rules will let you make. Sorted by points, your three running
+ * backs are scattered between eleven receivers, and finding them is the work
+ * the sort was supposed to save you.
+ *
+ * Grouped by position they sit together, in the order the slots above them run
+ * — QB, RB, WR, TE, PK, the order a fantasy manager already thinks in — so the
+ * bench reads as an extension of the board rather than as a separate list.
+ *
+ * Season points descending WITHIN a group, so the best option at a position is
+ * the top of its own run, and name as the final tiebreak so the order is stable
+ * between renders rather than reshuffling every unscored player on each pass.
+ * An unknown position sorts last rather than first: it is a feed anomaly, not a
+ * sixth position group.
+ */
+export function sortByPosition(cards: LineupCard[]): LineupCard[] {
+  const rank = (p: string | null) => {
+    const i = POSITION_ORDER.indexOf((p ?? '').toUpperCase() as (typeof POSITION_ORDER)[number]);
+    return i === -1 ? POSITION_ORDER.length : i;
+  };
+  return [...cards].sort(
+    (a, b) =>
+      rank(a.position) - rank(b.position) ||
+      (b.form?.seasonFp ?? -1) - (a.form?.seasonFp ?? -1) ||
+      a.name.localeCompare(b.name),
+  );
 }
 
 /**

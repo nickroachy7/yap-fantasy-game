@@ -31,6 +31,8 @@ type CollectionRow = {
   team_abbreviation: string | null;
   injury_status: string | null;
   career_fp: number | null;
+  next_tier_at: number | null;
+  next_tier_label: string | null;
   tier: CardTier | null;
   season: number | null;
 };
@@ -62,7 +64,7 @@ async function loadCollection(): Promise<CollectionRow[]> {
     supabase
       .from('my_collection')
       .select(
-        'id, player_id, player_name, position_abbreviation, team_abbreviation, injury_status, career_fp, tier, season',
+        'id, player_id, player_name, position_abbreviation, team_abbreviation, injury_status, career_fp, next_tier_at, next_tier_label, tier, season',
       )
       .order('career_fp', { ascending: false })
       .order('id', { ascending: true })
@@ -115,8 +117,8 @@ async function loadStatLines(season: number, playerIds: string[]): Promise<StatR
  * so the newest computed row is the current one. A mismatch would move a
  * displayed average, never what gets submitted.
  */
-function aggregate(rows: StatRow[]): Map<string, SeasonForm> {
-  const byPlayer = new Map<string, { order: number; points: number }[]>();
+function aggregate(rows: StatRow[], slate: Slate | null): Map<string, SeasonForm> {
+  const byPlayer = new Map<string, { order: number; points: number; thisWeek: boolean }[]>();
 
   for (const row of rows) {
     const best = row.fantasy_points.reduce<{ points: number; rules_version: number } | null>(
@@ -128,7 +130,15 @@ function aggregate(rows: StatRow[]): Map<string, SeasonForm> {
     // so one key orders a whole season without a date lookup.
     const order = row.season_type * 1000 + (row.week ?? 0);
     const list = byPlayer.get(row.player_id) ?? [];
-    list.push({ order, points: Number(best.points) });
+    list.push({
+      order,
+      points: Number(best.points),
+      /* The slate's own week, which the row draws beside the fixture. Matched
+         on season_type AS WELL as week: preseason week 3 and regular-season
+         week 3 are both "week 3" and are four weeks apart. */
+      thisWeek:
+        slate !== null && row.season_type === slate.season_type && row.week === slate.week,
+    });
     byPlayer.set(row.player_id, list);
   }
 
@@ -136,11 +146,15 @@ function aggregate(rows: StatRow[]): Map<string, SeasonForm> {
   for (const [playerId, games] of byPlayer) {
     games.sort((a, b) => a.order - b.order);
     const seasonFp = games.reduce((sum, g) => sum + g.points, 0);
+    const current = games.find((g) => g.thisWeek);
     out.set(playerId, {
       seasonFp,
       gamesPlayed: games.length,
       fpPerGame: seasonFp / games.length,
       recent: games.slice(-FORM_GAMES).map((g) => g.points),
+      // Absent, not zero. A game that has not been swept has no number at all,
+      // and the row draws that differently from a player who blanked.
+      weekFp: current ? current.points : null,
     });
   }
   return out;
@@ -274,7 +288,7 @@ export function useLineupData(): LineupData {
         starts_at: string | null;
       }[],
     );
-    const form = aggregate(stats);
+    const form = aggregate(stats, s);
 
     setCards(
       owned.map((r) => ({
@@ -286,6 +300,8 @@ export function useLineupData(): LineupData {
         injuryStatus: r.injury_status,
         tier: (r.tier ?? 'bronze') as CardTier,
         careerFp: Number(r.career_fp ?? 0),
+        nextTierAt: r.next_tier_at === null ? null : Number(r.next_tier_at),
+        nextTierLabel: r.next_tier_label,
         season: r.season,
         form: r.player_id ? (form.get(r.player_id) ?? null) : null,
         // A team missing from the week's schedule is on a bye, which is a real

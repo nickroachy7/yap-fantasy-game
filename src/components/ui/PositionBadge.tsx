@@ -4,7 +4,7 @@
  * Two shapes, one component, because they are the same object at different
  * specificities:
  *
- *   solid  — one position. `QB`, `RB1`, `TE`. Filled with that position's
+ *   solid  — one position. `QB`, `RB`, `TE`. Filled with that position's
  *            accent, abbreviation drawn on top.
  *   split  — a slot that accepts several positions. `FLEX` becomes three
  *            vertical cells, one per eligible position, each in its own
@@ -17,6 +17,19 @@
  *
  * The abbreviation is always drawn. See `constants/positions.ts` — colour here
  * is a scanning accelerator layered on text, never a substitute for it.
+ *
+ * WIDTH: SQUARE BY DEFAULT, FIXED WHEN A CALLER RUNS A COLUMN OF THEM
+ *
+ * Left alone, a badge is as wide as it needs to be — square for one position,
+ * wider for a split. That is right for the places one badge sits beside one
+ * name (the directory, the leaders panel), and wrong for a lineup, where nine
+ * badges stack into what the eye reads as a column. There, a `QB` at 26pt over
+ * a split `FLEX` at 45 makes every name start at a different x, and the page
+ * looks like it is jittering as you scan down it.
+ *
+ * `width` fixes the box. The split divides that width between its cells and
+ * SHRINKS ITS TEXT TO FIT rather than clipping — the split is what sets the
+ * floor on how narrow the column can be, and it has to be able to say so.
  */
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -34,6 +47,8 @@ export type PositionBadgeProps = {
   /**
    * What to write on the badge — a position (`WR`) or a slot code (`WR2`).
    * The colour is resolved from `positions` when given, otherwise from this.
+   *
+   * A slot code's digit is a caller's decision: see `slotBadgeLabel`.
    */
   label: string | null;
   /**
@@ -43,6 +58,11 @@ export type PositionBadgeProps = {
   positions?: Position[];
   /** Box height in px. Width follows: square when solid, wider when split. */
   size?: number;
+  /**
+   * Fixed box width, for a caller drawing a COLUMN of badges that must share
+   * an edge. Omit and each badge is its natural width. See the note above.
+   */
+  width?: number;
   /**
    * `position` (default) fills the badge with the position's accent.
    *
@@ -65,10 +85,29 @@ export function positionsForSlot(slot: string): Position[] | undefined {
   return SLOT_POSITIONS[slot.toUpperCase()];
 }
 
+/**
+ * What a SLOT badge says: the position, without the ordinal.
+ *
+ * `RB1` and `RB2` are two names for one thing — a slot that takes a running
+ * back — and the digit distinguishes them for the code, not for the reader.
+ * On screen it cost more than it said: it is the only reason a solid badge
+ * ever had to be wider than square, so a lineup's badges came out at three
+ * different widths and every name started at a different x. Nothing is lost
+ * by dropping it, because the rows are already in slot order and two RB rows
+ * sitting one above the other are self-evidently the first and the second.
+ *
+ * The full code is kept everywhere it still means something — the swap sheet's
+ * headings, every accessibility label, and the lineup payload itself.
+ */
+export function slotBadgeLabel(slot: string): string {
+  return slot.toUpperCase().replace(/\d+$/, '');
+}
+
 export function PositionBadge({
   label,
   positions,
   size = 24,
+  width,
   tone = 'position',
 }: PositionBadgeProps) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -78,6 +117,13 @@ export function PositionBadge({
   const neutral = tone === 'neutral';
 
   if (split) {
+    /* Each cell holds ONE character, so the type may be sized to the cell
+       rather than to the box: at a fixed width the three initials have to
+       shrink to fit, and clipping them inside `overflow: hidden` would be the
+       alternative. 0.62 is the largest ratio at which a bold `W` — the widest
+       initial in the set — still clears its own cell. */
+    const cellWidth = width ? width / positions.length : size * 0.58;
+    const splitFont = Math.max(8, Math.min(size * 0.42, cellWidth * 0.62));
     return (
       <View
         accessible
@@ -86,6 +132,7 @@ export function PositionBadge({
         style={[
           styles.split,
           { height: size, borderRadius: size * 0.22 },
+          width ? { width } : null,
           neutral && { borderWidth: 1, borderColor: theme.borderStrong },
         ]}>
         {positions.map((p, i) => {
@@ -95,7 +142,7 @@ export function PositionBadge({
               key={p}
               style={[
                 styles.cell,
-                { backgroundColor: neutral ? 'transparent' : c.accent, width: size * 0.58 },
+                { backgroundColor: neutral ? 'transparent' : c.accent, width: cellWidth },
                 /* Without fills the cells need a seam, or R W T reads as one
                    three-letter word rather than three eligible positions. */
                 neutral && i > 0 && { borderLeftWidth: 1, borderLeftColor: theme.borderStrong },
@@ -105,7 +152,7 @@ export function PositionBadge({
                   styles.text,
                   {
                     color: neutral ? theme.text : c.onAccent,
-                    fontSize: Math.max(8, size * 0.42),
+                    fontSize: splitFont,
                   },
                 ]}>
                 {/* The initial, not the pair: three two-letter codes in a 42pt
@@ -132,9 +179,12 @@ export function PositionBadge({
         styles.solid,
         {
           height: size,
-          // Slot codes carry a digit (`RB1`), so the box has to grow with the
-          // string rather than stay square, or the 1 gets clipped.
-          minWidth: text.length > 2 ? size * 1.25 : size,
+          /* Fixed when the caller is running a column; otherwise square, and
+             growing only for a label too long to fit one — `slotBadgeLabel`
+             means no LINEUP badge is, but this stays honest for anything else
+             that hands over a three-character code. */
+          width,
+          minWidth: width ?? (text.length > 2 ? size * 1.25 : size),
           borderRadius: size * 0.22,
           backgroundColor: neutral ? 'transparent' : c.accent,
         },
