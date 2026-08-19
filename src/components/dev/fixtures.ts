@@ -25,6 +25,7 @@ export const SAMPLE_CARDS: PlayerCardModel[] = [
     tierFloorFp: 0,
     nextTierAt: 200,
     nextTierLabel: 'SILVER',
+    fpPerGame: 14.2,
     game: { opponent: 'CAR', home: false, startsAt: '2026-09-13T17:05:00Z' },
   },
   {
@@ -37,6 +38,7 @@ export const SAMPLE_CARDS: PlayerCardModel[] = [
     tierFloorFp: 200,
     nextTierAt: 750,
     nextTierLabel: 'GOLD',
+    fpPerGame: 21.7,
     game: { opponent: 'BUF', home: true, startsAt: '2026-09-13T20:25:00Z' },
   },
   {
@@ -49,6 +51,7 @@ export const SAMPLE_CARDS: PlayerCardModel[] = [
     tierFloorFp: 750,
     nextTierAt: 2500,
     nextTierLabel: 'DIAMOND',
+    fpPerGame: 8.4,
     game: null,
   },
   {
@@ -79,6 +82,10 @@ const FIXTURE_SELL_VALUE: Record<CollectionCard['tier'], number> = {
 };
 
 export const OWNED_CARDS: CollectionCard[] = SAMPLE_CARDS.map((m, i) => ({
+  // The PLAYER's season average, not the card's earnings. The last card leaves
+  // it null on purpose: a player with no scored games yet is a real state and
+  // the card must draw it as absence rather than as a zero.
+  fpPerGame: m.fpPerGame ?? null,
   id: `sample-${i}`,
   cardId: `card-${i}`,
   playerName: m.playerName,

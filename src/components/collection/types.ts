@@ -30,6 +30,7 @@ export type CollectionViewRow = Pick<
   | 'season'
   | 'acquired_at'
   | 'sell_value'
+  | 'fp_per_game'
 >;
 
 /** One owned card instance, with every null resolved to something renderable. */
@@ -53,6 +54,12 @@ export type CollectionCard = {
   acquiredAt: number;
   /** Gems this copy sells for. Priced by the server from its tier. */
   sellValue: number;
+  /**
+   * The PLAYER's fantasy points per scored game this season — NOT the card's.
+   * Null until he has a scored game. Deliberately not a projection: the
+   * provider sells none and this app fabricates none.
+   */
+  fpPerGame: number | null;
 };
 
 /** Lineup-eligible positions, in the order the lineup screen lists them. */
@@ -124,6 +131,9 @@ export function normaliseRow(row: CollectionViewRow): CollectionCard {
     season: row.season,
     acquiredAt: Number.isNaN(acquired) ? 0 : acquired,
     sellValue: Number(row.sell_value ?? 0),
+    // Null-preserving: "no scored games yet" is not "averages nothing", and
+    // the card draws the two differently.
+    fpPerGame: row.fp_per_game == null ? null : num(row.fp_per_game),
   };
 }
 
@@ -147,6 +157,7 @@ export function toCardModel(c: CollectionCard, game?: GameContext | null): Playe
     tierFloorFp: c.tierFloorFp,
     nextTierAt: c.nextTierAt,
     nextTierLabel: c.nextTierLabel,
+    fpPerGame: c.fpPerGame,
     game,
   };
 }

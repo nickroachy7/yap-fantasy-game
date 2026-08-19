@@ -933,6 +933,7 @@ export type Database = {
           acquired_at: string | null
           card_id: string | null
           career_fp: number | null
+          fp_per_game: number | null
           id: string | null
           injury_status: string | null
           lineup_starts: number | null

@@ -95,6 +95,16 @@ export type PlayerCardModel = {
   /** OPTIONAL. Display name of the next tier, e.g. 'GOLD'. */
   nextTierLabel?: string;
   /**
+   * OPTIONAL. The PLAYER's fantasy points per scored game this season.
+   *
+   * NOT A PROJECTION, and must never be labelled as one. balldontlie sells no
+   * projections — verified 404s, recorded in docs/sleeper-spec-coverage.md —
+   * and nothing in this app fabricates one. This is what he has actually
+   * averaged, which answers the same question honestly. Null means he has no
+   * scored games yet, which is different from averaging nothing.
+   */
+  fpPerGame?: number | null;
+  /**
    * OPTIONAL. This club's game in the upcoming week. `null` means we know the
    * club is idle (a bye, which is worth saying); `undefined` means the caller
    * did not load a schedule at all, and the line is omitted rather than
@@ -157,7 +167,6 @@ export function PlayerCard({
     model.game === undefined ? null : `${team} ${matchupLabel(model.game)}`;
   const kickoff = model.game ? kickoffLabel(model.game) : null;
 
-  const starts = `${fmt(model.lineupStarts)} ${model.lineupStarts === 1 ? 'start' : 'starts'}`;
   const nextLine =
     toNext === null || !model.nextTierLabel
       ? 'top tier'
@@ -264,62 +273,88 @@ export function PlayerCard({
           </Text>
         </View>
 
-        {/* The club rides in here, because a matchup already names it. */}
-        {fixture ? (
-          <View style={compact ? styles.fixtureStack : styles.fixtureRow}>
-            <Text
-              numberOfLines={1}
-              style={[styles.fixture, { color: t.colors.textMuted, fontSize: dims.labelSize + 1 }]}>
-              {fixture}
-            </Text>
-            {kickoff ? (
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.fixtureWhen,
-                  { color: t.colors.textMuted, fontSize: dims.labelSize },
-                ]}>
-                {compact ? kickoff : `· ${kickoff}`}
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
       </View>
 
       <View style={[styles.divider, { borderColor: withAlpha(t.colors.textMuted, 0.28) }]} />
 
-      {/* ---- what it has earned, and where that puts it ----------------- *
-        * Three rows of balanced pairs rather than five stacked lines. Each   *
-        * row reads left-to-right as value-then-qualifier, and the columns    *
-        * line up down the card, which is what makes a 106pt cell scannable   *
-        * next to eight others.                                              *
+      {/* ---- one pattern, three times ---------------------------------- *
+        * Every row below is the same shape: what it is on the left, what it   *
+        * is worth on the right. The card used to mix a centred hero figure    *
+        * with left-aligned labels and a right-aligned bar, so nothing lined   *
+        * up down the cell and the eye had to re-find the numbers on each      *
+        * card in a grid of nine. One column rule fixes that.                  *
         * ================================================================ */}
-      <View style={styles.earned}>
-        {/* Full width, so a four-digit total is never abbreviated. */}
-        <Text
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.7}
-          style={[styles.figure, { color: t.colors.text, fontSize: dims.figureSize }]}>
-          {fmt(model.careerFp)}
-        </Text>
+      <View style={styles.rows}>
+        {/* Fixture against expectation. */}
+        {fixture ? (
+          <View style={styles.row}>
+            <View style={styles.rowLeft}>
+              <Text
+                numberOfLines={1}
+                style={[styles.rowValue, { color: t.colors.text, fontSize: dims.labelSize + 2 }]}>
+                {fixture}
+              </Text>
+              {kickoff ? (
+                <Text
+                  numberOfLines={1}
+                  style={[styles.rowLabel, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
+                  {kickoff}
+                </Text>
+              ) : null}
+            </View>
+            {/* NOT a projection — the provider sells none and this app
+                fabricates none. What he has actually averaged, labelled as
+                that. See the model's `fpPerGame`. */}
+            {model.fpPerGame != null ? (
+              <View style={styles.rowRight}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.rowValue, { color: t.colors.text, fontSize: dims.labelSize + 2 }]}>
+                  {model.fpPerGame.toFixed(1)}
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.rowLabel, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
+                  FP/G
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
-        <View style={styles.pair}>
-          <Text
-            numberOfLines={1}
-            style={[styles.micro, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
-            CAREER FP
-          </Text>
-          <Text
-            numberOfLines={1}
-            style={[styles.micro, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
-            {starts.toUpperCase()}
-          </Text>
+        {/* What the COPY has earned. Distinct from FP/G above, which is the
+            player's: a card on 0 beside a 21.3 average is a good player you
+            have never started, not a contradiction. */}
+        <View style={styles.statRows}>
+          <View style={styles.statRow}>
+            <Text
+              numberOfLines={1}
+              style={[styles.rowLabel, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
+              {compact ? 'CAREER FP' : 'CAREER POINTS'}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[styles.figure, { color: t.colors.text, fontSize: dims.statSize }]}>
+              {fmt(model.careerFp)}
+            </Text>
+          </View>
+          <View style={styles.statRow}>
+            <Text
+              numberOfLines={1}
+              style={[styles.rowLabel, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
+              {compact ? 'STARTS' : 'GAMES STARTED'}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[styles.figure, { color: t.colors.textMuted, fontSize: dims.statSize }]}>
+              {fmt(model.lineupStarts)}
+            </Text>
+          </View>
         </View>
 
-        {/* The bar is never the only source — the distance is printed beside
-            it, which is what keeps this out of colour-alone. */}
-        <View style={styles.pair}>
+        {/* Distance to the next tier. The bar is never the only source — the
+            number is printed beside it, which keeps this out of colour-alone. */}
+        <View style={styles.statRow}>
           {progress === null ? (
             <View style={styles.trackSpacer} />
           ) : (
@@ -334,7 +369,7 @@ export function PlayerCard({
           )}
           <Text
             numberOfLines={1}
-            style={[styles.micro, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
+            style={[styles.rowLabel, { color: t.colors.textMuted, fontSize: dims.labelSize }]}>
             {nextLine.toUpperCase()}
           </Text>
         </View>
@@ -384,20 +419,41 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     flexShrink: 0,
   },
-  /* Stacked at compact, where "PHI @ CAR · Sun 1:05p" does not fit 96pt of
-     usable width and clipped the kickoff — the half that tells you whether you
-     still have time to change your lineup. */
-  fixtureRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.one },
-  fixtureStack: { gap: 0 },
-  fixture: {
-    fontFamily: Fonts.sans,
-    fontWeight: '600',
-    letterSpacing: 0.4,
+  /* ONE column rule for the whole lower half: what it is on the left, what it
+     is worth on the right. Mixing a centred figure with left labels and a
+     right-aligned bar meant nothing lined up down a cell, and in a grid of
+     nine the eye had to re-find the numbers on every card. */
+  rows: { gap: Spacing.one + 2 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Spacing.one + 1,
   },
-  fixtureWhen: {
+  rowLeft: { flexShrink: 1, minWidth: 0, gap: 1 },
+  rowRight: { flexShrink: 0, alignItems: 'flex-end', gap: 1 },
+  statRows: { gap: 1 },
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.one + 1,
+  },
+  /* The LABEL shrinks, never the value: a truncated "413" is a wrong number,
+     where a truncated label is still a recognisable word. At 106pt the full
+     "CAREER POINTS" and a four-digit total do not both fit, so compact uses
+     shorter labels rather than a shorter number. */
+  rowLabel: {
     fontFamily: Fonts.sans,
-    fontWeight: '500',
-    opacity: 0.85,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  rowValue: {
+    fontFamily: Fonts.sans,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   artSlot: {
     alignSelf: 'stretch',
@@ -433,24 +489,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   divider: { borderTopWidth: StyleSheet.hairlineWidth },
-  earned: { gap: 3 },
-  /* Value left, qualifier right, on every row — so the two columns align down
-     the whole block rather than each row finding its own edges. */
-  pair: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.one + 1,
-  },
   figure: {
     fontFamily: Fonts.sans,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
-  },
-  micro: {
-    fontFamily: Fonts.sans,
-    fontWeight: '700',
-    letterSpacing: 0.6,
     flexShrink: 0,
   },
   /* Holds the row's height at the top tier, where there is no bar to draw and
