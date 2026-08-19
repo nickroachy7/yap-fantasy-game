@@ -47,6 +47,7 @@
 import { useState } from 'react';
 import { StyleSheet, Pressable, Text, View } from 'react-native';
 
+import { TierRail } from '@/components/cards/TierRail';
 import { DASH } from '@/components/ui/DataTable';
 import { PositionBadge, positionsForSlot } from '@/components/ui/PositionBadge';
 import { positionColors } from '@/constants/positions';
@@ -252,6 +253,10 @@ function Row({
         { backgroundColor: selected ? c.backgroundSelected : c.background },
         pressed && { backgroundColor: c.backgroundElement },
       ]}>
+      {/* In the gutter, not in the content — see TierRail. Only for a card an
+          owner actually holds; an empty slot has no tier to state. */}
+      {card ? <TierRail tier={card.tier} /> : null}
+
       <View style={styles.identity}>
         {canSwap ? (
           <Pressable
@@ -461,6 +466,7 @@ export function PlayerBand({
         { backgroundColor: selected ? c.backgroundSelected : c.background },
         pressed && { backgroundColor: c.backgroundElement },
       ]}>
+      {card ? <TierRail tier={card.tier} height={6} /> : null}
       {lead ? <View style={styles.lead}>{lead}</View> : null}
       {badge}
       <Identity
