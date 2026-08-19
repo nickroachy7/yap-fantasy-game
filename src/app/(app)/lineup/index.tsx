@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BenchBoard } from '@/components/lineup/BenchBoard';
-import { LineupSummary } from '@/components/lineup/LineupSummary';
+import { ContestCard } from '@/components/lineup/ContestCard';
 import { SlotBoard } from '@/components/lineup/SlotBoard';
 import {
   firstOpenSlotFor,
@@ -33,6 +33,7 @@ import { Tabs } from '@/components/ui/Tabs';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { injuryWeight } from '@/lib/injury';
+import { usePlayer } from '@/context/PlayerContext';
 import { supabase } from '@/lib/supabase';
 
 type Pane = 'lineup' | 'bench';
@@ -42,7 +43,20 @@ export default function LineupScreen() {
   const c = Colors[scheme];
   const wide = useIsWide();
 
-  const { slate, lockAt, slots, cards, savedPicks, loading, error: loadError, reload } = useLineupData();
+  const {
+    slate,
+    lockAt,
+    slots,
+    cards,
+    savedPicks,
+    savedPoints,
+    totalPoints,
+    scoredAt,
+    loading,
+    error: loadError,
+    reload,
+  } = useLineupData();
+  const { displayName } = usePlayer();
 
   /**
    * Edits are an overlay on the saved lineup rather than a copy of it. Copying
@@ -233,13 +247,17 @@ export default function LineupScreen() {
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}>
       <SubNav segments={LINEUP_SEGMENTS} inset={false} />
-      <LineupSummary
+      <ContestCard
+        displayName={displayName}
+        weekLabel={context}
         lockAt={lockAt}
         locked={locked}
         now={now}
         filled={filled}
         slotCount={slots.length}
         fpPerGame={lineupFpPerGame}
+        totalPoints={totalPoints}
+        scored={scoredAt !== null}
         alerts={alerts.length}
       />
 
@@ -297,6 +315,8 @@ export default function LineupScreen() {
               eligibleBySlot={eligibleBySlot}
               openSlot={openSlot}
               locked={locked}
+              savedPoints={savedPoints}
+              scored={scoredAt !== null}
               wide={wide}
               sort={sort}
               onSort={setSort}

@@ -15,9 +15,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-import { CardRow, CardRowHeader } from './CardRow';
+import { CardRow } from './CardRow';
 import { SortBar } from './SortBar';
-import { matchupLabel, type LineupCard, type SlotConfig, type SortKey } from './model';
+import { StarterRow } from './StarterRow';
+import { type LineupCard, type SlotConfig, type SortKey } from './model';
 
 function SlotBoardImpl({
   slots,
@@ -26,6 +27,8 @@ function SlotBoardImpl({
   eligibleBySlot,
   openSlot,
   locked,
+  savedPoints,
+  scored,
   wide,
   sort,
   onSort,
@@ -40,6 +43,9 @@ function SlotBoardImpl({
   eligibleBySlot: Map<string, LineupCard[]>;
   openSlot: string | null;
   locked: boolean;
+  /** Per-slot scored points, and whether the week has been swept at all. */
+  savedPoints: Record<string, number | null>;
+  scored: boolean;
   wide: boolean;
   sort: SortKey;
   onSort: (next: SortKey) => void;
@@ -52,7 +58,6 @@ function SlotBoardImpl({
 
   return (
     <View style={[styles.board, { backgroundColor: c.surface, borderColor: c.border }]}>
-      <CardRowHeader wide={wide} leadLabel="SLOT" />
       {slots.map((cfg) => {
         const pickedId = picks[cfg.slot];
         const card = pickedId ? byId.get(pickedId) : undefined;
@@ -62,30 +67,16 @@ function SlotBoardImpl({
 
         return (
           <View key={cfg.slot}>
-            <CardRow
-              wide={wide}
+            <StarterRow
+              slot={cfg.slot}
               card={card ?? null}
+              points={savedPoints[cfg.slot] ?? null}
+              scored={scored}
               selected={isOpen}
               disabled={locked}
+              eligibleCount={eligible.length}
+              eligiblePositions={positions}
               onPress={locked ? undefined : () => onToggleSlot(cfg.slot)}
-              accessibilityLabel={
-                card
-                  ? `${cfg.slot}: ${card.name}, ${card.team ?? 'no team'} ${matchupLabel(card.game)}. Tap to change.`
-                  : `${cfg.slot} is empty. ${eligible.length} eligible ${positions} cards. Tap to choose.`
-              }
-              lead={
-                <Text
-                  numberOfLines={1}
-                  style={[Type.micro, { color: card ? c.text : c.textTertiary }]}>
-                  {cfg.slot}
-                </Text>
-              }
-              emptyPrimary={eligible.length > 0 ? `Choose a ${positions}` : `No ${positions} cards`}
-              emptySecondary={
-                eligible.length > 0
-                  ? `${eligible.length} eligible`
-                  : 'Open a pack to fill this slot'
-              }
             />
 
             {isOpen && !locked ? (

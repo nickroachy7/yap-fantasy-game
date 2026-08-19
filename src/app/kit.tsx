@@ -21,6 +21,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
+import { ContestCard } from '@/components/lineup/ContestCard';
+import { StarterRow } from '@/components/lineup/StarterRow';
+import type { LineupCard } from '@/components/lineup/model';
 import { PlayerRow } from '@/components/cards/PlayerRow';
 import type { DirectoryPlayer } from '@/components/cards/player-directory';
 import { SortBar } from '@/components/cards/SortBar';
@@ -60,6 +63,54 @@ const NO_STATS = {
   fieldGoalAttempts: 0,
   extraPointsMade: 0,
 };
+
+/**
+ * Fixed instants, not `Date.now()`. A gallery that moves is a gallery you
+ * cannot compare against yesterday's screenshot — and calling the clock during
+ * render is impure, which the hooks lint rightly objects to.
+ */
+const DEMO_NOW = Date.parse('2026-09-12T12:00:00Z');
+const DEMO_LOCK_SOON = '2026-09-12T15:00:00Z';
+const DEMO_LOCK_PAST = '2026-09-12T11:00:00Z';
+
+const STARTERS: {
+  slot: string;
+  card: LineupCard | null;
+  points: number | null;
+}[] = [
+  {
+    slot: 'QB',
+    points: 24.6,
+    card: {
+      id: 's1', playerId: 's1', name: 'Caleb Williams', position: 'QB', team: 'CHI',
+      injuryStatus: null, tier: 'gold', careerFp: 812, season: 2026,
+      form: { seasonFp: 288.1, gamesPlayed: 17, fpPerGame: 16.9, recent: [12.4, 22.1, 8.6, 26.9, 19.2] },
+      game: { opponent: 'CAR', home: false, startsAt: '2026-09-13T17:00:00Z' },
+    },
+  },
+  {
+    slot: 'RB1',
+    points: null,
+    card: {
+      id: 's2', playerId: 's2', name: 'Christian McCaffrey', position: 'RB', team: 'SF',
+      injuryStatus: 'IR', tier: 'diamond', careerFp: 2610, season: 2026,
+      form: { seasonFp: 198.2, gamesPlayed: 12, fpPerGame: 16.5, recent: [21.0, 4.2, 18.8] },
+      // No game: the bye case, which is the one people lose weeks to.
+      game: null,
+    },
+  },
+  {
+    slot: 'FLEX',
+    points: null,
+    card: {
+      id: 's3', playerId: 's3', name: 'Bartholomew Vandersteen III', position: 'TE', team: 'NYJ',
+      injuryStatus: 'Questionable', tier: 'bronze', careerFp: 14, season: 2026,
+      form: null,
+      game: { opponent: 'BUF', home: true, startsAt: '2026-09-13T17:00:00Z' },
+    },
+  },
+  { slot: 'K', points: null, card: null },
+];
 
 /** One of each position, plus the two states that are easy to get wrong. */
 const DIRECTORY_ROWS: { player: DirectoryPlayer; fixture?: string }[] = [
@@ -290,8 +341,60 @@ function Kit() {
           </Section>
 
           <Section
+            title="Contest card"
+            note="Unscored shows the starters' average pace; a swept week shows the real total.">
+            <ContestCard
+              displayName="nickroachy"
+              weekLabel="Preseason · Week 3"
+              lockAt={DEMO_LOCK_SOON}
+              locked={false}
+              now={DEMO_NOW}
+              filled={7}
+              slotCount={8}
+              fpPerGame={104.2}
+              totalPoints={null}
+              scored={false}
+              alerts={2}
+            />
+            <ContestCard
+              displayName="nickroachy"
+              weekLabel="Preseason · Week 2"
+              lockAt={DEMO_LOCK_PAST}
+              locked
+              now={DEMO_NOW}
+              filled={8}
+              slotCount={8}
+              fpPerGame={104.2}
+              totalPoints={118.4}
+              scored
+              alerts={0}
+            />
+          </Section>
+
+          <Section
+            title="Starter row"
+            note="Same shape as the directory row, asked about the week. Bye, injury, empty slot.">
+            <Panel>
+              {STARTERS.map((s) => (
+                <StarterRow
+                  key={s.slot}
+                  slot={s.slot}
+                  card={s.card}
+                  points={s.points}
+                  scored={s.points !== null}
+                  selected={false}
+                  disabled={false}
+                  eligibleCount={s.card ? 0 : 3}
+                  eligiblePositions="PK"
+                  onPress={() => {}}
+                />
+              ))}
+            </Panel>
+          </Section>
+
+          <Section
             title="Directory row"
-            note="Two bands at a fixed 76pt. Last row has never played — dashes, not zeroes.">
+            note="Identity over a tinted stat tray, fixed 90pt. Last row has never played — dashes, not zeroes.">
             <SortBar sort={{ key: 'fp', dir: 'desc' }} onSort={() => {}} />
             <Panel>
               {DIRECTORY_ROWS.map((r) => (

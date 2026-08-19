@@ -168,6 +168,16 @@ export type LineupData = {
   cards: LineupCard[];
   /** Whatever was already submitted for this week, so an edit starts from it. */
   savedPicks: Record<string, string>;
+  /**
+   * Points this week PER SLOT, once the sweep has run. Null for a slot that
+   * has not been scored — which is not the same as a slot that scored nothing,
+   * and the row draws the two differently.
+   */
+  savedPoints: Record<string, number | null>;
+  /** The week's total, straight from the server rather than re-added here. */
+  totalPoints: number | null;
+  /** Non-null once the week has been swept. Gates every actual figure. */
+  scoredAt: string | null;
   loading: boolean;
   error: string | null;
   reload: () => Promise<void>;
@@ -179,6 +189,9 @@ export function useLineupData(): LineupData {
   const [slots, setSlots] = useState<SlotConfig[]>([]);
   const [cards, setCards] = useState<LineupCard[]>([]);
   const [savedPicks, setSavedPicks] = useState<Record<string, string>>({});
+  const [savedPoints, setSavedPoints] = useState<Record<string, number | null>>({});
+  const [totalPoints, setTotalPoints] = useState<number | null>(null);
+  const [scoredAt, setScoredAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -232,7 +245,7 @@ export function useLineupData(): LineupData {
       s
         ? supabase
             .from('lineups')
-            .select('id, lineup_slots(slot, card_instance_id)')
+            .select('id, total_points, scored_at, lineup_slots(slot, card_instance_id, points)')
             .eq('season', s.season)
             .eq('season_type', s.season_type)
             .eq('week', s.week)
@@ -282,12 +295,25 @@ export function useLineupData(): LineupData {
     );
 
     // Re-hydrate a lineup already submitted for this week.
-    const prior = existing.data as { lineup_slots?: { slot: string; card_instance_id: string }[] } | null;
+    const prior = existing.data as {
+      total_points: number | null;
+      scored_at: string | null;
+      lineup_slots?: { slot: string; card_instance_id: string; points: number | null }[];
+    } | null;
     setSavedPicks(
       prior?.lineup_slots
         ? Object.fromEntries(prior.lineup_slots.map((r) => [r.slot, r.card_instance_id]))
         : {},
     );
+    setSavedPoints(
+      prior?.lineup_slots
+        ? Object.fromEntries(
+            prior.lineup_slots.map((r) => [r.slot, r.points === null ? null : Number(r.points)]),
+          )
+        : {},
+    );
+    setTotalPoints(prior?.total_points === null || prior?.total_points === undefined ? null : Number(prior.total_points));
+    setScoredAt(prior?.scored_at ?? null);
     setLoading(false);
   }, []);
 
@@ -295,5 +321,17 @@ export function useLineupData(): LineupData {
     void load();
   }, [load]);
 
-  return { slate, lockAt, slots, cards, savedPicks, loading, error, reload: load };
+  return {
+    slate,
+    lockAt,
+    slots,
+    cards,
+    savedPicks,
+    savedPoints,
+    totalPoints,
+    scoredAt,
+    loading,
+    error,
+    reload: load,
+  };
 }

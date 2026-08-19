@@ -58,6 +58,20 @@ export default function AppLayout() {
         {isWide ? <Sidebar /> : null}
         <View style={styles.content}>
           <Tabs
+            /**
+             * Back returns to the tab you CAME FROM, not to the first one.
+             *
+             * react-navigation defaults to `firstRoute`, which meant backing
+             * out of a player profile always landed on Lineup — the profile is
+             * an href:null sibling of the five tabs, so leaving it popped to
+             * the navigator's initial route rather than to the directory you
+             * opened it from. Verified with a probe: default lands on tab one,
+             * `history` lands where you were.
+             *
+             * It also makes Android's hardware back walk the tabs you actually
+             * visited, which is what people expect of it everywhere else.
+             */
+            backBehavior="history"
             screenOptions={{
               headerShown: false,
               tabBarActiveTintColor: c.text,

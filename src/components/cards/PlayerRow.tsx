@@ -41,8 +41,8 @@
  *
  * 3. The stat strip's last cell was left-aligned like the other four, so the
  *    row ended in a ragged 120pt of nothing while the FP figure above it was
- *    flush right. FP and FP/G now share a right edge, which is what gives the
- *    row a straight side.
+ *    flush right. The last cell is right-aligned now, so the figure chip and
+ *    the FP/G column share an outer edge and the row has a straight side.
  *
  * 4. Zebra striping AND a hairline under every row. Either separates rows;
  *    both together is a grid, and it read as noise in light mode.
@@ -76,10 +76,10 @@ import { formatStat, statStrip, type DirectoryPlayer } from './player-directory'
  * to `getItemLayout` verbatim, so a row that renders taller than this scrolls
  * out of alignment. 76 = identity band (44) + stat strip (32).
  */
-export const PLAYER_ROW_HEIGHT = 76;
+export const PLAYER_ROW_HEIGHT = 90;
 
 /** The two bands. They must sum to PLAYER_ROW_HEIGHT. */
-const IDENTITY_HEIGHT = 44;
+const IDENTITY_HEIGHT = 58;
 const STRIP_HEIGHT = PLAYER_ROW_HEIGHT - IDENTITY_HEIGHT;
 
 /**
@@ -135,10 +135,15 @@ function PlayerRowInner({ player, onPress, fixture }: PlayerRowProps) {
       <View style={styles.identity}>
         <PositionBadge label={player.position} size={26} />
 
+        {/* Three lines, not two. Who he is, what he is, and when he plays —
+            each on its own baseline. Folded onto one line they ran together
+            into a single grey sentence, and the fixture (the part that decides
+            whether to start him this week) was the half that got squeezed. */}
         <View style={styles.names}>
           <Text numberOfLines={1} style={[styles.name, { color: c.text }]}>
             {player.name}
           </Text>
+
           <View style={styles.meta}>
             {/* Position and rank as one token — `WR8`. Alone, either half is
                 worse: the position repeats the badge, and the rank floats free
@@ -149,8 +154,8 @@ function PlayerRowInner({ player, onPress, fixture }: PlayerRowProps) {
             <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
               {player.team?.toUpperCase() ?? DASH}
             </Text>
-            {/* The designation rides on the identity line rather than in a
-                column, so it is read with the name it qualifies. */}
+            {/* The designation sits with the name it qualifies rather than in a
+                column of its own. */}
             {weight && player.injuryStatus ? (
               <Text
                 numberOfLines={1}
@@ -158,20 +163,21 @@ function PlayerRowInner({ player, onPress, fixture }: PlayerRowProps) {
                 {injuryAbbr(player.injuryStatus)}
               </Text>
             ) : null}
-            {fixture ? (
-              <Text numberOfLines={1} style={[Type.fine, styles.fixture, { color: c.textTertiary }]}>
-                {fixture}
-              </Text>
-            ) : null}
           </View>
+
+          <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
+            {fixture ?? ' '}
+          </Text>
         </View>
 
-        <View style={styles.figure}>
+        {/* The figure is boxed rather than floating. At the right edge of a
+            three-line block a bare number reads as belonging to whichever line
+            it happens to sit beside; a chip makes it the row's, and gives the
+            label somewhere to live that is not directly above a name. */}
+        <View style={[styles.figure, { backgroundColor: tray, borderColor: c.border }]}>
           <Text style={[Type.micro, { color: c.textTertiary }]}>FP</Text>
-          {/* An em dash at 19pt/800 is a black bar, not an absence — it reads
-              as a redaction. A player with no games gets the dash at the
-              strip's weight instead, which is what "nothing here yet" should
-              look like. */}
+          {/* An em dash at figure weight is a black bar, not an absence — it
+              reads as a redaction. Unplayed drops to the strip's weight. */}
           {played ? (
             <Text numberOfLines={1} style={[styles.figureValue, NUMERIC, { color: c.text }]}>
               {oneDp(player.seasonFp)}
@@ -237,11 +243,16 @@ const styles = StyleSheet.create({
   names: { flex: 1, minWidth: 0, gap: 1 },
   name: { fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
-  /* Pushed to the right of the meta line so the fixture is the first thing to
-     be squeezed out on a narrow screen, rather than the club or the injury. */
-  fixture: { flexShrink: 1 },
-  figure: { alignItems: 'flex-end', minWidth: 54, paddingLeft: Spacing.two },
-  figureValue: { fontSize: 19, fontWeight: '800', letterSpacing: -0.4 },
+  figure: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 68,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 4,
+    borderRadius: 9,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  figureValue: { fontSize: 17, fontWeight: '800', letterSpacing: -0.4 },
   strip: {
     height: STRIP_HEIGHT,
     flexDirection: 'row',
