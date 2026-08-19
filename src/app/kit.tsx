@@ -21,6 +21,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
+import { PlayerRow } from '@/components/cards/PlayerRow';
+import type { DirectoryPlayer } from '@/components/cards/player-directory';
+import { SortBar } from '@/components/cards/SortBar';
 import { CollectionSummary } from '@/components/collection/CollectionSummary';
 import { summarise } from '@/components/collection/types';
 import { OWNED_MANY } from '@/components/dev/fixtures';
@@ -39,6 +42,88 @@ import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const TAB_ICONS: TabIconName[] = ['lineup', 'leaderboard', 'cards', 'collection', 'profile'];
+
+const NO_STATS = {
+  receptions: 0,
+  targets: 0,
+  receivingYards: 0,
+  receivingTds: 0,
+  rushingAttempts: 0,
+  rushingYards: 0,
+  rushingTds: 0,
+  passingCompletions: 0,
+  passingAttempts: 0,
+  passingYards: 0,
+  passingTds: 0,
+  interceptions: 0,
+  fieldGoalsMade: 0,
+  fieldGoalAttempts: 0,
+  extraPointsMade: 0,
+};
+
+/** One of each position, plus the two states that are easy to get wrong. */
+const DIRECTORY_ROWS: { player: DirectoryPlayer; fixture?: string }[] = [
+  {
+    player: {
+      cardId: 'd1', playerId: 'd1', season: 2026, name: 'Nico Collins',
+      position: 'WR', team: 'HOU', injuryStatus: null, rarity: 'common',
+      seasonFp: 236.4, gamesPlayed: 16, fpPerGame: 14.8, posRank: 8,
+      age: 27, college: 'Michigan', experience: 5,
+      stats: { ...NO_STATS, receptions: 76, targets: 118, receivingYards: 1144, receivingTds: 7 },
+    },
+    fixture: 'Sun 1:00p vs BUF',
+  },
+  {
+    player: {
+      cardId: 'd2', playerId: 'd2', season: 2026, name: 'Malik Nabers',
+      position: 'WR', team: 'NYG', injuryStatus: 'Questionable', rarity: 'rare',
+      seasonFp: 232.6, gamesPlayed: 15, fpPerGame: 15.5, posRank: 11,
+      age: 23, college: 'LSU', experience: 2,
+      stats: { ...NO_STATS, receptions: 82, targets: 140, receivingYards: 1050, receivingTds: 7 },
+    },
+    fixture: 'Sun 5:20p vs DAL',
+  },
+  {
+    player: {
+      cardId: 'd3', playerId: 'd3', season: 2026, name: 'Christian McCaffrey',
+      position: 'RB', team: 'SF', injuryStatus: 'IR', rarity: 'legendary',
+      seasonFp: 198.2, gamesPlayed: 12, fpPerGame: 16.5, posRank: 4,
+      age: 29, college: 'Stanford', experience: 9,
+      stats: { ...NO_STATS, rushingAttempts: 214, rushingYards: 1002, rushingTds: 9, receptions: 44, receivingTds: 2 },
+    },
+    fixture: 'BYE',
+  },
+  {
+    player: {
+      cardId: 'd4', playerId: 'd4', season: 2026, name: 'Caleb Williams',
+      position: 'QB', team: 'CHI', injuryStatus: null, rarity: 'epic',
+      seasonFp: 288.1, gamesPlayed: 17, fpPerGame: 16.9, posRank: 5,
+      age: 24, college: 'USC', experience: 2,
+      stats: { ...NO_STATS, passingYards: 3541, passingTds: 24, interceptions: 9, rushingYards: 412 },
+    },
+    fixture: 'Sun 1:00p @ CAR',
+  },
+  {
+    player: {
+      cardId: 'd5', playerId: 'd5', season: 2026, name: 'Ka’imi Fairbairn',
+      position: 'PK', team: 'HOU', injuryStatus: null, rarity: 'common',
+      seasonFp: 141.0, gamesPlayed: 16, fpPerGame: 8.8, posRank: 3,
+      age: 31, college: 'UCLA', experience: 10,
+      stats: { ...NO_STATS, fieldGoalsMade: 31, fieldGoalAttempts: 36, extraPointsMade: 42 },
+    },
+    fixture: 'Sun 1:00p vs BUF',
+  },
+  {
+    // Never played. Every number must be a dash, not a zero.
+    player: {
+      cardId: 'd6', playerId: 'd6', season: 2026, name: 'Bartholomew Vandersteen III',
+      position: 'TE', team: null, injuryStatus: null, rarity: 'common',
+      seasonFp: 0, gamesPlayed: 0, fpPerGame: 0, posRank: null,
+      age: 22, college: 'Rutgers', experience: 0,
+      stats: NO_STATS,
+    },
+  },
+];
 
 /** Every lineup slot the config ships with, so the split badge is exercised. */
 const SLOTS = ['QB', 'RB1', 'RB2', 'WR1', 'WR2', 'TE', 'FLEX', 'K'];
@@ -202,6 +287,23 @@ function Kit() {
                 <TabIcon key={`big-${n}`} name={n} color={c.text} focused size={72} />
               ))}
             </View>
+          </Section>
+
+          <Section
+            title="Directory row"
+            note="Two bands at a fixed 76pt. Last row has never played — dashes, not zeroes.">
+            <SortBar sort={{ key: 'fp', dir: 'desc' }} onSort={() => {}} />
+            <Panel>
+              {DIRECTORY_ROWS.map((r, i) => (
+                <PlayerRow
+                  key={r.player.cardId}
+                  player={r.player}
+                  index={i}
+                  onPress={() => {}}
+                  fixture={r.fixture}
+                />
+              ))}
+            </Panel>
           </Section>
 
           <Section title="Position badges" note="Every position, then every lineup slot.">

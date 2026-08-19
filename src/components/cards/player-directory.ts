@@ -24,6 +24,8 @@ export type DirectoryPlayer = {
   seasonFp: number;
   gamesPlayed: number;
   fpPerGame: number;
+  /** Season totals, for the row's stat strip. See `statStrip`. */
+  stats: DirectoryStats;
   /* --- from `players`, merged in by `fetchPlayerDirectory` --- */
   age: number | null;
   college: string | null;
@@ -33,8 +35,26 @@ export type DirectoryPlayer = {
   posRank: number | null;
 };
 
+export type DirectoryStats = {
+  receptions: number;
+  targets: number;
+  receivingYards: number;
+  receivingTds: number;
+  rushingAttempts: number;
+  rushingYards: number;
+  rushingTds: number;
+  passingCompletions: number;
+  passingAttempts: number;
+  passingYards: number;
+  passingTds: number;
+  interceptions: number;
+  fieldGoalsMade: number;
+  fieldGoalAttempts: number;
+  extraPointsMade: number;
+};
+
 export const DIRECTORY_COLUMNS =
-  'card_id, player_id, season, player_name, position_abbreviation, team_abbreviation, injury_status, rarity, season_fp, games_played, fp_per_game';
+  'card_id, player_id, season, player_name, position_abbreviation, team_abbreviation, injury_status, rarity, season_fp, games_played, fp_per_game, receptions, receiving_targets, receiving_yards, receiving_touchdowns, rushing_attempts, rushing_yards, rushing_touchdowns, passing_completions, passing_attempts, passing_yards, passing_touchdowns, passing_interceptions, field_goals_made, field_goal_attempts, extra_points_made';
 
 /**
  * Page size. Deliberately well under PostgREST's `db-max-rows` ceiling so a
@@ -74,6 +94,23 @@ export function normalise(row: DirectoryRow, bio?: PlayerBio): DirectoryPlayer {
     seasonFp: num(row.season_fp),
     gamesPlayed: num(row.games_played),
     fpPerGame: num(row.fp_per_game),
+    stats: {
+      receptions: num(row.receptions),
+      targets: num(row.receiving_targets),
+      receivingYards: num(row.receiving_yards),
+      receivingTds: num(row.receiving_touchdowns),
+      rushingAttempts: num(row.rushing_attempts),
+      rushingYards: num(row.rushing_yards),
+      rushingTds: num(row.rushing_touchdowns),
+      passingCompletions: num(row.passing_completions),
+      passingAttempts: num(row.passing_attempts),
+      passingYards: num(row.passing_yards),
+      passingTds: num(row.passing_touchdowns),
+      interceptions: num(row.passing_interceptions),
+      fieldGoalsMade: num(row.field_goals_made),
+      fieldGoalAttempts: num(row.field_goal_attempts),
+      extraPointsMade: num(row.extra_points_made),
+    },
     age: bio?.age ?? null,
     college: bio?.college ?? null,
     experience: bio?.experience ?? null,
@@ -283,17 +320,27 @@ export function positionCounts(players: DirectoryPlayer[]): Record<PositionFilte
   return counts;
 }
 
-export type SortKey =
-  | 'name'
-  | 'pos'
-  | 'team'
-  | 'college'
-  | 'exp'
-  | 'age'
-  | 'games'
-  | 'fp'
-  | 'fpg';
+/**
+ * Sortable fields.
+ *
+ * `pos`, `team` and `college` were dropped along with the column headers that
+ * used to carry them. Position is what the filter tabs above the list do, and
+ * team and college are both matched by the search box — so all three were a
+ * second way to do something the screen already does, and a sort bar has to
+ * earn every chip it shows.
+ */
+export type SortKey = 'name' | 'exp' | 'age' | 'games' | 'fp' | 'fpg';
 export type SortDir = 'asc' | 'desc';
+
+/** Chip order for the sort bar. Production first, identity last. */
+export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'fp', label: 'FP' },
+  { key: 'fpg', label: 'FP/G' },
+  { key: 'games', label: 'GP' },
+  { key: 'name', label: 'Name' },
+  { key: 'age', label: 'Age' },
+  { key: 'exp', label: 'Yrs' },
+];
 
 /**
  * The direction a column takes the first time you press it. Descending for a
@@ -302,9 +349,6 @@ export type SortDir = 'asc' | 'desc';
  */
 export const DEFAULT_SORT_DIR: Record<SortKey, SortDir> = {
   name: 'asc',
-  pos: 'asc',
-  team: 'asc',
-  college: 'asc',
   exp: 'asc',
   age: 'asc',
   games: 'desc',
@@ -381,12 +425,6 @@ function compareBy(a: DirectoryPlayer, b: DirectoryPlayer, key: SortKey, dir: So
   switch (key) {
     case 'name':
       return compareText(a.name, b.name, dir);
-    case 'pos':
-      return compareText(a.position, b.position, dir);
-    case 'team':
-      return compareText(a.team, b.team, dir);
-    case 'college':
-      return compareText(a.college, b.college, dir);
     case 'exp':
       return compareNullable(a.experience, b.experience, dir);
     case 'age':
@@ -404,4 +442,72 @@ function compareBy(a: DirectoryPlayer, b: DirectoryPlayer, key: SortKey, dir: So
         dir,
       );
   }
+}
+
+
+/* -------------------------------------------------------------------------- *
+ * The row's stat strip.
+ * -------------------------------------------------------------------------- */
+
+export type StatCell = { label: string; value: number };
+
+/**
+ * Five stats per position, chosen the way a manager reads a player.
+ *
+ * Five because that is what fits a phone row without the labels colliding, and
+ * because the sixth stat for every position is already noise — a receiver's
+ * rushing attempts, a quarterback's receptions.
+ *
+ * The last cell is always FP/G. The reference layout puts rostered-percentage
+ * there, which this app cannot honestly show: ownership is RLS-scoped to its
+ * owner, so a global figure needs a server-side aggregate, and with a
+ * beta-sized user base it would read 0% or 100% for everyone. FP per game is
+ * the number that actually decides a start, and it is real.
+ */
+export function statStrip(player: DirectoryPlayer): StatCell[] {
+  const s = player.stats;
+  const perGame = player.gamesPlayed > 0 ? player.fpPerGame : 0;
+
+  switch ((player.position ?? '').toUpperCase()) {
+    case 'QB':
+      return [
+        { label: 'PASS YD', value: s.passingYards },
+        { label: 'PASS TD', value: s.passingTds },
+        { label: 'INT', value: s.interceptions },
+        { label: 'RUSH YD', value: s.rushingYards },
+        { label: 'FP/G', value: perGame },
+      ];
+    case 'RB':
+      return [
+        { label: 'ATT', value: s.rushingAttempts },
+        { label: 'RUSH YD', value: s.rushingYards },
+        { label: 'TD', value: s.rushingTds + s.receivingTds },
+        { label: 'REC', value: s.receptions },
+        { label: 'FP/G', value: perGame },
+      ];
+    case 'PK':
+      return [
+        { label: 'FG', value: s.fieldGoalsMade },
+        { label: 'FGA', value: s.fieldGoalAttempts },
+        { label: 'XP', value: s.extraPointsMade },
+        { label: 'GP', value: player.gamesPlayed },
+        { label: 'FP/G', value: perGame },
+      ];
+    // WR and TE read identically, and so does anything unexpected the feed
+    // sends: receiving is the safest default for a skill position.
+    default:
+      return [
+        { label: 'REC', value: s.receptions },
+        { label: 'REC YD', value: s.receivingYards },
+        { label: 'TD', value: s.receivingTds },
+        { label: 'TGT', value: s.targets },
+        { label: 'FP/G', value: perGame },
+      ];
+  }
+}
+
+/** FP/G wants a decimal; a touchdown count does not. */
+export function formatStat(cell: StatCell): string {
+  if (cell.label === 'FP/G') return cell.value.toFixed(1);
+  return Math.round(cell.value).toLocaleString();
 }

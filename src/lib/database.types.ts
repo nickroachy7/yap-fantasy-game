@@ -934,13 +934,28 @@ export type Database = {
       player_directory: {
         Row: {
           card_id: string | null
+          extra_points_made: number | null
+          field_goal_attempts: number | null
+          field_goals_made: number | null
           fp_per_game: number | null
           games_played: number | null
           injury_status: string | null
+          passing_attempts: number | null
+          passing_completions: number | null
+          passing_interceptions: number | null
+          passing_touchdowns: number | null
+          passing_yards: number | null
           player_id: string | null
           player_name: string | null
           position_abbreviation: string | null
           rarity: Database["public"]["Enums"]["rarity"] | null
+          receiving_targets: number | null
+          receiving_touchdowns: number | null
+          receiving_yards: number | null
+          receptions: number | null
+          rushing_attempts: number | null
+          rushing_touchdowns: number | null
+          rushing_yards: number | null
           season: number | null
           season_fp: number | null
           team_abbreviation: string | null

@@ -20,7 +20,8 @@ building it.
 | §10 repeated primitives | `constants/positions.ts`, `ui/PositionBadge`, `ui/StatusChip`, `ui/EmptyState`, `ui/DropdownChip` |
 | §1.3 position badge, incl. multi-cell flex grid | `ui/PositionBadge` — `FLEX` renders three cells (R/W/T) in position colours |
 | §1.2 week selector chip + 3-column grid popover | `ui/DropdownChip`, used by Scores |
-| §4.2 / §1.5 grouped stat headers | `groups` prop on the existing `ui/DataTable` |
+| §4.2 / §1.5 grouped stat headers | `groups` prop on the existing `ui/DataTable` — see the note below |
+| §4.2 results row | `cards/PlayerRow` — rebuilt tall, with a position-aware stat strip |
 | §7 Game Center | `/lineup/scores` — week picker, schedule grouped by kickoff, game detail, position-grouped leaders |
 | §5 Trend | `/cards/trend` — reinterpreted, see below |
 | §3.5 Scoring settings | `/leaderboard/scoring` |
@@ -28,6 +29,13 @@ building it.
 | §1.5 career heat map | `players/CareerTable`, shaded column-relative |
 | §1.5 transaction history | `players/CardHistory` — reinterpreted, see below |
 | §10 empty-state shape | `ui/EmptyState`, replacing four divergent hand-rolled copies |
+
+**Note on the grouped headers.** They were added for a Cards table that has
+since been replaced: the directory is now a list of tall rows with a per-player
+stat strip rather than a wide table, so nothing in the product passes `groups`
+today. The feature works and is exercised in `/kit`, but it is currently kept
+on spec rather than on demand — the career table is the plausible future
+consumer.
 
 Two were deliberately re-pointed rather than copied:
 

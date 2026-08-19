@@ -1,74 +1,49 @@
 /**
- * One row of the player directory table.
+ * One player in the directory.
  *
- * Fixed height on purpose: it lets the FlatList supply `getItemLayout`, which
- * is what keeps scrolling ~1,000 rows smooth on a phone. 34pt puts roughly
- * fifteen players on screen at once, which is the number that lets you compare
- * a position group without scrolling — the whole reason to open this screen.
+ * WHY THIS IS NOT A TABLE ROW ANY MORE
  *
- * No photo, no logo, no jersey — we hold no licence for any of them. The club
- * is its three-letter abbreviation as text and the position is a glyph.
+ * It used to be a 34pt row in a nine-column table, and the reasoning for that
+ * was density: fifteen players on screen lets you compare a position group
+ * without scrolling. That reasoning was sound about the goal and wrong about
+ * how it was being met. The columns that made it a *table* — college, age,
+ * years, games — are bio, not production, and on a phone the layout dropped
+ * them anyway. What was left was a name, a club, and two fantasy-point figures
+ * in 12pt type: dense, but dense with very little.
  *
- * Column geometry is exported rather than private because the header row in
- * PlayersPanel has to line up with it to the pixel, and the only way that stays
- * true through an edit is for both to read the same numbers.
+ * This row is twice as tall and carries roughly three times as much, because
+ * the space goes to what a manager actually reads — the club and designation on
+ * their own line, the week's fixture, and a strip of the five stats that matter
+ * for that player's position. "Who is the fourth-best tight end" is still
+ * answerable at a glance; "and why" now is too.
+ *
+ * The height is still FIXED, which is the part that matters for a ~1,000-row
+ * list: `getItemLayout` needs it, and without it scrolling this list on a phone
+ * stutters. Two bands, both of known height, is what keeps that true — nothing
+ * here may wrap.
+ *
+ * No photo, no logo, no jersey — we hold no licence for any of them. The
+ * reference design puts a circular headshot at the left of every row; ours is
+ * the position glyph, which is the same slot doing an honest job.
  */
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
+import { PositionBadge } from '@/components/ui/PositionBadge';
 import { DASH } from '@/components/ui/DataTable';
+import { positionColors } from '@/constants/positions';
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { injuryAbbr, injuryWeight } from '@/lib/injury';
-import { PositionGlyph } from './PositionGlyph';
-import type { DirectoryPlayer } from './player-directory';
+import { formatStat, statStrip, type DirectoryPlayer } from './player-directory';
 
-/** Row box. Must match what `getItemLayout` is told. */
-export const PLAYER_ROW_HEIGHT = 34;
+/**
+ * Row box, and the single most load-bearing constant in this file: it is handed
+ * to `getItemLayout` verbatim, so a row that renders taller than this scrolls
+ * out of alignment. 76 = identity band (44) + stat strip (32).
+ */
+export const PLAYER_ROW_HEIGHT = 76;
 
-/** Shared by the row and the header row above it. */
 export const ROW_GUTTER = Spacing.two + 2;
-export const CELL_GAP = 6;
-
-export const COL = {
-  rank: 22,
-  pos: 24,
-  team: 30,
-  exp: 24,
-  age: 26,
-  games: 24,
-  fp: 46,
-  fpg: 42,
-} as const;
-
-/**
- * The two text columns share whatever the fixed columns leave, rather than the
- * name taking all of it: at the 940pt table measure a single flexible column
- * gives the name ~600pt of empty space and pushes the points to the far edge,
- * which is the exact travel ContentMeasure exists to prevent.
- */
-export const NAME_FLEX = 1;
-export const COLLEGE_FLEX = 0.62;
-
-/**
- * How much of the table fits.
- *
- *  compact  — a phone. Everything here is what you cannot identify a player
- *             without, plus the two numbers you came for.
- *  standard — room for the bio and volume columns that separate a rookie on
- *             two games from a starter on two.
- *  full     — a desktop window. College fills space that would otherwise be
- *             name padding, and it is the field people actually scout by.
- */
-export type RowLayout = 'compact' | 'standard' | 'full';
-
-export const STANDARD_WIDTH = 640;
-export const FULL_WIDTH = 900;
-
-export function layoutFor(width: number): RowLayout {
-  if (width >= FULL_WIDTH) return 'full';
-  if (width >= STANDARD_WIDTH) return 'standard';
-  return 'compact';
-}
 
 const oneDp = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
@@ -78,181 +53,131 @@ const oneDp = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
  * state and printing 0.0 for all of them implies they were measured and found
  * to be worth nothing.
  */
-const stat = (value: number, games: number) => (games > 0 ? oneDp(value) : DASH);
+const seasonFigure = (value: number, games: number) => (games > 0 ? oneDp(value) : DASH);
 
-/** 0 is a rookie, and 'R' is how every fantasy table in the world writes it. */
-const years = (experience: number | null) =>
-  experience === null ? DASH : experience === 0 ? 'R' : String(experience);
-
-function PlayerRowInner({
-  player,
-  index,
-  layout,
-  onPress,
-}: {
+export type PlayerRowProps = {
   player: DirectoryPlayer;
-  /** Drives the zebra banding, so it has to come from the list. */
   index: number;
-  layout: RowLayout;
   onPress: (player: DirectoryPlayer) => void;
-}) {
+  /** "Sun 1:05p vs BUF" or "BYE". Absent when the schedule has not loaded. */
+  fixture?: string | null;
+};
+
+function PlayerRowInner({ player, index, onPress, fixture }: PlayerRowProps) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const team = player.team?.toUpperCase() ?? DASH;
-  const played = player.gamesPlayed > 0;
-  const detailed = layout !== 'compact';
+  const accent = positionColors(player.position, scheme).accent;
 
-  const rank = player.posRank ? `${player.position ?? ''}${player.posRank}` : 'unranked';
-  const label =
-    `${player.name}, ${player.position ?? 'unknown position'}, ${team}, ${rank}. ` +
-    (played
-      ? `${oneDp(player.seasonFp)} fantasy points, ${oneDp(player.fpPerGame)} per game over ${player.gamesPlayed} games. `
-      : 'Has not played this season. ') +
-    (player.age ? `Age ${player.age}. ` : '') +
-    (player.injuryStatus ? `Injury designation ${player.injuryStatus}.` : '');
+  const weight = injuryWeight(player.injuryStatus);
+  const played = player.gamesPlayed > 0;
 
   return (
     <Pressable
       onPress={() => onPress(player)}
-      // Explicit, so VoiceOver reads the row as one player rather than stopping
-      // on the position glyph and then each numeric cell in turn. Nine stops
-      // per row across a thousand rows is not a directory anyone can use.
-      accessible
       accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint="Opens the player's profile"
+      accessibilityLabel={describe(player)}
       style={({ pressed }) => [
         styles.row,
-        // Banding rather than a hairline under every row: at nine columns the
-        // eye has to track the full width, and a rule per row reads as a grid
-        // of boxes while a band reads as a line to follow.
+        { borderBottomColor: c.border },
+        // Zebra striping survives the redesign: at this row height it is what
+        // stops two adjacent stat strips reading as one block of numbers.
         index % 2 === 1 && { backgroundColor: c.surfaceSunken },
-        pressed && { backgroundColor: c.backgroundSelected },
+        pressed && { backgroundColor: c.backgroundElement },
       ]}>
-      <Text
-        numberOfLines={1}
-        style={[Type.micro, NUMERIC, styles.right, { width: COL.rank, color: c.textTertiary }]}>
-        {player.posRank ?? DASH}
-      </Text>
-
-      <PositionGlyph
-        position={player.position}
-        size={COL.pos}
-        color={c.textSecondary}
-        background={c.backgroundElement}
-        borderColor={c.border}
-      />
-
-      {/* flexShrink + minWidth 0 is what actually makes a long name truncate
-          instead of pushing the points column off the screen. */}
       <View style={styles.identity}>
-        <Text
-          numberOfLines={1}
-          ellipsizeMode="tail"
-          style={[Type.strong, styles.shrink, { color: c.text }]}>
-          {player.name}
+        <Text style={[Type.fine, NUMERIC, styles.rank, { color: c.textTertiary }]}>
+          {player.posRank ?? DASH}
         </Text>
-        <InjuryMark status={player.injuryStatus} />
+
+        <PositionBadge label={player.position} size={26} />
+
+        <View style={styles.names}>
+          <Text numberOfLines={1} style={[styles.name, { color: c.text }]}>
+            {player.name}
+          </Text>
+          <View style={styles.meta}>
+            <Text numberOfLines={1} style={[Type.fine, { color: accent }]}>
+              {(player.position ?? '—').toUpperCase()}
+            </Text>
+            <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
+              {player.team?.toUpperCase() ?? DASH}
+            </Text>
+            {/* The designation rides on the identity line rather than in a
+                column, so it is read with the name it qualifies. */}
+            {weight && player.injuryStatus ? (
+              <Text
+                numberOfLines={1}
+                style={[Type.micro, { color: weight === 'blocking' ? c.negative : c.warning }]}>
+                {injuryAbbr(player.injuryStatus)}
+              </Text>
+            ) : null}
+            {fixture ? (
+              <Text numberOfLines={1} style={[Type.fine, styles.fixture, { color: c.textTertiary }]}>
+                {fixture}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+
+        <View style={styles.figure}>
+          <Text style={[Type.micro, { color: c.textTertiary }]}>FP</Text>
+          <Text numberOfLines={1} style={[styles.figureValue, NUMERIC, { color: c.text }]}>
+            {seasonFigure(player.seasonFp, player.gamesPlayed)}
+          </Text>
+        </View>
       </View>
 
-      <Text numberOfLines={1} style={[Type.label, { width: COL.team, color: c.textSecondary }]}>
-        {team}
-      </Text>
-
-      {layout === 'full' ? (
-        <Text
-          numberOfLines={1}
-          ellipsizeMode="tail"
-          style={[Type.fine, styles.college, { color: c.textTertiary }]}>
-          {player.college ?? DASH}
-        </Text>
-      ) : null}
-
-      {detailed ? (
-        <>
-          <Text
-            numberOfLines={1}
-            style={[Type.body, NUMERIC, styles.right, { width: COL.exp, color: c.textTertiary }]}>
-            {years(player.experience)}
-          </Text>
-          <Text
-            numberOfLines={1}
-            style={[Type.body, NUMERIC, styles.right, { width: COL.age, color: c.textTertiary }]}>
-            {player.age ?? DASH}
-          </Text>
-          <Text
-            numberOfLines={1}
-            style={[Type.body, NUMERIC, styles.right, { width: COL.games, color: c.textTertiary }]}>
-            {player.gamesPlayed}
-          </Text>
-        </>
-      ) : null}
-
-      <Text
-        numberOfLines={1}
-        style={[Type.strong, NUMERIC, styles.right, { width: COL.fp, color: c.text }]}>
-        {stat(player.seasonFp, player.gamesPlayed)}
-      </Text>
-      <Text
-        numberOfLines={1}
-        style={[Type.body, NUMERIC, styles.right, { width: COL.fpg, color: c.textSecondary }]}>
-        {stat(player.fpPerGame, player.gamesPlayed)}
-      </Text>
+      {/* The strip is drawn even for a player with no games, as labels over
+          dashes. Collapsing it would make rows different heights, which is
+          exactly what getItemLayout forbids — and an empty strip is itself the
+          answer to "has he played". */}
+      <View style={styles.strip}>
+        {statStrip(player).map((cell) => (
+          <View key={cell.label} style={styles.cell}>
+            <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
+              {cell.label}
+            </Text>
+            <Text numberOfLines={1} style={[Type.body, NUMERIC, { color: c.textSecondary }]}>
+              {played ? formatStat(cell) : DASH}
+            </Text>
+          </View>
+        ))}
+      </View>
     </Pressable>
   );
 }
 
-/**
- * The designation, abbreviated. `InjuryChip` prints the status in full, which
- * is right on a profile but measures ~100pt beside a name at this row height —
- * it was the abbreviation or the name, and the name wins.
- *
- * Severity comes from `injuryWeight` and nowhere else: this screen and the
- * lineup screen must never disagree about what 'PUP-R' means.
- */
-function InjuryMark({ status }: { status: string | null }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  const weight = injuryWeight(status);
-  if (!weight || !status) return null;
-
-  // Blocking carries a filled bullet as well as the colour, so it survives a
-  // greyscale screenshot and red/green colour blindness.
-  const blocking = weight === 'blocking';
-  return (
-    <Text
-      numberOfLines={1}
-      style={[Type.micro, styles.fixed, { color: blocking ? c.negative : c.warning }]}>
-      {blocking ? `● ${injuryAbbr(status)}` : injuryAbbr(status)}
-    </Text>
-  );
+function describe(p: DirectoryPlayer): string {
+  const rank = p.posRank ? `${p.position ?? ''}${p.posRank}` : 'unranked';
+  const points =
+    p.gamesPlayed > 0
+      ? `${oneDp(p.seasonFp)} fantasy points over ${p.gamesPlayed} games`
+      : 'no games played';
+  return `${p.name}, ${p.position ?? 'unknown position'} ${p.team ?? ''}, ${rank}, ${points}`;
 }
 
-/**
- * Memoised: without it, every keystroke in the search box re-renders all
- * mounted rows.
- */
 export const PlayerRow = memo(PlayerRowInner);
 
 const styles = StyleSheet.create({
   row: {
     height: PLAYER_ROW_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: CELL_GAP,
     paddingHorizontal: ROW_GUTTER,
+    justifyContent: 'center',
+    gap: 2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  identity: {
-    flexGrow: NAME_FLEX,
-    flexShrink: 1,
-    flexBasis: 0,
-    minWidth: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: CELL_GAP,
-  },
-  college: { flexGrow: COLLEGE_FLEX, flexShrink: 1, flexBasis: 0, minWidth: 0 },
-  shrink: { flexShrink: 1 },
-  fixed: { flexShrink: 0 },
-  right: { textAlign: 'right' },
+  identity: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  rank: { width: 20, textAlign: 'right' },
+  names: { flex: 1, minWidth: 0, gap: 1 },
+  name: { fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },
+  meta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
+  /* Pushed to the right of the meta line so the fixture is the first thing to
+     be squeezed out on a narrow screen, rather than the club or the injury. */
+  fixture: { flexShrink: 1 },
+  figure: { alignItems: 'flex-end', minWidth: 54 },
+  figureValue: { fontSize: 19, fontWeight: '800', letterSpacing: -0.4 },
+  strip: { flexDirection: 'row', alignItems: 'flex-end' },
+  /* Equal shares rather than fixed widths: five cells across a phone and across
+     a 940pt table are the same five cells, just further apart. */
+  cell: { flex: 1, minWidth: 0, gap: 1 },
 });
