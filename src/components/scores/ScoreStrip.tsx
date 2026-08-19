@@ -28,9 +28,18 @@
  * "MIA at BUF, final" is a fact about the league, and "two of yours were in it"
  * is a fact about your week.
  */
-import { memo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { memo, useCallback, useRef, useState } from 'react';
+import {
+  NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type NativeScrollEvent,
+} from 'react-native';
 
+import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -39,6 +48,10 @@ import { kickoffLabel, scoreText, type ScoreGame } from './scoreboard';
 const BAND_HEIGHT = 62;
 const CELL_WIDTH = 116;
 const WEEK_CELL_WIDTH = 92;
+const ARROW_WIDTH = 30;
+
+/** Slop, in points, before a scroll offset counts as "there is more that way". */
+const EDGE = 2;
 
 function ScoreStripImpl({
   games,
@@ -55,6 +68,67 @@ function ScoreStripImpl({
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+
+  /* A sixteen-game week is ~1,850pt of fixtures in a 940pt column, so the band
+     scrolls. On a phone that is a swipe and needs no furniture. On a desktop
+     there is no swipe: the row simply ran off the side of the page with nothing
+     to say it continued — which is what the reference's chevron is for. */
+  const scroller = useRef<ScrollView>(null);
+  const [offset, setOffset] = useState(0);
+  const [viewport, setViewport] = useState(0);
+  const [content, setContent] = useState(0);
+  /* Wide web only. A touch screen scrolls this with a thumb and needs no
+     furniture, and on a narrow browser the two arrows would eat 60 of the
+     375pt the fixtures have to share. `useIsWide` is already "web, and wide
+     enough", which is exactly the condition. */
+  const paged = useIsWide();
+  const canLeft = offset > EDGE;
+  const canRight = offset + viewport < content - EDGE;
+
+  const onScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => setOffset(e.nativeEvent.contentOffset.x),
+    [],
+  );
+
+  const page = useCallback(
+    (direction: 1 | -1) => {
+      /* A page is a whole number of fixtures — the visible count less one, so
+         the game you were reading at the edge is still on screen after the jump
+         rather than the list teleporting past it. Whole cells, and snapped to a
+         cell boundary, because paging by a raw pixel width left a two-character
+         sliver of the previous fixture pinned at the left edge. */
+      const perPage = Math.max(1, Math.floor(viewport / CELL_WIDTH) - 1);
+      const from = Math.round(offset / CELL_WIDTH) * CELL_WIDTH;
+      const x = Math.max(
+        0,
+        Math.min(from + direction * perPage * CELL_WIDTH, content - viewport),
+      );
+
+      /* Assign `scrollLeft` on the DOM node, rather than calling either
+       * `ScrollView.scrollTo` or the element's own `scrollTo`.
+       *
+       * Both of those returned without error and without moving. The element's
+       * `scrollTo` is a no-op in some engines — verified in the browser this
+       * was built against, where `el.scrollTo({left: 444})` left `scrollLeft`
+       * at 0 while `el.scrollLeft = 444` worked — and react-native-web's
+       * `scrollTo` resolves through it. So the arrow looked dead, silently,
+       * with the handler running and the offsets all correct.
+       *
+       * The jump is instant, which is what a scoreboard's paging arrow does
+       * anyway. `getScrollableNode()` is RNW's own accessor for the element the
+       * browser actually scrolls; the RN call stays as the fallback for any
+       * platform that grows these arrows later, since today they are web-only.
+       */
+      const node = scroller.current?.getScrollableNode?.() as HTMLElement | undefined;
+      if (node) {
+        node.scrollLeft = x;
+        setOffset(x);
+      } else {
+        scroller.current?.scrollTo({ x, animated: true });
+      }
+    },
+    [offset, viewport, content],
+  );
 
   /* Nothing at all rather than an empty band. Before the fixtures for a week
      land — and through the offseason — an empty strip is a hole at the top of
@@ -76,7 +150,22 @@ function ScoreStripImpl({
         </Text>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      {paged ? <Arrow direction={-1} enabled={canLeft} onPress={page} /> : null}
+
+      {/* `flex: 1` AND `minWidth: 0`. Without the second, react-native-web
+          leaves the flex item at its content width — the row of fixtures — so
+          the band grew to ~1,850pt inside a 940pt page and ran off the side of
+          the window instead of scrolling inside its own box. It looked like a
+          clipping bug and was a flexbox default. */}
+      <ScrollView
+        ref={scroller}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={paged ? onScroll : undefined}
+        onLayout={(e) => setViewport(e.nativeEvent.layout.width)}
+        onContentSizeChange={(w) => setContent(w)}
+        style={styles.scroll}>
         {loading && games.length === 0
           ? // Placeholders, not a spinner: the band keeps its height so the
             // page below does not jump down when the games arrive.
@@ -99,7 +188,48 @@ function ScoreStripImpl({
               />
             ))}
       </ScrollView>
+
+      {paged ? <Arrow direction={1} enabled={canRight} onPress={page} /> : null}
     </View>
+  );
+}
+
+/**
+ * One end of the band, on web only.
+ *
+ * Always rendered, dimmed when it cannot move: an arrow that appears and
+ * disappears shifts every fixture sideways by 30pt as you reach either end,
+ * which is worse than a grey chevron.
+ */
+function Arrow({
+  direction,
+  enabled,
+  onPress,
+}: {
+  direction: 1 | -1;
+  enabled: boolean;
+  onPress: (direction: 1 | -1) => void;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
+  return (
+    <Pressable
+      onPress={() => onPress(direction)}
+      disabled={!enabled}
+      accessibilityRole="button"
+      accessibilityLabel={direction === 1 ? 'Later games' : 'Earlier games'}
+      accessibilityState={{ disabled: !enabled }}
+      style={({ pressed }) => [
+        styles.arrow,
+        { borderColor: c.border },
+        direction === 1 ? styles.arrowRight : null,
+        pressed && enabled ? { backgroundColor: c.backgroundElement } : null,
+      ]}>
+      <Text style={[Type.strong, { color: enabled ? c.textSecondary : c.textTertiary }]}>
+        {direction === 1 ? '›' : '‹'}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -195,10 +325,24 @@ const styles = StyleSheet.create({
      the bezel. */
   band: {
     height: BAND_HEIGHT,
+    width: '100%',
     flexDirection: 'row',
+    /* The fixtures scroll INSIDE this box. Without the clip, a long week paints
+       over whatever sits beside the page. */
+    overflow: 'hidden',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  scroll: { flex: 1, minWidth: 0 },
+  arrow: {
+    width: ARROW_WIDTH,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRightWidth: StyleSheet.hairlineWidth,
+  },
+  /* The right-hand arrow closes the band, so its rule goes on the other side. */
+  arrowRight: { borderRightWidth: 0, borderLeftWidth: StyleSheet.hairlineWidth },
   weekCell: {
     width: WEEK_CELL_WIDTH,
     flexShrink: 0,

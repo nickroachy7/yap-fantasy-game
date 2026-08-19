@@ -167,37 +167,42 @@ const SWAP_BENCH: SwapRequest = {
   ],
 };
 
-/** A weekend: one finished, one being played, two still to come. */
+/**
+ * A full weekend — sixteen games, which is the case that matters: the band has
+ * to scroll inside its own box rather than run off the side of the page, and
+ * four fixtures never showed that. One finished in overtime, one being played,
+ * the rest still to come with one TBD.
+ */
 const STRIP_GAMES: ScoreGame[] = [
-  {
-    id: 'g1', season: 2026, seasonType: 1, week: 3,
-    home: { id: 'h1', abbreviation: 'BUF', name: 'Bills' },
-    away: { id: 'a1', abbreviation: 'NYJ', name: 'Jets' },
-    homeScore: 27, awayScore: 20, startsAt: '2026-09-13T17:00:00Z',
-    status: 'final', statusText: 'Final/OT',
-  },
-  {
-    id: 'g2', season: 2026, seasonType: 1, week: 3,
-    home: { id: 'h2', abbreviation: 'SF', name: '49ers' },
-    away: { id: 'a2', abbreviation: 'SEA', name: 'Seahawks' },
-    homeScore: 10, awayScore: 13, startsAt: '2026-09-13T20:05:00Z',
-    status: 'live', statusText: 'Q3 04:11',
-  },
-  {
-    id: 'g3', season: 2026, seasonType: 1, week: 3,
-    home: { id: 'h3', abbreviation: 'CAR', name: 'Panthers' },
-    away: { id: 'a3', abbreviation: 'CHI', name: 'Bears' },
-    homeScore: null, awayScore: null, startsAt: '2026-09-13T21:25:00Z',
-    status: 'scheduled', statusText: null,
-  },
-  {
-    id: 'g4', season: 2026, seasonType: 1, week: 3,
-    home: { id: 'h4', abbreviation: 'DAL', name: 'Cowboys' },
-    away: { id: 'a4', abbreviation: 'NYG', name: 'Giants' },
-    homeScore: null, awayScore: null, startsAt: null,
-    status: 'scheduled', statusText: null,
-  },
-];
+  ['NYJ', 'BUF', 20, 27, 'final', 'Final/OT', '2026-09-13T17:00:00Z'],
+  ['SEA', 'SF', 13, 10, 'live', 'Q3 04:11', '2026-09-13T20:05:00Z'],
+  ['CHI', 'CAR', null, null, 'scheduled', null, '2026-09-13T21:25:00Z'],
+  ['NYG', 'DAL', null, null, 'scheduled', null, null],
+  ['LV', 'HOU', null, null, 'scheduled', null, '2026-09-14T00:00:00Z'],
+  ['GB', 'PIT', null, null, 'scheduled', null, '2026-09-14T02:00:00Z'],
+  ['IND', 'NE', null, null, 'scheduled', null, '2026-09-14T23:00:00Z'],
+  ['LAC', 'HOU', null, null, 'scheduled', null, '2026-09-14T23:00:00Z'],
+  ['ARI', 'LV', null, null, 'scheduled', null, '2026-09-15T01:00:00Z'],
+  ['TEN', 'SF', null, null, 'scheduled', null, '2026-09-15T01:00:00Z'],
+  ['TB', 'NYJ', null, null, 'scheduled', null, '2026-09-15T17:00:00Z'],
+  ['MIA', 'WSH', null, null, 'scheduled', null, '2026-09-15T17:00:00Z'],
+  ['DEN', 'ATL', null, null, 'scheduled', null, '2026-09-15T20:00:00Z'],
+  ['CLE', 'PHI', null, null, 'scheduled', null, '2026-09-15T20:00:00Z'],
+  ['MIN', 'BAL', null, null, 'scheduled', null, '2026-09-15T23:00:00Z'],
+  ['KC', 'NO', null, null, 'scheduled', null, '2026-09-16T00:20:00Z'],
+].map(([away, home, awayScore, homeScore, status, statusText, startsAt], i) => ({
+  id: `g${i}`,
+  season: 2026,
+  seasonType: 1,
+  week: 3,
+  home: { id: `h${i}`, abbreviation: home as string, name: null },
+  away: { id: `a${i}`, abbreviation: away as string, name: null },
+  homeScore: homeScore as number | null,
+  awayScore: awayScore as number | null,
+  startsAt: startsAt as string | null,
+  status: status as ScoreGame['status'],
+  statusText: statusText as string | null,
+}));
 
 /** Two starters in the opener, one in the live game. */
 const STRIP_MINE = new Map([['NYJ', 1], ['BUF', 1], ['SF', 1]]);
