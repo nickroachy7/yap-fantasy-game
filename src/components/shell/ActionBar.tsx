@@ -2,12 +2,13 @@
  * The row of icon-and-label actions that sits at the top of a browsing screen.
  *
  * It is one control doing two jobs, which is why it exists at all: on a phone
- * the Players and Collection screens had four separate stacked control rows —
- * a search field, a position strip, a tier strip, a sort strip — that between
- * them ate about a third of the screen before a single player appeared. Folding
- * the four into one bar of five targets gives the list back its screen and,
- * more importantly, makes the two pages read as the same kind of place: the
- * same bar in the same position, with the same position chips beneath it.
+ * the Players and Collection screens had FIVE stacked rows of furniture — a
+ * segmented control naming the sub-pages, a search field, a position strip, a
+ * tier strip, a sort strip — that between them ate about a third of the screen
+ * before a single player appeared. Folding them into one bar gives the list
+ * back its screen and, more importantly, makes every browsing page read as the
+ * same kind of place: the same bar in the same position, with the same position
+ * chips beneath it.
  *
  * Items are of two kinds and the bar does not distinguish them visually,
  * because to a reader they are the same gesture — "show me the X view":
@@ -17,15 +18,15 @@
  *   link   — goes to a sibling page (Trend, Shop, Sets).
  *
  * WIDE WEB DROPS THE LINKS. The rail already lists every sub-page as a row, so
- * repeating them here would put the same navigation on screen twice — the same
- * rule `SubNav` follows. Filters stay, because the rail has no opinion about
- * those. Callers mark the links with `nav: true` and pass `wide`.
+ * repeating them here would put the same navigation on screen twice. Filters
+ * stay, because the rail has no opinion about those. Callers mark the links
+ * with `nav: true` and pass `wide`; `SectionNav` is what supplies them.
  *
  * Active is not colour alone: the glyph goes solid, the label goes to full
  * contrast, and the cell gains a fill. Same three signals the tab bar uses, so
  * the two bars cannot be read as meaning different things by the same person.
  */
-import { StyleSheet, Pressable, Text, View, type ColorValue } from 'react-native';
+import { ScrollView, StyleSheet, Pressable, Text, View, type ColorValue } from 'react-native';
 
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -37,13 +38,19 @@ export type ActionIconName =
   | 'available'
   | 'tiers'
   | 'shop'
-  | 'sets';
+  | 'sets'
+  | 'inventory'
+  | 'directory'
+  | 'standings'
+  | 'scoring';
 
 export type Action = {
   key: string;
   label: string;
   icon: ActionIconName;
   active?: boolean;
+  /** e.g. "Soon" on Sets — the same signal the rail gives. */
+  badge?: string;
   /** A link to a sibling page. Dropped on wide web — see the header. */
   nav?: boolean;
   onPress: () => void;
@@ -57,7 +64,19 @@ export function ActionBar({ actions, wide }: { actions: Action[]; wide: boolean 
   if (shown.length === 0) return null;
 
   return (
-    <View style={[styles.bar, { backgroundColor: c.surface, borderColor: c.border }]}>
+    /* The bar SCROLLS when it has to.
+     *
+     * Items grow to share the width when they fit — five cells of equal size
+     * read as one control — and stop shrinking at 62pt, which is what "AVAILABLE"
+     * needs at 9pt. A Collection page carries seven items (three pages plus four
+     * facets) and that is 470pt of content in a 343pt phone: without the scroll
+     * the last two labels ellipsised into nothing, and with a hard cap on the
+     * item count the seventh would simply have been unreachable. */
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={[styles.bar, { backgroundColor: c.surface, borderColor: c.border }]}>
       {shown.map((a) => (
         <Pressable
           key={a.key}
@@ -80,9 +99,14 @@ export function ActionBar({ actions, wide }: { actions: Action[]; wide: boolean 
             style={[Type.micro, styles.label, { color: a.active ? c.text : c.textTertiary }]}>
             {a.label.toUpperCase()}
           </Text>
+          {a.badge ? (
+            <Text numberOfLines={1} style={[styles.badge, { color: c.textTertiary }]}>
+              {a.badge}
+            </Text>
+          ) : null}
         </Pressable>
       ))}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -260,6 +284,104 @@ function ActionIcon({
         </View>
       );
 
+    case 'inventory':
+      /* Two cards, one behind the other — what you own, which is the same
+         object the tab bar draws for the section, said smaller. */
+      return (
+        <View style={box} accessibilityElementsHidden importantForAccessibility="no">
+          <View
+            style={{
+              position: 'absolute',
+              left: 3 * u,
+              top: 4 * u,
+              width: 9 * u,
+              height: 13 * u,
+              borderRadius: 2 * u,
+              borderWidth: stroke,
+              borderColor: color,
+              transform: [{ rotate: '-10deg' }],
+            }}
+          />
+          <View
+            style={[
+              {
+                position: 'absolute',
+                right: 3 * u,
+                top: 5 * u,
+                width: 9 * u,
+                height: 13 * u,
+                borderRadius: 2 * u,
+              },
+              skin,
+            ]}
+          />
+        </View>
+      );
+
+    case 'directory':
+      // A list of names: three rows, each a marker and a line.
+      return (
+        <View style={box} accessibilityElementsHidden importantForAccessibility="no">
+          <View style={{ gap: 3 * u }}>
+            {[13, 10, 12].map((w, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 * u }}>
+                <View style={[{ width: 4 * u, height: 4 * u, borderRadius: 1.5 * u }, skin]} />
+                <View style={bar(w, 2)} />
+              </View>
+            ))}
+          </View>
+        </View>
+      );
+
+    case 'standings':
+      // A podium: the middle column tallest, which is the one thing a
+      // leaderboard glyph has to say.
+      return (
+        <View style={box} accessibilityElementsHidden importantForAccessibility="no">
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2 * u }}>
+            {[8, 14, 11].map((h, i) => (
+              <View
+                key={i}
+                style={[{ width: 4 * u, height: h * u, borderRadius: 1.5 * u }, skin]}
+              />
+            ))}
+          </View>
+        </View>
+      );
+
+    case 'scoring':
+      // A rules sheet: a page with lines on it.
+      return (
+        <View style={box} accessibilityElementsHidden importantForAccessibility="no">
+          <View
+            style={[
+              {
+                width: 14 * u,
+                height: 17 * u,
+                borderRadius: 2.5 * u,
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 2.5 * u,
+              },
+              skin,
+            ]}>
+            {[8, 6, 8].map((w, i) => (
+              <View
+                key={i}
+                style={{
+                  width: w * u,
+                  height: 1.5 * u,
+                  borderRadius: 1 * u,
+                  // On the solid state the lines are cut OUT of the page, which
+                  // is the only way a filled rectangle can still read as one.
+                  backgroundColor: focused ? '#00000000' : color,
+                }}
+              />
+            ))}
+          </View>
+        </View>
+      );
+
     case 'sets':
       /* Four cells with one filled: a set is a collection with a hole in it,
          and the hole is the whole point of the screen. */
@@ -293,6 +415,9 @@ function ActionIcon({
 const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
+    // Grows to the full width when the items do not fill it, so the bar is a
+    // bar rather than a huddle of buttons on the left.
+    flexGrow: 1,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.one,
@@ -302,8 +427,9 @@ const styles = StyleSheet.create({
      read as one control, where five different widths read as a sentence of
      buttons. */
   item: {
-    flex: 1,
-    minWidth: 0,
+    flexGrow: 1,
+    flexBasis: 0,
+    minWidth: 62,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 3,
@@ -311,6 +437,7 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   label: { letterSpacing: 0.4 },
+  badge: { fontSize: 7, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
   box: { alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.65 },
 });

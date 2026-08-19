@@ -1,8 +1,8 @@
 /**
  * In-page tabs: switching what a screen SHOWS, not where you are.
  *
- * Distinct from `SubNav`/`SegmentedControl`, which navigate between routes and
- * therefore change the URL. These do not — they are local state, so they suit
+ * Distinct from `SectionNav`, which navigates between routes and therefore
+ * changes the URL. These do not — they are local state, so they suit
  * "Season / Career / Splits" on one page where a route per view would be a
  * back-button trap.
  *

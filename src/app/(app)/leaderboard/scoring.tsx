@@ -19,8 +19,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '@/components/shell/Screen';
-import { SubNav } from '@/components/shell/SubNav';
-import { LEADERBOARD_SEGMENTS } from '@/components/shell/sections';
+import { SectionNav } from '@/components/shell/SectionNav';
 import {
   parseScoringSheet,
   pointsText,
@@ -142,7 +141,7 @@ export default function ScoringScreen() {
       context="How a fantasy point is earned"
       refreshing={refreshing}
       onRefresh={() => void load('refresh')}>
-      <SubNav segments={LEADERBOARD_SEGMENTS} inset={false} />
+      <SectionNav section="/leaderboard" />
       {body()}
       <View style={{ height: tabInset }} />
     </Screen>

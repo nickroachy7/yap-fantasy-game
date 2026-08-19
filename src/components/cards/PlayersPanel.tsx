@@ -19,7 +19,6 @@
  * ~1,000 rows, so the list is virtualised from day one rather than "later",
  * and the read is paged and count-checked rather than trusted.
  */
-import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -31,8 +30,9 @@ import {
   useColorScheme,
 } from 'react-native';
 
-import { ActionBar, type Action } from '@/components/shell/ActionBar';
-import { useIsWide, useTabBarInset } from '@/components/shell/useResponsive';
+import { type Action } from '@/components/shell/ActionBar';
+import { SectionNav } from '@/components/shell/SectionNav';
+import { useTabBarInset } from '@/components/shell/useResponsive';
 import { Chip, ChipRow } from '@/components/ui/Chip';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
@@ -63,8 +63,6 @@ export function PlayersPanel({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const tabInset = useTabBarInset();
-  const wide = useIsWide();
-  const router = useRouter();
 
   const [result, setResult] = useState<DirectoryFetch | null>(null);
   const [loading, setLoading] = useState(true);
@@ -140,7 +138,7 @@ export function PlayersPanel({
     setPosition('ALL');
   }, []);
 
-  const actions = useMemo<Action[]>(
+  const facets = useMemo<Action[]>(
     () => [
       {
         key: 'search',
@@ -159,15 +157,8 @@ export function PlayersPanel({
         active: showSort,
         onPress: () => setShowSort((v) => !v),
       },
-      {
-        key: 'trend',
-        label: 'Trend',
-        icon: 'trend',
-        nav: true,
-        onPress: () => router.push('/players/trend'),
-      },
     ],
-    [showSearch, showSort, query, router],
+    [showSearch, showSort, query],
   );
 
   const filtering = query.trim().length > 0 || position !== 'ALL';
@@ -188,7 +179,7 @@ export function PlayersPanel({
       {/* Controls live OUTSIDE the FlatList. As a ListHeaderComponent the text
           input is remounted on every keystroke and loses focus. */}
       <View style={styles.controls}>
-        <ActionBar actions={actions} wide={wide} />
+        <SectionNav section="/players" extra={facets} />
 
         {showSearch ? (
           <View style={styles.searchRow}>

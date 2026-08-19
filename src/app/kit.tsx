@@ -503,7 +503,7 @@ function Kit() {
 
           <Section
             title="Action bar"
-            note="Every glyph, hollow then solid. Nav items (Trend, Shop) are dropped on wide web, where the rail already lists them.">
+            note="Every glyph, hollow then solid. The second bar overflows, which is how a seven-item Collection page behaves on a phone.">
             <ActionBar
               wide={false}
               actions={[
@@ -517,8 +517,12 @@ function Kit() {
             <ActionBar
               wide={false}
               actions={[
-                { key: 'shop', label: 'Shop', icon: 'shop', active: action === 'shop', onPress: () => setAction('shop') },
-                { key: 'sets', label: 'Sets', icon: 'sets', active: action === 'sets', onPress: () => setAction('sets') },
+                { key: 'inventory', label: 'Inventory', icon: 'inventory', active: action === 'inventory', onPress: () => setAction('inventory') },
+                { key: 'sets', label: 'Sets', icon: 'sets', badge: 'Soon', active: action === 'sets', onPress: () => setAction('sets') },
+                { key: 'shop2', label: 'Shop', icon: 'shop', active: action === 'shop2', onPress: () => setAction('shop2') },
+                { key: 'directory', label: 'Directory', icon: 'directory', active: action === 'directory', onPress: () => setAction('directory') },
+                { key: 'standings', label: 'Standings', icon: 'standings', active: action === 'standings', onPress: () => setAction('standings') },
+                { key: 'scoring', label: 'Scoring', icon: 'scoring', active: action === 'scoring', onPress: () => setAction('scoring') },
               ]}
             />
           </Section>

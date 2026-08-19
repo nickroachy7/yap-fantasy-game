@@ -4,8 +4,6 @@ import { useCallback, useState } from 'react';
 import { PlayersPanel } from '@/components/cards/PlayersPanel';
 import type { DirectoryFetch } from '@/components/cards/player-directory';
 import { Screen } from '@/components/shell/Screen';
-import { SubNav } from '@/components/shell/SubNav';
-import { PLAYERS_SEGMENTS } from '@/components/shell/sections';
 
 export default function PlayersScreen() {
   const router = useRouter();
@@ -26,7 +24,6 @@ export default function PlayersScreen() {
     /* 'table' rather than 'grid': this is nine columns of rows being read, and
        the wider measure only buys empty space between a name and its points. */
     <Screen title="Players" measure="table" context={context} scroll={false}>
-      <SubNav segments={PLAYERS_SEGMENTS} />
       <PlayersPanel onOpenPlayer={openPlayer} onLoaded={setDirectory} />
     </Screen>
   );

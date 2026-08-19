@@ -17,8 +17,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { weekLabel } from '@/components/scores/scoreboard';
 import { useSeasonSchedule, useWeekLeaders, type Slate } from '@/components/scores/use-scores';
 import { Screen } from '@/components/shell/Screen';
-import { SubNav } from '@/components/shell/SubNav';
-import { PLAYERS_SEGMENTS } from '@/components/shell/sections';
+import { SectionNav } from '@/components/shell/SectionNav';
 import { useIsWide, useTabBarInset } from '@/components/shell/useResponsive';
 import { computeMovers, deltaText, type Mover } from '@/components/trend/movers';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -187,7 +186,7 @@ export default function TrendScreen() {
       title="Trend"
       measure="grid"
       context={comparison ?? `${season} season`}>
-      <SubNav segments={PLAYERS_SEGMENTS} inset={false} />
+      <SectionNav section="/players" />
 
       <Tabs tabs={POS_TABS} value={pos} onChange={setPos} />
 

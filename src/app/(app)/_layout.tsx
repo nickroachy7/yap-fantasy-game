@@ -21,7 +21,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  * restores that navigator's last state when you return to it — so after a trip
  * to Scores, pressing "Lineup" put you back on Scores, and the tab labelled
  * Lineup never showed the lineup again. `popToTopOnBlur` does not fix it
- * either: `SubNav` navigates with `replace`, so the sub-page IS the stack root
+ * either: `SectionNav` navigates with `replace`, so the sub-page IS the stack root
  * and there is nothing to pop.
  *
  * Naming the href makes the tab button a link to that exact path rather than a

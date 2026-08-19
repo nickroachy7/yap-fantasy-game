@@ -3,8 +3,8 @@
  *
  * Three presentations read this: the bottom tab bar renders one tab per
  * section, the wide-web sidebar renders sections as rows with their sub-pages
- * nested beneath, and the mobile `SubNav` renders a section's sub-pages as a
- * segmented control. Values are route paths.
+ * nested beneath, and `SectionNav` renders a section's sub-pages as the first
+ * items of the page's action bar. Values are route paths.
  *
  * This file previously declared only the Collection segments while
  * `Sidebar.tsx` kept its own parallel copy of the whole nav — so the comment
@@ -26,10 +26,23 @@
  * alternative — a bare `/lineup/index` child — would show the same word twice
  * in the rail for no gain.
  */
-import type { Segment } from '@/components/shell/SegmentedControl';
+import type { ActionIconName } from '@/components/shell/ActionBar';
 import type { TabIconName } from '@/components/shell/TabIcon';
 
-export type NavChild = { href: string; label: string; badge?: string };
+export type NavChild = {
+  href: string;
+  label: string;
+  badge?: string;
+  /**
+   * Drawn beside the label in the page's action bar.
+   *
+   * It lives here rather than in the screens because the bar is assembled from
+   * this file — a screen that picked its own glyph for "Shop" would be the
+   * parallel copy of the navigation this file's header warns about, one icon at
+   * a time.
+   */
+  icon: ActionIconName;
+};
 export type NavSection = {
   href: string;
   label: string;
@@ -62,11 +75,11 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Collection',
     icon: 'collection',
     children: [
-      { href: '/collection/inventory', label: 'Inventory' },
+      { href: '/collection/inventory', label: 'Inventory', icon: 'inventory' },
       // Sets is a designed empty state until Week 3; the badge says so rather
       // than the screen looking broken.
-      { href: '/collection/sets', label: 'Sets', badge: 'Soon' },
-      { href: '/collection/shop', label: 'Shop' },
+      { href: '/collection/sets', label: 'Sets', badge: 'Soon', icon: 'sets' },
+      { href: '/collection/shop', label: 'Shop', icon: 'shop' },
     ],
   },
   {
@@ -74,8 +87,8 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Players',
     icon: 'players',
     children: [
-      { href: '/players', label: 'Directory' },
-      { href: '/players/trend', label: 'Trend' },
+      { href: '/players', label: 'Directory', icon: 'directory' },
+      { href: '/players/trend', label: 'Trend', icon: 'trend' },
     ],
   },
   {
@@ -84,8 +97,8 @@ export const NAV_SECTIONS: NavSection[] = [
     tabLabel: 'Board',
     icon: 'leaderboard',
     children: [
-      { href: '/leaderboard', label: 'Standings' },
-      { href: '/leaderboard/scoring', label: 'Scoring' },
+      { href: '/leaderboard', label: 'Standings', icon: 'standings' },
+      { href: '/leaderboard/scoring', label: 'Scoring', icon: 'scoring' },
     ],
   },
   { href: '/profile', label: 'Profile', icon: 'profile' },
@@ -105,21 +118,7 @@ export function routeNameOf(section: NavSection): string {
   return section.href.replace(/^\//, '');
 }
 
-/** The sub-pages of a section, as SubNav's segmented control wants them. */
-export function segmentsFor(sectionHref: string): Segment<string>[] {
-  const section = NAV_SECTIONS.find((s) => s.href === sectionHref);
-  return (section?.children ?? []).map((c) => ({
-    value: c.href,
-    label: c.label,
-    badge: c.badge,
-  }));
+/** A section's sub-pages, in order. `SectionNav` turns these into bar items. */
+export function childrenOf(sectionHref: string): NavChild[] {
+  return NAV_SECTIONS.find((s) => s.href === sectionHref)?.children ?? [];
 }
-
-/**
- * Retained so the Collection screens keep a stable import. Derived rather than
- * duplicated — that is the entire point of this file.
- */
-export const COLLECTION_SEGMENTS: Segment<string>[] = segmentsFor('/collection');
-
-export const LEADERBOARD_SEGMENTS: Segment<string>[] = segmentsFor('/leaderboard');
-export const PLAYERS_SEGMENTS: Segment<string>[] = segmentsFor('/players');

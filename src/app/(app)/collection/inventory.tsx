@@ -52,11 +52,9 @@ import {
   type TierFilter,
 } from '@/components/collection/types';
 import { useCollection } from '@/components/collection/use-collection';
-import { ActionBar, type Action } from '@/components/shell/ActionBar';
+import { type Action } from '@/components/shell/ActionBar';
 import { Screen } from '@/components/shell/Screen';
-import { SubNav } from '@/components/shell/SubNav';
-import { COLLECTION_SEGMENTS } from '@/components/shell/sections';
-import { useIsWide } from '@/components/shell/useResponsive';
+import { SectionNav } from '@/components/shell/SectionNav';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -104,7 +102,6 @@ export default function InventoryScreen() {
   const [showSearch, setShowSearch] = useState(false);
   const [showTiers, setShowTiers] = useState(false);
   const [showSort, setShowSort] = useState(false);
-  const wide = useIsWide();
 
   /* ---- grid geometry ------------------------------------------------- *
    * MEASURED, not recomputed. This used to derive the column width from the
@@ -212,7 +209,7 @@ export default function InventoryScreen() {
   const total = cards?.length ?? cardCount;
   const context = filtered ? `${visible.length} of ${total} cards` : `${total} cards`;
 
-  const actions = useMemo<Action[]>(
+  const facets = useMemo<Action[]>(
     () => [
       // Search only appears above the size where scanning stops working — the
       // same threshold that used to gate the field itself.
@@ -250,20 +247,12 @@ export default function InventoryScreen() {
         active: showSort,
         onPress: () => setShowSort((v) => !v),
       },
-      {
-        key: 'shop',
-        label: 'Shop',
-        icon: 'shop' as const,
-        nav: true,
-        onPress: () => router.push('/collection/shop'),
-      },
     ],
-    [searchable, showSearch, needle, showTiers, tier, availability, showSort, router],
+    [searchable, showSearch, needle, showTiers, tier, availability, showSort],
   );
 
   return (
     <Screen title="Inventory" context={context} scroll={false}>
-      <SubNav segments={COLLECTION_SEGMENTS} />
 
       <View style={styles.fill} onLayout={(e) => setListWidth(e.nativeEvent.layout.width)}>
         {loading ? (
@@ -295,7 +284,7 @@ export default function InventoryScreen() {
         ) : listWidth === 0 ? null : (
           <>
             <View style={styles.toolbar}>
-              <ActionBar actions={actions} wide={wide} />
+              <SectionNav section="/collection" extra={facets} />
               {searchable && showSearch ? (
                 <SearchField value={query} onChange={setQuery} hint={`${total} OWNED`} />
               ) : null}
