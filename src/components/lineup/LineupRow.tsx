@@ -23,7 +23,8 @@
  *
  * The two variants differ in three places, and nowhere else:
  *   - the badge is the SLOT for a starter (`FLEX` splits into its eligible
- *     positions) and the POSITION for a bench card;
+ *     positions) and `BN` for a bench card, so one glance down the page sorts
+ *     the eight who are playing from the rest;
  *   - the figure is the week's scored points for a starter and the season total
  *     for a bench card, which is the number the directory row leads with too;
  *   - an empty slot is a row rather than a gap, and only starters have those.
@@ -41,6 +42,7 @@
  * Fixed height, like the directory row, for the same reason: nothing here may
  * wrap, and both bands have known heights.
  */
+import { useState } from 'react';
 import { StyleSheet, Pressable, Text, View } from 'react-native';
 
 import { DASH } from '@/components/ui/DataTable';
@@ -65,9 +67,15 @@ const STRIP_HEIGHT = LINEUP_ROW_HEIGHT - IDENTITY_HEIGHT;
  */
 const GUTTER = Spacing.three;
 
+/** What a bench card's badge says instead of his position. See BenchRow. */
+const BENCH_BADGE = 'BN';
+
 export type LineupRowProps = {
   card: LineupCard | null;
-  onPress?: () => void;
+  /** Opens the swap sheet. The BADGE is the control for this, not the row. */
+  onSwap?: () => void;
+  /** Opens the player profile. Everything except the badge does this. */
+  onOpenProfile?: () => void;
   selected?: boolean;
   disabled?: boolean;
 };
@@ -82,7 +90,8 @@ export function StarterRow({
   disabled,
   eligibleCount,
   eligiblePositions,
-  onPress,
+  onSwap,
+  onOpenProfile,
 }: LineupRowProps & {
   slot: string;
   /** This slot's scored points. Null when the week has not been swept. */
@@ -105,10 +114,12 @@ export function StarterRow({
       emptySecondary={eligibleCount > 0 ? `${eligibleCount} eligible` : 'Open a pack to fill this slot'}
       selected={selected}
       disabled={disabled}
-      onPress={onPress}
+      onSwap={onSwap}
+      onOpenProfile={onOpenProfile}
+      swapLabel={card ? `Change who starts at ${slot}` : `Choose a ${eligiblePositions} for ${slot}`}
       accessibilityLabel={
         card
-          ? `${slot}: ${card.name}, ${card.team ?? 'no team'} ${matchupLabel(card.game)}. Tap to change.`
+          ? `${slot}: ${card.name}, ${card.team ?? 'no team'} ${matchupLabel(card.game)}. Tap for his profile.`
           : `${slot} is empty. ${eligibleCount} eligible ${eligiblePositions} cards. Tap to choose.`
       }
     />
@@ -118,39 +129,67 @@ export function StarterRow({
 /**
  * A card that is not starting.
  *
- * `destination` is where a tap would land him — the first empty slot he is
- * legal for. It is drawn ON the swap mark rather than in a column of its own,
- * which is where it used to live: a column wide enough for FLEX cost 30pt of
- * every row including the seven that had nothing to put in it, and the sheet
- * that a tap now opens lists every destination anyway. Null when every slot he
- * could take is occupied — the tap still works, it just costs someone.
+ * THE BADGE READS `BN`, NOT THE PLAYER'S POSITION.
+ *
+ * Both boards are on one scroll, so the question a reader asks of any given row
+ * is "is this one of my eight, or is it on the bench" — and when every badge
+ * showed a position, a bench WR and a starting WR2 were told apart only by how
+ * far down the page they were. The badge now answers it: a slot code means he
+ * is playing, `BN` means he is not, and the eye can sort the page in one pass.
+ *
+ * The position is not lost — it is on the meta line under the name, in its own
+ * accent, where the directory row puts it too.
+ *
+ * `destination` is where the swap would land him — the first empty slot he is
+ * legal for. It no longer has a mark of its own to be written on (see Row), but
+ * it still carries the screen reader's label, which is the one place it was
+ * doing real work.
  */
 export function BenchRow({
   card,
   destination,
   selected,
   disabled,
-  onPress,
+  onSwap,
+  onOpenProfile,
 }: LineupRowProps & { card: LineupCard; destination: string | null }) {
   return (
     <Row
       card={card}
-      badge={<PositionBadge label={card.position} size={26} />}
+      badge={<PositionBadge label={BENCH_BADGE} size={26} />}
       figureLabel="FP"
       figureValue={card.form ? card.form.seasonFp.toFixed(1) : null}
-      swapLabel={destination ?? undefined}
       selected={selected}
       disabled={disabled}
-      onPress={onPress}
-      accessibilityLabel={
+      onSwap={onSwap}
+      onOpenProfile={onOpenProfile}
+      swapLabel={
         destination
-          ? `${card.name}, ${card.team ?? 'no team'} ${matchupLabel(card.game)}. Tap to start him at ${destination} or choose another slot.`
-          : `${card.name}, ${card.team ?? 'no team'} ${matchupLabel(card.game)}. Tap to choose a slot.`
+          ? `Start ${card.name} at ${destination}, or choose another slot`
+          : `Choose a slot for ${card.name}`
       }
+      accessibilityLabel={`${card.name}, ${card.team ?? 'no team'} ${matchupLabel(card.game)}. Tap for his profile.`}
     />
   );
 }
 
+/**
+ * TWO TARGETS IN ONE ROW, AND WHY THEY ARE SIBLINGS.
+ *
+ * The badge changes the lineup; everything else opens the player. That is the
+ * whole interaction, and it retires the ⇄ mark this row used to carry — a
+ * control that existed only to say "the row opens something", back when the row
+ * opened exactly one thing.
+ *
+ * They CANNOT be nested. react-native-web renders `accessibilityRole="button"`
+ * as a real <button>, and a button inside a button is invalid HTML that React
+ * rejects at runtime — the same trap `SwapSheet` and `ConfirmDialog` document.
+ * So the row itself is a plain View and the two Pressables sit side by side
+ * inside it, with the strip a third that shares the profile's press.
+ *
+ * Which means the pressed highlight has to be lifted to the row, or pressing a
+ * name would light only the top band of an object that reads as one row.
+ */
 function Row({
   card,
   badge,
@@ -161,7 +200,8 @@ function Row({
   emptySecondary,
   selected,
   disabled,
-  onPress,
+  onSwap,
+  onOpenProfile,
   accessibilityLabel,
 }: {
   card: LineupCard | null;
@@ -169,13 +209,14 @@ function Row({
   figureLabel: string;
   /** Null draws an em dash — "not measured", never a nought. */
   figureValue: string | null;
-  /** Written on the swap mark, e.g. the slot a bench tap would fill. */
+  /** The badge's accessible name — what changing the lineup here would do. */
   swapLabel?: string;
   emptyPrimary?: string;
   emptySecondary?: string;
   selected?: boolean;
   disabled?: boolean;
-  onPress?: () => void;
+  onSwap?: () => void;
+  onOpenProfile?: () => void;
   accessibilityLabel: string;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -186,24 +227,52 @@ function Row({
   const weight = injuryWeight(card?.injuryStatus);
   const form = card?.form ?? null;
   const kick = kickoffLabel(card?.game ?? null);
-  const pressable = Boolean(onPress) && !disabled;
+
+  const canSwap = Boolean(onSwap) && !disabled;
+  /* An EMPTY slot has no profile to open, so the whole row is the swap — a row
+     that says "Choose a RB" must do that wherever you press it. A card with no
+     player id behind it falls the same way rather than becoming inert. */
+  const openBody = onOpenProfile ?? (canSwap ? onSwap : undefined);
+
+  const [pressed, setPressed] = useState(false);
+  const press = {
+    onPressIn: () => setPressed(true),
+    onPressOut: () => setPressed(false),
+  };
 
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={!pressable}
-      accessibilityRole="button"
-      accessibilityState={{ selected: Boolean(selected) }}
-      accessibilityLabel={accessibilityLabel}
-      style={({ pressed }) => [
+    <View
+      style={[
         styles.row,
         { backgroundColor: selected ? c.backgroundSelected : c.background },
         pressed && { backgroundColor: c.backgroundElement },
       ]}>
       <View style={styles.identity}>
-        {badge}
+        {canSwap ? (
+          <Pressable
+            onPress={onSwap}
+            accessibilityRole="button"
+            accessibilityLabel={swapLabel ?? 'Change this slot'}
+            /* The badge is 26pt — under the 44pt minimum on its own, and it is
+               now the only way to change a lineup. The slop takes it to the
+               row's full height and into the gutter beside it. */
+            hitSlop={{ top: 16, bottom: 16, left: GUTTER, right: Spacing.two }}
+            style={({ pressed: p }) => [styles.badgeHit, p && styles.badgePressed]}>
+            {badge}
+          </Pressable>
+        ) : (
+          badge
+        )}
 
-        <View style={styles.names}>
+        <Pressable
+          onPress={openBody}
+          disabled={!openBody}
+          accessibilityRole="button"
+          accessibilityState={{ selected: Boolean(selected) }}
+          accessibilityLabel={accessibilityLabel}
+          style={styles.body}
+          {...press}>
+          <View style={styles.names}>
           {card ? (
             <>
               <Text numberOfLines={1} style={[styles.name, { color: c.text }]}>
@@ -258,33 +327,18 @@ function Row({
             </Text>
           )}
         </View>
-
-        {/* The swap mark.
-
-            A plain View inside the row's own Pressable, never a Pressable of
-            its own: react-native-web renders `accessibilityRole="button"` as a
-            real <button>, and one inside another is invalid HTML that React
-            rejects at runtime. So this is an affordance, not a second target —
-            it says the row opens something, and the whole row is what you press
-            to open it. Without it a tappable row looked exactly like the static
-            rows on every other screen in the app.
-
-            Absent when the lineup is locked, because then it does not. */}
-        {pressable ? (
-          <View
-            style={[
-              styles.swap,
-              swapLabel ? styles.swapWide : null,
-              { borderColor: c.border, backgroundColor: tray },
-            ]}>
-            <Text numberOfLines={1} style={[swapLabel ? Type.micro : Type.body, { color: c.textSecondary }]}>
-              {swapLabel ?? '⇄'}
-            </Text>
-          </View>
-        ) : null}
+      </Pressable>
       </View>
 
-      <View style={[styles.strip, { backgroundColor: tray }]}>
+      {/* The stat strip shares the body's target: it is part of the same row and
+          answers the same question, so pressing it opens the same player. */}
+      <Pressable
+        onPress={openBody}
+        disabled={!openBody}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        style={[styles.strip, { backgroundColor: tray }]}
+        {...press}>
         <Cell label="FP/G" value={form ? form.fpPerGame.toFixed(1) : DASH} />
         <Cell label="SEASON" value={form ? form.seasonFp.toFixed(0) : DASH} />
         <Cell label="GP" value={form ? String(form.gamesPlayed) : DASH} />
@@ -298,8 +352,8 @@ function Row({
             <Text style={[Type.body, { color: c.textTertiary }]}>{DASH}</Text>
           )}
         </View>
-      </View>
-    </Pressable>
+      </Pressable>
+    </View>
   );
 }
 
@@ -340,17 +394,21 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   figureValue: { fontSize: 17, fontWeight: '800', letterSpacing: -0.4 },
-  swap: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
+  /* The badge's own target. No box of its own — the badge IS the affordance,
+     and a ring around it would read as a second control beside the thing it
+     surrounds. The hit area is grown with hitSlop instead, which costs no
+     pixels. */
+  badgeHit: { alignItems: 'center', justifyContent: 'center' },
+  badgePressed: { opacity: 0.55 },
+  /* Everything except the badge, as one target: name, fixture and figure. */
+  body: {
+    flex: 1,
+    minWidth: 0,
+    height: IDENTITY_HEIGHT,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: Spacing.two,
   },
-  /* A slot code is up to four characters, so the pill grows sideways rather
-     than shrinking the type — "FLEX" at 9pt in a 28pt circle is unreadable. */
-  swapWide: { width: 'auto', minWidth: 38, paddingHorizontal: Spacing.one + 2, borderRadius: 9 },
   strip: {
     height: STRIP_HEIGHT,
     flexDirection: 'row',

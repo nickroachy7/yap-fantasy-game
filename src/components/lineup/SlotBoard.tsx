@@ -28,6 +28,7 @@ function SlotBoardImpl({
   savedPoints,
   scored,
   onOpenSlot,
+  onOpenProfile,
 }: {
   slots: SlotConfig[];
   byId: Map<string, LineupCard>;
@@ -40,7 +41,10 @@ function SlotBoardImpl({
   /** Per-slot scored points, and whether the week has been swept at all. */
   savedPoints: Record<string, number | null>;
   scored: boolean;
+  /** The badge opens the swap sheet for this slot. */
   onOpenSlot: (slot: string) => void;
+  /** Everything else opens the player. Never called for an empty slot. */
+  onOpenProfile: (card: LineupCard) => void;
 }) {
   return (
     <View>
@@ -55,7 +59,11 @@ function SlotBoardImpl({
           disabled={locked}
           eligibleCount={eligibleCounts.get(cfg.slot) ?? 0}
           eligiblePositions={cfg.eligible_positions.join('/')}
-          onPress={locked ? undefined : () => onOpenSlot(cfg.slot)}
+          onSwap={locked ? undefined : () => onOpenSlot(cfg.slot)}
+          onOpenProfile={(() => {
+            const card = picks[cfg.slot] ? byId.get(picks[cfg.slot]) : undefined;
+            return card?.playerId ? () => onOpenProfile(card) : undefined;
+          })()}
         />
       ))}
     </View>

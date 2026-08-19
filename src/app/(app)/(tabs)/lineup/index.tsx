@@ -16,6 +16,7 @@
  * that has already happened.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BenchBoard } from '@/components/lineup/BenchBoard';
@@ -54,6 +55,7 @@ type Swap = { kind: 'slot'; slot: string } | { kind: 'bench'; cardId: string };
 export default function LineupScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  const router = useRouter();
   const wide = useIsWide();
 
   const {
@@ -217,6 +219,22 @@ export default function LineupScreen() {
     [],
   );
   const closeSwap = useCallback(() => setSwap(null), []);
+
+  /**
+   * Open the player, not the slot.
+   *
+   * The badge on the left of a row changes the lineup; the rest of the row asks
+   * about the PLAYER, which is a different question and now has a different
+   * answer. `/player/[id]` wants the player id, never the card instance id —
+   * the same distinction `set_lineup` cares about in the other direction.
+   */
+  const openProfile = useCallback(
+    (card: LineupCard) => {
+      if (!card.playerId) return;
+      router.push({ pathname: '/player/[id]', params: { id: card.playerId } });
+    },
+    [router],
+  );
 
   const targetSlotFor = useCallback(
     (card: LineupCard) => firstOpenSlotFor(card, slots, picks),
@@ -399,6 +417,7 @@ export default function LineupScreen() {
               savedPoints={savedPoints}
               scored={scoredAt !== null}
               onOpenSlot={openSlot}
+              onOpenProfile={openProfile}
             />
           </View>
 
@@ -416,6 +435,7 @@ export default function LineupScreen() {
               sort={sort}
               onSort={setSort}
               onOpen={openBenchCard}
+              onOpenProfile={openProfile}
               offSeasonCount={offSeasonCount}
             />
           </View>

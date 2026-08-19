@@ -30,6 +30,7 @@ function BenchBoardImpl({
   sort,
   onSort,
   onOpen,
+  onOpenProfile,
   offSeasonCount,
 }: {
   cards: LineupCard[];
@@ -40,8 +41,10 @@ function BenchBoardImpl({
   locked: boolean;
   sort: SortKey;
   onSort: (next: SortKey) => void;
-  /** Opens the swap sheet for this card. */
+  /** The badge opens the swap sheet for this card. */
   onOpen: (card: LineupCard) => void;
+  /** Everything else opens the player. */
+  onOpenProfile: (card: LineupCard) => void;
   /** Cards for a different season. `set_lineup` rejects them, so they are hidden. */
   offSeasonCount: number;
 }) {
@@ -62,7 +65,8 @@ function BenchBoardImpl({
             card={card}
             destination={targetSlotFor(card)}
             disabled={locked || !startableFor(card)}
-            onPress={!locked && startableFor(card) ? () => onOpen(card) : undefined}
+            onSwap={!locked && startableFor(card) ? () => onOpen(card) : undefined}
+            onOpenProfile={card.playerId ? () => onOpenProfile(card) : undefined}
           />
         ))
       )}

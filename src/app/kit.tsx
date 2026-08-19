@@ -476,7 +476,7 @@ function Kit() {
 
           <Section
             title="Lineup rows"
-            note="Starters then bench, one row component, no frame. Bye, injury, empty slot; the bench mark names the slot a tap would fill.">
+            note="Starters then bench, one row component, no frame. The BADGE opens the swap — BN marks a bench card — and the rest of the row opens the player. Bye, injury and empty slot are all here.">
             {STARTERS.map((s) => (
               <StarterRow
                 key={s.slot}
@@ -488,7 +488,8 @@ function Kit() {
                 disabled={false}
                 eligibleCount={s.card ? 0 : 3}
                 eligiblePositions="PK"
-                onPress={() => {}}
+                onSwap={() => {}}
+                onOpenProfile={() => {}}
               />
             ))}
             {SWAP_OPTIONS.map((card, i) => (
@@ -498,7 +499,8 @@ function Kit() {
                 // The third has nowhere free to go, which is the state that
                 // used to render as a dead tap.
                 destination={i === 0 ? 'RB2' : i === 1 ? 'FLEX' : null}
-                onPress={() => {}}
+                onSwap={() => {}}
+                onOpenProfile={() => {}}
               />
             ))}
           </Section>
