@@ -86,6 +86,22 @@ export function weekLabel(seasonType: number, week: number | null): string {
   return `Week ${week}`;
 }
 
+/**
+ * The same week, short enough for a 92pt cell: "PRE WK 3", "WEEK 12",
+ * "WILD CARD".
+ *
+ * `weekLabel` gives "Preseason Wk 3", which at 9pt in the score band's fixed
+ * left cell wrapped mid-word — "PRESEASO / N WK 3". Every word here is short
+ * enough to break between words if it has to, and the postseason rounds are
+ * already two short words.
+ */
+export function shortWeekLabel(seasonType: number, week: number | null): string {
+  if (week === null) return seasonTypeLabel(seasonType);
+  if (seasonType === 1) return `Pre Wk ${week}`;
+  if (seasonType === 3) return POSTSEASON_ROUNDS[week] ?? `Post Wk ${week}`;
+  return `Week ${week}`;
+}
+
 export function seasonTypeLabel(seasonType: number): string {
   if (seasonType === 1) return 'Preseason';
   if (seasonType === 3) return 'Postseason';

@@ -1,18 +1,19 @@
 /**
- * One player line, used for a starting slot, for the eligible picker and for
- * the bench.
+ * One candidate line inside the swap sheet.
  *
- * It is one component on purpose. The whole value of the bench is that you can
- * compare a candidate against the starter directly above it, and that only
- * works if both are drawn by the same code at the same widths — two similar
- * row components drift within a release and the comparison quietly stops being
- * one.
+ * It used to draw the bench as well, and that was right while the bench was a
+ * separate tab and wrong once the two boards were stacked: a bench row has to
+ * be readable against the starter above it, and this row is a different height,
+ * density and column order from the one the slots use. `LineupRow` draws both
+ * boards now — its header explains what the compact row could not do at 375pt.
  *
- * `ui/DataTable` was the obvious home for this and is not usable: its rows are
- * plain Views (its `onRowPress` prop is declared but never wired up), and every
- * row here has to be pressable. The column discipline it encodes — right
- * aligned tabular numbers, an em dash for missing, identity on the left — is
- * followed rather than reimplemented differently.
+ * What is left is the job this shape is actually good at: a list you are
+ * scanning, twenty deep, for the best of several. The column discipline comes
+ * from `ui/DataTable` — right-aligned tabular numbers, an em dash for missing,
+ * identity on the left — followed rather than reimplemented differently.
+ * DataTable itself is not usable here: its rows are plain Views (its
+ * `onRowPress` prop is declared but never wired up), and every row here has to
+ * be pressable.
  */
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';

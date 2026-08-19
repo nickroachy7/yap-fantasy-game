@@ -15,7 +15,6 @@
  * Nothing here is a projection. Every number is either a clock or something
  * that has already happened.
  */
-import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -35,11 +34,9 @@ import {
 } from '@/components/lineup/model';
 import { useLineupData } from '@/components/lineup/use-lineup-data';
 import { ScoreStrip } from '@/components/scores/ScoreStrip';
-import { weekLabel } from '@/components/scores/scoreboard';
+import { shortWeekLabel } from '@/components/scores/scoreboard';
 import { useSlateGames } from '@/components/scores/use-scores';
 import { Screen } from '@/components/shell/Screen';
-import { SubNav } from '@/components/shell/SubNav';
-import { LINEUP_SEGMENTS } from '@/components/shell/sections';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -58,7 +55,6 @@ export default function LineupScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const wide = useIsWide();
-  const router = useRouter();
 
   const {
     slate,
@@ -221,7 +217,6 @@ export default function LineupScreen() {
     [],
   );
   const closeSwap = useCallback(() => setSwap(null), []);
-  const openScores = useCallback(() => router.push('/lineup/scores'), [router]);
 
   const targetSlotFor = useCallback(
     (card: LineupCard) => firstOpenSlotFor(card, slots, picks),
@@ -324,16 +319,15 @@ export default function LineupScreen() {
       context={context}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}>
-      <SubNav segments={LINEUP_SEGMENTS} inset={false} />
-
       {slate ? (
-        <ScoreStrip
-          games={weekGames}
-          title={weekLabel(slate.season_type, slate.week)}
-          startersByTeam={startersByTeam}
-          loading={gamesLoading}
-          onOpenScores={openScores}
-        />
+        <View style={styles.bleed}>
+          <ScoreStrip
+            games={weekGames}
+            week={shortWeekLabel(slate.season_type, slate.week)}
+            startersByTeam={startersByTeam}
+            loading={gamesLoading}
+          />
+        </View>
       ) : null}
 
       <ContestCard
@@ -394,34 +388,37 @@ export default function LineupScreen() {
             hint={`${filled}/${slots.length} filled`}
             tone={filled < slots.length ? c.warning : c.textTertiary}
           />
-          <SlotBoard
-            slots={slots}
-            byId={byId}
-            picks={picks}
-            eligibleCounts={eligibleCounts}
-            openSlot={swap?.kind === 'slot' ? swap.slot : null}
-            locked={locked}
-            savedPoints={savedPoints}
-            scored={scoredAt !== null}
-            onOpenSlot={openSlot}
-          />
+          <View style={styles.bleed}>
+            <SlotBoard
+              slots={slots}
+              byId={byId}
+              picks={picks}
+              eligibleCounts={eligibleCounts}
+              openSlot={swap?.kind === 'slot' ? swap.slot : null}
+              locked={locked}
+              savedPoints={savedPoints}
+              scored={scoredAt !== null}
+              onOpenSlot={openSlot}
+            />
+          </View>
 
           <SectionHead
             label="Bench"
             hint={`${bench.length} card${bench.length === 1 ? '' : 's'}`}
             tone={c.textTertiary}
           />
-          <BenchBoard
-            cards={bench}
-            targetSlotFor={targetSlotFor}
-            startableFor={startableFor}
-            locked={locked}
-            wide={wide}
-            sort={sort}
-            onSort={setSort}
-            onOpen={openBenchCard}
-            offSeasonCount={offSeasonCount}
-          />
+          <View style={styles.bleed}>
+            <BenchBoard
+              cards={bench}
+              targetSlotFor={targetSlotFor}
+              startableFor={startableFor}
+              locked={locked}
+              sort={sort}
+              onSort={setSort}
+              onOpen={openBenchCard}
+              offSeasonCount={offSeasonCount}
+            />
+          </View>
         </>
       )}
 
@@ -502,6 +499,11 @@ const styles = StyleSheet.create({
   },
   alertSlot: { width: 30 },
   alertText: { flex: 1 },
+  /* The boards run to the page edges, like the directory and the collection
+     do, rather than sitting in a 16pt trough inside it. `Screen` pads its
+     content; this gives that padding back, and the rows supply their own
+     gutter — which is why LineupRow's is 16 and not the directory's 14. */
+  bleed: { marginHorizontal: -Spacing.three },
   /* Negative top margin against `Screen`'s 14pt content gap: a heading belongs
      to the board under it, and an even 14 above and below made it float
      between the two. */

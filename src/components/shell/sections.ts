@@ -54,15 +54,9 @@ export type NavSection = {
 };
 
 export const NAV_SECTIONS: NavSection[] = [
-  {
-    href: '/lineup',
-    label: 'Lineup',
-    icon: 'lineup',
-    children: [
-      { href: '/lineup', label: 'This week' },
-      { href: '/lineup/scores', label: 'Scores' },
-    ],
-  },
+  // No children: the scoreboard that used to be `/lineup/scores` is now a band
+  // across the top of the lineup itself, so the section is one page again.
+  { href: '/lineup', label: 'Lineup', icon: 'lineup' },
   {
     href: '/collection',
     label: 'Collection',
@@ -127,6 +121,5 @@ export function segmentsFor(sectionHref: string): Segment<string>[] {
  */
 export const COLLECTION_SEGMENTS: Segment<string>[] = segmentsFor('/collection');
 
-export const LINEUP_SEGMENTS: Segment<string>[] = segmentsFor('/lineup');
 export const LEADERBOARD_SEGMENTS: Segment<string>[] = segmentsFor('/leaderboard');
 export const CARDS_SEGMENTS: Segment<string>[] = segmentsFor('/cards');

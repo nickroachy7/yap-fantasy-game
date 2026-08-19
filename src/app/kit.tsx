@@ -22,7 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
 import { ContestCard } from '@/components/lineup/ContestCard';
-import { StarterRow } from '@/components/lineup/StarterRow';
+import { BenchRow, StarterRow } from '@/components/lineup/LineupRow';
 import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
 import type { LineupCard } from '@/components/lineup/model';
 import { PlayerRow } from '@/components/cards/PlayerRow';
@@ -466,35 +466,42 @@ function Kit() {
           </Section>
 
           <Section
-            title="Starter row"
-            note="Same shape as the directory row, asked about the week. Bye, injury, empty slot.">
-            <Panel>
-              {STARTERS.map((s) => (
-                <StarterRow
-                  key={s.slot}
-                  slot={s.slot}
-                  card={s.card}
-                  points={s.points}
-                  scored={s.points !== null}
-                  selected={false}
-                  disabled={false}
-                  eligibleCount={s.card ? 0 : 3}
-                  eligiblePositions="PK"
-                  onPress={() => {}}
-                />
-              ))}
-            </Panel>
+            title="Lineup rows"
+            note="Starters then bench, one row component, no frame. Bye, injury, empty slot; the bench mark names the slot a tap would fill.">
+            {STARTERS.map((s) => (
+              <StarterRow
+                key={s.slot}
+                slot={s.slot}
+                card={s.card}
+                points={s.points}
+                scored={s.points !== null}
+                selected={false}
+                disabled={false}
+                eligibleCount={s.card ? 0 : 3}
+                eligiblePositions="PK"
+                onPress={() => {}}
+              />
+            ))}
+            {SWAP_OPTIONS.map((card, i) => (
+              <BenchRow
+                key={card.id}
+                card={card}
+                // The third has nowhere free to go, which is the state that
+                // used to render as a dead tap.
+                destination={i === 0 ? 'RB2' : i === 1 ? 'FLEX' : null}
+                onPress={() => {}}
+              />
+            ))}
           </Section>
 
           <Section
-            title="Score strip"
-            note="This week across the top of the lineup. Final, live, timed and TBD; a dot marks games your starters are in.">
+            title="Score band"
+            note="This week across the top of the lineup. Final, live, timed and TBD; a caret marks the winner and a dot the games your starters are in.">
             <ScoreStrip
               games={STRIP_GAMES}
-              title="Preseason Wk 3"
+              week="Pre Wk 3"
               startersByTeam={STRIP_MINE}
               loading={false}
-              onOpenScores={() => {}}
             />
           </Section>
 

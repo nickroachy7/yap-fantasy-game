@@ -7,16 +7,15 @@
  * this board's job is to say what the lineup currently is and to hand the tap
  * upward.
  *
- * Empty slots are rows, not gaps. A blank space reads as decoration; a row that
- * says "Choose a RB — 6 eligible" reads as work outstanding, which it is.
+ * No frame around it. The rows carry their own separation — see `LineupRow` —
+ * and a rounded border on top of that was a box inside the page's own box,
+ * insetting every name by another 12pt on the width where names were already
+ * being cut.
  */
 import { memo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-import { StarterRow } from './StarterRow';
+import { StarterRow } from './LineupRow';
 import { type LineupCard, type SlotConfig } from './model';
 
 function SlotBoardImpl({
@@ -43,11 +42,8 @@ function SlotBoardImpl({
   scored: boolean;
   onOpenSlot: (slot: string) => void;
 }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-
   return (
-    <View style={[styles.board, { backgroundColor: c.surface, borderColor: c.border }]}>
+    <View>
       {slots.map((cfg) => (
         <StarterRow
           key={cfg.slot}
@@ -73,7 +69,3 @@ function SlotBoardImpl({
  * holds.
  */
 export const SlotBoard = memo(SlotBoardImpl);
-
-const styles = StyleSheet.create({
-  board: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, overflow: 'hidden' },
-});
