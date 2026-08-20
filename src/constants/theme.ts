@@ -512,14 +512,28 @@ export const CardSizes = {
     labelSize: 7,
     statSize: 10,
     /**
-     * The one number the card leads with (career FP).
+     * The one number the card ends on (career FP).
      *
-     * 16, not 18: at 106pt the card's two bottom columns are "14 STARTS" and a
-     * four-digit total, and 18 pushed their sum past the usable width so the
-     * left one clipped to "14 STAR…". Still the largest thing on a compact
-     * card by some way — the name is 11 and the labels are 7.
+     * 14 is a WEIGHT decision, not a fit one, and it used to be the other way
+     * round: 16 was picked because the bottom row was "14 STARTS" beside a
+     * four-digit total and 18 clipped the left column. That column is gone, so
+     * the row is a 7pt label and a figure with ~66pt of the 94 spare — nothing
+     * about the width argues for any size at all now.
+     *
+     * What argues for 12 is the card being small. At 16 the total sat 5pt above
+     * the name and read as the card shouting one number at you. 12 is one point
+     * above it, and the size is no longer what makes it the headline — weight
+     * and colour are: 800 against the name's 700, full `text` against the
+     * meta's tertiary grey, and tabular figures so a column of them lines up
+     * down the grid. That is enough for a cell this size, and it lets the
+     * portrait and the name be the loud things instead.
+     *
+     * IT IS ALSO THE FLOOR. The name is 11, so anything below 12 makes the
+     * total smaller than the player it belongs to, and a card whose headline
+     * number is the smallest type on it has stopped having a headline. The meta
+     * is 9 and the labels are 7.
      */
-    figureSize: 16,
+    figureSize: 12,
     glyph: 16,
     pip: 4,
   },
