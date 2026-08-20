@@ -8,10 +8,18 @@
  * doing an honest job.
  *
  * This is the other honest option, and a better one now that the row has
- * somewhere else to say the position. Drawing the SLOT — a circle at the size a
+ * somewhere else to say the position. Drawing the SLOT — a frame at the size a
  * headshot would be, with a generic figure in it — reserves the space, so the
  * day a licensed image arrives it drops in without a row moving. A row designed
  * around a 26pt badge would have had to be redesigned around a 40pt portrait.
+ *
+ * A ROUNDED SQUARE, NOT A CIRCLE. The frame is the crop the real photograph
+ * will arrive in, so it should be the crop we actually want: a circle eats the
+ * corners of a headshot, and every other container on these screens — chips,
+ * facts, trays, the cards themselves — is a rounded rectangle. A ring of
+ * circles down the directory was the one shape in the app that agreed with
+ * nothing around it. The radius is proportional so a 40pt row slot and a 56pt
+ * hero portrait sit at the same visual softness.
  *
  * DELIBERATELY UNIFORM. Every player gets the same silhouette. Varying it by
  * position or tier would make it look like it MEANS something, and a placeholder
@@ -31,16 +39,25 @@
  */
 import { StyleSheet, View } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { Colors, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 /**
- * Diameter. 40 is what a headshot wants beside a 15pt name over two more
+ * Side. 40 is what a headshot wants beside a 15pt name over two more
  * lines — big enough to read as a portrait rather than as an icon, and the
  * same width as the lineup's badge column, so the two screens' names still
  * start at the same x.
  */
 export const AVATAR_SIZE = 40;
+
+/**
+ * Corner radius for a given side, so the frame reads the same at every size.
+ * `Radius.chip` is the floor: below it the shape stops being a rounded square
+ * and starts being a square.
+ */
+function frameRadius(size: number): number {
+  return Math.max(Radius.chip, Math.round(size * 0.2));
+}
 
 export function PlayerAvatar({ size = AVATAR_SIZE }: { size?: number }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -53,8 +70,8 @@ export function PlayerAvatar({ size = AVATAR_SIZE }: { size?: number }) {
   const well = scheme === 'dark' ? c.surface : c.surfaceSunken;
   const ink = c.textTertiary;
 
-  const head = size * 0.3;
-  const body = size * 0.56;
+  const head = size * 0.28;
+  const body = size * 0.62;
 
   return (
     <View
@@ -62,10 +79,16 @@ export function PlayerAvatar({ size = AVATAR_SIZE }: { size?: number }) {
       importantForAccessibility="no"
       style={[
         styles.well,
-        { width: size, height: size, borderRadius: size / 2, backgroundColor: well },
+        { width: size, height: size, borderRadius: frameRadius(size), backgroundColor: well },
       ]}>
+      {/* The figure sits ON the bottom edge rather than floating in the middle:
+          that is where a head and shoulders land in a real headshot crop, and
+          it is the difference between a frame awaiting a photograph and a
+          pictogram of a person. The square is what makes it possible — a
+          circle's bottom edge is a point, so anything resting on it has to
+          float clear of it instead. */}
       <View style={{ width: head, height: head, borderRadius: head / 2, backgroundColor: ink }} />
-      <View style={{ width: body, height: body * 0.42, overflow: 'hidden', marginTop: size * 0.06 }}>
+      <View style={{ width: body, height: body * 0.42, overflow: 'hidden', marginTop: size * 0.07 }}>
         <View
           style={{ width: body, height: body, borderRadius: body / 2, backgroundColor: ink }}
         />
@@ -75,5 +98,5 @@ export function PlayerAvatar({ size = AVATAR_SIZE }: { size?: number }) {
 }
 
 const styles = StyleSheet.create({
-  well: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  well: { alignItems: 'center', justifyContent: 'flex-end', overflow: 'hidden' },
 });
