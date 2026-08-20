@@ -44,7 +44,11 @@ export type Database = {
           acquired_at: string
           card_id: string
           career_fp: number
+          committed_at: string | null
+          committed_for: number | null
+          committed_to: string | null
           id: string
+          is_held: boolean | null
           lineup_starts: number
           pack_opening_id: string | null
           sold_at: string | null
@@ -57,7 +61,11 @@ export type Database = {
           acquired_at?: string
           card_id: string
           career_fp?: number
+          committed_at?: string | null
+          committed_for?: number | null
+          committed_to?: string | null
           id?: string
+          is_held?: boolean | null
           lineup_starts?: number
           pack_opening_id?: string | null
           sold_at?: string | null
@@ -70,7 +78,11 @@ export type Database = {
           acquired_at?: string
           card_id?: string
           career_fp?: number
+          committed_at?: string | null
+          committed_for?: number | null
+          committed_to?: string | null
           id?: string
+          is_held?: boolean | null
           lineup_starts?: number
           pack_opening_id?: string | null
           sold_at?: string | null
@@ -95,6 +107,20 @@ export type Database = {
             referencedColumns: ["card_id"]
           },
           {
+            foreignKeyName: "card_instances_committed_to_fkey"
+            columns: ["committed_to"]
+            isOneToOne: false
+            referencedRelation: "card_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_instances_committed_to_fkey"
+            columns: ["committed_to"]
+            isOneToOne: false
+            referencedRelation: "my_sets"
+            referencedColumns: ["set_id"]
+          },
+          {
             foreignKeyName: "card_instances_pack_opening_fkey"
             columns: ["pack_opening_id"]
             isOneToOne: false
@@ -102,6 +128,125 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      card_set_members: {
+        Row: {
+          card_id: string
+          set_id: string
+        }
+        Insert: {
+          card_id: string
+          set_id: string
+        }
+        Update: {
+          card_id?: string
+          set_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_set_members_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_set_members_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "card_set_members_set_id_fkey"
+            columns: ["set_id"]
+            isOneToOne: false
+            referencedRelation: "card_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_set_members_set_id_fkey"
+            columns: ["set_id"]
+            isOneToOne: false
+            referencedRelation: "my_sets"
+            referencedColumns: ["set_id"]
+          },
+        ]
+      }
+      card_set_milestones: {
+        Row: {
+          reward_gems: number
+          set_id: string
+          threshold_pct: number
+        }
+        Insert: {
+          reward_gems: number
+          set_id: string
+          threshold_pct: number
+        }
+        Update: {
+          reward_gems?: number
+          set_id?: string
+          threshold_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_set_milestones_set_id_fkey"
+            columns: ["set_id"]
+            isOneToOne: false
+            referencedRelation: "card_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_set_milestones_set_id_fkey"
+            columns: ["set_id"]
+            isOneToOne: false
+            referencedRelation: "my_sets"
+            referencedColumns: ["set_id"]
+          },
+        ]
+      }
+      card_sets: {
+        Row: {
+          code: string
+          commit_payout_pct: number
+          created_at: string
+          family: string
+          id: string
+          is_active: boolean
+          name: string
+          required_count: number
+          season: number
+          sort_order: number
+          subtitle: string | null
+        }
+        Insert: {
+          code: string
+          commit_payout_pct?: number
+          created_at?: string
+          family: string
+          id?: string
+          is_active?: boolean
+          name: string
+          required_count: number
+          season: number
+          sort_order?: number
+          subtitle?: string | null
+        }
+        Update: {
+          code?: string
+          commit_payout_pct?: number
+          created_at?: string
+          family?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          required_count?: number
+          season?: number
+          sort_order?: number
+          subtitle?: string | null
+        }
+        Relationships: []
       }
       cards: {
         Row: {
@@ -691,6 +836,48 @@ export type Database = {
         }
         Relationships: []
       }
+      set_milestone_claims: {
+        Row: {
+          committed_at_claim: number
+          completed_at: string
+          reward_gems: number
+          set_id: string
+          threshold_pct: number
+          user_id: string
+        }
+        Insert: {
+          committed_at_claim: number
+          completed_at?: string
+          reward_gems: number
+          set_id: string
+          threshold_pct: number
+          user_id: string
+        }
+        Update: {
+          committed_at_claim?: number
+          completed_at?: string
+          reward_gems?: number
+          set_id?: string
+          threshold_pct?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "set_completions_set_id_fkey"
+            columns: ["set_id"]
+            isOneToOne: false
+            referencedRelation: "card_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "set_completions_set_id_fkey"
+            columns: ["set_id"]
+            isOneToOne: false
+            referencedRelation: "my_sets"
+            referencedColumns: ["set_id"]
+          },
+        ]
+      }
       stat_lines: {
         Row: {
           game_id: string
@@ -980,6 +1167,30 @@ export type Database = {
           },
         ]
       }
+      my_sets: {
+        Row: {
+          claimable_gems: number | null
+          claimed_gems: number | null
+          code: string | null
+          commit_payout_pct: number | null
+          committed: number | null
+          complete: boolean | null
+          family: string | null
+          milestones: Json | null
+          name: string | null
+          next_at: number | null
+          next_reward: number | null
+          ready: number | null
+          required_count: number | null
+          season: number | null
+          set_id: string | null
+          sort_order: number | null
+          subtitle: string | null
+          total_cards: number | null
+          total_reward: number | null
+        }
+        Relationships: []
+      }
       player_directory: {
         Row: {
           card_id: string | null
@@ -1100,6 +1311,16 @@ export type Database = {
         Returns: Json
       }
       card_profile: { Args: { p_card_instance_id: string }; Returns: Json }
+      claim_set_reward: { Args: { p_set_code: string }; Returns: Json }
+      commit_candidate: { Args: { p_card_id: string }; Returns: string }
+      commit_card_to_set: {
+        Args: { p_card_id: string; p_set_code: string }
+        Returns: Json
+      }
+      commit_cards_to_set: {
+        Args: { p_card_ids: string[]; p_set_code: string }
+        Returns: Json
+      }
       current_slate: {
         Args: never
         Returns: {
@@ -1174,6 +1395,7 @@ export type Database = {
       player_game_log: { Args: { p_player_id: string }; Returns: Json }
       player_market: { Args: { p_player_id: string }; Returns: Json }
       player_profile: { Args: { p_player_id: string }; Returns: Json }
+      rebuild_card_sets: { Args: { p_season: number }; Returns: Json }
       refresh_player_season_ranks: { Args: never; Returns: undefined }
       score_week: {
         Args: { p_season: number; p_season_type: number; p_week: number }
@@ -1184,6 +1406,22 @@ export type Database = {
         Returns: number
       }
       sell_card: { Args: { p_card_instance_id: string }; Returns: Json }
+      set_checklist: {
+        Args: { p_set_code: string }
+        Returns: {
+          card_id: string
+          commit_tier: Database["public"]["Enums"]["card_tier"]
+          commit_value: number
+          committed: boolean
+          held: number
+          player_id: string
+          player_name: string
+          position_abbreviation: string
+          rarity: Database["public"]["Enums"]["rarity"]
+          season_fp: number
+          team_abbreviation: string
+        }[]
+      }
       set_lineup: {
         Args: {
           p_season: number
@@ -1218,6 +1456,8 @@ export type Database = {
         | "pack_purchase"
         | "admin_adjust"
         | "card_sale"
+        | "set_reward"
+        | "set_commit"
       rarity: "common" | "uncommon" | "rare" | "epic" | "legendary"
     }
     CompositeTypes: {
@@ -1358,6 +1598,8 @@ export const Constants = {
         "pack_purchase",
         "admin_adjust",
         "card_sale",
+        "set_reward",
+        "set_commit",
       ],
       rarity: ["common", "uncommon", "rare", "epic", "legendary"],
     },

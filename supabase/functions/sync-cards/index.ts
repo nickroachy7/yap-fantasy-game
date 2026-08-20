@@ -10,6 +10,10 @@
  * defaults ('common' / 'fallback'). Existing rows are never updated, which is
  * what makes a re-run safe once rarity is being set by something else.
  *
+ * Once the templates are written it calls `rebuild_card_sets`, which folds any
+ * new card into its team and position sets. That call is best-effort: see the
+ * note at the call site for why its failure must not fail the sync.
+ *
  * Body: { season?: number }  (defaults to the current UTC year)
  */
 import { createClient } from '@supabase/supabase-js';
@@ -147,12 +151,32 @@ Deno.serve(async (req) => {
       created += (data ?? []).length;
     }
 
+    // ---- 4. fold the new templates into their sets -------------------------
+    // Set membership is built from this pool, so a card created above belongs
+    // to a team set and a position set that do not yet know about it. The
+    // rebuild is idempotent and only ever ADDS members (see the function's own
+    // comment), so calling it on every run is the cheapest way to keep the two
+    // in step — there is no other trigger for it.
+    //
+    // ITS FAILURE MUST NOT FAIL THE SYNC. Creating the templates is the job;
+    // stale set membership is a page that undercounts by a card or two until
+    // the next nightly run, which is a far smaller problem than a card sync
+    // that reports an error after having already written its rows.
+    let setsRebuilt: unknown = null;
+    const { data: rebuild, error: rebuildError } = await supabase.rpc('rebuild_card_sets', {
+      p_season: season,
+    });
+    if (rebuildError) console.error('rebuild_card_sets failed', rebuildError);
+    else setsRebuilt = rebuild;
+
     return json({
       ok: true,
       season,
       eligible: eligiblePlayers.length,
       created,
       existing: existingRows.length,
+      sets: setsRebuilt,
+      sets_error: rebuildError ? String(rebuildError.message ?? rebuildError) : null,
       ms: Date.now() - startedAt,
     });
   } catch (err) {

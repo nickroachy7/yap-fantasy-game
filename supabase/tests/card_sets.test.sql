@@ -1,0 +1,772 @@
+-- Yap Fantasy — committing cards to a set, and the milestone ladder it pays
+--
+-- Two functions here can create currency out of game state — `commit_card_to_set`
+-- pays for a card it destroys, `claim_set_reward` pays for progress — so they
+-- get the same treatment `open_pack` and `sell_card` already get: every refusal
+-- is asserted on its SPECIFIC reason, because a test that only checks "it
+-- failed" passes just as happily when the caller was stopped by the wrong rule.
+--
+-- The things that must hold:
+--   1. committing BURNS the copy: it leaves the collection, cannot be started,
+--      cannot be sold, and cannot be taken back;
+--   2. it burns the LEAST valuable copy you hold and never your best — the one
+--      mistake here would cost somebody a gold card on a mis-tap;
+--   3. one copy per slot: three copies of a player fill his slot once;
+--   4. the ladder pays each rung EXACTLY ONCE, sweeps every rung reached since
+--      the last claim, and pays nothing when nothing new has been reached;
+--   5. a set cannot be over-committed past its requirement;
+--   6. none of it leaks: another user's commits are invisible and unusable.
+--
+-- THE LADDER UNDER TEST IS THIS FILE'S OWN, not the one rebuild_card_sets
+-- seeds. A suite asserting against the production figures would fail every time
+-- somebody tuned them, which is exactly the change those figures exist to make
+-- cheap.
+--
+-- THE ROLE SWITCHING IS NOT DECORATION. Every read runs as `authenticated`,
+-- because RLS does not apply to the table owner and the owner is who psql
+-- connects as. An earlier draft asserted isolation while still connected as the
+-- owner and "failed" against a view that was perfectly correct. Setup and the
+-- writes between stages run as the owner; every assertion runs as authenticated.
+-- Same pattern as rls_isolation.
+--
+-- Runs inside a transaction that is rolled back, so it is safe against any
+-- environment including production.
+--
+-- Run:  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/card_sets.test.sql
+
+begin;
+
+insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at)
+values
+  ('00000000-0000-0000-0000-000000000000', '51111111-1111-1111-1111-111111111111', 'authenticated', 'authenticated', 'collector@test.local', '', now(), now(), now()),
+  ('00000000-0000-0000-0000-000000000000', '52222222-2222-2222-2222-222222222222', 'authenticated', 'authenticated', 'rival@test.local',     '', now(), now(), now());
+
+insert into public.gem_balances (user_id, balance) values
+  ('51111111-1111-1111-1111-111111111111', 100),
+  ('52222222-2222-2222-2222-222222222222', 100)
+on conflict (user_id) do update set balance = 100;
+
+-- A set of its own, so the suite does not depend on how many cards the real
+-- pool holds. All six players are quarterbacks, which matters only for the
+-- lineup stage at the end.
+insert into public.teams (external_id, abbreviation, full_name, conference, division)
+values (9301, 'SET', 'Set Test Club', 'AFC', 'NORTH');
+
+insert into public.players (external_id, first_name, last_name, position, position_abbreviation, team_id)
+select 9300 + n, 'Member', 'Number' || n, 'QB', 'QB', (select id from public.teams where external_id = 9301)
+  from generate_series(1, 6) n;
+
+insert into public.cards (player_id, season, rarity)
+select p.id, 2026, 'common'
+  from public.players p
+ where p.external_id between 9301 and 9306;
+
+-- FIVE members, requiring FOUR. The gap is what makes "already complete"
+-- testable: a member card has to still be outside the set when the bar is met.
+-- Card 6 is outside the set entirely, so "not in this set" is asserted against
+-- a card that genuinely exists.
+insert into public.card_sets (id, code, name, family, subtitle, season, required_count, sort_order)
+values ('53333333-3333-3333-3333-333333333333', 'test-set-2026', 'Test Set', 'team', 'AFC North', 2026, 4, 999);
+
+insert into public.card_set_members (set_id, card_id)
+select '53333333-3333-3333-3333-333333333333', c.id
+  from public.cards c
+  join public.players p on p.id = c.player_id
+ where p.external_id between 9301 and 9305;
+
+-- Four rungs on a requirement of four, so each lands on a whole card:
+-- 25% -> 1, 50% -> 2, 75% -> 3, 100% -> 4. The amounts are deliberately
+-- unequal, so a sweep that paid the WRONG pair of rungs cannot pass by adding
+-- up to the right total.
+insert into public.card_set_milestones (set_id, threshold_pct, reward_gems) values
+  ('53333333-3333-3333-3333-333333333333',  25,  10),
+  ('53333333-3333-3333-3333-333333333333',  50,  20),
+  ('53333333-3333-3333-3333-333333333333',  75,  30),
+  ('53333333-3333-3333-3333-333333333333', 100, 100);
+
+create temporary table set_test_cards on commit drop as
+select row_number() over (order by p.external_id) as n, c.id
+  from public.cards c
+  join public.players p on p.id = c.player_id
+ where p.external_id between 9301 and 9306;
+
+-- The stages below read this while acting as `authenticated`, and a temp table
+-- is owned by the connecting role like any other. Without the grant the first
+-- assertion fails with "permission denied for table set_test_cards" from inside
+-- an exception handler, which reads as the function under test refusing for the
+-- wrong reason.
+grant select on set_test_cards to authenticated;
+
+-- ---------------------------------------------------------------- signed out
+set local role authenticated;
+
+do $$
+declare ok boolean := false; r jsonb;
+begin
+  begin
+    r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 1));
+  exception when others then ok := true; end;
+  if not ok then raise exception 'FAIL: anonymous caller was allowed to commit'; end if;
+
+  ok := false;
+  begin r := public.claim_set_reward('test-set-2026'); exception when others then ok := true; end;
+  if not ok then raise exception 'FAIL: anonymous caller was allowed to claim'; end if;
+end;
+$$;
+
+-- ------------------------------------------------------- nothing held at all
+set local request.jwt.claims = '{"sub":"51111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+declare ok boolean := false; r jsonb; v record;
+begin
+  select committed, ready, total_cards, required_count, total_reward, claimable_gems,
+         next_at, next_reward
+    into v from public.my_sets where code = 'test-set-2026';
+
+  if v.committed <> 0 or v.ready <> 0 then
+    raise exception 'FAIL: an empty collection read as % committed / % ready', v.committed, v.ready;
+  end if;
+  if v.total_cards <> 5 or v.required_count <> 4 then
+    raise exception 'FAIL: the set reported % members requiring %, expected 5 and 4',
+      v.total_cards, v.required_count;
+  end if;
+  if v.total_reward <> 160 then
+    raise exception 'FAIL: the ladder totals %, expected 160', v.total_reward;
+  end if;
+  if v.claimable_gems <> 0 then
+    raise exception 'FAIL: % gems were claimable with nothing committed', v.claimable_gems;
+  end if;
+  -- The first rung, before anything has been done about it.
+  if v.next_at <> 1 or v.next_reward <> 10 then
+    raise exception 'FAIL: the next rung reads % cards for % gems, expected 1 for 10',
+      v.next_at, v.next_reward;
+  end if;
+
+  begin
+    r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 1));
+  exception when others then
+    ok := sqlerrm like '%do not hold a copy%';
+    if not ok then raise exception 'FAIL: empty collection blocked by the wrong rule: %', sqlerrm; end if;
+  end;
+  if not ok then raise exception 'FAIL: a card nobody holds was committed'; end if;
+
+  ok := false;
+  begin
+    r := public.claim_set_reward('test-set-2026');
+  exception when others then
+    ok := sqlerrm like '%nothing to claim%';
+    if not ok then raise exception 'FAIL: an untouched ladder was blocked by the wrong rule: %', sqlerrm; end if;
+  end;
+  if not ok then raise exception 'FAIL: a set paid out with nothing committed'; end if;
+end;
+$$;
+
+-- ------------------------------------------------- three copies, one of them gold
+--
+-- THE STAGE THAT MATTERS. Three copies of card 1, and committing must take the
+-- cheapest of them:
+--
+--   0 fp   bronze   <- this one
+--  10 fp   bronze
+-- 800 fp   gold
+--
+-- THE MIDDLE COPY EARNS ITS 10 POINTS. It was 0 in the first draft, which tied
+-- it with the copy under test on career_fp and pushed the decision onto
+-- `commit_candidate`'s id tiebreak — a gen_random_uuid(), so the suite passed
+-- or failed by coin flip and did so on the second run. A test of "takes the
+-- cheapest" has to have exactly one cheapest.
+reset role;
+insert into public.card_instances (id, user_id, card_id, career_fp)
+values ('54444444-0000-0000-0000-00000000000b',
+        '51111111-1111-1111-1111-111111111111',
+        (select id from set_test_cards where n = 1), 0),
+       ('54444444-0000-0000-0000-00000000000f',
+        '51111111-1111-1111-1111-111111111111',
+        (select id from set_test_cards where n = 1), 800);
+-- A third copy, so "three copies fill one slot" is a real case rather than an
+-- assumed one.
+insert into public.card_instances (user_id, card_id, career_fp)
+values ('51111111-1111-1111-1111-111111111111',
+        (select id from set_test_cards where n = 1), 10);
+-- And one copy of card 6, which is not in the set.
+insert into public.card_instances (user_id, card_id)
+values ('51111111-1111-1111-1111-111111111111', (select id from set_test_cards where n = 6));
+set local role authenticated;
+
+do $$
+declare
+  v_bronze constant uuid := '54444444-0000-0000-0000-00000000000b';
+  v_gold   constant uuid := '54444444-0000-0000-0000-00000000000f';
+  ok boolean := false; r jsonb; v record; v_bal integer;
+begin
+  -- The tiers the trigger derived, so the payout below is not asserted against
+  -- a number this file made up.
+  if (select tier from public.card_instances where id = v_bronze) <> 'bronze'
+     or (select tier from public.card_instances where id = v_gold) <> 'gold' then
+    raise exception 'FAIL: the fixture copies are not bronze and gold';
+  end if;
+
+  -- Three copies of one card is ONE actionable slot, not three.
+  select committed, ready into v from public.my_sets where code = 'test-set-2026';
+  if v.ready <> 1 then
+    raise exception 'FAIL: three copies of one card reported % ready slots', v.ready;
+  end if;
+
+  -- A card that is not in this set is refused as such.
+  begin
+    r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 6));
+  exception when others then
+    ok := sqlerrm like '%not in this set%';
+    if not ok then raise exception 'FAIL: a non-member was blocked by the wrong rule: %', sqlerrm; end if;
+  end;
+  if not ok then raise exception 'FAIL: a card outside the set was committed to it'; end if;
+
+  -- The commit itself.
+  r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 1));
+
+  if (r ->> 'card_instance_id')::uuid <> v_bronze then
+    raise exception 'FAIL: the commit burnt % — it must take the least valuable copy', r ->> 'card_instance_id';
+  end if;
+  if (r ->> 'tier') <> 'bronze' then
+    raise exception 'FAIL: the commit reported tier %, expected bronze', r ->> 'tier';
+  end if;
+  if (select is_held from public.card_instances where id = v_gold) is not true then
+    raise exception 'FAIL: the gold copy was destroyed';
+  end if;
+  -- bronze sells for 8, the set pays 50% of it.
+  if (r ->> 'paid')::integer <> 4 then
+    raise exception 'FAIL: the commit paid % gems, expected 4', r ->> 'paid';
+  end if;
+  if (select balance from public.gem_balances where user_id = auth.uid()) <> 104 then
+    raise exception 'FAIL: balance is % after a 4 gem commit on 100',
+      (select balance from public.gem_balances where user_id = auth.uid());
+  end if;
+  if (select count(*) from public.gems_ledger where reason = 'set_commit') <> 1 then
+    raise exception 'FAIL: the commit did not write exactly one ledger row';
+  end if;
+
+  -- BURNT. Out of the collection, and no longer held.
+  if (select is_held from public.card_instances where id = v_bronze) is not false then
+    raise exception 'FAIL: a committed copy is still held';
+  end if;
+  if exists (select 1 from public.my_collection where id = v_bronze) then
+    raise exception 'FAIL: a committed copy is still in the collection';
+  end if;
+
+  -- One slot filled, the two remaining copies of the same card no longer
+  -- actionable, and the first rung crossed.
+  select committed, ready, claimable_gems, next_at, next_reward
+    into v from public.my_sets where code = 'test-set-2026';
+  if v.committed <> 1 then
+    raise exception 'FAIL: one commit read as % committed', v.committed;
+  end if;
+  if v.ready <> 0 then
+    raise exception 'FAIL: a filled slot still reported % ready', v.ready;
+  end if;
+  if v.claimable_gems <> 10 then
+    raise exception 'FAIL: one commit made % gems claimable, expected 10', v.claimable_gems;
+  end if;
+  if v.next_at <> 2 or v.next_reward <> 20 then
+    raise exception 'FAIL: the next rung reads % cards for % gems, expected 2 for 20',
+      v.next_at, v.next_reward;
+  end if;
+
+  -- The same card cannot be committed twice, and the refusal costs nothing.
+  v_bal := (select balance from public.gem_balances where user_id = auth.uid());
+  ok := false;
+  begin
+    r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 1));
+  exception when others then
+    ok := sqlerrm like '%already in this set%';
+    if not ok then raise exception 'FAIL: a second commit was blocked by the wrong rule: %', sqlerrm; end if;
+  end;
+  if not ok then raise exception 'FAIL: one card filled its slot twice'; end if;
+  if (select balance from public.gem_balances where user_id = auth.uid()) <> v_bal then
+    raise exception 'FAIL: a refused commit still paid out';
+  end if;
+
+  -- A committed copy cannot be sold. It is in a set; paying for it again would
+  -- be paying twice for one card.
+  ok := false;
+  begin
+    r := public.sell_card(v_bronze);
+  exception when others then
+    ok := sqlerrm like '%committed to a set%';
+    if not ok then raise exception 'FAIL: selling a committed card was blocked by the wrong rule: %', sqlerrm; end if;
+  end;
+  if not ok then raise exception 'FAIL: a committed card was sold'; end if;
+
+  -- The checklist agrees with the view.
+  if (select count(*) from public.set_checklist('test-set-2026') where committed) <> 1 then
+    raise exception 'FAIL: the checklist did not mark exactly one slot filled';
+  end if;
+  if (select commit_value from public.set_checklist('test-set-2026')
+       where card_id = (select id from set_test_cards where n = 2)) <> 0 then
+    raise exception 'FAIL: a card you do not hold quoted a commit value';
+  end if;
+
+  -- ---- the first rung ----------------------------------------------------
+  r := public.claim_set_reward('test-set-2026');
+  if (r ->> 'reward_gems')::integer <> 10 or (r ->> 'rungs')::integer <> 1 then
+    raise exception 'FAIL: the first claim paid % over % rungs, expected 10 over 1',
+      r ->> 'reward_gems', r ->> 'rungs';
+  end if;
+  if (select balance from public.gem_balances where user_id = auth.uid()) <> 114 then
+    raise exception 'FAIL: balance is % after a 10 gem rung on 104',
+      (select balance from public.gem_balances where user_id = auth.uid());
+  end if;
+
+  -- NOTHING NEW SINCE. A second press must not pay the same rung again.
+  ok := false;
+  begin
+    r := public.claim_set_reward('test-set-2026');
+  exception when others then
+    ok := sqlerrm like '%nothing to claim%';
+    if not ok then raise exception 'FAIL: a repeat claim was blocked by the wrong rule: %', sqlerrm; end if;
+  end;
+  if not ok then raise exception 'FAIL: the same rung was claimed twice'; end if;
+  if (select balance from public.gem_balances where user_id = auth.uid()) <> 114 then
+    raise exception 'FAIL: a refused claim still moved the balance';
+  end if;
+  -- The paid rung reports what actually landed, not what it is priced at.
+  if (select claimed_gems from public.my_sets where code = 'test-set-2026') <> 10 then
+    raise exception 'FAIL: the claimed total reads %, expected 10',
+      (select claimed_gems from public.my_sets where code = 'test-set-2026');
+  end if;
+end;
+$$;
+
+-- --------------------------------------------- a card inside an unscored lineup
+reset role;
+insert into public.card_instances (id, user_id, card_id)
+values ('54444444-0000-0000-0000-000000000002',
+        '51111111-1111-1111-1111-111111111111',
+        (select id from set_test_cards where n = 2));
+
+insert into public.lineups (id, user_id, season, season_type, week)
+values ('55555555-5555-5555-5555-555555555555',
+        '51111111-1111-1111-1111-111111111111', 2026, 1, 1);
+insert into public.lineup_slots (lineup_id, slot, card_instance_id)
+values ('55555555-5555-5555-5555-555555555555', 'QB', '54444444-0000-0000-0000-000000000002');
+set local role authenticated;
+
+do $$
+declare ok boolean := false; r jsonb;
+begin
+  begin
+    r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 2));
+  exception when others then
+    ok := sqlerrm like '%not been scored%';
+    if not ok then raise exception 'FAIL: an in-lineup card was blocked by the wrong rule: %', sqlerrm; end if;
+  end;
+  if not ok then raise exception 'FAIL: a card in an unscored lineup was burnt'; end if;
+end;
+$$;
+
+-- Release it, and hand over the rest of the set.
+reset role;
+delete from public.lineup_slots where lineup_id = '55555555-5555-5555-5555-555555555555';
+insert into public.card_instances (user_id, card_id)
+values ('51111111-1111-1111-1111-111111111111', (select id from set_test_cards where n = 3)),
+       ('51111111-1111-1111-1111-111111111111', (select id from set_test_cards where n = 4)),
+       ('51111111-1111-1111-1111-111111111111', (select id from set_test_cards where n = 5));
+set local role authenticated;
+
+do $$
+declare ok boolean := false; r jsonb; v record;
+begin
+  r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 2));
+  r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 3));
+
+  -- ---- TWO RUNGS AT ONCE -------------------------------------------------
+  -- Three committed crosses both the 50% and the 75% bars, and one press must
+  -- collect both.
+  select claimable_gems into v from public.my_sets where code = 'test-set-2026';
+  if v.claimable_gems <> 50 then
+    raise exception 'FAIL: three commits made % claimable, expected 50 (20 + 30)', v.claimable_gems;
+  end if;
+
+  r := public.claim_set_reward('test-set-2026');
+  if (r ->> 'rungs')::integer <> 2 or (r ->> 'reward_gems')::integer <> 50 then
+    raise exception 'FAIL: the sweep paid % over % rungs, expected 50 over 2',
+      r ->> 'reward_gems', r ->> 'rungs';
+  end if;
+  -- 114 + 4 + 4 commits + 50.
+  if (select balance from public.gem_balances where user_id = auth.uid()) <> 172 then
+    raise exception 'FAIL: balance is %, expected 172',
+      (select balance from public.gem_balances where user_id = auth.uid());
+  end if;
+  -- ONE LEDGER ROW PER RUNG, not one for the sweep: a 25% tranche and a 100%
+  -- tranche have to stay distinguishable in the audit trail.
+  if (select count(*) from public.gems_ledger where reason = 'set_reward') <> 3 then
+    raise exception 'FAIL: the ladder wrote % ledger rows, expected 3',
+      (select count(*) from public.gems_ledger where reason = 'set_reward');
+  end if;
+
+  -- ---- the top rung ------------------------------------------------------
+  r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 4));
+
+  select committed, complete, next_at into v from public.my_sets where code = 'test-set-2026';
+  if v.committed <> 4 or not v.complete then
+    raise exception 'FAIL: four commits read as % committed, complete=%', v.committed, v.complete;
+  end if;
+  if v.next_at is not null then
+    raise exception 'FAIL: a finished ladder still points at a rung of % cards', v.next_at;
+  end if;
+
+  -- OVER-COMMITTING IS REFUSED, even though a fifth member is held and its
+  -- slot is empty. Past the bar a commit pays half of what the sell button
+  -- pays and buys nothing, because there is no rung above 100%.
+  ok := false;
+  begin
+    r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 5));
+  exception when others then
+    ok := sqlerrm like '%already complete%';
+    if not ok then raise exception 'FAIL: over-commit was blocked by the wrong rule: %', sqlerrm; end if;
+  end;
+  if not ok then raise exception 'FAIL: a card was burnt into an already-complete set'; end if;
+
+  r := public.claim_set_reward('test-set-2026');
+  if (r ->> 'reward_gems')::integer <> 100 or (r ->> 'rungs')::integer <> 1 then
+    raise exception 'FAIL: the top rung paid % over % rungs, expected 100 over 1',
+      r ->> 'reward_gems', r ->> 'rungs';
+  end if;
+  -- 172 + 4 commit + 100.
+  if (select balance from public.gem_balances where user_id = auth.uid()) <> 276 then
+    raise exception 'FAIL: balance is %, expected 276',
+      (select balance from public.gem_balances where user_id = auth.uid());
+  end if;
+  -- The whole ladder, and no more.
+  select claimed_gems, claimable_gems, total_reward into v
+    from public.my_sets where code = 'test-set-2026';
+  if v.claimed_gems <> 160 or v.claimable_gems <> 0 or v.total_reward <> 160 then
+    raise exception 'FAIL: ladder totals read claimed=% claimable=% total=%, expected 160/0/160',
+      v.claimed_gems, v.claimable_gems, v.total_reward;
+  end if;
+
+  ok := false;
+  begin
+    r := public.claim_set_reward('test-set-2026');
+  exception when others then
+    ok := sqlerrm like '%nothing to claim%';
+    if not ok then raise exception 'FAIL: an exhausted ladder was blocked by the wrong rule: %', sqlerrm; end if;
+  end;
+  if not ok then raise exception 'FAIL: an exhausted ladder paid out again'; end if;
+
+  -- COMPLETION IS MONOTONIC. There is no way back under the bar: committed
+  -- copies cannot be sold, started or un-committed.
+  if not (select complete from public.my_sets where code = 'test-set-2026') then
+    raise exception 'FAIL: a finished set stopped reading complete';
+  end if;
+
+  -- An unknown set is refused as such, not as an empty ladder.
+  ok := false;
+  begin
+    r := public.claim_set_reward('no-such-set');
+  exception when others then
+    ok := sqlerrm like '%no such set%';
+    if not ok then raise exception 'FAIL: an unknown set was blocked by the wrong rule: %', sqlerrm; end if;
+  end;
+  if not ok then raise exception 'FAIL: an unknown set code was claimable'; end if;
+end;
+$$;
+
+-- ------------------------------------------- a committed card cannot be started
+--
+-- The other half of the burn, and the one whose failure is silent: without the
+-- `is_held` guard in set_lineup you could commit a card and then name it in a
+-- lineup, and the slot would score nothing with no error anywhere.
+--
+-- A future week of its own, so the assertion neither depends on where the real
+-- season has got to nor rots after it.
+reset role;
+insert into public.games (external_id, season, week, season_type, starts_at, status)
+values (990001, 2026, 99, 1, now() + interval '7 days', 'scheduled');
+set local role authenticated;
+
+do $$
+declare
+  v_burnt constant uuid := '54444444-0000-0000-0000-00000000000b';
+  v_held  constant uuid := '54444444-0000-0000-0000-00000000000f';
+  ok boolean := false; v_lineup uuid;
+begin
+  begin
+    v_lineup := public.set_lineup(2026, 1::smallint, 99,
+      jsonb_build_array(jsonb_build_object('slot', 'QB', 'card_instance_id', v_burnt)));
+  exception when others then
+    ok := sqlerrm like '%does not belong to you%';
+    if not ok then raise exception 'FAIL: a burnt starter was blocked by the wrong rule: %', sqlerrm; end if;
+  end;
+  if not ok then raise exception 'FAIL: a card committed to a set was started in a lineup'; end if;
+
+  -- BOTH HALVES. The same payload with the copy that is still held must work,
+  -- or the assertion above proves only that set_lineup rejects everything.
+  v_lineup := public.set_lineup(2026, 1::smallint, 99,
+    jsonb_build_array(jsonb_build_object('slot', 'QB', 'card_instance_id', v_held)));
+  if v_lineup is null then
+    raise exception 'FAIL: a held card could not be started either';
+  end if;
+end;
+$$;
+
+-- ------------------------------------------------------------ the rival sees
+--
+-- If my_sets were definer-rights this would read 4 and every set in the game
+-- would look finished to everybody.
+set local request.jwt.claims = '{"sub":"52222222-2222-2222-2222-222222222222","role":"authenticated"}';
+
+do $$
+declare ok boolean := false; r jsonb; v record;
+begin
+  select committed, ready, claimable_gems, claimed_gems into v
+    from public.my_sets where code = 'test-set-2026';
+  if v.committed <> 0 or v.ready <> 0 then
+    raise exception 'FAIL: my_sets showed a rival % committed / % ready out of another user''s cards',
+      v.committed, v.ready;
+  end if;
+  if v.claimable_gems <> 0 or v.claimed_gems <> 0 then
+    raise exception 'FAIL: my_sets showed a rival somebody else''s ladder (% claimable, % claimed)',
+      v.claimable_gems, v.claimed_gems;
+  end if;
+  if (select count(*) from public.set_checklist('test-set-2026') where committed) <> 0 then
+    raise exception 'FAIL: the checklist showed a rival somebody else''s commits';
+  end if;
+
+  ok := false;
+  begin
+    r := public.claim_set_reward('test-set-2026');
+  exception when others then
+    ok := sqlerrm like '%nothing to claim%';
+    if not ok then raise exception 'FAIL: the rival was blocked by the wrong rule: %', sqlerrm; end if;
+  end;
+  if not ok then raise exception 'FAIL: a rival claimed off somebody else''s commits'; end if;
+
+  -- And cannot commit a card they do not hold, even into a slot that is open
+  -- for them.
+  ok := false;
+  begin
+    r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 5));
+  exception when others then
+    ok := sqlerrm like '%do not hold a copy%';
+    if not ok then raise exception 'FAIL: the rival was blocked by the wrong rule: %', sqlerrm; end if;
+  end;
+  if not ok then raise exception 'FAIL: a rival committed a card they do not own'; end if;
+  if (select balance from public.gem_balances where user_id = auth.uid()) <> 100 then
+    raise exception 'FAIL: a refused commit paid the rival anyway';
+  end if;
+
+  raise notice 'card_sets: commit and ladder assertions passed';
+end;
+$$;
+
+reset role;
+
+-- ---------------------------------------------------------------------------
+-- FILLING A SET IN ONE GO
+--
+-- Its own player and its own set, so the balances the stages above assert to
+-- the gem are not disturbed by a bulk run in the middle of them.
+--
+-- The two things that matter: one card the rules refuse must not fail the
+-- others, and the array must stop at the requirement rather than burning
+-- everything it was handed.
+-- ---------------------------------------------------------------------------
+
+insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at)
+values ('00000000-0000-0000-0000-000000000000', '61111111-1111-1111-1111-111111111111', 'authenticated', 'authenticated', 'bulk@test.local', '', now(), now(), now());
+-- A wallet already exists: handle_new_user opens one on sign-up.
+insert into public.gem_balances (user_id, balance) values ('61111111-1111-1111-1111-111111111111', 0)
+on conflict (user_id) do update set balance = 0;
+
+insert into public.teams (external_id, abbreviation, full_name) values (9401, 'BLK', 'Bulk Test Club');
+insert into public.players (external_id, first_name, last_name, position, position_abbreviation, team_id)
+select 9400 + n, 'Bulk', 'Number' || n, 'QB', 'QB', (select id from public.teams where external_id = 9401)
+  from generate_series(1, 5) n;
+insert into public.cards (player_id, season, rarity)
+select p.id, 2026, 'common' from public.players p where p.external_id between 9401 and 9405;
+
+-- FIVE members, requiring THREE, and one of the five parked in an unscored
+-- lineup. Sending all five must add three, skip the lineup one by name, and
+-- refuse the rest for being past the bar.
+insert into public.card_sets (id, code, name, family, subtitle, season, required_count, sort_order)
+values ('63333333-3333-3333-3333-333333333333', 'bulk-set-2026', 'Bulk Set', 'team', 'AFC North', 2026, 3, 998);
+insert into public.card_set_members (set_id, card_id)
+select '63333333-3333-3333-3333-333333333333', c.id
+  from public.cards c join public.players p on p.id = c.player_id
+ where p.external_id between 9401 and 9405;
+insert into public.card_set_milestones (set_id, threshold_pct, reward_gems) values
+  ('63333333-3333-3333-3333-333333333333',  25,  5),
+  ('63333333-3333-3333-3333-333333333333',  50, 10),
+  ('63333333-3333-3333-3333-333333333333',  75, 15),
+  ('63333333-3333-3333-3333-333333333333', 100, 50);
+
+insert into public.card_instances (id, user_id, card_id)
+select ('64444444-0000-0000-0000-00000000000' || n)::uuid,
+       '61111111-1111-1111-1111-111111111111',
+       c.id
+  from generate_series(1, 5) n
+  join public.players p on p.external_id = 9400 + n
+  join public.cards c on c.player_id = p.id;
+
+-- The SECOND card in the array order is the one in a lineup, so the skip is
+-- proved to happen in the middle of the run rather than at its end.
+insert into public.lineups (id, user_id, season, season_type, week)
+values ('65555555-5555-5555-5555-555555555555', '61111111-1111-1111-1111-111111111111', 2026, 1, 1);
+insert into public.lineup_slots (lineup_id, slot, card_instance_id)
+values ('65555555-5555-5555-5555-555555555555', 'QB', '64444444-0000-0000-0000-000000000002');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"61111111-1111-1111-1111-111111111111","role":"authenticated"}';
+
+do $$
+declare
+  v_ids uuid[];
+  r jsonb; ok boolean := false; v record;
+begin
+  select array_agg(c.id order by p.external_id) into v_ids
+    from public.cards c join public.players p on p.id = c.player_id
+   where p.external_id between 9401 and 9405;
+
+  r := public.commit_cards_to_set('bulk-set-2026', v_ids);
+
+  -- Three in, two refused: one for its lineup, one for arriving after the bar.
+  if (r ->> 'added')::integer <> 3 then
+    raise exception 'FAIL: the fill added %, expected 3', r ->> 'added';
+  end if;
+  if (r ->> 'skipped')::integer <> 2 then
+    raise exception 'FAIL: the fill skipped %, expected 2', r ->> 'skipped';
+  end if;
+  -- Five bronze copies at 8 gems, half of it each.
+  if (r ->> 'paid')::integer <> 12 then
+    raise exception 'FAIL: the fill paid %, expected 12', r ->> 'paid';
+  end if;
+  if (select balance from public.gem_balances where user_id = auth.uid()) <> 12 then
+    raise exception 'FAIL: balance is %, expected 12',
+      (select balance from public.gem_balances where user_id = auth.uid());
+  end if;
+
+  -- EACH REFUSAL SAYS WHY. A bulk action that dropped cards silently would be
+  -- worse than one that refused outright.
+  if not exists (
+    select 1 from jsonb_array_elements(r -> 'refusals') x
+     where x ->> 'reason' like '%not been scored%'
+  ) then
+    raise exception 'FAIL: the in-lineup card was not reported as such: %', r -> 'refusals';
+  end if;
+  if not exists (
+    select 1 from jsonb_array_elements(r -> 'refusals') x
+     where x ->> 'reason' like '%already complete%'
+  ) then
+    raise exception 'FAIL: the past-the-bar card was not reported as such: %', r -> 'refusals';
+  end if;
+
+  -- THE CARD IN THE LINEUP SURVIVED. It is the whole reason a refusal must not
+  -- take the transaction with it.
+  if (select is_held from public.card_instances where id = '64444444-0000-0000-0000-000000000002')
+     is not true then
+    raise exception 'FAIL: a skipped card was burnt anyway';
+  end if;
+
+  select committed, complete, claimable_gems into v from public.my_sets where code = 'bulk-set-2026';
+  if v.committed <> 3 or not v.complete then
+    raise exception 'FAIL: the fill left the set at % of 3, complete=%', v.committed, v.complete;
+  end if;
+  -- One fill crossed all four rungs at once.
+  if v.claimable_gems <> 80 then
+    raise exception 'FAIL: a filled set has % claimable, expected 80', v.claimable_gems;
+  end if;
+
+  -- A second fill has nothing left to do and says so per card rather than
+  -- raising: the set is complete, so every card comes back refused.
+  r := public.commit_cards_to_set('bulk-set-2026', v_ids);
+  if (r ->> 'added')::integer <> 0 then
+    raise exception 'FAIL: a second fill added % cards to a complete set', r ->> 'added';
+  end if;
+
+  -- An empty array is a caller bug, not a no-op.
+  ok := false;
+  begin
+    r := public.commit_cards_to_set('bulk-set-2026', '{}'::uuid[]);
+  exception when others then
+    ok := sqlerrm like '%no cards were named%';
+    if not ok then raise exception 'FAIL: an empty fill was blocked by the wrong rule: %', sqlerrm; end if;
+  end;
+  if not ok then raise exception 'FAIL: an empty fill was accepted'; end if;
+
+  raise notice 'card_sets: bulk fill assertions passed';
+end;
+$$;
+
+reset role;
+
+-- ---------------------------------------------------------------------------
+-- The rebuild is idempotent, never shrinks a set, makes a team set its whole
+-- roster, and leaves every set with a ladder it can climb.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_before integer;
+  v_after  integer;
+  v_sets   integer;
+begin
+  if not exists (select 1 from public.cards where is_mintable and season = 2026) then
+    raise notice 'card_sets: no 2026 pool here, skipping the rebuild assertions';
+    return;
+  end if;
+
+  select count(*) into v_before from public.card_set_members;
+  select count(*) into v_sets   from public.card_sets where season = 2026 and is_active;
+
+  perform public.rebuild_card_sets(2026);
+
+  select count(*) into v_after from public.card_set_members;
+
+  if v_after < v_before then
+    raise exception 'FAIL: a rebuild removed % membership rows', v_before - v_after;
+  end if;
+  if (select count(*) from public.card_sets where season = 2026 and is_active) < v_sets then
+    raise exception 'FAIL: a rebuild deactivated sets that already had members';
+  end if;
+
+  -- Nothing may ask for more cards than it holds.
+  if exists (
+    select 1
+      from public.card_sets s
+      join (select set_id, count(*) as total from public.card_set_members group by set_id) m
+        on m.set_id = s.id
+     where s.season = 2026
+       and s.required_count > m.total
+  ) then
+    raise exception 'FAIL: a set requires more cards than it contains';
+  end if;
+
+  -- A TEAM SET IS ITS WHOLE ROSTER. This is the rule the ladder's pricing
+  -- assumes; a team set quietly requiring six again would make the 100% rung
+  -- farmable in a fortnight.
+  if exists (
+    select 1
+      from public.card_sets s
+      join (select set_id, count(*) as total from public.card_set_members group by set_id) m
+        on m.set_id = s.id
+     where s.season = 2026
+       and s.family = 'team'
+       and s.required_count <> m.total
+  ) then
+    raise exception 'FAIL: a team set does not require its whole roster';
+  end if;
+
+  -- Every active set has a full ladder.
+  if exists (
+    select 1 from public.card_sets s
+     where s.season = 2026 and s.is_active
+       and (select count(*) from public.card_set_milestones ml where ml.set_id = s.id) <> 4
+  ) then
+    raise exception 'FAIL: an active set does not have four milestones';
+  end if;
+
+  raise notice 'card_sets: rebuild assertions passed';
+end;
+$$;
+
+rollback;
