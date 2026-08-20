@@ -48,8 +48,6 @@ import {
 } from '@/components/collection/types';
 import { useCollection } from '@/components/collection/use-collection';
 import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
-import { useUpcomingFixtures } from '@/components/cards/use-fixtures';
-import { matchupLabel } from '@/components/lineup/model';
 import { SearchField } from '@/components/ui/Controls';
 import { Screen } from '@/components/shell/Screen';
 import { Colors, Spacing, Type } from '@/constants/theme';
@@ -243,34 +241,6 @@ export default function InventoryScreen() {
     [router],
   );
 
-  /**
-   * The card's footer line prints this club's next game beside the tier
-   * progress — see `PlayerCard`, which draws the two perishable facts off the
-   * frame.
-   *
-   * ONE read for the whole grid. `useUpcomingFixtures` is a session cache
-   * shared with the directory, Leaders and search, so by the time anyone has
-   * navigated here the map is usually already resolved and the first paint
-   * carries the fixtures. An empty map — the hook's answer to every failure —
-   * simply leaves the right-hand half of the footer blank.
-   *
-   * `matchupLabel` rather than `fixtureLabel`: the cell is ~100pt and the
-   * kickoff time the directory prints does not survive that width. "@ ARI" is
-   * the half of the fixture worth keeping when there is only room for half.
-   */
-  const fixtures = useUpcomingFixtures();
-  const cardMatchup = useCallback(
-    (team: string | null) => {
-      if (!team) return undefined;
-      const key = team.toUpperCase();
-      // Absent from the map is "the schedule has not loaded", which draws
-      // nothing. Present-and-null is "this club is idle", which is BYE — and
-      // `matchupLabel` says so.
-      return fixtures.has(key) ? matchupLabel(fixtures.get(key) ?? null) : undefined;
-    },
-    [fixtures],
-  );
-
   // cardCount is the header's count and lands before the grid does, so it is
   // the right stand-in only until the rows themselves arrive.
   const total = cards?.length ?? cardCount;
@@ -399,7 +369,6 @@ export default function InventoryScreen() {
                 <InventoryCard
                   card={item}
                   width={itemWidth}
-                  matchup={cardMatchup(item.team)}
                   onPress={openCard(item)}
                 />
               )}

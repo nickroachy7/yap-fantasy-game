@@ -1,9 +1,8 @@
 /**
  * One grid cell: a <PlayerCard> sized to the column.
  *
- * The card is reused as-is — this wrapper adds only the two things the card
- * cannot know about: how wide its column is, and what this club is doing on
- * Sunday.
+ * The card is reused as-is — this wrapper adds the one thing the card cannot
+ * know about, which is how wide its column is.
  *
  * IT USED TO ADD SOMETHING ELSE, and losing it is why this file spent a while
  * being four lines long. An injury flag hung UNDERNEATH the card: a bordered
@@ -18,10 +17,14 @@
  * The collection and the lineup cannot disagree about what "PUP-R" means
  * because neither decides it.
  *
- * THE FIXTURE IS BACK, AND IT LEARNED THAT LESSON. It is drawn on the card's
- * own footer line — one fixed-height row that every cell has, sharing it with
- * the progress phrase — so a cell with no known fixture is exactly as tall as
- * one with a fixture, and the ragged edge cannot come back.
+ * THE FIXTURE IS GONE FROM THE GRID ENTIRELY, and that is what emptied this
+ * file back out. It came back once on a footer line, then moved onto the card,
+ * then went — the collection is a place you look at what you OWN, and who a
+ * club plays on Sunday is a question the directory and Leaders exist to answer.
+ * Nothing here reads the schedule now, so nothing here can be a line behind it.
+ *
+ * A cell is a square and its width. There is no longer anything under the frame
+ * for a ragged edge to happen to.
  */
 import { View } from 'react-native';
 
@@ -31,28 +34,17 @@ import { toCardModel, type CollectionCard } from './types';
 export function InventoryCard({
   card,
   width,
-  matchup,
   onPress,
 }: {
   card: CollectionCard;
   /** Exact column width, so rows align and the last row does not stretch. */
   width: number;
-  /**
-   * OPTIONAL. This club's next game, already formatted — "vs BUF", "@ ARI",
-   * "BYE".
-   *
-   * Handed down from the SCREEN rather than read here, because the schedule is
-   * one session-cached map for the whole grid and a hook in this component
-   * would be a subscription per cell — 34 of them on a phone, up to a few
-   * hundred on a wide window.
-   */
-  matchup?: string | null;
   onPress?: () => void;
 }) {
   return (
     <View style={{ width }}>
       <PlayerCard
-        model={{ ...toCardModel(card), matchup }}
+        model={toCardModel(card)}
         size="compact"
         fixedWidth={false}
         onPress={onPress}

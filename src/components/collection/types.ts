@@ -139,13 +139,15 @@ export function normaliseRow(row: CollectionViewRow): CollectionCard {
 /**
  * `CollectionCard` -> what `PlayerCard` draws.
  *
- * IT DOES NOT CARRY THE FIXTURE, and that is a boundary rather than an
- * oversight. Everything mapped here comes off the collection row: a name, a
- * club, a position, a tier, a career total — facts about a copy you hold. The
- * matchup is a fact about a Sunday, it arrives from a different read on a
- * different cadence (`useUpcomingFixtures`), and `PlayerCard` draws it off the
- * frame for exactly that reason. `InventoryCard` spreads it onto the model at
- * the call site, so this function stays a pure projection of one row.
+ * A PURE PROJECTION OF ONE ROW, and it is now the whole model rather than most
+ * of it. Everything here comes off the collection row: a name, a club, a
+ * position, a tier, a career total — facts about a copy you hold.
+ *
+ * It used to be most-of-it because the card also took a `matchup`, which is a
+ * fact about a Sunday arriving from a different read on a different cadence, so
+ * `InventoryCard` spread it on at the call site. The card does not draw a
+ * fixture any more (see the note there) and the grid does not read the schedule
+ * at all, which is what closed the gap: one row in, one model out.
  */
 export function toCardModel(c: CollectionCard): PlayerCardModel {
   return {

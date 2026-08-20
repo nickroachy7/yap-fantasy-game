@@ -32,7 +32,7 @@ import {
   MCCAFFREY_PROFILE,
   USAGE_SAMPLE,
 } from '@/components/dev/profile-fixture';
-import { OWNED_MANY, SAMPLE_MATCHUPS, SETS_FIXTURE, SET_MEMBERS_FIXTURE } from '@/components/dev/fixtures';
+import { OWNED_MANY, SETS_FIXTURE, SET_MEMBERS_FIXTURE } from '@/components/dev/fixtures';
 import { SetChecklist } from '@/components/collection/SetChecklist';
 import { SetsList } from '@/components/collection/SetsList';
 import { autofillSelection, remainingOf } from '@/components/collection/sets';
@@ -250,8 +250,7 @@ function InventoryFixture() {
               card={card}
               width={itemWidth}
               /* Handed in separately, exactly as the inventory screen does. */
-              matchup={card.team ? SAMPLE_MATCHUPS[card.team] : undefined}
-            />
+              />
           ))}
         </View>
       )}
