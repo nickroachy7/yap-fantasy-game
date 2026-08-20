@@ -34,6 +34,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { horizontalStrip } from '@/components/ui/scroll-strip';
 
 export const DASH = '—';
 
@@ -121,7 +122,7 @@ export function DataTable<Row>({
       </View>
 
       {/* Stats, scrollable. */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <ScrollView horizontal {...horizontalStrip} showsHorizontalScrollIndicator={false}>
         <View>
           {bands ? (
             <View style={styles.bandRow}>

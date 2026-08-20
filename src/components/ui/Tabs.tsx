@@ -13,6 +13,7 @@ import { ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
 
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { horizontalStrip } from '@/components/ui/scroll-strip';
 
 export type Tab<T extends string> = {
   value: T;
@@ -41,6 +42,7 @@ export function Tabs<T extends string>({
     // by wrapping into a second row that shifts the content below it.
     <ScrollView
       horizontal
+      {...horizontalStrip}
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.row}>
       {tabs.map((t) => {

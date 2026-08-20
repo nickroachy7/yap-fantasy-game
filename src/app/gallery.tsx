@@ -34,8 +34,8 @@ import {
 } from '@/components/dev/profile-fixture';
 import { OWNED_MANY, SETS_FIXTURE, SET_MEMBERS_FIXTURE } from '@/components/dev/fixtures';
 import { SetChecklist } from '@/components/collection/SetChecklist';
-import { SetsList } from '@/components/collection/SetsList';
-import { autofillSelection, remainingOf } from '@/components/collection/sets';
+import { SetsList, SetsStrip } from '@/components/collection/SetsList';
+import { autofillSelection, remainingOf, summariseSets } from '@/components/collection/sets';
 import { PlayerHero } from '@/components/players/PlayerHero';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { CardStanding } from '@/components/players/CardStanding';
@@ -174,6 +174,11 @@ function SetsFixture() {
 
   return (
     <View style={styles.profile}>
+      {/* The strip is `SetsPanel`'s rather than the list's — it is pinned above
+          the scroll on the real screen, at the same height the inventory pins
+          its own. Drawn here so the gallery still shows the whole page and not
+          just the rows under it. */}
+      <SetsStrip stats={summariseSets(SETS_FIXTURE)} />
       <SetsList
         sets={SETS_FIXTURE}
         claimingCode={claiming}
@@ -209,6 +214,10 @@ function ChecklistFixture() {
         selected={selected}
         submitting={false}
         onClaim={() => setClaiming((v) => !v)}
+        /* Inert, like the submission: the quick add's whole point is the
+           confirmation behind it, and the gallery has no session to commit
+           against. Ticking a card is the part worth being able to look at. */
+        onQuickAdd={() => {}}
         onToggle={(m) =>
           setSelected((held) =>
             held.includes(m.card_id)
@@ -249,8 +258,7 @@ function InventoryFixture() {
               key={card.id}
               card={card}
               width={itemWidth}
-              /* Handed in separately, exactly as the inventory screen does. */
-              />
+            />
           ))}
         </View>
       )}

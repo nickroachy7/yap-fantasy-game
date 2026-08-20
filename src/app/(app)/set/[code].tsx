@@ -113,6 +113,26 @@ export default function SetChecklistScreen() {
 
   const plan = useMemo(() => planFor(members ?? [], selected), [members, selected]);
 
+  /**
+   * One card being added on its own, from a card's plus badge — the shortcut
+   * past the batch.
+   *
+   * HELD SEPARATELY FROM `selected`, deliberately. The obvious shortcut is to
+   * set the selection to that one id and open the same dialog, and it quietly
+   * throws away whatever the player had already ticked or autofilled. A
+   * distinct id means the batch survives a quick add, and the two can even be
+   * pending at once without either being surprising.
+   */
+  const [quick, setQuick] = useState<string | null>(null);
+
+  /* What the dialog is about to do, from whichever path opened it. Everything
+     downstream — the title, the warning, the price, the RPC — reads this and
+     not `plan`, which is why there is one destructive path rather than two. */
+  const confirmPlan = useMemo(
+    () => (quick ? planFor(members ?? [], [quick]) : plan),
+    [quick, members, plan],
+  );
+
   const toggle = useCallback((member: SetMember) => {
     setSelected((held) =>
       held.includes(member.card_id)
@@ -131,7 +151,7 @@ export default function SetChecklistScreen() {
   }, [set, members]);
 
   const submit = useCallback(async () => {
-    if (!set || plan.cardIds.length === 0) return;
+    if (!set || confirmPlan.cardIds.length === 0) return;
     setSubmitting(true);
     setSubmitError(null);
     /* The server takes the list in order and skips whatever its own rules
@@ -139,7 +159,7 @@ export default function SetChecklistScreen() {
        — rather than failing the whole run. Both halves come back. */
     const { data, error: err } = await supabase.rpc('commit_cards_to_set', {
       p_set_code: set.code,
-      p_card_ids: plan.cardIds,
+      p_card_ids: confirmPlan.cardIds,
     });
 
     if (err) {
@@ -164,12 +184,19 @@ export default function SetChecklistScreen() {
        longer exists. */
     invalidateCollection();
     await Promise.all([reloadMembers(), reload(), refreshPlayer()]);
-    // Cleared only on success. A failed submission must leave the batch intact
-    // so the player can retry it rather than rebuild it.
-    setSelected([]);
+    /* Cleared only on success. A failed submission must leave the batch intact
+       so the player can retry it rather than rebuild it.
+
+       The submitted ids are dropped from the batch rather than the batch being
+       emptied, which is what makes a quick add safe to do mid-batch: it takes
+       its own card out and leaves the rest ticked. For a batch submit the two
+       are the same thing, since every id in the plan came from the batch. */
+    const done = new Set(confirmPlan.cardIds);
+    setSelected((held) => held.filter((id) => !done.has(id)));
+    setQuick(null);
     setSubmitting(false);
     setConfirming(false);
-  }, [set, plan, reloadMembers, reload, refreshPlayer]);
+  }, [set, confirmPlan, reloadMembers, reload, refreshPlayer]);
 
   const close = useCallback(() => router.back(), [router]);
 
@@ -217,11 +244,20 @@ export default function SetChecklistScreen() {
             submitting={submitting}
             onClaim={() => void claim()}
             onToggle={toggle}
+            onQuickAdd={(member) => {
+              setSubmitError(null);
+              setAdded(null);
+              setQuick(member.card_id);
+              setConfirming(true);
+            }}
             onAutofill={autofill}
             onClear={() => setSelected([])}
             onSubmit={() => {
               setSubmitError(null);
               setAdded(null);
+              // The batch path. `quick` must be cleared or a stale one from an
+              // earlier badge tap would decide what this dialog submits.
+              setQuick(null);
               setConfirming(true);
             }}
           />
@@ -236,13 +272,13 @@ export default function SetChecklistScreen() {
         visible={confirming}
         title={
           set
-            ? plan.cards === 1
+            ? confirmPlan.cards === 1
               ? `Add 1 card to ${set.name}?`
-              : `Add ${plan.cards} cards to ${set.name}?`
+              : `Add ${confirmPlan.cards} cards to ${set.name}?`
             : ''
         }
-        body={set ? fillWarning(set, plan) : undefined}
-        confirmLabel={`Add ${plan.cards} for ${plan.gems}`}
+        body={set ? fillWarning(set, confirmPlan) : undefined}
+        confirmLabel={`Add ${confirmPlan.cards} for ${confirmPlan.gems}`}
         destructive
         busy={submitting}
         error={submitError}
@@ -251,6 +287,9 @@ export default function SetChecklistScreen() {
           if (submitting) return;
           setConfirming(false);
           setSubmitError(null);
+          // A cancelled quick add leaves nothing behind; the batch is untouched
+          // either way because it was never what this dialog was holding.
+          setQuick(null);
         }}
       />
     </PlayerSheetFrame>

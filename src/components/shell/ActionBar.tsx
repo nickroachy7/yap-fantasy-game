@@ -42,6 +42,7 @@ import { ScrollView, StyleSheet, Pressable, Text, View, type ColorValue } from '
 
 import { Colors, Radius, selectionAccent, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { horizontalStrip } from '@/components/ui/scroll-strip';
 
 export type ActionIconName =
   | 'search'
@@ -82,9 +83,15 @@ export function ActionBar({ actions, wide }: { actions: Action[]; wide: boolean 
      * needs at 9pt. A Collection page carries seven items (three pages plus four
      * facets) and that is 470pt of content in a 343pt phone: without the scroll
      * the last two labels ellipsised into nothing, and with a hard cap on the
-     * item count the seventh would simply have been unreachable. */
+     * item count the seventh would simply have been unreachable.
+     *
+     * AND ONLY WHEN IT HAS TO. `horizontalStrip` is what stops a three-item bar
+     * being draggable — a horizontal ScrollView bounces by default whether or
+     * not there is anywhere to go, which made every section nav in the app feel
+     * like a carousel with nothing in it. See that file. */
     <ScrollView
       horizontal
+      {...horizontalStrip}
       showsHorizontalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       /* `flexGrow: 0`, and it is load-bearing. React-native-web gives every

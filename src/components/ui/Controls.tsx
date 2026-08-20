@@ -27,6 +27,7 @@ import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Chip } from '@/components/ui/Chip';
 import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { horizontalStrip } from '@/components/ui/scroll-strip';
 
 export function SearchField({
   value,
@@ -93,6 +94,7 @@ export function SortChips<K extends string>({
       <Text style={[Type.micro, styles.sortLabel, { color: c.textTertiary }]}>SORT</Text>
       <ScrollView
         horizontal
+        {...horizontalStrip}
         showsHorizontalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         style={styles.sortScroll}

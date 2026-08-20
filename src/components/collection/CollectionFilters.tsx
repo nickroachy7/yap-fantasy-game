@@ -259,6 +259,22 @@ export function InventoryControls({
  * off. What is left says what the filter DID, which a control cannot: "12 of 40
  * cards", and the count of what is being hidden.
  *
+ * IT SAYS NOTHING WHEN THE FILTERS DID NOTHING, which is most of the time.
+ * `shown === total` means no filter is narrowing anything, and the line then
+ * read "33 cards" — a fact `CollectionSummary` prints two rows above it, in a
+ * cell labelled CARDS. One number, twice, eight points apart.
+ *
+ * The test covers the hidden count too, and not by accident: hiding anything
+ * makes `shown` smaller than `total`, so `shown === total` already implies
+ * nothing was hidden. There is no state where the second line has something to
+ * say and the first does not.
+ *
+ * This is the component doing what its name says rather than a special case.
+ * It reports what the FILTERS did; the summary reports what you own. When the
+ * filters have done nothing, there is nothing here to report — and a line that
+ * only appears once a filter is on is also how a reader learns the two are
+ * connected.
+ *
  * THAT SECOND LINE USED TO SAY THE WRONG THING. It read "4 in lineups hidden",
  * which described a filter this screen does not have: `unavailable` counts
  * cards whose player carries a BLOCKING designation — see `isAvailable`, which
@@ -280,10 +296,14 @@ export function ResultLine({
   const c = Colors[useScheme()];
   const hiding = availability === 'AVAILABLE';
 
+  /* Nothing narrowed, nothing to say — see the header. Before the wrapper, so
+     the caller's spacing is all that is left behind. */
+  if (shown === total) return null;
+
   return (
     <View style={styles.resultLine}>
       <Text numberOfLines={1} style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
-        {shown === total ? `${total} cards` : `${shown} of ${total} cards`}
+        {`${shown} of ${total} cards`}
       </Text>
       {hiding && unavailable > 0 ? (
         <Text numberOfLines={1} style={[Type.fine, NUMERIC, { color: c.textTertiary }]}>

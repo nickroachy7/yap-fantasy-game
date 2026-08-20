@@ -15,6 +15,7 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Gem } from '@/components/shell/AppHeader';
+import { SummaryStrip, type SummaryCell } from '@/components/ui/SummaryStrip';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
@@ -22,7 +23,6 @@ import {
   groupSets,
   progressOf,
   statusOf,
-  summariseSets,
   type CardSet,
   type SetsSummary,
 } from './sets';
@@ -46,8 +46,6 @@ export function SetsList({
 
   return (
     <>
-      <SetsStrip stats={summariseSets(sets)} />
-
       {sections.map((section) => (
         <View key={section.key} style={styles.section}>
           <View style={styles.sectionHead}>
@@ -79,85 +77,76 @@ export function SetsList({
 }
 
 /**
- * The page's own summary, in the same framed strip the inventory uses.
+ * The page's own summary, in the SAME STRIP the inventory draws — literally the
+ * same component, not the same design copied.
  *
- * Four cells, always the same four: a strip whose columns appear and vanish
+ * It was a copy for a while, and the copy is why this note exists: the frame
+ * weight, the divider, the label-over-figure cell and the gem slot were written
+ * out again here, so when the inventory's strip learned weighted columns and a
+ * label that can be a component, this one silently did not. Two tabs of one
+ * section had visibly different objects in the same position. `SummaryStrip`
+ * owns all of that now and this function is only the four numbers.
+ *
+ * FOUR CELLS, ALWAYS THE SAME FOUR: a strip whose columns appear and vanish
  * would make the two numbers that matter — slots you can fill, gems you can
  * claim — move around the page between visits. A zero is worth its cell here,
  * because "0 ready" is an answer to the question this screen exists to ask.
+ * The inventory's strip is fixed at six for the same reason.
  *
  * TO FILL counts SLOTS, not cards, and the label says so. One duplicate can be
  * the open slot in two different sets, so the number of actions available is
  * genuinely larger than the number of cards they would cost.
+ *
+ * EQUAL WIDTHS, unlike the inventory's. Weighting is there for a cell that
+ * holds five figures beside a gem; the widest thing here is a four-figure gem
+ * total in a cell whose label is "CLAIMED", so an even split has room and the
+ * default is the honest choice.
  */
 export function SetsStrip({ stats }: { stats: SetsSummary }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const gold = TierColors[scheme].gold.accent;
 
-  const cells: {
-    key: string;
-    label: string;
-    value: string;
-    tone?: string;
-    mark?: React.ReactNode;
-    a11y: string;
-  }[] = [
-    { key: 'sets', label: 'SETS', value: String(stats.sets), a11y: `${stats.sets} sets this season` },
+  const cells: SummaryCell[] = [
+    {
+      key: 'sets',
+      label: 'SETS',
+      value: String(stats.sets),
+      accessibilityLabel: `${stats.sets} sets this season`,
+    },
     {
       key: 'claimed',
       label: 'CLAIMED',
       value: String(stats.claimed),
-      a11y: `${stats.claimed} sets claimed`,
+      accessibilityLabel: `${stats.claimed} sets claimed`,
     },
     {
       key: 'fill',
       label: 'TO FILL',
       value: String(stats.toCommit),
-      tone: stats.toCommit > 0 ? c.text : undefined,
-      a11y:
+      accessibilityLabel:
         stats.toCommit > 0
           ? `${stats.toCommit} slots you hold a card for`
           : 'No slots you can fill right now',
     },
     {
+      /* The one tinted figure on either strip, and it earns it: this is the
+         only cell on either that reports MONEY WAITING rather than a count of
+         things you have. The gem rides with the tint so the number cannot be
+         read as a count of sets. */
       key: 'ready',
       label: 'READY',
       value: stats.ready > 0 ? stats.gemsWaiting.toLocaleString() : '0',
       tone: stats.ready > 0 ? c.positive : undefined,
       mark: stats.ready > 0 ? <Gem color={gold} size={8} /> : undefined,
-      a11y:
+      accessibilityLabel:
         stats.ready > 0
           ? `${stats.ready} sets ready to claim, worth ${stats.gemsWaiting} gems`
           : 'No sets ready to claim',
     },
   ];
 
-  return (
-    <View style={[styles.strip, { borderColor: c.borderStrong }]}>
-      {cells.map((cell, i) => (
-        <View
-          key={cell.key}
-          accessible
-          accessibilityRole="text"
-          accessibilityLabel={cell.a11y}
-          style={[
-            styles.cell,
-            i > 0 && { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: c.border },
-          ]}>
-          <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
-            {cell.label}
-          </Text>
-          <View style={styles.figureRow}>
-            {cell.mark}
-            <Text numberOfLines={1} style={[Type.figure, NUMERIC, { color: cell.tone ?? c.text }]}>
-              {cell.value}
-            </Text>
-          </View>
-        </View>
-      ))}
-    </View>
-  );
+  return <SummaryStrip cells={cells} />;
 }
 
 /**
@@ -359,17 +348,6 @@ const styles = StyleSheet.create({
   /* The inventory's strip, verbatim in construction: 1.5pt of borderStrong
      outside, hairline dividers within, no fill. Two summaries in one section
      that framed themselves differently is what this is written to prevent. */
-  strip: { flexDirection: 'row', borderWidth: 1.5, borderRadius: Radius.panel, overflow: 'hidden' },
-  cell: {
-    flex: 1,
-    minWidth: 0,
-    alignItems: 'center',
-    gap: 1,
-    paddingHorizontal: Spacing.one,
-    paddingVertical: Spacing.one + 2,
-  },
-  figureRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
-
   section: { gap: Spacing.two },
   sectionHead: { gap: 1 },
   rows: { borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.panel, overflow: 'hidden' },

@@ -42,6 +42,7 @@ import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { careerColumnsFor } from './profile';
 import { weekLabel, type GameLogGame, type GameLogSection } from './game-log';
+import { horizontalStrip } from '@/components/ui/scroll-strip';
 
 const DASH = '—';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -203,7 +204,7 @@ function SeasonSection({
 
       {open ? (
         <View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <ScrollView horizontal {...horizontalStrip} showsHorizontalScrollIndicator={false}>
             <View>
               <View style={[styles.row, styles.headRow, { borderColor: c.border }]}>
                 {startedWeeks ? (

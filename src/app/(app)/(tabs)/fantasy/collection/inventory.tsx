@@ -290,6 +290,25 @@ export default function InventoryScreen() {
                 the chips are the side that gives: a round button cannot be
                 narrowed, where chips you can push are merely narrower. Same
                 reasoning, same numbers, as the trend board. */}
+            {/* WHAT YOU OWN, ABOVE WHAT NARROWS IT. The summary is a statement
+                about the whole collection and the row below it is the set of
+                controls that cut the collection down, so it reads in that
+                order: here is everything, now here is how to sieve it. It sat
+                under the controls, inside the list, for as long as it was one
+                more thing scrolling past the top of the grid.
+
+                IT IS PINNED NOW, and that is the cost of the move rather than a
+                bonus. Anything above the toolbar is outside the FlatList, so
+                these ~50pt are spent on every screen of scrolling instead of
+                being reclaimed after the first. It is affordable because the
+                strip is ONE ROW at any cell count — see `CollectionSummary`,
+                where equal columns are what guarantee it cannot grow a second —
+                so the pinned block has a fixed height that no collection can
+                change. If it ever gains a line, it goes back in the list. */}
+            <View style={styles.summary}>
+              <CollectionSummary stats={stats} />
+            </View>
+
             <View style={styles.toolbar}>
               <View style={styles.chips}>
                 <PositionFilter value={position} onChange={setPosition} />
@@ -346,13 +365,22 @@ export default function InventoryScreen() {
               keyboardDismissMode="on-drag"
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
               ListHeaderComponent={
-                /* What is LEFT here is the two things that are not controls:
-                   what you own, and what the controls did to it. Everything
-                   that could be pressed moved either onto the row above or into
+                /* One line, and it is the only thing here that belongs to the
+                   RESULT rather than to the collection: what the controls above
+                   did to the pool. The summary went up with them — it describes
+                   what you own, which does not change when a chip is pressed.
+
+                   Everything pressable moved either onto the row above or into
                    the sheet behind it, which is what stopped this header
-                   changing height as facets were opened and closed. */
+                   changing height as facets were opened and closed.
+
+                   THE WRAPPER STAYS EVEN WHEN THE LINE DOES NOT. `ResultLine`
+                   renders nothing while no filter is narrowing anything — the
+                   count it printed then is the summary's CARDS cell — and the
+                   8pt below is the gap between the controls and the first row
+                   of cards. Dropping the wrapper with the line would close that
+                   gap and reopen it the moment a chip was pressed. */
                 <View style={styles.header}>
-                  <CollectionSummary stats={stats} />
                   <ResultLine
                     shown={visible.length}
                     total={all.length}
@@ -401,7 +429,11 @@ const styles = StyleSheet.create({
   searchRow: { paddingHorizontal: GUTTER, paddingBottom: Spacing.two },
   list: { paddingHorizontal: GUTTER, paddingBottom: Spacing.six, gap: GAP },
   row: { gap: GAP },
-  header: { gap: Spacing.two, paddingBottom: Spacing.two },
+  /* The gutter the list's own content padding used to give it, now that it
+     sits outside the list. Same GUTTER as the toolbar below, so the strip's
+     frame and the chips line up on one left edge. */
+  summary: { paddingHorizontal: GUTTER, paddingBottom: Spacing.two },
+  header: { paddingBottom: Spacing.two },
   emptyContent: { padding: GUTTER, paddingBottom: Spacing.six },
   centred: {
     flex: 1,

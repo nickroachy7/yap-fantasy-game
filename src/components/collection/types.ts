@@ -261,6 +261,13 @@ export type CollectionStats = {
   uncertain: number;
   /** What the whole collection would fetch if every copy were sold. */
   sellValue: number;
+  /**
+   * Copies held at each tier. EVERY tier is a key, zeros included — the summary
+   * draws a cell per tier and a collection that has not pulled a diamond yet
+   * must still have a diamond cell to put a nought in, or the strip changes
+   * shape the day it does.
+   */
+  byTier: Record<CardTier, number>;
 };
 
 /**
@@ -278,11 +285,15 @@ export function summarise(cards: CollectionCard[]): CollectionStats {
   let unavailable = 0;
   let uncertain = 0;
   let sellValue = 0;
+  /* Seeded from `TierOrder` rather than filled as tiers are met, so every tier
+     has a key whether or not the collection contains one. See the field. */
+  const byTier = Object.fromEntries(TierOrder.map((t) => [t, 0])) as Record<CardTier, number>;
 
   for (const c of cards) {
     players.add(c.cardId ?? c.playerName);
     if (c.team) teams.add(c.team);
     sellValue += c.sellValue;
+    if (c.tier) byTier[c.tier] += 1;
     const weight = injuryWeight(c.injuryStatus);
     if (weight === 'blocking') unavailable += 1;
     else if (weight === 'advisory') uncertain += 1;
@@ -296,5 +307,6 @@ export function summarise(cards: CollectionCard[]): CollectionStats {
     unavailable,
     uncertain,
     sellValue,
+    byTier,
   };
 }

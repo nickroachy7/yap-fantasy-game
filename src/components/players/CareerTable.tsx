@@ -30,6 +30,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Colors, Spacing, TierColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { careerColumnsFor, type CareerSeason } from './profile';
+import { horizontalStrip } from '@/components/ui/scroll-strip';
 
 const NUMERIC = { fontVariant: ['tabular-nums' as const] };
 
@@ -113,7 +114,7 @@ export function CareerTable({
     <View style={styles.wrap}>
       {/* Horizontally scrollable so a wide stat set never squeezes the season
           column into unreadability on a phone. */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <ScrollView horizontal {...horizontalStrip} showsHorizontalScrollIndicator={false}>
         <View>
           <View style={[styles.row, styles.headRow, { borderColor: c.backgroundElement }]}>
             <Text style={[styles.season, styles.head, { color: c.textSecondary }]}>SEASON</Text>

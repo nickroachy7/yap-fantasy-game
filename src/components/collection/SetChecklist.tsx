@@ -55,7 +55,15 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { PlayerCard } from '@/components/cards';
 import { Gem } from '@/components/shell/AppHeader';
 import { Chip, ChipRow } from '@/components/ui/Chip';
-import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
+import {
+  Colors,
+  NUMERIC,
+  Radius,
+  selectionAccent,
+  Spacing,
+  TierColors,
+  Type,
+} from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   actionableOf,
@@ -116,6 +124,7 @@ export function SetChecklist({
   submitting,
   onClaim,
   onToggle,
+  onQuickAdd,
   onAutofill,
   onClear,
   onSubmit,
@@ -131,6 +140,13 @@ export function SetChecklist({
   submitting: boolean;
   onClaim: () => void;
   onToggle: (member: SetMember) => void;
+  /**
+   * Commit ONE card now, behind its own confirmation — the plus badge on a
+   * card you hold. It is a shortcut past the batch rather than a second way of
+   * doing it: the route sends it to the same dialog and the same RPC the
+   * submit bar uses, so nothing here has two destructive paths to keep in step.
+   */
+  onQuickAdd: (member: SetMember) => void;
   onAutofill: () => void;
   onClear: () => void;
   onSubmit: () => void;
@@ -454,6 +470,7 @@ export function SetChecklist({
                       member={m}
                       width={cardWidth}
                       picked={chosen.has(m.card_id)}
+                      onQuickAdd={() => onQuickAdd(m)}
                       // A card you cannot tick, and the two reasons are
                       // different: the set is full, or the selection already
                       // fills it. Either way the tick would be a refusal in
@@ -600,44 +617,139 @@ function Rung({
  *             drawing a gold frame for a copy the set cannot take. "This one is
  *             in" is the only thing that frame should be saying.
  *
+ *             A TICKED one takes the selection accent, for the same reason: it
+ *             is about to be acted on, and that outranks what it is worth.
+ *
  *             Grey is a card you hold no copy of at all.
  *   figure    the player's SEASON points, not the card's career total: half
  *             this list is players you do not own, who have no career here to
  *             report. `statLabel` says FP so it cannot be misread as TFP.
- *   under it  the state, alone — which is the whole question this screen asks.
+ *   the badge the state — see `StateBadge`. It replaced a caption under the
+ *             frame, which is why nothing is drawn below the square now.
  *
  * The tier progress, the fixture and the injury designation are all left off.
  * Each is a fact about a copy in your hand and this screen is mostly about
  * cards that are not.
  *
- * THE CLUB IS OFF TOO, and it was the last thing to go. On a team set it is
- * the same three letters on all twenty-nine cards, which is a column of noise
- * saying what the set's own title says. On a position set it is real
- * information — but not information this screen is for: you are here to fill
- * slots, and no slot is filled or unfilled because of who the player plays
- * for. The Players boards are one tab away for that.
+ * THE CLUB IS BACK, and not by this screen's choice — `PlayerCard` draws it in
+ * the corner opposite the position for every caller. It was argued off the
+ * checklist once, on the grounds that a team set repeats the same three letters
+ * on all twenty-nine cards and says what the set's own title already says, and
+ * that is still true of a team set. It is wrong about a position set, where the
+ * club is the fact that tells two receivers apart, and it is not worth a prop
+ * on the card to make one screen's team sets a little quieter.
  *
- * MIS-TAPS COST NOTHING. Tapping TICKS the card; the batch is edited first and
- * only the submit bar leads anywhere destructive, so the second tap undoes the
- * first. That is why the whole cell is the target here where the old row kept
- * its tap area off the name — there is no longer a second thing to hit.
+ * TWO TARGETS, AND THE CHEAP ONE IS THE BIG ONE. The cell TICKS the card: the
+ * batch is edited first and only the submit bar leads anywhere destructive, so
+ * a mis-tap costs a second tap to undo. The plus badge is the other, much
+ * smaller, and it opens the confirmation for that one card.
+ *
+ * A note here used to say there was only ever one target, and that the whole
+ * cell could be it because there was nothing else to hit. Adding the badge
+ * reverses that, and it is worth being deliberate about: the safe gesture keeps
+ * the whole square and the one that leads to a dialog is a 22pt disc you have
+ * to aim at. Wrong-footing the pair — a big quick-add and a small tick — would
+ * be a burn button covering a card.
  */
+/**
+ * The mark laid on a slot's card: what this slot IS, in one glyph.
+ *
+ * A DISC AT THE CENTRE OF THE SQUARE, not a word under the card. The four
+ * states used to be a caption below the frame — IN SET / ×3 ◆4 / ✓ SELECTED /
+ * MISSING — which put a line of text under every cell in a grid of thirty, made
+ * the cells a different height depending on which state they were in, and asked
+ * the reader to go and read a label to learn something a colour could have told
+ * them.
+ *
+ * IT IS A RING OVER A THIN SCRIM, NOT A COIN, and that is about a photograph
+ * that does not exist yet. There is no licensed player art today, so the disc
+ * sits on a grey silhouette and a solid fill costs nothing; the day an <Image>
+ * lands behind it, a solid 25pt disc dead centre is a sticker over the player's
+ * face. A translucent scrim with a coloured ring and a coloured glyph reads at
+ * the same distance and lets the face through — and the scrim is the SCHEME's
+ * own ground, black on dark and white on light, the same trick the card's own
+ * scrims use so the ring colours stay legible either way.
+ *
+ * Each state has a shape AND a colour, never colour alone:
+ *
+ *   addable    a `+`, ringed in the page's own ink. It is a BUTTON.
+ *   picked     a `✓` on a FILLED accent disc — the one state left deliberately
+ *              solid, because it is the only one with an action pending and
+ *              there are never many at once.
+ *   committed  a `✓` ringed in the positive tone, and the frame is green too.
+ *   missing    nothing at all; the card is grey and faded, which is what an
+ *              empty slot in a sticker album looks like.
+ *
+ * Picked and committed are both ticks, so they lean on more than hue to
+ * separate: one is filled and one is a ring, which survives a reader who cannot
+ * tell gold from green.
+ */
+function StateBadge({
+  glyph,
+  ink,
+  filled,
+  scrim,
+  size,
+}: {
+  glyph: string;
+  /** The ring and the glyph. A filled badge uses it as the fill instead. */
+  ink: string;
+  /** Solid disc rather than a ring — the pending state only. */
+  filled?: boolean;
+  /** The scheme's own ground at low alpha, for the unfilled states. */
+  scrim: string;
+  /** Diameter. The cell scales it so the mark reads the same at any column. */
+  size: number;
+}) {
+  return (
+    <View
+      style={[
+        styles.badge,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: filled ? ink : scrim,
+          /* 1.5, the card frame's own weight at compact: a hairline ring
+             disappears against a busy photograph, which is the case this whole
+             treatment is built for. */
+          borderWidth: filled ? 0 : 1.5,
+          borderColor: ink,
+        },
+      ]}>
+      <Text
+        style={[
+          styles.badgeGlyph,
+          {
+            color: filled ? '#000000' : ink,
+            fontSize: Math.round(size * 0.5),
+            lineHeight: Math.round(size * 0.7),
+          },
+        ]}>
+        {glyph}
+      </Text>
+    </View>
+  );
+}
+
 function MemberCard({
   member,
   width,
   picked,
   locked,
   onToggle,
+  onQuickAdd,
 }: {
   member: SetMember;
   width: number;
   picked: boolean;
   locked: boolean;
   onToggle: () => void;
+  onQuickAdd: () => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const gold = TierColors[scheme].gold.accent;
+  const accent = selectionAccent(scheme);
 
   const addable = isAddable(member);
   const fp = member.season_fp === null ? null : Number(member.season_fp);
@@ -647,6 +759,52 @@ function MemberCard({
     : addable
       ? `${member.held} held${picked ? ', selected' : ''}`
       : 'Missing';
+
+  /* Scaled off the column, so the mark is the same fraction of a card at three
+     across on a phone and seven on a wide window. Floored at 20, because below
+     that a glyph inside a ring stops being either; capped at a QUARTER of the
+     card, because the badge centres on the square now and anything taller
+     reaches the name under it. */
+  const badgeSize = Math.min(Math.round(width * 0.25), Math.max(20, Math.round(width * 0.22)));
+
+  /* The scheme's own ground, at the alpha the card's own scrims settle on. It
+     is what the ring sits on so the glyph never has to fight the picture. */
+  const scrim = scheme === 'dark' ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.6)';
+
+  /* THREE WEIGHTS, AND THE ORDER IS BY HOW MUCH IS STILL UP TO YOU.
+   *
+   *   picked     the loudest — the one filled disc. It is the only state with
+   *              an action pending, and the submit bar is about to act on it.
+   *   addable    a ring. An affordance, not a claim.
+   *   committed  the quietest, though it is the most permanent: a positive
+   *              ring, and the frame is already green. A solid green coin on
+   *              every filled slot made a set that was going well look like a
+   *              screen full of alerts.
+   */
+  const badge = member.committed ? (
+    <StateBadge glyph="✓" ink={c.positive} scrim={scrim} size={badgeSize} />
+  ) : !addable ? null : picked ? (
+    <StateBadge glyph="✓" ink={accent} filled scrim={scrim} size={badgeSize} />
+  ) : (
+    /* THE ONLY THING ON THIS SCREEN THAT COMMITS ONE CARD. Everything else
+       batches: the cell ticks, Autofill ticks many, and the bar at the bottom
+       submits them behind a single confirmation. The plus is the shortcut for
+       the case that does not want a batch — one card, one dialog, done — and it
+       reaches the same confirmation and the same RPC, so there is exactly one
+       destructive path in the feature and one place that describes it. */
+    <Pressable
+      onPress={onQuickAdd}
+      disabled={locked}
+      accessibilityRole="button"
+      accessibilityLabel={
+        `Add ${member.player_name} to this set now. Burns your ` +
+        `${member.commit_tier ?? 'lowest'} copy for ${member.commit_value} gems.`
+      }
+      hitSlop={8}
+      style={({ pressed }) => [pressed && styles.pressed]}>
+      <StateBadge glyph="+" ink={c.text} scrim={scrim} size={badgeSize} />
+    </Pressable>
+  );
 
   const card = (
     <PlayerCard
@@ -660,7 +818,7 @@ function MemberCard({
           : `${member.player_name}, ${member.position_abbreviation ?? 'no position'}, ` +
             `${member.team_abbreviation ?? 'no club'}. ${state}.`
       }
-      frameColor={member.committed ? c.positive : undefined}
+      frameColor={member.committed ? c.positive : picked ? accent : undefined}
       model={{
         playerName: member.player_name,
         positionAbbreviation: member.position_abbreviation,
@@ -673,42 +831,12 @@ function MemberCard({
         statLabel: 'FP',
         nextTierAt: null,
       }}
-      footer={
-        <>
-          {member.committed ? (
-            <Text numberOfLines={1} style={[Type.label, { color: c.positive }]}>
-              IN SET
-            </Text>
-          ) : addable ? (
-            <View style={styles.gemRow}>
-              {picked ? (
-                <Text numberOfLines={1} style={[Type.label, { color: gold }]}>
-                  {'✓ SELECTED'}
-                </Text>
-              ) : (
-                <>
-                  {/* Duplicates, and only above one: "×1" is noise, "×2" is
-                      what says you can spare this one without giving anything
-                      up. */}
-                  {member.held > 1 ? (
-                    <Text style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
-                      {`×${member.held}`}
-                    </Text>
-                  ) : null}
-                  <Gem color={c.textTertiary} size={8} />
-                  <Text style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
-                    {member.commit_value}
-                  </Text>
-                </>
-              )}
-            </View>
-          ) : (
-            <Text numberOfLines={1} style={[Type.label, { color: c.textTertiary }]}>
-              MISSING
-            </Text>
-          )}
-        </>
-      }
+      overlay={badge}
+      /* NOTHING UNDER THE FRAME. The state is the badge and the frame now, so
+         a cell is a square and nothing else — the same shape the inventory's
+         cells took when their own two lines moved onto the card. Passing null
+         rather than leaving it off is what takes the default block out. */
+      footer={null}
     />
   );
 
@@ -730,10 +858,6 @@ function MemberCard({
       style={({ pressed }) => [
         styles.cell,
         { width },
-        /* The TINT is the selected state, not a ring: a ring around a card
-           that already has a coloured frame is two borders arguing, and the
-           tier frame is the one carrying information. */
-        picked && { backgroundColor: c.backgroundElement },
         locked && styles.disabled,
         pressed && !locked && styles.pressed,
       ]}>
@@ -743,6 +867,11 @@ function MemberCard({
 }
 
 const styles = StyleSheet.create({
+  badge: { alignItems: 'center', justifyContent: 'center' },
+  /* The glyphs are text characters rather than drawn shapes — a plus and a
+     tick are two of the few marks a font renders better than four Views can,
+     and this file already set `✓` as type when the state was a caption. */
+  badgeGlyph: { fontWeight: '800', textAlign: 'center' },
   hero: { gap: Spacing.two },
   progressRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
   rule: { flex: 1, minWidth: 0 },

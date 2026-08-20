@@ -44,7 +44,10 @@
  *     no longer see the finished half of is a worse checklist.
  *
  * The list itself is `SetsList`, which takes rows and draws them. This half is
- * the network, the wallet and the two notices.
+ * the network, the wallet, the two notices — and the summary strip, which is
+ * pinned here above the scroll rather than drawn by the list. That is what puts
+ * it at the same height as the inventory's, which is pinned above ITS list for
+ * the same reason; see the note at the render.
  */
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -63,8 +66,8 @@ import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
-import { SetsList } from './SetsList';
-import type { CardSet } from './sets';
+import { SetsList, SetsStrip } from './SetsList';
+import { summariseSets, type CardSet } from './sets';
 import { useSets } from './use-sets';
 
 export function SetsPanel({
@@ -147,10 +150,37 @@ export function SetsPanel({
   }
 
   return (
-    <ScrollView
-      style={styles.fill}
-      contentContainerStyle={[styles.content, { paddingBottom: tabInset + Spacing.four }]}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+    <View style={styles.fill}>
+      {/* PINNED, AND AT THE INVENTORY'S HEIGHT. The two tabs draw the same
+          `SummaryStrip` in the same place, and until this it was neither: the
+          strip lived inside the scroll — so it slid away, where the inventory's
+          does not — and it sat 24pt under the section nav against the
+          inventory's 8, because this panel wrapped everything in a 16pt
+          `padding` and the nav already leaves 8 of its own below it.
+
+          The gap is the nav's 8 now, on both, and the two strips line up when
+          you flip between the tabs rather than stepping down half a line.
+
+          Only when there ARE sets: the empty state below is a whole-page
+          message and a summary of nothing above it would be four noughts
+          explaining themselves. */}
+      {all.length > 0 ? (
+        <View style={styles.strip}>
+          <SetsStrip stats={summariseSets(all)} />
+        </View>
+      ) : null}
+
+      <ScrollView
+        style={styles.fill}
+        contentContainerStyle={[
+          styles.content,
+          /* The strip owns the gap under the nav now, so the scroll starts
+             flush — except with no strip above it, where this is the only thing
+             holding the empty state off the nav. */
+          all.length === 0 && styles.contentTop,
+          { paddingBottom: tabInset + Spacing.four },
+        ]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
       {all.length === 0 ? (
         /* No sets AT ALL is a season with no card pool behind it — a fresh
            database, or a season whose cards have not synced. That is not the
@@ -193,15 +223,21 @@ export function SetsPanel({
             Packs are still drawn from the whole season pool, so which sets you can fill is a matter
             of what you happen to pull.
           </Text>
-        </>
-      )}
-    </ScrollView>
+          </>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  content: { padding: Spacing.three, gap: Spacing.three },
+  /* The inventory's `summary` wrapper, to the point: one gutter, and the 8pt
+     gap to whatever comes next. Two screens with the same strip at different
+     heights is what this replaced. */
+  strip: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
+  content: { paddingHorizontal: Spacing.three, gap: Spacing.three },
+  contentTop: { paddingTop: Spacing.three },
   centred: {
     flex: 1,
     alignItems: 'center',

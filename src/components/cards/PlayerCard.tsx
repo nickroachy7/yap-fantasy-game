@@ -381,6 +381,39 @@ export type PlayerCardProps = {
    */
   footer?: ReactNode;
   /**
+   * A mark laid over the card, low in the PICTURE and just clear of the plate.
+   *
+   * NOT THE CENTRE OF THE SQUARE, and that was asked for and measured before it
+   * was refused. On a compact card the nameplate is 52pt of 102 — 51% — since
+   * the stat block grew its labels, so the square's centre at y=51 sits one
+   * point BELOW the plate's top edge at y=50 and five points into the name. A
+   * badge big enough to read there covers the player's name on every cell in
+   * the grid. There is no size that fixes it: the mark would have to be 6pt
+   * across to clear the text, at which point it is not a mark.
+   *
+   * So it goes as low in the picture as it can, which lands about 40% down the
+   * card — well below the quarter-way point it sat at when it centred in the
+   * art, and the closest to the middle it can get with the name intact.
+   *
+   * LOW IS ALSO THE RIGHT PLACE FOR THE OTHER REASON. There is no licensed
+   * player art yet, but a headshot crop puts the FACE in the upper middle —
+   * exactly where a centred badge would land. Down here it sits over the chest
+   * and shoulders, where the silhouette already runs under the plate.
+   *
+   * It is a slot on the card rather than something a caller absolutely
+   * positions over the cell, because the cell is not the card — `wrap` may
+   * carry a footer under it, and then the cell's geometry is not the square's.
+   *
+   * The set checklist is the caller: a slot's state — missing, addable, in the
+   * set — is a fact about the CARD rather than about the player on it, so it is
+   * drawn on top rather than beside.
+   *
+   * `pointerEvents` is left alone deliberately. An overlay that is only a mark
+   * should pass taps through to whatever wraps the card; one that is a button
+   * handles its own, and both work because the slot does not impose either.
+   */
+  overlay?: ReactNode;
+  /**
    * Overrides the frame colour, for a screen whose frame means something other
    * than tier.
    *
@@ -502,6 +535,7 @@ export function PlayerCard({
   style,
   fixedWidth = true,
   footer,
+  overlay,
   frameColor,
   accessibilityLabel: label,
 }: PlayerCardProps) {
@@ -922,6 +956,29 @@ export function PlayerCard({
             ))}
           </View>
         </View>
+        {/* ---- the overlay: a mark on the card -------------------------- *
+          * Bounded by the ART and pushed to the bottom of it — see the prop for  *
+          * why not the square's centre. Last in the card so it sits above the    *
+          * scrims and the two corner labels: a mark that says what this slot IS  *
+          * outranks the facts about who is on it.                                 *
+          * ================================================================ */}
+        {overlay ? (
+          <View
+            /* Bounded by the NAME's top, not the plate's. The plate's upper
+               band is scrim over the same picture — the text does not start
+               until `dims.padding` into it — so stopping at `plateH` gave away
+               5pt for nothing and left the mark 10% of a card higher than it
+               needed to be. Measured: 30.9% down the card against 40.7 here.
+               The 2 is the only real clearance, and it is the gap between the
+               disc and the first letter of the name. */
+            style={[
+              styles.overlay,
+              { bottom: plateH - dims.padding, paddingBottom: 2 },
+            ]}
+            pointerEvents="box-none">
+            {overlay}
+          </View>
+        ) : null}
       </View>
 
       {/* ---- under the frame: nothing, unless a caller asks -------------- *
@@ -983,6 +1040,17 @@ const styles = StyleSheet.create({
   /* `pointerEvents` in the STYLE, not as a prop — the prop is deprecated in
      0.86 and warns once per mount, which is once per cell in a grid. */
   scrim: { position: 'absolute', left: 0, right: 0, pointerEvents: 'none' },
+  /* The art, as a box that centres horizontally and sits its child at the
+     BOTTOM — `bottom` and the padding are set inline from the plate's measured
+     height, so the mark tracks the plate at every size instead of guessing. */
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
   /* The top strip. A row pinned across the card between its insets, so the
      position and the fixture share one baseline and one line of height, and
      neither can be placed over the other. */

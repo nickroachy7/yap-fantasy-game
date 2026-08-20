@@ -20,6 +20,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { horizontalStrip } from '@/components/ui/scroll-strip';
 
 export function Chip({
   selected,
@@ -86,6 +87,7 @@ export function ChipRow({ children }: { children: React.ReactNode }) {
   return (
     <ScrollView
       horizontal
+      {...horizontalStrip}
       showsHorizontalScrollIndicator={false}
       // A tap on a facet with the search field focused must apply the facet,
       // not just dismiss the keyboard and be swallowed.
