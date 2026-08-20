@@ -2,9 +2,9 @@
  * The empty state, in the shape the spec calls for everywhere: a bold line
  * saying what is not here, a quieter line saying why, and at most one action.
  *
- * Shared because it was already written four times — PlayersPanel, the player
- * detail screen, the inventory and the sets panel each had their own, with four
- * different type scales and three different paddings. An empty state is the
+ * Shared because it was already written four times — the old combined player
+ * directory, the player detail screen, the inventory and the sets panel each had
+ * their own, with four different type scales and three different paddings. An empty state is the
  * screen a new user sees most often, so it is exactly the wrong thing to let
  * drift.
  *

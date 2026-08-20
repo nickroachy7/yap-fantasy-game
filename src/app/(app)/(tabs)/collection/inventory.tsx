@@ -7,8 +7,7 @@
  * The screen is three bands: a search field that never scrolls away, a facet
  * block that does, and the grid. The split is not cosmetic — a TextInput used
  * as a ListHeaderComponent is remounted on every keystroke and loses focus
- * after one character (the same bug is documented in PlayersPanel), so the
- * field has to live outside the list. The facets have no such constraint and
+ * after one character, so the field has to live outside the list. The facets have no such constraint and
  * are worth ~120pt of screen once you have stopped using them.
  */
 import { useRouter } from 'expo-router';
@@ -380,7 +379,9 @@ export default function InventoryScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  /* Mirrors PlayersPanel's `controls`. See the note there. */
+  /* The same block as the Players boards' `controls`, down to the numbers: one
+     gutter, one gap between controls, one gap before the list. Two screens with
+     the same controls at different rhythms is what this was written to stop. */
   toolbar: { paddingHorizontal: GUTTER, paddingBottom: Spacing.two, gap: Spacing.two },
   list: { paddingHorizontal: GUTTER, paddingBottom: Spacing.six, gap: GAP },
   row: { gap: GAP },

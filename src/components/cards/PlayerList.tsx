@@ -8,10 +8,10 @@
  * the same row, the same fixed height, the same fixture lookup, the same
  * virtualisation settings, the same tab inset at the bottom.
  *
- * All three Players pages use this. `PlayersPanel` — the old combined
- * directory, with its search field, sort strip and position chips in one
- * scroll container — is no longer rendered by anything; see the note in
- * `search.tsx` for what replaced it and what had to be carried across.
+ * All three Players pages use this. It replaced a single combined directory
+ * that carried its search field, sort strip and position chips in one scroll
+ * container; see the note in `search.tsx` for why that split into three and
+ * what had to be carried across.
  *
  * FIXED ROW HEIGHT IS THE WHOLE POINT of `getItemLayout`, and it is the reason
  * a screen may not conditionally hide part of a row. See `PlayerRow`.
