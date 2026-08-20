@@ -37,6 +37,16 @@ export type CardIdentity = {
   /** Non-null once sold. The copy still resolves; it is just no longer held. */
   soldAt: string | null;
   soldFor: number | null;
+  /**
+   * Non-null once committed to a set. The OTHER way a copy leaves a
+   * collection, and the page has to tell them apart: a sold card was traded
+   * for its full price, a committed one was burnt into a checklist for a share
+   * of it and is sitting in a set the player can still open.
+   */
+  committedAt: string | null;
+  committedFor: number | null;
+  committedSetCode: string | null;
+  committedSetName: string | null;
   /** Gems this copy sells for, priced by the server from its tier. */
   sellValue: number;
   tierFloorFp: number | null;
@@ -141,6 +151,10 @@ export function parseCardProfile(payload: Json): CardProfile | null {
       source: str(c.source),
       soldAt: str(c.sold_at),
       soldFor: num(c.sold_for),
+      committedAt: str(c.committed_at),
+      committedFor: num(c.committed_for),
+      committedSetCode: str(c.committed_set_code),
+      committedSetName: str(c.committed_set_name),
       sellValue: numOr(c.sell_value, 0),
       tierFloorFp: num(c.tier_floor_fp),
       nextTierAt: num(c.next_tier_at),

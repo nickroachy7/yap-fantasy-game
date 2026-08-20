@@ -11,6 +11,8 @@
  * claiming a bye nobody checked for.
  */
 import type { PlayerCardModel } from '@/components/cards';
+import type { SetMember } from '@/components/collection/SetChecklist';
+import type { CardSet } from '@/components/collection/sets';
 import type { CollectionCard } from '@/components/collection/types';
 
 /**
@@ -116,3 +118,248 @@ export const OWNED_MANY: CollectionCard[] = Array.from({ length: 14 }, (_, i) =>
   return { ...base, id: `many-${i}`, cardId: `many-card-${i}` };
 });
 
+
+/**
+ * Set progress, covering every state a row can be in — which is the whole point
+ * of having it here. A real account reaches at most one or two of these at a
+ * time, and never the interesting ones early, so a reviewer with a live session
+ * sees a page of grey bars and none of the states that carry the design: ready
+ * to claim, already claimed, part-filled with cards in hand, and untouched at
+ * zero with nothing to add.
+ *
+ * TWO OF THEM ARE HERE TO CATCH ARITHMETIC RATHER THAN LAYOUT. The kickers hold
+ * two candidates for a set that is already full, and the receivers hold five
+ * for a set with two slots left; both must report what can actually be done
+ * (0 and 2), because the server refuses a commit past the bar and a row that
+ * promised more would be promising an error.
+ *
+ * EVERY LADDER STATE IS SOMEWHERE IN HERE: a rung collected, a rung reached and
+ * waiting, a rung ahead, and a set with all four behind it. The team sets carry
+ * their whole roster as the requirement, which is what makes their bars sit at
+ * a quarter or less — the case a bar measured only against completion would be
+ * useless for, and the reason the rung marks exist.
+ *
+ * The numbers mirror the real 2026 build — a team's whole roster, six cards for
+ * a position, the 100/500/1500/5000 and 25/40/60/100 ladders, 50% of sell value
+ * on a commit — so the layout is exercised at the widths those figures actually
+ * produce. Fixtures may restate the server's numbers; product code reads
+ * `my_sets`.
+ */
+export const SETS_FIXTURE: CardSet[] = [
+  {
+    // Every rung reached, none collected: the claim button at its loudest.
+    id: 'set-1',
+    code: 'position-qb-2026',
+    name: 'Quarterbacks',
+    family: 'position',
+    subtitle: null,
+    season: 2026,
+    required: 6,
+    totalCards: 120,
+    committed: 6,
+    ready: 0,
+    commitPayoutPct: 50,
+    complete: true,
+    milestones: [
+      { pct: 25, cards: 2, gems: 25, reached: true, claimed: false, paid: null },
+      { pct: 50, cards: 3, gems: 40, reached: true, claimed: false, paid: null },
+      { pct: 75, cards: 5, gems: 60, reached: true, claimed: false, paid: null },
+      { pct: 100, cards: 6, gems: 100, reached: true, claimed: false, paid: null },
+    ],
+    totalReward: 225,
+    claimableGems: 225,
+    claimedGems: 0,
+    nextAt: null,
+    nextReward: null,
+    sortOrder: 1,
+  },
+  {
+    // Finished and fully collected, still holding two candidates. Nothing is
+    // actionable here and the row must say so — the server refuses a commit
+    // past the bar, so an offer of two more would be an offer of an error.
+    id: 'set-2',
+    code: 'position-pk-2026',
+    name: 'Kickers',
+    family: 'position',
+    subtitle: null,
+    season: 2026,
+    required: 6,
+    totalCards: 41,
+    committed: 6,
+    ready: 2,
+    commitPayoutPct: 50,
+    complete: true,
+    milestones: [
+      { pct: 25, cards: 2, gems: 25, reached: true, claimed: true, paid: 25 },
+      { pct: 50, cards: 3, gems: 40, reached: true, claimed: true, paid: 40 },
+      { pct: 75, cards: 5, gems: 60, reached: true, claimed: true, paid: 60 },
+      { pct: 100, cards: 6, gems: 100, reached: true, claimed: true, paid: 100 },
+    ],
+    totalReward: 225,
+    claimableGems: 0,
+    claimedGems: 225,
+    nextAt: null,
+    nextReward: null,
+    sortOrder: 5,
+  },
+  {
+    // Mid-ladder with rungs both behind and ahead, and more candidates held
+    // than slots left: the row must promise 2, not 5.
+    id: 'set-3',
+    code: 'position-wr-2026',
+    name: 'Wide Receivers',
+    family: 'position',
+    subtitle: null,
+    season: 2026,
+    required: 6,
+    totalCards: 398,
+    committed: 4,
+    ready: 5,
+    commitPayoutPct: 50,
+    complete: false,
+    milestones: [
+      { pct: 25, cards: 2, gems: 25, reached: true, claimed: true, paid: 25 },
+      { pct: 50, cards: 3, gems: 40, reached: true, claimed: true, paid: 40 },
+      { pct: 75, cards: 5, gems: 60, reached: false, claimed: false, paid: null },
+      { pct: 100, cards: 6, gems: 100, reached: false, claimed: false, paid: null },
+    ],
+    totalReward: 225,
+    claimableGems: 0,
+    claimedGems: 65,
+    nextAt: 5,
+    nextReward: 60,
+    sortOrder: 3,
+  },
+  {
+    id: 'set-4',
+    code: 'position-te-2026',
+    name: 'Tight Ends',
+    family: 'position',
+    subtitle: null,
+    season: 2026,
+    required: 6,
+    totalCards: 208,
+    committed: 2,
+    ready: 0,
+    commitPayoutPct: 50,
+    complete: false,
+    milestones: [
+      { pct: 25, cards: 2, gems: 25, reached: true, claimed: true, paid: 25 },
+      { pct: 50, cards: 3, gems: 40, reached: false, claimed: false, paid: null },
+      { pct: 75, cards: 5, gems: 60, reached: false, claimed: false, paid: null },
+      { pct: 100, cards: 6, gems: 100, reached: false, claimed: false, paid: null },
+    ],
+    totalReward: 225,
+    claimableGems: 0,
+    claimedGems: 25,
+    nextAt: 3,
+    nextReward: 40,
+    sortOrder: 4,
+  },
+  {
+    // A team set as they actually look for most of a season: a fraction of
+    // the roster in, the first rung collected, the second a long way off.
+    id: 'set-5',
+    code: 'team-nyg-2026',
+    name: 'New York Giants',
+    family: 'team',
+    subtitle: 'NFC East',
+    season: 2026,
+    required: 32,
+    totalCards: 32,
+    committed: 9,
+    ready: 1,
+    commitPayoutPct: 50,
+    complete: false,
+    milestones: [
+      { pct: 25, cards: 8, gems: 100, reached: true, claimed: true, paid: 100 },
+      { pct: 50, cards: 16, gems: 500, reached: false, claimed: false, paid: null },
+      { pct: 75, cards: 24, gems: 1500, reached: false, claimed: false, paid: null },
+      { pct: 100, cards: 32, gems: 5000, reached: false, claimed: false, paid: null },
+    ],
+    totalReward: 7100,
+    claimableGems: 0,
+    claimedGems: 100,
+    nextAt: 16,
+    nextReward: 500,
+    sortOrder: 21,
+  },
+  {
+    // A long club name, to prove the row ellipsises rather than shoving the
+    // right-hand column off its edge. One rung reached and uncollected, so
+    // the checklist gallery opens on a live claim AND live add buttons.
+    id: 'set-6',
+    code: 'team-jax-2026',
+    name: 'Jacksonville Jaguars',
+    family: 'team',
+    subtitle: 'AFC South',
+    season: 2026,
+    required: 29,
+    totalCards: 29,
+    committed: 8,
+    ready: 2,
+    commitPayoutPct: 50,
+    complete: false,
+    milestones: [
+      { pct: 25, cards: 8, gems: 100, reached: true, claimed: false, paid: null },
+      { pct: 50, cards: 15, gems: 500, reached: false, claimed: false, paid: null },
+      { pct: 75, cards: 22, gems: 1500, reached: false, claimed: false, paid: null },
+      { pct: 100, cards: 29, gems: 5000, reached: false, claimed: false, paid: null },
+    ],
+    totalReward: 7100,
+    claimableGems: 100,
+    claimedGems: 0,
+    nextAt: 15,
+    nextReward: 500,
+    sortOrder: 9,
+  },
+  {
+    // Zero with nothing to add: the state 31 of 32 team sets sit in early on.
+    id: 'set-7',
+    code: 'team-lac-2026',
+    name: 'Los Angeles Chargers',
+    family: 'team',
+    subtitle: 'AFC West',
+    season: 2026,
+    required: 27,
+    totalCards: 27,
+    committed: 0,
+    ready: 0,
+    commitPayoutPct: 50,
+    complete: false,
+    milestones: [
+      { pct: 25, cards: 7, gems: 100, reached: false, claimed: false, paid: null },
+      { pct: 50, cards: 14, gems: 500, reached: false, claimed: false, paid: null },
+      { pct: 75, cards: 21, gems: 1500, reached: false, claimed: false, paid: null },
+      { pct: 100, cards: 27, gems: 5000, reached: false, claimed: false, paid: null },
+    ],
+    totalReward: 7100,
+    claimableGems: 0,
+    claimedGems: 0,
+    nextAt: 7,
+    nextReward: 100,
+    sortOrder: 13,
+  },
+];
+
+/**
+ * One set's membership, for the checklist gallery. Deliberately awkward: a
+ * duplicate held three times (which must move the bar by ONE), a name long
+ * enough to ellipsise, a player with no production yet (no FP suffix, not a
+ * printed zero), and more missing than held so both halves of the filter have
+ * something in them.
+ */
+export const SET_MEMBERS_FIXTURE: SetMember[] = [
+  { card_id: 'm1', player_id: 'p1', player_name: 'Brian Thomas Jr.',        position_abbreviation: 'WR', team_abbreviation: 'JAX', season_fp: 241.8, committed: true,  held: 0, commit_value: 0,  commit_tier: null },
+  { card_id: 'm2', player_id: 'p2', player_name: 'Travis Etienne',          position_abbreviation: 'RB', team_abbreviation: 'JAX', season_fp: 188.4, committed: true,  held: 0, commit_value: 0,  commit_tier: null },
+  { card_id: 'm3', player_id: 'p3', player_name: 'Trevor Lawrence',         position_abbreviation: 'QB', team_abbreviation: 'JAX', season_fp: 174.2, committed: true,  held: 1, commit_value: 4,  commit_tier: 'bronze' },
+  // Three copies held: the row must offer ONE add and say ×3 beside it.
+  { card_id: 'm4', player_id: 'p4', player_name: 'Christian Kirk-Williams', position_abbreviation: 'WR', team_abbreviation: 'JAX', season_fp: 96.1,  committed: false, held: 3, commit_value: 4,  commit_tier: 'bronze' },
+  // A gold copy, so the dialog's "burns your gold copy" line is exercised and
+  // the payout is visibly bigger than a bronze one.
+  { card_id: 'm5', player_id: 'p5', player_name: 'Evan Engram',             position_abbreviation: 'TE', team_abbreviation: 'JAX', season_fp: 88.7,  committed: false, held: 1, commit_value: 75, commit_tier: 'gold' },
+  { card_id: 'm6', player_id: 'p6', player_name: 'Cam Little',              position_abbreviation: 'PK', team_abbreviation: 'JAX', season_fp: 61.0,  committed: false, held: 1, commit_value: 4,  commit_tier: 'bronze' },
+  { card_id: 'm7', player_id: 'p7', player_name: 'Parker Washington',       position_abbreviation: 'WR', team_abbreviation: 'JAX', season_fp: 24.3,  committed: false, held: 0, commit_value: 0,  commit_tier: null },
+  // No production yet: no FP suffix, rather than a printed zero.
+  { card_id: 'm8', player_id: 'p8', player_name: 'Seth Williams',           position_abbreviation: 'WR', team_abbreviation: 'JAX', season_fp: null,  committed: false, held: 0, commit_value: 0,  commit_tier: null },
+];

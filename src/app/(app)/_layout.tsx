@@ -95,6 +95,10 @@ export default function AppLayout() {
             questions — see the note on sheetOptions. */}
         <Stack.Screen name="player/[id]" options={sheetOptions} />
         <Stack.Screen name="card/[id]" options={sheetOptions} />
+        {/* A set's checklist. Same presentation as the two profiles, because
+            it is the same kind of object: something you open off a row, read,
+            and put down again. */}
+        <Stack.Screen name="set/[code]" options={sheetOptions} />
         {/* Search is a TAKEOVER, not a sheet: it covers the header and the tab
             bar as well as the page, which is the whole point of it and the
             reason it cannot live under `(tabs)`. `fullScreenModal` is the one

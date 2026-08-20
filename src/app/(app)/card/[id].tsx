@@ -30,6 +30,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 
 import { TierBadge } from '@/components/cards/TierBadge';
 import { invalidateCollection } from '@/components/collection/use-collection';
+import { invalidateSets } from '@/components/collection/use-sets';
 import { CardStanding } from '@/components/players/CardStanding';
 import { CommunityPanel } from '@/components/players/CommunityPanel';
 import { GameLogTab } from '@/components/players/GameLogTab';
@@ -138,6 +139,9 @@ export default function CardDetailScreen() {
       // This copy is gone from the collection, which the inventory holds for
       // the session — drop it or the grid still shows the card you just sold.
       invalidateCollection();
+      // And it may have been the card holding a set over its bar, which the
+      // Sets page holds for the session too. See `invalidateSets`.
+      invalidateSets();
       await refreshWallet();
       setSelling(false);
       dismiss();
@@ -220,6 +224,31 @@ export default function CardDetailScreen() {
                   {`You sold this copy on ${dateLabel(k.soldAt)}${k.soldFor === null ? '' : ` for ${k.soldFor} gems`}. It still counts in the lineups it started, but you no longer hold it.`}
                 </Text>
               </View>
+            ) : k.committedAt ? (
+              /* The other way a copy leaves, and it must not read as a sale.
+                 This one went somewhere: the set is named, and it is still
+                 there to look at. */
+              <View style={[styles.note, { backgroundColor: c.backgroundElement }]}>
+                <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
+                  {`You added this copy to ${k.committedSetName ?? 'a set'} on ${dateLabel(k.committedAt)}${k.committedFor === null ? '' : ` for ${k.committedFor} gems`}. It is part of that set now — it still counts in the lineups it started, but it cannot be started or sold again.`}
+                </Text>
+                {k.committedSetCode ? (
+                  <Pressable
+                    onPress={() =>
+                      router.replace({
+                        pathname: '/set/[code]',
+                        params: { code: k.committedSetCode as string },
+                      })
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open ${k.committedSetName ?? 'the set'}`}
+                    style={({ pressed }) => [pressed && styles.pressed]}>
+                    <Text style={[Type.strong, { color: c.textSecondary }]}>
+                      {`See ${k.committedSetName ?? 'the set'} →`}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
             ) : null}
 
             <Text style={[Type.fine, { color: c.textTertiary }]}>
@@ -229,7 +258,10 @@ export default function CardDetailScreen() {
             <CardStanding card={k} rank={card.rank} />
             <StartLog starts={card.starts} playerName={k.playerName} />
 
-            {k.soldAt ? null : (
+            {/* Neither exit leaves anything to sell. Both are checked, not
+                just the sale: a committed copy with a live SELL button is a
+                button whose only outcome is a Postgres error. */}
+            {k.soldAt || k.committedAt ? null : (
               <Pressable
                 onPress={() => {
                   setSellError(null);
@@ -338,7 +370,9 @@ const styles = StyleSheet.create({
   },
   centreText: { textAlign: 'center' },
   tabBar: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 2 },
-  note: { borderRadius: Radius.panel, padding: Spacing.two + 4 },
+  /* `gap` for the committed banner's link, which sits under its sentence. The
+     sold banner has no second child and is unaffected. */
+  note: { borderRadius: Radius.panel, padding: Spacing.two + 4, gap: Spacing.two },
   sell: {
     flexDirection: 'row',
     alignItems: 'center',

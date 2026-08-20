@@ -1,186 +1,227 @@
 /**
- * The Sets segment.
+ * Collection · Sets — the named groups, what you have of each, and the reward.
  *
- * Sets are deferred to Week 3 and the reward mechanic is genuinely undecided,
- * so this screen is a designed "not yet" rather than a preview. Three rules
- * govern what is allowed on it:
+ * WHAT THIS SCREEN USED TO BE
  *
- *  1. No invented set names, gem values, rewards or completion rules. The
- *     decision has not been made; printing one here would teach players a
- *     mechanic we might not ship, and they would build a collection around it.
- *  2. No progress bars and no placeholder set cards. Both imply data exists.
- *     There is no set table in the schema — for anyone.
- *  3. It must read as deliberate. The dashed frame, the "not built yet"
- *     eyebrow and the plainly-stated open decision are what separate "we have
- *     not done this yet" from "this screen is broken".
+ * A designed "not yet": a dashed panel stating that no set table existed, that
+ * the completion reward was undecided, and listing three candidate mechanics
+ * without picking one. That was the right screen to have while the decision was
+ * open. It is the wrong screen now, and none of its content survives except the
+ * discipline behind it — every number below comes off `my_sets`, and nothing
+ * here states a rule the server does not enforce.
  *
- * The status list below is the densest honest thing this screen can show: three
- * facts that are already true and already stated in prose here. It is NOT a
- * progress table — every value is an absence, and none of them will ever tick
- * up on their own.
+ * THE DECISION IT WAS HOLDING OPEN, RESOLVED TWICE OVER. Completion pays GEMS,
+ * once, on an explicit claim — of the three candidates that was the only one
+ * that changes nothing about what a card is. And a card has to be COMMITTED to
+ * a set, which burns it: the set takes the card out of the collection for good
+ * and pays back a share of its sell value on the way.
  *
- * The only decoration is <TierMotif>, which is abstract geometry that already
- * exists in the card art slot — it cannot be mistaken for set data.
+ * The burn is what makes this a tab rather than a read-out. Progress used to
+ * accumulate on its own while you were somewhere else; it is now something you
+ * spend duplicates on, against the cost of never starting them again.
+ *
+ * A set is completed by committing a THRESHOLD of its cards, not all of them —
+ * six, whatever the group's size. The old screen said "all of them"; the pack
+ * maths says a named five-card set costs ~44,000 gems against a season's income
+ * of ~6,000, which is not a hard set but an impossible one. The arithmetic is
+ * in the migration header. What matters here is that the screen never implies
+ * otherwise: every row reads "4/6", and the set's full size is named beside it
+ * so the six cannot be mistaken for the whole group.
+ *
+ * FOUR THINGS THIS SCREEN REFUSES TO DO:
+ *
+ *  1. Compute completion itself. `complete` comes off the view and the claim
+ *     button follows it. A client that decides for itself when a set is done
+ *     will eventually disagree with the server, and the disagreement is a
+ *     player pressing Claim and reading a raw Postgres error.
+ *  2. Claim on your behalf. The gems land on an explicit press, so the reward
+ *     is something you collect rather than something that happened while you
+ *     were on another tab.
+ *  3. Burn anything from here. Adding a card destroys it, so the act belongs on
+ *     the checklist behind a `destructive` confirmation naming the copy — never
+ *     one tap from a list of 37 rows.
+ *  4. Hide a claimed set. It stays, marked, in its family: a checklist you can
+ *     no longer see the finished half of is a worse checklist.
+ *
+ * The list itself is `SetsList`, which takes rows and draws them. This half is
+ * the network, the wallet and the two notices.
  */
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
-import { TierMotif } from '@/components/cards';
-import { Colors, Spacing, Type } from '@/constants/theme';
+import { useTabBarInset } from '@/components/shell/useResponsive';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Colors, Radius, Spacing, Type } from '@/constants/theme';
+import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { supabase } from '@/lib/supabase';
+import { SetsList } from './SetsList';
+import type { CardSet } from './sets';
+import { useSets } from './use-sets';
 
-/**
- * The open product question, stated as the open question it is. These are
- * candidates under discussion, deliberately listed without mechanics, numbers
- * or rewards attached — naming the decision is honest, resolving it here would
- * not be.
- */
-const CANDIDATES = ['Gated lineup slots', 'Points-scaled payouts', 'Duplicate fuel'];
-
-/** Every value is a nothing. That is the entire content of this screen. */
-const STATUS: { label: string; value: string }[] = [
-  { label: 'SET DEFINITIONS', value: 'None — no set table in the schema' },
-  { label: 'COMPLETION REWARD', value: 'Undecided' },
-  { label: 'YOUR PROGRESS', value: 'Not being tracked' },
-  { label: 'PLANNED', value: 'Week 3' },
-];
-
-export function SetsPanel({ onBackToInventory }: { onBackToInventory: () => void }) {
+export function SetsPanel({
+  onOpenSet,
+  onBackToInventory,
+}: {
+  onOpenSet: (code: string) => void;
+  onBackToInventory: () => void;
+}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  const tabInset = useTabBarInset();
+  // Single source of truth for the balance: the header reads the same value, so
+  // a claim has to refresh THAT rather than keep a second copy here.
+  const { refresh: refreshPlayer } = usePlayer();
+  const { sets, error, loading, refreshing, refresh, reload } = useSets();
+
+  /** The code being claimed, so only the pressed row shows a spinner. */
+  const [claiming, setClaiming] = useState<string | null>(null);
+  /** The last claim's failure. Shared with nothing — it is about one press. */
+  const [claimError, setClaimError] = useState<string | null>(null);
+  /** The last claim that worked, kept until the next press. */
+  const [claimed, setClaimed] = useState<{ name: string; gems: number } | null>(null);
+
+  const all = useMemo(() => sets ?? [], [sets]);
+
+  const claim = useCallback(
+    async (set: CardSet) => {
+      setClaiming(set.code);
+      setClaimError(null);
+      setClaimed(null);
+      // The completion check, the payout and the ledger row all happen inside
+      // this one call, server-side. Nothing is credited here.
+      const { error: err } = await supabase.rpc('claim_set_reward', { p_set_code: set.code });
+      if (err) {
+        setClaimError(err.message);
+      } else {
+        setClaimed({ name: set.name, gems: set.claimableGems });
+        // Both matter: the list has to redraw the row as claimed, and the
+        // header has to show the gems that just landed.
+        await Promise.all([reload(), refreshPlayer()]);
+      }
+      setClaiming(null);
+    },
+    [reload, refreshPlayer],
+  );
+
+  const onRefresh = useCallback(async () => {
+    await Promise.all([refresh(), refreshPlayer()]);
+  }, [refresh, refreshPlayer]);
+
+  if (loading) {
+    return (
+      <View style={styles.centred}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
+  /* Only when there is nothing to draw. A failed REFRESH over a list that is
+     already on screen must not replace it with an error page — the rows are
+     still the last true answer. */
+  if (error && sets === null) {
+    return (
+      <View style={styles.centred}>
+        <Text style={[Type.section, { color: c.text }]}>Could not load your sets</Text>
+        <Text style={[Type.body, styles.centredText, { color: c.textSecondary }]}>{error}</Text>
+        <Pressable
+          onPress={() => void onRefresh()}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.retry,
+            { backgroundColor: c.backgroundElement },
+            pressed && styles.pressed,
+          ]}>
+          <Text style={[Type.strong, { color: c.text }]}>Try again</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
-    <ScrollView style={styles.fill} contentContainerStyle={styles.content}>
-      <View style={[styles.panel, { borderColor: c.borderStrong }]}>
-        <View style={styles.headRow}>
-          <View style={styles.headText}>
-            <Text style={[Type.micro, { color: c.textTertiary }]}>NOT BUILT YET</Text>
-            {/* Not "Sets" — the page heading above already says that. */}
-            <Text style={[Type.figure, { color: c.text }]}>Nothing to collect here yet</Text>
-          </View>
-          {/* Abstract geometry, not a placeholder for a set. */}
-          <View
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            style={[styles.mark, { borderColor: c.borderStrong }]}>
-            <TierMotif motif="stripes" color={c.borderStrong} />
-          </View>
-        </View>
-
-        <Text style={[Type.bodyRelaxed, { color: c.text }]}>
-          A set will be a named group of cards you complete by owning all of them. That much is
-          settled. What completing one actually gives you is not.
-        </Text>
-
-        <View style={[styles.status, { borderColor: c.border }]}>
-          {STATUS.map((row, i) => (
-            <View
-              key={row.label}
-              style={[
-                styles.statusRow,
-                { borderColor: c.border },
-                i > 0 && styles.statusRowDivided,
-              ]}>
-              <Text style={[Type.micro, styles.statusLabel, { color: c.textTertiary }]}>
-                {row.label}
-              </Text>
-              <Text style={[Type.body, styles.statusValue, { color: c.textSecondary }]}>
-                {row.value}
+    <ScrollView
+      style={styles.fill}
+      contentContainerStyle={[styles.content, { paddingBottom: tabInset + Spacing.four }]}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+      {all.length === 0 ? (
+        /* No sets AT ALL is a season with no card pool behind it — a fresh
+           database, or a season whose cards have not synced. That is not the
+           same thing as owning none of them, and it does not offer the Shop,
+           because buying a pack would not produce a set to collect. */
+        <EmptyState
+          title="No sets this season"
+          body="Sets are built from the season's card pool, and there is no pool here yet."
+          actionLabel="Back to Inventory"
+          onAction={onBackToInventory}
+        />
+      ) : (
+        <>
+          {claimed ? (
+            <View style={[styles.notice, { borderColor: c.positive, backgroundColor: c.surface }]}>
+              <Text style={[Type.micro, { color: c.positive }]}>CLAIMED</Text>
+              <Text style={[Type.body, { color: c.text }]}>
+                {`${claimed.name} — ${claimed.gems.toLocaleString()} gems added to your balance.`}
               </Text>
             </View>
-          ))}
-        </View>
+          ) : null}
 
-        <Text style={[Type.micro, styles.gutterTop, { color: c.textTertiary }]}>
-          THE OPEN DECISION
-        </Text>
-        <View style={styles.list}>
-          {CANDIDATES.map((option) => (
-            <View key={option} style={styles.listItem}>
-              <Text style={[Type.label, styles.marker, { color: c.textTertiary }]}>?</Text>
-              <Text style={[Type.strong, styles.listText, { color: c.text }]}>{option}</Text>
+          {claimError ? (
+            <View style={[styles.notice, { borderColor: c.negative, backgroundColor: c.surface }]}>
+              <Text style={[Type.micro, { color: c.negative }]}>THAT DID NOT WORK</Text>
+              <Text style={[Type.body, { color: c.text }]}>{claimError}</Text>
             </View>
-          ))}
-        </View>
-        <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
-          Three candidates. None of them is chosen, and they pull collecting in very different
-          directions — so committing to one in the UI before we commit to it in the game would be a
-          promise we might have to take back.
-        </Text>
+          ) : null}
 
-        <Text style={[Type.bodyRelaxed, styles.gutterTop, { color: c.textSecondary }]}>
-          That is why this tab is empty rather than half-built. Nothing is locked away behind it —
-          not for you, not for anyone.
-        </Text>
-      </View>
+          <SetsList
+            sets={all}
+            claimingCode={claiming}
+            onOpenSet={onOpenSet}
+            onClaim={(set) => void claim(set)}
+          />
 
-      <Pressable
-        onPress={onBackToInventory}
-        accessibilityRole="button"
-        accessibilityLabel="Back to Inventory"
-        style={({ pressed }) => [
-          styles.action,
-          { backgroundColor: c.backgroundElement },
-          pressed && styles.pressed,
-        ]}>
-        <Text style={[Type.strong, { color: c.text }]}>Back to Inventory</Text>
-      </Pressable>
+          <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
+            Open a set to add cards to it. A card you add is burnt — it leaves your collection for
+            good and cannot be started again — and pays back part of what it would have sold for.
+            Packs are still drawn from the whole season pool, so which sets you can fill is a matter
+            of what you happen to pull.
+          </Text>
+        </>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  content: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.six },
-  panel: {
-    // Dashed, because the frame itself should read as provisional.
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderRadius: 14,
-    padding: Spacing.four,
-    gap: Spacing.two + 2,
-  },
-  headRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: Spacing.three,
-  },
-  headText: { gap: Spacing.half, flexShrink: 1 },
-  mark: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    overflow: 'hidden',
-  },
-  status: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 8,
-    marginTop: Spacing.one,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
+  content: { padding: Spacing.three, gap: Spacing.three },
+  centred: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: Spacing.two,
-    paddingHorizontal: Spacing.two + 2,
-    paddingVertical: Spacing.two - 1,
+    padding: Spacing.four,
   },
-  statusRowDivided: { borderTopWidth: StyleSheet.hairlineWidth },
-  // Fixed so the four values start on one line and the list reads as a column
-  // of answers rather than four sentences.
-  statusLabel: { width: 128 },
-  statusValue: { flexShrink: 1 },
-  gutterTop: { paddingTop: Spacing.two },
-  list: { gap: Spacing.one + 1 },
-  listItem: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two },
-  marker: { width: 10, textAlign: 'center' },
-  listText: { flexShrink: 1 },
-  action: {
-    alignSelf: 'flex-start',
-    borderRadius: 8,
+  centredText: { textAlign: 'center' },
+  retry: {
+    borderRadius: Radius.chip,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
   },
+  notice: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.chip,
+    padding: Spacing.two + 2,
+    gap: Spacing.half,
+  },
   pressed: { opacity: 0.75 },
+  // Sentences, not a grid: hold them to a readable line at any measure.
+  measure: { maxWidth: 560 },
 });

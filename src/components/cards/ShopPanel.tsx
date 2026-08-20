@@ -19,6 +19,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { invalidateCollection } from '@/components/collection/use-collection';
+import { invalidateSets } from '@/components/collection/use-sets';
 import { Gem } from '@/components/shell/AppHeader';
 import { useTabBarInset } from '@/components/shell/useResponsive';
 import {
@@ -163,6 +164,8 @@ export function ShopPanel() {
         // inventory holds it for the session — so the held copy is wrong until
         // it is dropped. See `invalidateCollection`.
         invalidateCollection();
+        // Five new cards can move six sets, so the held progress is wrong too.
+        invalidateSets();
         // Both matter: `load` re-reads the openings so a one-per-player pack
         // flips to Claimed, `refresh` re-reads the balance the header shows.
         await Promise.all([reloadShelf(), refresh()]);

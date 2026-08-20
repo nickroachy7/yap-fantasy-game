@@ -42,7 +42,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const [profile, balance, cards] = await Promise.all([
         supabase.from('profiles').select('display_name').single(),
         supabase.from('gem_balances').select('balance').single(),
-        supabase.from('card_instances').select('id', { count: 'exact', head: true }),
+        /* `is_held`, not every row this user has ever had. A sold copy is still
+           their row and a committed one is too, so an unfiltered count made the
+           header's card total drift upward every time somebody cleared a
+           duplicate — and committing a card to a set would have made it drift
+           faster. The generated column is the same predicate `my_collection`
+           filters on, so the two cannot disagree. */
+        supabase
+          .from('card_instances')
+          .select('id', { count: 'exact', head: true })
+          .eq('is_held', true),
       ]);
       if (!live()) return;
       const failure = profile.error ?? balance.error ?? cards.error;

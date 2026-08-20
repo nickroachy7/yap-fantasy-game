@@ -32,7 +32,10 @@ import {
   MCCAFFREY_PROFILE,
   USAGE_SAMPLE,
 } from '@/components/dev/profile-fixture';
-import { OWNED_MANY } from '@/components/dev/fixtures';
+import { OWNED_MANY, SETS_FIXTURE, SET_MEMBERS_FIXTURE } from '@/components/dev/fixtures';
+import { SetChecklist } from '@/components/collection/SetChecklist';
+import { SetsList } from '@/components/collection/SetsList';
+import { autofillSelection, remainingOf } from '@/components/collection/sets';
 import { PlayerHero } from '@/components/players/PlayerHero';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { CardStanding } from '@/components/players/CardStanding';
@@ -106,9 +109,11 @@ const GALLERY_STARTERS_BY_TEAM = new Map([
   ['SF', 1],
 ]);
 
-type View_ = 'inventory' | 'leaderboard' | 'lineup' | 'profile';
+type View_ = 'inventory' | 'sets' | 'checklist' | 'leaderboard' | 'lineup' | 'profile';
 const VIEWS: Segment<View_>[] = [
   { value: 'inventory', label: 'Inventory' },
+  { value: 'sets', label: 'Sets' },
+  { value: 'checklist', label: 'Set' },
   { value: 'leaderboard', label: 'Board' },
   { value: 'lineup', label: 'Lineup' },
   { value: 'profile', label: 'Profile' },
@@ -117,12 +122,16 @@ const VIEWS: Segment<View_>[] = [
 /** Each view previews the measure its real screen asks for, not a single one. */
 const VIEW_MEASURE: Record<View_, Measure> = {
   inventory: 'grid',
+  sets: 'table',
+  checklist: 'form',
   leaderboard: 'table',
   lineup: 'form',
   profile: 'table',
 };
 const VIEW_TITLE: Record<View_, string> = {
   inventory: 'Inventory',
+  sets: 'Sets',
+  checklist: 'Jacksonville Jaguars',
   leaderboard: 'Leaderboard',
   lineup: 'Lineup',
   profile: 'Christian McCaffrey',
@@ -131,6 +140,8 @@ const VIEW_TITLE: Record<View_, string> = {
 /** Drives the rail's active/nested state, which is otherwise unreachable here. */
 const VIEW_PATH: Record<View_, string> = {
   inventory: '/collection/inventory',
+  sets: '/collection/sets',
+  checklist: '/collection/sets',
   leaderboard: '/leaderboard',
   lineup: '/lineup',
   profile: '/players',
@@ -149,6 +160,71 @@ const MIN_CARD_WIDTH = 100;
  * than the product renders. A gallery that lies about the layout is worse than
  * no gallery, so it measures.
  */
+/**
+ * Every state a set row can be in, at once — see `SETS_FIXTURE`. The claim
+ * button is live but inert: this gallery has no session and no wallet, so the
+ * press is here to prove the control is reachable and correctly sized, not to
+ * pay anything.
+ */
+function SetsFixture() {
+  const [claiming, setClaiming] = useState<string | null>(null);
+
+  return (
+    <View style={styles.profile}>
+      <SetsList
+        sets={SETS_FIXTURE}
+        claimingCode={claiming}
+        onOpenSet={() => undefined}
+        onClaim={(set) => setClaiming((held) => (held === set.code ? null : set.code))}
+      />
+    </View>
+  );
+}
+
+/**
+ * The checklist sheet's CONTENT, drawn on the page rather than in the sheet.
+ * The frame itself is already exercised by the profile view above; what needs
+ * looking at here is the hero, the ladder, and the three states a member row
+ * can be in — in the set, tickable, missing.
+ *
+ * The SELECTION IS REAL here, which is the point: autofill seeds it from the
+ * same rules the product uses and every row toggles, so the editing flow can be
+ * driven without a session. Only the submission is inert.
+ */
+function ChecklistFixture() {
+  const [claiming, setClaiming] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const set = SETS_FIXTURE.find((s) => s.code === 'team-jax-2026') ?? null;
+
+  return (
+    <View style={styles.profile}>
+      <SetChecklist
+        set={set}
+        members={SET_MEMBERS_FIXTURE}
+        claiming={claiming}
+        claimError={null}
+        selected={selected}
+        submitting={false}
+        onClaim={() => setClaiming((v) => !v)}
+        onToggle={(m) =>
+          setSelected((held) =>
+            held.includes(m.card_id)
+              ? held.filter((id) => id !== m.card_id)
+              : [...held, m.card_id],
+          )
+        }
+        onAutofill={() =>
+          setSelected(autofillSelection(SET_MEMBERS_FIXTURE, set ? remainingOf(set) : 0))
+        }
+        onClear={() => setSelected([])}
+        // Inert: there is no session behind this page, and the confirmation it
+        // would raise belongs to the route.
+        onSubmit={() => undefined}
+      />
+    </View>
+  );
+}
+
 function InventoryFixture() {
   const [w, setW] = useState(0);
   /* No gutter subtraction here, unlike inventory.tsx. This sits inside
@@ -422,6 +498,8 @@ function GalleryBody() {
           <SegmentedControl segments={VIEWS} value={view} onChange={setView} />
 
           {view === 'inventory' ? <InventoryFixture /> : null}
+          {view === 'sets' ? <SetsFixture /> : null}
+          {view === 'checklist' ? <ChecklistFixture /> : null}
           {view === 'leaderboard' ? <LeaderboardFixture /> : null}
           {view === 'lineup' ? <LineupFixture /> : null}
           {view === 'profile' ? <ProfileFixture /> : null}
