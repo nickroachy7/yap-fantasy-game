@@ -28,10 +28,26 @@
  * requirement is its whole roster — thirty-odd cards, a multi-season chase — so
  * without the ladder the only visible reward would be one nobody ever reaches.
  * The rungs are what make constant progress worth something.
+ *
+ * A DAILY IS THE OTHER SHAPE, and it exists so the standing sets do not have to
+ * be both things at once. Three cards of one position, one rung, paid on the
+ * third, gone at midnight. It is the faucet; the team sets are the chase. The
+ * family that used to try to be both — six cards out of a pool of hundreds — is
+ * retired, and the note on `SetFamily` says why.
  */
 import type { Database } from '@/lib/database.types';
 
-export type SetFamily = 'team' | 'position';
+/**
+ * `position` is RETIRED and kept only so an old row still normalises.
+ *
+ * It asked for six cards out of a pool of hundreds, which is a quota rather
+ * than a checklist, and five of them paying at every quarter turned this tab
+ * into a trickle. The migration deactivates every one of them, so nothing the
+ * server sends will carry it — but a client that could not name it would
+ * silently relabel any that survived as a team set, which is worse than a
+ * dead branch. The DAILY family took over the job it was doing badly.
+ */
+export type SetFamily = 'team' | 'position' | 'daily';
 
 /** One rung. `paid` is null until it is claimed, and is what actually landed. */
 export type Milestone = {
@@ -78,7 +94,7 @@ export type CardSet = {
   code: string;
   name: string;
   family: SetFamily;
-  /** A division, for a team set. Null for the position sets. */
+  /** A division for a team set, the date for a daily. */
   subtitle: string | null;
   season: number | null;
   /** Distinct members needed. The bar, not the size of the set. */
@@ -118,7 +134,8 @@ export type CardSet = {
  */
 export type SetStatus = 'claimed' | 'ready' | 'progress';
 
-const isFamily = (v: string | null): v is SetFamily => v === 'team' || v === 'position';
+const isFamily = (v: string | null): v is SetFamily =>
+  v === 'team' || v === 'position' || v === 'daily';
 
 const num = (v: number | null): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
@@ -254,12 +271,14 @@ export type SetSection = {
 };
 
 const FAMILY_TITLE: Record<SetFamily, string> = {
+  daily: 'Today',
   position: 'By position',
   team: 'By team',
 };
 
 const FAMILY_NOTE: Record<SetFamily, string> = {
-  position: 'Six of a position, paying at every quarter. The quickest to finish.',
+  daily: 'Three of one position, and it pays on the third. Gone at midnight.',
+  position: 'Retired. Nothing new is offered here.',
   team: "A club's whole roster. Pays at every quarter of the way.",
 };
 
@@ -296,7 +315,12 @@ export function groupSets(sets: CardSet[]): SetSection[] {
     });
   }
 
-  for (const family of ['position', 'team'] as const) {
+  /* DAILY FIRST, then the standing sets. It is the only section with a clock
+     on it — everything below is a chase you can come back to next month — so
+     burying it under thirty-two team rows would be hiding the one thing that
+     expires. Position sits between them only for the rows that predate its
+     retirement; the server sends none. */
+  for (const family of ['daily', 'position', 'team'] as const) {
     const rest = sets.filter((s) => s.family === family && statusOf(s) !== 'ready');
     if (rest.length === 0) continue;
 

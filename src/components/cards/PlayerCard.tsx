@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import {
@@ -154,6 +155,19 @@ void _tierParity;
  * one fact. The square is the app's own `backgroundElement`, as every other
  * panel is.
  *
+ * IT IS NOT ONLY THE COLLECTION'S CARD. The set checklist draws the same
+ * object for every card in a set, including the ones you do not own, and that
+ * is what the three widenings in the model are for: a null `tier` (no copy in
+ * hand, so the frame falls back to the app's border grey and the tier letter
+ * goes), a null `careerFp` (no career to report), and `statLabel`, because
+ * that screen puts the player's SEASON points on the face instead. The two
+ * lines under the frame are replaceable wholesale via `footer` — they are both
+ * facts about a copy you hold, and a checklist has different ones to tell.
+ *
+ * What is NOT parameterised is the layout: the corners, the plate, the scrims
+ * and the footer's reserved height are the card's own, so two screens drawing
+ * it cannot drift into two different objects.
+ *
  * This component is PURE — it never touches Supabase. Callers join
  * card_instances -> cards -> players -> teams (and tier_thresholds for
  * `nextTierAt`) and pass the flattened result in.
@@ -169,8 +183,29 @@ export type PlayerCardModel = {
    * is "nothing reported", which is the common case and draws nothing.
    */
   injuryStatus?: string | null;
-  tier: CardTier;
-  careerFp: number;
+  /**
+   * The tier of the copy in hand — NULL when there is no copy.
+   *
+   * Null is a real state rather than a missing value, and the set checklist is
+   * what it exists for: that screen draws every card in a set, including the
+   * ones you do not own. A null tier draws the frame in the app's own border
+   * grey and leaves the tier letter off the footer, which is what an empty
+   * slot in a sticker album looks like. Nothing else may pass it — a card in
+   * your collection always has a tier.
+   */
+  tier: CardTier | null;
+  /**
+   * The figure on the card's face. NULL prints an em dash.
+   *
+   * Named for the collection's use of it, which is career FP, but it is
+   * whatever `statLabel` says it is — the set checklist puts the player's
+   * season points here because a card you do not own has no career of its own.
+   * Null is "no scored games yet", which is not the same as zero and must not
+   * be drawn as one.
+   */
+  careerFp: number | null;
+  /** What the figure IS. Defaults to the collection's 'TFP'. */
+  statLabel?: string;
   nextTierAt: number | null; // null when already diamond
   /**
    * OPTIONAL. `min_career_fp` of the card's CURRENT tier. Retained because
@@ -201,12 +236,45 @@ export type PlayerCardProps = {
   style?: ViewStyle;
   /** Set false to let the card fill its container instead of a fixed width. */
   fixedWidth?: boolean;
+  /**
+   * Replaces the two lines UNDER the frame — tier progress and next fixture.
+   *
+   * Passing anything, `null` included, takes the default block out; leaving it
+   * off keeps it. The set checklist supplies its own, because the two facts
+   * the collection puts there are both about a copy you hold and it is drawing
+   * cards you may not.
+   *
+   * The card owns the block's centring and reserves ONE line for it, so a
+   * caller drawing one line per cell gets an even grid for free. Anything
+   * taller is the caller's to keep uniform.
+   */
+  footer?: ReactNode;
+  /**
+   * Overrides the frame colour, for a screen whose frame means something other
+   * than tier.
+   *
+   * The set checklist is the one caller: a slot already filled is drawn in the
+   * positive tone because "this one is in" is what its frame is saying, and it
+   * has no tier to say instead — `set_checklist` reports the tier of a SPARE
+   * copy you hold, which for a filled slot is a card the set cannot take.
+   * Pair it with a null `tier` so nothing else on the card claims otherwise.
+   */
+  frameColor?: string;
+  /**
+   * Overrides the label the card composes from its own model. Callers that
+   * wrap the card in a different meaning — a checklist row that burns it —
+   * should say what pressing it does, and there must only ever be one label
+   * on a cell.
+   */
+  accessibilityLabel?: string;
 };
 
-const fmt = (n: number) =>
-  Math.round(n)
-    .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+const fmt = (n: number | null) =>
+  n === null
+    ? '—'
+    : Math.round(n)
+        .toString()
+        .replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
 /**
  * A CSS gradient, addressed to whichever prop the platform calls it.
@@ -302,10 +370,16 @@ export function PlayerCard({
   onPress,
   style,
   fixedWidth = true,
+  footer,
+  frameColor,
+  accessibilityLabel: label,
 }: PlayerCardProps) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const t = useTierTheme(model.tier);
+  /* Resolved unconditionally because hooks must be, but only READ when there
+     is a tier — a null one is a card you do not hold and takes the app's own
+     border grey. */
+  const t = useTierTheme(model.tier ?? 'bronze');
   const dims = CardSizes[size];
   const compact = size === 'compact';
 
@@ -316,7 +390,10 @@ export function PlayerCard({
 
   const team = model.teamAbbreviation?.toUpperCase() ?? null;
   const weight = injuryWeight(model.injuryStatus);
-  const progress = tierProgressLabel(model, { short: compact });
+  const progress =
+    model.careerFp === null
+      ? null
+      : tierProgressLabel({ ...model, careerFp: model.careerFp }, { short: compact });
 
   /* THE CLUB IS PART OF THE FIXTURE, not a fact of its own — see the header.
      "CAR @ JAX" costs the same width the club alone used to take on the card
@@ -363,13 +440,18 @@ export function PlayerCard({
   const rgb = scheme === 'dark' ? '0, 0, 0' : '255, 255, 255';
 
   const a11yLabel =
-    `${model.playerName}, ${t.label} tier, ` +
-    `${model.positionAbbreviation ?? 'unknown position'}, ` +
-    `${model.teamAbbreviation ?? 'no team'}, ` +
-    `${fmt(model.careerFp)} career fantasy points` +
-    (model.injuryStatus ? `, designated ${model.injuryStatus}` : '') +
-    (progress === null ? ', top tier' : `, ${progress}`) +
-    (model.matchup ? `, ${model.matchup}` : '');
+    label ??
+    `${model.playerName}, ${model.tier ? `${t.label} tier, ` : 'not held, '}` +
+      `${model.positionAbbreviation ?? 'unknown position'}, ` +
+      `${model.teamAbbreviation ?? 'no team'}, ` +
+      `${fmt(model.careerFp)} ${model.statLabel ?? 'career fantasy points'}` +
+      (model.injuryStatus ? `, designated ${model.injuryStatus}` : '') +
+      (model.careerFp === null || model.tier === null
+        ? ''
+        : progress === null
+          ? ', top tier'
+          : `, ${progress}`) +
+      (model.matchup ? `, ${model.matchup}` : '');
 
 
   const body = (
@@ -397,7 +479,7 @@ export function PlayerCard({
                `accent`: the palette keeps a separate value for an edge, which
                is a touch deeper than the one meant for type. */
             borderWidth: dims.frame,
-            borderColor: t.colors.frame,
+            borderColor: frameColor ?? (model.tier ? t.colors.frame : c.border),
             backgroundColor: c.backgroundElement,
           },
         ]}>
@@ -477,7 +559,7 @@ export function PlayerCard({
               {fmt(model.careerFp)}
             </Text>
             <Text style={[styles.cornerLabel, { color: c.textTertiary, fontSize: dims.labelSize }]}>
-              {'  TFP'}
+              {`  ${model.statLabel ?? 'TFP'}`}
             </Text>
           </Text>
         </View>
@@ -498,28 +580,38 @@ export function PlayerCard({
         * sentence it begins, "B, 0/200 to Silver", which is exactly what the    *
         * lineup row's third line does with it.                                  *
         * ================================================================ */}
-      <View style={[styles.footer, { minHeight: footLine * 2 }]}>
-        <View style={styles.progress}>
-          <TierMark tier={model.tier} size={footSize} />
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.footerText,
-              { color: c.textSecondary, fontSize: footSize, lineHeight: footLine },
-            ]}>
-            {progress ?? 'Top tier'}
-          </Text>
-        </View>
-        {fixture ? (
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.footerText,
-              { color: c.textTertiary, fontSize: footSize, lineHeight: footLine },
-            ]}>
-            {fixture}
-          </Text>
-        ) : null}
+      {/* The default block is two lines and reserves both; a supplied one
+          reserves a single line and owns anything above it. A caller that
+          mixes one- and two-line footers across a grid will get a ragged
+          bottom edge, which is the caller's to keep straight. */}
+      <View style={[styles.footer, { minHeight: footer === undefined ? footLine * 2 : footLine }]}>
+        {footer === undefined ? (
+          <>
+            <View style={styles.progress}>
+              {model.tier ? <TierMark tier={model.tier} size={footSize} /> : null}
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.footerText,
+                  { color: c.textSecondary, fontSize: footSize, lineHeight: footLine },
+                ]}>
+                {progress ?? 'Top tier'}
+              </Text>
+            </View>
+            {fixture ? (
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.footerText,
+                  { color: c.textTertiary, fontSize: footSize, lineHeight: footLine },
+                ]}>
+                {fixture}
+              </Text>
+            ) : null}
+          </>
+        ) : (
+          footer
+        )}
       </View>
     </View>
   );

@@ -11,8 +11,9 @@
  * what makes a re-run safe once rarity is being set by something else.
  *
  * Once the templates are written it calls `rebuild_card_sets`, which folds any
- * new card into its team and position sets. That call is best-effort: see the
- * note at the call site for why its failure must not fail the sync.
+ * new card into its team set, and then `rebuild_daily_set`, which ensures the
+ * day's daily exists and retires yesterday's. Both calls are best-effort: see
+ * the notes at the call sites for why their failure must not fail the sync.
  *
  * Body: { season?: number }  (defaults to the current UTC year)
  */
@@ -153,10 +154,10 @@ Deno.serve(async (req) => {
 
     // ---- 4. fold the new templates into their sets -------------------------
     // Set membership is built from this pool, so a card created above belongs
-    // to a team set and a position set that do not yet know about it. The
-    // rebuild is idempotent and only ever ADDS members (see the function's own
-    // comment), so calling it on every run is the cheapest way to keep the two
-    // in step — there is no other trigger for it.
+    // to a team set that does not yet know about it. The rebuild is idempotent
+    // and only ever ADDS members (see the function's own comment), so calling
+    // it on every run is the cheapest way to keep the two in step — there is no
+    // other trigger for it.
     //
     // ITS FAILURE MUST NOT FAIL THE SYNC. Creating the templates is the job;
     // stale set membership is a page that undercounts by a card or two until
@@ -169,6 +170,27 @@ Deno.serve(async (req) => {
     if (rebuildError) console.error('rebuild_card_sets failed', rebuildError);
     else setsRebuilt = rebuild;
 
+    // TODAY'S DAILY, ensured on the same run and for the same reason: this is
+    // the only thing that wakes up nightly, and a daily set that does not exist
+    // is a Sets tab with an empty top section.
+    //
+    // ROLLED FORWARD RATHER THAN CAUGHT UP. Only today's is built — a run that
+    // was missed for three days does not backfill three dailies, because a
+    // daily nobody could clear on the day is not a reward, it is a claim
+    // waiting to be found. `rebuild_daily_set` retires anything older itself.
+    //
+    // The date is the server's, deliberately: the rotation is a pure function
+    // of it (`daily_set_position`), so the set a day produces has to be decided
+    // in one place and this is not that place.
+    let dailyBuilt: unknown = null;
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: daily, error: dailyError } = await supabase.rpc('rebuild_daily_set', {
+      p_season: season,
+      p_day: today,
+    });
+    if (dailyError) console.error('rebuild_daily_set failed', dailyError);
+    else dailyBuilt = daily;
+
     return json({
       ok: true,
       season,
@@ -177,6 +199,8 @@ Deno.serve(async (req) => {
       existing: existingRows.length,
       sets: setsRebuilt,
       sets_error: rebuildError ? String(rebuildError.message ?? rebuildError) : null,
+      daily: dailyBuilt,
+      daily_error: dailyError ? String(dailyError.message ?? dailyError) : null,
       ms: Date.now() - startedAt,
     });
   } catch (err) {

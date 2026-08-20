@@ -10,6 +10,7 @@
  * all, which draws nothing rather than claiming a bye nobody checked for.
  */
 import type { PlayerCardModel } from '@/components/cards';
+import type { CardTier } from '@/constants/theme';
 import type { SetMember } from '@/components/collection/SetChecklist';
 import type { CardSet } from '@/components/collection/sets';
 import type { CollectionCard } from '@/components/collection/types';
@@ -22,7 +23,15 @@ import type { CollectionCard } from '@/components/collection/types';
  * carry them, and the card profile draws them there. They live beside the model
  * rather than inside it so the gallery keeps exercising the real type.
  */
-type Sample = PlayerCardModel & { starts: number; perGame: number | null };
+type Sample = PlayerCardModel & {
+  /* NARROWED from the model, which allows nulls for the set checklist's sake —
+     a card you do not hold has no tier and no career. Every sample here is a
+     card in hand, and the `CollectionCard` rows built below require both. */
+  tier: CardTier;
+  careerFp: number;
+  starts: number;
+  perGame: number | null;
+};
 
 export const SAMPLE_CARDS: Sample[] = [
   {
@@ -155,122 +164,111 @@ export const OWNED_MANY: CollectionCard[] = Array.from({ length: 14 }, (_, i) =>
  * a quarter or less — the case a bar measured only against completion would be
  * useless for, and the reason the rung marks exist.
  *
- * The numbers mirror the real 2026 build — a team's whole roster, six cards for
- * a position, the 100/500/1500/5000 and 25/40/60/100 ladders, 50% of sell value
- * on a commit — so the layout is exercised at the widths those figures actually
- * produce. Fixtures may restate the server's numbers; product code reads
- * `my_sets`.
+ * The numbers mirror the real 2026 build — a team's whole roster on the
+ * 100/500/1500/5000 ladder, a daily's three cards on its single 40-gem rung,
+ * 50% of sell value on a commit — so the layout is exercised at the widths
+ * those figures actually produce. Fixtures may restate the server's numbers;
+ * product code reads `my_sets`.
+ *
+ * NO POSITION SETS. The family is retired (see `SetFamily`), so a gallery full
+ * of them would be reviewing a screen the server can no longer send. The four
+ * that were here are dailies now, carrying the same four states.
  */
 export const SETS_FIXTURE: CardSet[] = [
   {
-    // Every rung reached, none collected: the claim button at its loudest.
+    // TODAY'S DAILY, cleared and waiting: the claim button at its loudest, and
+    // the shape most players will meet most often.
     id: 'set-1',
-    code: 'position-qb-2026',
-    name: 'Quarterbacks',
-    family: 'position',
-    subtitle: null,
+    code: 'daily-qb-2026-08-21',
+    name: 'Quarterback of the day',
+    family: 'daily',
+    subtitle: 'Friday 21 August',
     season: 2026,
-    required: 6,
+    required: 3,
     totalCards: 120,
-    committed: 6,
+    committed: 3,
     ready: 0,
     commitPayoutPct: 50,
     complete: true,
-    milestones: [
-      { pct: 25, cards: 2, gems: 25, reached: true, claimed: false, paid: null },
-      { pct: 50, cards: 3, gems: 40, reached: true, claimed: false, paid: null },
-      { pct: 75, cards: 5, gems: 60, reached: true, claimed: false, paid: null },
-      { pct: 100, cards: 6, gems: 100, reached: true, claimed: false, paid: null },
-    ],
-    totalReward: 225,
-    claimableGems: 225,
+    // ONE RUNG. A daily pays on the third card and not before — the whole
+    // point of the family is that it does not trickle.
+    milestones: [{ pct: 100, cards: 3, gems: 40, reached: true, claimed: false, paid: null }],
+    totalReward: 40,
+    claimableGems: 40,
     claimedGems: 0,
     nextAt: null,
     nextReward: null,
-    sortOrder: 1,
+    sortOrder: 0,
   },
   {
-    // Finished and fully collected, still holding two candidates. Nothing is
-    // actionable here and the row must say so — the server refuses a commit
-    // past the bar, so an offer of two more would be an offer of an error.
+    // Yesterday's, cleared and collected, still holding two spares. Nothing is
+    // actionable and the row must say so — the server refuses a commit past
+    // the bar, so an offer of two more would be an offer of an error.
     id: 'set-2',
-    code: 'position-pk-2026',
-    name: 'Kickers',
-    family: 'position',
-    subtitle: null,
+    code: 'daily-pk-2026-08-20',
+    name: 'Kicker of the day',
+    family: 'daily',
+    subtitle: 'Thursday 20 August',
     season: 2026,
-    required: 6,
+    required: 3,
     totalCards: 41,
-    committed: 6,
+    committed: 3,
     ready: 2,
     commitPayoutPct: 50,
     complete: true,
-    milestones: [
-      { pct: 25, cards: 2, gems: 25, reached: true, claimed: true, paid: 25 },
-      { pct: 50, cards: 3, gems: 40, reached: true, claimed: true, paid: 40 },
-      { pct: 75, cards: 5, gems: 60, reached: true, claimed: true, paid: 60 },
-      { pct: 100, cards: 6, gems: 100, reached: true, claimed: true, paid: 100 },
-    ],
-    totalReward: 225,
+    milestones: [{ pct: 100, cards: 3, gems: 40, reached: true, claimed: true, paid: 40 }],
+    totalReward: 40,
     claimableGems: 0,
-    claimedGems: 225,
+    claimedGems: 40,
     nextAt: null,
     nextReward: null,
-    sortOrder: 5,
+    sortOrder: 0,
   },
   {
     // Mid-ladder with rungs both behind and ahead, and more candidates held
     // than slots left: the row must promise 2, not 5.
     id: 'set-3',
-    code: 'position-wr-2026',
-    name: 'Wide Receivers',
-    family: 'position',
-    subtitle: null,
+    code: 'daily-wr-2026-08-19',
+    name: 'Wide receiver of the day',
+    family: 'daily',
+    subtitle: 'Wednesday 19 August',
     season: 2026,
-    required: 6,
+    required: 3,
     totalCards: 398,
-    committed: 4,
+    committed: 1,
     ready: 5,
     commitPayoutPct: 50,
     complete: false,
-    milestones: [
-      { pct: 25, cards: 2, gems: 25, reached: true, claimed: true, paid: 25 },
-      { pct: 50, cards: 3, gems: 40, reached: true, claimed: true, paid: 40 },
-      { pct: 75, cards: 5, gems: 60, reached: false, claimed: false, paid: null },
-      { pct: 100, cards: 6, gems: 100, reached: false, claimed: false, paid: null },
-    ],
-    totalReward: 225,
+    milestones: [{ pct: 100, cards: 3, gems: 40, reached: false, claimed: false, paid: null }],
+    totalReward: 40,
     claimableGems: 0,
-    claimedGems: 65,
-    nextAt: 5,
-    nextReward: 60,
-    sortOrder: 3,
+    claimedGems: 0,
+    nextAt: 3,
+    nextReward: 40,
+    sortOrder: 0,
   },
   {
+    // Untouched and with nothing in hand to touch it with — the state a daily
+    // opens in every morning, and the one with no lever on it at all.
     id: 'set-4',
-    code: 'position-te-2026',
-    name: 'Tight Ends',
-    family: 'position',
-    subtitle: null,
+    code: 'daily-te-2026-08-18',
+    name: 'Tight end of the day',
+    family: 'daily',
+    subtitle: 'Tuesday 18 August',
     season: 2026,
-    required: 6,
+    required: 3,
     totalCards: 208,
-    committed: 2,
+    committed: 0,
     ready: 0,
     commitPayoutPct: 50,
     complete: false,
-    milestones: [
-      { pct: 25, cards: 2, gems: 25, reached: true, claimed: true, paid: 25 },
-      { pct: 50, cards: 3, gems: 40, reached: false, claimed: false, paid: null },
-      { pct: 75, cards: 5, gems: 60, reached: false, claimed: false, paid: null },
-      { pct: 100, cards: 6, gems: 100, reached: false, claimed: false, paid: null },
-    ],
-    totalReward: 225,
+    milestones: [{ pct: 100, cards: 3, gems: 40, reached: false, claimed: false, paid: null }],
+    totalReward: 40,
     claimableGems: 0,
-    claimedGems: 25,
+    claimedGems: 0,
     nextAt: 3,
     nextReward: 40,
-    sortOrder: 4,
+    sortOrder: 0,
   },
   {
     // A team set as they actually look for most of a season: a fraction of

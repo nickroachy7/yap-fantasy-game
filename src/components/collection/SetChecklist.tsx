@@ -30,13 +30,31 @@
  * of a position, it doubles as a scouting list. Hence the ordering, which comes
  * off the server: filled slots first, then the ones you can fill, then the best
  * of the rest.
+ *
+ * IT IS A GRID OF CARDS, NOT A LIST OF NAMES, and that is the point of a
+ * checklist: the thing you are collecting is a card, so the page that tracks
+ * them should be showing you cards. It was a table — a position badge, a name,
+ * a club and a value in four columns — which said the same words about a
+ * sticker album in the shape of a spreadsheet. Same `PlayerCard` the inventory
+ * draws, at the same compact size, so a card you own looks identical on both
+ * screens.
+ *
+ * THE CARDS SAY LESS HERE, deliberately. Three of the collection card's facts
+ * are about a copy in your hand and this screen draws cards you may not own:
+ * the tier progress, the week's fixture and the injury designation are all
+ * gone. What replaces them under the frame is the only question this screen
+ * asks — is it in, can I put it in, and what does that cost.
+ *
+ * A CARD YOU DO NOT OWN still draws, with a grey frame instead of a tier one
+ * and an em dash where the figure goes. That is the empty slot in the album,
+ * and it is most of what a position set contains.
  */
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { PlayerCard } from '@/components/cards';
 import { Gem } from '@/components/shell/AppHeader';
 import { Chip, ChipRow } from '@/components/ui/Chip';
-import { PositionBadge } from '@/components/ui/PositionBadge';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
@@ -72,11 +90,15 @@ export type SetMember = {
 type Filter = 'ALL' | 'IN_SET' | 'CAN_ADD' | 'MISSING';
 
 /**
- * Rows drawn before the "Show all" button appears. Comfortably more than any
+ * Cards drawn before the "Show all" button appears. Comfortably more than any
  * team set contains (rosters are 27-33), so the button is only ever reached on
  * a position set — which is exactly the case it exists for.
  */
 const HEAD = 60;
+
+/** The inventory grid's numbers, so the two screens wrap at the same widths. */
+const GAP = Spacing.two + 4;
+const MIN_CARD_WIDTH = 100;
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'ALL', label: 'All' },
@@ -124,6 +146,15 @@ export function SetChecklist({
    * cards and the sheet owns its own scroll container.
    */
   const [limit, setLimit] = useState(HEAD);
+
+  /* The sheet owns the scroll container, so this cannot be a FlatList — nesting
+     a VirtualizedList inside a ScrollView is an error rather than a slow path.
+     The grid is a wrapping row measured on layout, exactly as `/gallery` draws
+     the inventory, and the head below is what keeps a 398-card position set
+     from mapping all of it on open. */
+  const [width, setWidth] = useState(0);
+  const columns = Math.max(2, Math.min(6, Math.floor((width + GAP) / (MIN_CARD_WIDTH + GAP))));
+  const cardWidth = Math.floor((width - GAP * (columns - 1)) / columns);
 
   const counts = useMemo(() => {
     let inSet = 0;
@@ -185,9 +216,11 @@ export function SetChecklist({
                 and — the part a progress bar cannot say — that filling a slot
                 costs the card. */}
             <Text style={[Type.body, styles.rule, { color: c.textSecondary }]}>
-              {set.family === 'team'
-                ? `A complete set is all ${set.totalCards} ${set.name} cards, and it pays at every quarter of the way. A card added to a set is gone from your collection for good.`
-                : `Add ${set.required} of these ${set.totalCards} cards to complete the set, and it pays at every quarter of the way. A card added to a set is gone from your collection for good.`}
+              {set.family === 'daily'
+                ? `Add any ${set.required} of these ${set.totalCards.toLocaleString()} cards before midnight and the set pays out. A card added to a set is gone from your collection for good.`
+                : set.family === 'team'
+                  ? `A complete set is all ${set.totalCards} ${set.name} cards, and it pays at every quarter of the way. A card added to a set is gone from your collection for good.`
+                  : `Add ${set.required} of these ${set.totalCards} cards to complete the set, and it pays at every quarter of the way. A card added to a set is gone from your collection for good.`}
             </Text>
           </View>
 
@@ -227,12 +260,19 @@ export function SetChecklist({
           {/* THE LADDER ITSELF, which the list behind this sheet has no room
               for. It is the whole answer to "why would I keep going on a set I
               will never finish": four rungs, what each wants, what each pays,
-              and which are behind you. */}
+              and which are behind you.
+
+              A DAILY HAS ONE RUNG, so the table would be a single row restating
+              the line above it — and a one-row table reads as a ladder with
+              three rungs missing. It is left off there; the reward row below
+              already says what clearing it pays. */}
+          {set.family === 'daily' ? null : (
           <View style={[styles.ladder, { borderColor: c.border }]}>
             {set.milestones.map((m, i) => (
               <Rung key={m.pct} milestone={m} committed={set.committed} first={i === 0} />
             ))}
           </View>
+          )}
 
           {/* The reward, in whichever of its three states this set is in.
               CLAIMING SWEEPS EVERY RUNG you have reached and not been paid for,
@@ -405,31 +445,35 @@ export function SetChecklist({
           </Text>
         ) : (
           <>
-            <View style={[styles.rows, { borderColor: c.border }]}>
-              {shown.slice(0, limit).map((m, i) => (
-                <MemberRow
-                  key={m.card_id}
-                  member={m}
-                  divided={i > 0}
-                  picked={chosen.has(m.card_id)}
-                  // A row you cannot tick, and the two reasons are different:
-                  // the set is full, or the selection already fills it. Either
-                  // way the tick would be a refusal in waiting.
-                  locked={submitting || full || (roomLeft === 0 && !chosen.has(m.card_id))}
-                  onToggle={() => onToggle(m)}
-                />
-              ))}
+            <View style={styles.grid} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+              {width === 0
+                ? null
+                : shown.slice(0, limit).map((m) => (
+                    <MemberCard
+                      key={m.card_id}
+                      member={m}
+                      width={cardWidth}
+                      picked={chosen.has(m.card_id)}
+                      // A card you cannot tick, and the two reasons are
+                      // different: the set is full, or the selection already
+                      // fills it. Either way the tick would be a refusal in
+                      // waiting.
+                      locked={submitting || full || (roomLeft === 0 && !chosen.has(m.card_id))}
+                      onToggle={() => onToggle(m)}
+                    />
+                  ))}
             </View>
 
             {/* NAMED, NOT SILENT. A team set is ~30 cards and never reaches
                 this; a position set is up to 398, and mapping all of them into
-                a sheet's ScrollView costs a visible stall every time it opens.
-                A FlatList is not the fix here — the frame owns the scroll
+                a sheet's ScrollView costs a visible stall every time it opens —
+                more so now that each one is a card rather than a row. A
+                FlatList is not the fix here: the frame owns the scroll
                 container, and nesting a VirtualizedList inside a ScrollView is
                 an error rather than an optimisation.
 
                 So the head is drawn and the rest is one press away. The button
-                states the real total, because a list that quietly stopped at 60
+                states the real total, because a grid that quietly stopped at 60
                 would read as "this set has 60 cards" — and the number beside it
                 is the whole point of the screen. */}
             {shown.length > limit ? (
@@ -455,7 +499,9 @@ export function SetChecklist({
             ? `Adding a card burns it: it leaves your collection, cannot be started or sold again, and pays back ${set.commitPayoutPct}% of what it would have sold for. The set always takes your lowest-earning copy.${
                 set.family === 'team'
                   ? ' Packs are drawn from the whole season pool, so a full roster is a long chase — the rewards along the way are the point of it.'
-                  : ''
+                  : set.family === 'daily'
+                    ? ' A daily is worth more than the sell button and less than the pack that dealt the cards, which is what makes it a good home for spares and a bad way to grind.'
+                    : ''
               }`
             : ''}
         </Text>
@@ -531,29 +577,60 @@ function Rung({
 }
 
 /**
- * One card on the checklist, in one of three states.
+ * One card on the checklist, in one of three states, drawn as the card it is.
  *
- * They are told apart by WEIGHT and by CONTROL, never by colour alone: a filled
- * slot keeps full-strength text and carries a tick, a fillable one carries the
- * add button, and a missing one drops to secondary with a dash. All three
- * survive greyscale, which is the rule the tier chips and the filter chips
- * already follow.
+ * The three are told apart by the FRAME and by the line under it, never by
+ * colour alone: a filled slot says IN SET, a fillable one says what the commit
+ * pays, and a missing one is a grey-framed card with an em dash where the
+ * figure goes and the whole cell at reduced opacity. All three survive
+ * greyscale, which is the rule the tier frames and the filter chips already
+ * follow.
  *
- * The row is not itself pressable. The obvious tap is "open the player", and
- * the honest answer for a card you do not own is a directory page — but the row
- * already carries a button that destroys something, and putting a second target
- * around it is how a mis-tap becomes a burnt card. The Players boards are one
- * tab away.
+ * WHAT THE CARD SHOWS HERE, AND WHY IT IS NOT WHAT THE INVENTORY SHOWS:
+ *
+ *   frame     for a card you can add, the tier of the copy that would ACTUALLY
+ *             BE BURNT — the server's choice, not yours (`commit_candidate`
+ *             always takes the least valuable copy you hold). Drawing it is how
+ *             that guarantee is made visible rather than merely true: ticking a
+ *             player can cost you a bronze and can never cost you a gold.
+ *
+ *             A FILLED SLOT is framed in the positive tone instead, and it has
+ *             to be. `set_checklist` reports `commit_tier` from a SPARE copy,
+ *             so a filled slot where you happen to hold a second card was
+ *             drawing a gold frame for a copy the set cannot take. "This one is
+ *             in" is the only thing that frame should be saying.
+ *
+ *             Grey is a card you hold no copy of at all.
+ *   figure    the player's SEASON points, not the card's career total: half
+ *             this list is players you do not own, who have no career here to
+ *             report. `statLabel` says FP so it cannot be misread as TFP.
+ *   under it  the state, alone — which is the whole question this screen asks.
+ *
+ * The tier progress, the fixture and the injury designation are all left off.
+ * Each is a fact about a copy in your hand and this screen is mostly about
+ * cards that are not.
+ *
+ * THE CLUB IS OFF TOO, and it was the last thing to go. On a team set it is
+ * the same three letters on all twenty-nine cards, which is a column of noise
+ * saying what the set's own title says. On a position set it is real
+ * information — but not information this screen is for: you are here to fill
+ * slots, and no slot is filled or unfilled because of who the player plays
+ * for. The Players boards are one tab away for that.
+ *
+ * MIS-TAPS COST NOTHING. Tapping TICKS the card; the batch is edited first and
+ * only the submit bar leads anywhere destructive, so the second tap undoes the
+ * first. That is why the whole cell is the target here where the old row kept
+ * its tap area off the name — there is no longer a second thing to hit.
  */
-function MemberRow({
+function MemberCard({
   member,
-  divided,
+  width,
   picked,
   locked,
   onToggle,
 }: {
   member: SetMember;
-  divided: boolean;
+  width: number;
   picked: boolean;
   locked: boolean;
   onToggle: () => void;
@@ -571,82 +648,76 @@ function MemberRow({
       ? `${member.held} held${picked ? ', selected' : ''}`
       : 'Missing';
 
-  const body = (
-    <>
-      <PositionBadge label={member.position_abbreviation} size={22} />
-
-      <View style={styles.memberName}>
-        <Text
-          numberOfLines={1}
-          style={[Type.strong, { color: member.committed || addable ? c.text : c.textSecondary }]}>
-          {member.player_name}
-        </Text>
-        <Text numberOfLines={1} style={[Type.fine, NUMERIC, { color: c.textTertiary }]}>
-          {member.team_abbreviation ?? '—'}
-          {fp !== null && fp > 0 ? ` · ${fp.toFixed(1)} FP` : ''}
-          {/* Duplicates, and only above one: "×1" is noise, "×3" is what says
-              you can spare one of these without giving anything up. */}
-          {addable && member.held > 1 ? ` · ×${member.held}` : ''}
-          {/* The tier of the copy that would actually go. It only earns its
-              place when it is worth more than the floor — every bronze row
-              saying "bronze" would be a column of the same word. */}
-          {addable && member.commit_tier && member.commit_tier !== 'bronze'
-            ? ` · ${member.commit_tier}`
-            : ''}
-        </Text>
-      </View>
-
-      {member.committed ? (
-        <View style={styles.tag}>
-          <Text style={[Type.label, { color: c.positive }]}>IN SET</Text>
-        </View>
-      ) : addable ? (
-        /* A TICK, NOT A BUTTON — it is a View inside the row's own Pressable.
-           Nesting a pressable here would render a <button> inside a <button>
-           on web, which React rejects at runtime; the same trap PlayerSheetFrame
-           and ConfirmDialog both document. */
-        <View
-          style={[
-            styles.tick,
-            picked
-              ? { backgroundColor: gold, borderColor: gold }
-              : { borderColor: c.borderStrong },
-          ]}>
-          {picked ? (
-            <Text style={[Type.label, { color: '#17130A' }]}>✓</Text>
-          ) : (
+  const card = (
+    <PlayerCard
+      size="compact"
+      fixedWidth={false}
+      accessibilityLabel={
+        addable
+          ? `${member.player_name}, ${member.position_abbreviation ?? 'no position'}, ` +
+            `${member.team_abbreviation ?? 'no club'}. ${state}. Adding burns your ` +
+            `${member.commit_tier ?? 'lowest'} copy for ${member.commit_value} gems.`
+          : `${member.player_name}, ${member.position_abbreviation ?? 'no position'}, ` +
+            `${member.team_abbreviation ?? 'no club'}. ${state}.`
+      }
+      frameColor={member.committed ? c.positive : undefined}
+      model={{
+        playerName: member.player_name,
+        positionAbbreviation: member.position_abbreviation,
+        teamAbbreviation: member.team_abbreviation,
+        // Null on a filled slot as well as on a missing one: the tier the
+        // server reports there belongs to a spare copy, and `frameColor` above
+        // is saying something else entirely.
+        tier: member.committed ? null : member.commit_tier,
+        careerFp: fp,
+        statLabel: 'FP',
+        nextTierAt: null,
+      }}
+      footer={
+        <>
+          {member.committed ? (
+            <Text numberOfLines={1} style={[Type.label, { color: c.positive }]}>
+              IN SET
+            </Text>
+          ) : addable ? (
             <View style={styles.gemRow}>
-              <Gem color={c.textTertiary} size={8} />
-              <Text style={[Type.fine, NUMERIC, { color: c.textTertiary }]}>
-                {member.commit_value}
-              </Text>
+              {picked ? (
+                <Text numberOfLines={1} style={[Type.label, { color: gold }]}>
+                  {'✓ SELECTED'}
+                </Text>
+              ) : (
+                <>
+                  {/* Duplicates, and only above one: "×1" is noise, "×2" is
+                      what says you can spare this one without giving anything
+                      up. */}
+                  {member.held > 1 ? (
+                    <Text style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
+                      {`×${member.held}`}
+                    </Text>
+                  ) : null}
+                  <Gem color={c.textTertiary} size={8} />
+                  <Text style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
+                    {member.commit_value}
+                  </Text>
+                </>
+              )}
             </View>
+          ) : (
+            <Text numberOfLines={1} style={[Type.label, { color: c.textTertiary }]}>
+              MISSING
+            </Text>
           )}
-        </View>
-      ) : (
-        <Text style={[Type.strong, styles.mark, { color: c.textTertiary }]}>–</Text>
-      )}
-    </>
+        </>
+      }
+    />
   );
 
-  /* Only an addable row is a target. A committed one has nothing to do and a
+  /* Only an addable cell is a target. A committed one has nothing to do and a
      missing one has nothing to do it with, so making either pressable would be
      offering a gesture that does nothing. */
   if (!addable) {
     return (
-      <View
-        accessible
-        accessibilityRole="text"
-        accessibilityLabel={`${member.player_name}, ${
-          member.position_abbreviation ?? 'no position'
-        }, ${member.team_abbreviation ?? 'no club'}. ${state}.`}
-        style={[
-          styles.member,
-          divided && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border },
-          !member.committed && styles.faded,
-        ]}>
-        {body}
-      </View>
+      <View style={[styles.cell, { width }, !member.committed && styles.faded]}>{card}</View>
     );
   }
 
@@ -656,19 +727,17 @@ function MemberRow({
       disabled={locked}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: picked, disabled: locked }}
-      accessibilityLabel={`${member.player_name}, ${
-        member.position_abbreviation ?? 'no position'
-      }, ${member.team_abbreviation ?? 'no club'}. ${state}. Adding burns your ${
-        member.commit_tier ?? 'lowest'
-      } copy for ${member.commit_value} gems.`}
       style={({ pressed }) => [
-        styles.member,
-        divided && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border },
+        styles.cell,
+        { width },
+        /* The TINT is the selected state, not a ring: a ring around a card
+           that already has a coloured frame is two borders arguing, and the
+           tier frame is the one carrying information. */
         picked && { backgroundColor: c.backgroundElement },
         locked && styles.disabled,
         pressed && !locked && styles.pressed,
       ]}>
-      {body}
+      {card}
     </Pressable>
   );
 }
@@ -758,30 +827,15 @@ const styles = StyleSheet.create({
     minHeight: 38,
   },
   pickNote: { paddingHorizontal: Spacing.one },
-  rows: { borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.panel, overflow: 'hidden' },
-  member: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.two + 2,
-    paddingVertical: Spacing.two,
-  },
-  faded: { opacity: 0.75 },
-  memberName: { flex: 1, minWidth: 0, gap: 1 },
-  mark: { width: 56, textAlign: 'center' },
-  tag: { width: 56, alignItems: 'flex-end' },
-  /* Unticked it shows what the card would pay, which is the number worth
-     scanning down the column; ticked it is a solid mark, because at that point
-     the amount is in the submit button's total instead. */
-  tick: {
-    width: 56,
-    minHeight: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderRadius: Radius.chip,
-    paddingVertical: 3,
-  },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, alignItems: 'flex-start' },
+  /* The cell is padded on every card, selected or not, so the tint has
+     somewhere to sit without a selected card being a different size from its
+     neighbours and stepping the whole row. */
+  cell: { padding: Spacing.half, borderRadius: Radius.chip },
+  /* A card you do not own is present but not in the album yet. Opacity says
+     that in one channel; the grey frame and the word MISSING say it in two
+     more, so nothing here rests on the dimming alone. */
+  faded: { opacity: 0.6 },
   more: {
     alignSelf: 'flex-start',
     borderRadius: Radius.chip,

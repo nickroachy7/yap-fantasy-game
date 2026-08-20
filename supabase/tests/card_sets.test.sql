@@ -716,17 +716,36 @@ begin
   end if;
 
   select count(*) into v_before from public.card_set_members;
-  select count(*) into v_sets   from public.card_sets where season = 2026 and is_active;
+  -- TEAM ONLY. The position family is retired and a rebuild deactivates it on
+  -- purpose, so counting it here would make the deactivation look like the bug
+  -- the next assertion is watching for.
+  select count(*) into v_sets
+    from public.card_sets
+   where season = 2026 and is_active and family = 'team';
 
   perform public.rebuild_card_sets(2026);
 
   select count(*) into v_after from public.card_set_members;
 
+  -- MEMBERSHIP IS A PRINTED CHECKLIST and is never withdrawn, not even from a
+  -- retired family: the position sets keep every row they had, they simply
+  -- stop being offered.
   if v_after < v_before then
     raise exception 'FAIL: a rebuild removed % membership rows', v_before - v_after;
   end if;
-  if (select count(*) from public.card_sets where season = 2026 and is_active) < v_sets then
-    raise exception 'FAIL: a rebuild deactivated sets that already had members';
+  if (select count(*) from public.card_sets
+       where season = 2026 and is_active and family = 'team') < v_sets then
+    raise exception 'FAIL: a rebuild deactivated team sets that already had members';
+  end if;
+
+  -- THE RETIREMENT IS PART OF THE CONTRACT, so it is asserted rather than
+  -- merely tolerated. A position set that came back would put the trickle back
+  -- with it.
+  if exists (
+    select 1 from public.card_sets
+     where family = 'position' and is_active
+  ) then
+    raise exception 'FAIL: a position set is still active after a rebuild';
   end if;
 
   -- Nothing may ask for more cards than it holds.
@@ -756,16 +775,123 @@ begin
     raise exception 'FAIL: a team set does not require its whole roster';
   end if;
 
-  -- Every active set has a full ladder.
+  -- Every active TEAM set has the full four-rung ladder. A daily has exactly
+  -- one, at completion — four rungs on a three-card set would pay at one card,
+  -- which is the trickle the daily family was introduced to replace.
   if exists (
     select 1 from public.card_sets s
-     where s.season = 2026 and s.is_active
+     where s.season = 2026 and s.is_active and s.family = 'team'
        and (select count(*) from public.card_set_milestones ml where ml.set_id = s.id) <> 4
   ) then
-    raise exception 'FAIL: an active set does not have four milestones';
+    raise exception 'FAIL: an active team set does not have four milestones';
   end if;
 
   raise notice 'card_sets: rebuild assertions passed';
+end;
+$$;
+
+
+-- ---------------------------------------------------------------------------
+-- DAILY SETS
+-- ---------------------------------------------------------------------------
+--
+-- The faucet, and the numbers on it are the ones the migration header argues
+-- about, so they are asserted rather than trusted: three cards, one rung, and
+-- a reward inside the bracket that makes a daily beat the sell button and lose
+-- to the pack that dealt the cards.
+do $$
+declare
+  v_today  constant date := date '2026-09-13';
+  v_prev   constant date := date '2026-09-12';
+  v_set    uuid;
+  v_prior  uuid;
+  v_rungs  integer;
+  v_gems   integer;
+  v_req    smallint;
+  v_pos    text;
+begin
+  if not exists (select 1 from public.cards where is_mintable and season = 2026) then
+    raise notice 'daily_sets: no 2026 pool here, skipping';
+    return;
+  end if;
+
+  -- PURE IN THE DATE. The rotation is a function rather than stored state
+  -- precisely so a backfill and a live run cannot disagree; if this ever stops
+  -- holding, yesterday's set becomes unreproducible.
+  if public.daily_set_position(v_today) <> public.daily_set_position(v_today) then
+    raise exception 'FAIL: daily_set_position is not stable';
+  end if;
+  if public.daily_set_position(v_today) = public.daily_set_position(v_today + 1) then
+    raise exception 'FAIL: consecutive days ask for the same position';
+  end if;
+  -- Five positions, five days, back to the start.
+  if public.daily_set_position(v_today) <> public.daily_set_position(v_today + 5) then
+    raise exception 'FAIL: the rotation is not a five-day cycle';
+  end if;
+
+  perform public.rebuild_daily_set(2026, v_prev);
+  select id into v_prior
+    from public.card_sets where family = 'daily' and opens_on = v_prev;
+  if v_prior is null then
+    raise exception 'FAIL: yesterday''s daily was not built';
+  end if;
+
+  perform public.rebuild_daily_set(2026, v_today);
+  -- IDEMPOTENT. The nightly sync calls this on every run, and a re-run must not
+  -- double the membership or reset a rung.
+  perform public.rebuild_daily_set(2026, v_today);
+
+  select id, required_count into v_set, v_req
+    from public.card_sets where family = 'daily' and opens_on = v_today;
+  if v_set is null then
+    raise exception 'FAIL: today''s daily was not built';
+  end if;
+  if v_req <> 3 then
+    raise exception 'FAIL: a daily asks for % cards, not 3', v_req;
+  end if;
+
+  select count(*), coalesce(max(reward_gems), 0) into v_rungs, v_gems
+    from public.card_set_milestones where set_id = v_set;
+  if v_rungs <> 1 then
+    raise exception 'FAIL: a daily has % rungs, not 1', v_rungs;
+  end if;
+
+  -- THE BRACKET, restated as an assertion. Three bronze sell for 24 and pay 12
+  -- into a set at 50%, and cost 60 in packs at 20 a card. A rung at or below 12
+  -- is worse than selling; at or above 48 the daily can be farmed with bought
+  -- packs. See the migration header.
+  if v_gems <= 12 then
+    raise exception 'FAIL: a daily pays % gems, which loses to the sell button', v_gems;
+  end if;
+  if v_gems >= 48 then
+    raise exception 'FAIL: a daily pays % gems, which is farmable with packs', v_gems;
+  end if;
+
+  -- The whole position pool is the membership, so it is always clearable.
+  v_pos := public.daily_set_position(v_today);
+  if (select count(*) from public.card_set_members where set_id = v_set) < 3 then
+    raise exception 'FAIL: the % daily has fewer than 3 members', v_pos;
+  end if;
+  if exists (
+    select 1
+      from public.card_set_members m
+      join public.cards c   on c.id = m.card_id
+      join public.players p on p.id = c.player_id
+     where m.set_id = v_set
+       and upper(p.position_abbreviation) <> v_pos
+  ) then
+    raise exception 'FAIL: the % daily contains another position', v_pos;
+  end if;
+
+  -- Yesterday's is retired by today's run, and retired is not deleted.
+  if (select is_active from public.card_sets where id = v_prior) then
+    raise exception 'FAIL: yesterday''s daily is still active';
+  end if;
+  if not exists (select 1 from public.card_set_members where set_id = v_prior) then
+    raise exception 'FAIL: retiring yesterday''s daily removed its membership';
+  end if;
+
+  raise notice 'daily_sets: assertions passed';
 end;
 $$;
 

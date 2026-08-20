@@ -215,6 +215,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          opens_on: string | null
           required_count: number
           season: number
           sort_order: number
@@ -228,6 +229,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          opens_on?: string | null
           required_count: number
           season: number
           sort_order?: number
@@ -241,6 +243,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          opens_on?: string | null
           required_count?: number
           season?: number
           sort_order?: number
@@ -1329,6 +1332,7 @@ export type Database = {
           week: number
         }[]
       }
+      daily_set_position: { Args: { p_day: string }; Returns: string }
       gameday_sweep: { Args: never; Returns: Json }
       grant_weekly_gems: {
         Args: {
@@ -1396,6 +1400,10 @@ export type Database = {
       player_market: { Args: { p_player_id: string }; Returns: Json }
       player_profile: { Args: { p_player_id: string }; Returns: Json }
       rebuild_card_sets: { Args: { p_season: number }; Returns: Json }
+      rebuild_daily_set: {
+        Args: { p_day: string; p_season: number }
+        Returns: Json
+      }
       refresh_player_season_ranks: { Args: never; Returns: undefined }
       score_week: {
         Args: { p_season: number; p_season_type: number; p_week: number }
