@@ -181,6 +181,33 @@ export const Radius = {
   panel: 12,
 } as const;
 
+/**
+ * A round control's diameter — the action bar's detached button, and the
+ * inventory's filter buttons.
+ *
+ * 32 matches the chips' 28 plus the ring that makes it a button. It lives here
+ * rather than in either file that draws one because BOTH do: `MenuButton` had
+ * the only copy, and the action bar cannot import it (MenuButton imports
+ * `ActionIcon` from there, so the arrow already points the other way).
+ */
+export const ControlDiameter = 32;
+
+/**
+ * The action bar's detached button — bigger than the round controls above,
+ * deliberately.
+ *
+ * 44 is not a taste pick twice over. It is the platform's minimum touch target,
+ * and it is ALREADY this button's real size: it was a 32pt circle with
+ * `hitSlop: 6`, so it has always been 44pt to a thumb and 32pt to the eye.
+ * Drawing it at 44 just stops the two disagreeing, and the hitSlop goes.
+ *
+ * It must not collapse back into `ControlDiameter`. That one sizes the
+ * inventory's four FILTER buttons, which sit in their own row a rank below
+ * this; growing those to 44 would take another 12pt off the grid on a screen
+ * whose whole argument is fitting more cards on it.
+ */
+export const ActionDiameter = 44;
+
 export const Spacing = {
   half: 2,
   one: 4,

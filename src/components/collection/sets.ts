@@ -67,7 +67,7 @@ const num0 = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v
 
 /**
  * `my_sets.milestones` is jsonb, so it is `unknown` until proven otherwise —
- * the same discipline `ShopPanel` applies to `packs.guaranteed_positions`. A
+ * the same discipline `PackShelf` applies to `packs.guaranteed_positions`. A
  * malformed rung is dropped rather than drawn as a row of zeroes.
  */
 function parseMilestones(raw: unknown): Milestone[] {

@@ -118,7 +118,7 @@ export function FantasyTopNav({
     <View style={[styles.bar, { borderBottomColor: c.border }]}>
       <View style={styles.inner}>
         {FANTASY_SECTIONS.map((section) => {
-          // A section is active anywhere inside it, so `/fantasy/collection/shop`
+          // A section is active anywhere inside it, so `/fantasy/collection/sets`
           // keeps Collection lit.
           const active =
             pathname === section.href || pathname.startsWith(`${section.href}/`);

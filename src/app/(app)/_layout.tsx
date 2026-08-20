@@ -20,7 +20,7 @@ import { PlayerProvider } from '@/context/PlayerContext';
  *
  * A modal presentation needs a Stack; a Tabs navigator has no concept of one.
  * Hence this layer. The tabs moved into the `(tabs)` group, which is a GROUP —
- * it does not appear in any URL, so `/lineup`, `/collection/shop` and
+ * it does not appear in any URL, so `/lineup`, `/collection/sets` and
  * `/player/<id>` are all exactly the paths they were before. Nothing that links
  * to them changed.
  *
@@ -99,6 +99,10 @@ export default function AppLayout() {
             it is the same kind of object: something you open off a row, read,
             and put down again. */}
         <Stack.Screen name="set/[code]" options={sheetOptions} />
+        {/* Packs. Same presentation again, and for the same reason: you open
+            it, spend, and put it down. It replaced `collection/shop`, which
+            was a whole sub-page for a shelf of two rows — see there. */}
+        <Stack.Screen name="packs" options={sheetOptions} />
         {/* Search is a TAKEOVER, not a sheet: it covers the header and the tab
             bar as well as the page, which is the whole point of it and the
             reason it cannot live under `(tabs)`. `fullScreenModal` is the one

@@ -65,11 +65,16 @@ export type NavChild = {
    * Opened with a PUSH rather than a replace, and dismissed rather than
    * navigated away from.
    *
-   * The other children are peers — three boards you flip between — so replacing
-   * is right for them: pushing would build a back stack out of every toggle.
-   * Search is not a peer. It is a full-screen takeover living ABOVE the tab
-   * navigator, so it belongs on top of whatever you were reading, and the way
-   * out of it is to close it and find that page still there.
+   * The other children are peers — boards you flip between — so replacing is
+   * right for them: pushing would build a back stack out of every toggle.
+   *
+   * TWO CHILDREN ARE NOT PEERS, and they are not the same shape as each other
+   * either — what they share is that both live ABOVE the tab navigator, on a
+   * root path, and both are things you put DOWN rather than navigate away from.
+   * Search is a `fullScreenModal`: you use it instead of the app. Packs is the
+   * profile sheet: you glance at it over the app. Either way it belongs on top
+   * of whatever you were reading, and the way out is to close it and find that
+   * page still there.
    *
    * Replacing was what made the way out wrong. With no entry left behind it,
    * the screen had nothing to go back TO, so it hard-coded a return to Trend —
@@ -77,6 +82,25 @@ export type NavChild = {
    * board on the way out.
    */
   takeover?: boolean;
+  /**
+   * Drawn as the round button beside the tray rather than as a cell in it.
+   *
+   * SEPARATE FROM `takeover`, and the two must not be folded together again —
+   * they answer different questions. `takeover` is about NAVIGATION: push over
+   * the page rather than replace it. This is about PRESENTATION: is the thing
+   * a place, or an errand?
+   *
+   * Both of this file's takeovers prove the difference. Search is a takeover
+   * and stays a cell, because it IS a third way to browse the players board —
+   * find one, see who moved, see who is best. It belongs among its peers.
+   * Packs is a takeover and does not, because it is not another way to look at
+   * your collection; it is where you go to buy more. One is a room in the
+   * house, the other is the shop on the corner.
+   *
+   * Deriving this from `takeover` made Search a circle too, which is how the
+   * distinction got noticed.
+   */
+  detached?: boolean;
 };
 
 /** One of the four boards inside Fantasy. Level 2. */
@@ -137,7 +161,13 @@ export const FANTASY_SECTIONS: NavSection[] = [
          weaker version of what the page itself opens with: NOT BUILT YET, over
          "Nothing to collect here yet", over PLANNED — Week 3. */
       { href: '/fantasy/collection/sets', label: 'Sets', icon: 'sets' },
-      { href: '/fantasy/collection/shop', label: 'Shop', icon: 'shop' },
+      /* NOT a peer of the two above, and not a page. Packs are a sheet
+         presented over the app — the same `takeover` shape Search already
+         uses, so pressing this pushes `/packs` over whatever you were reading
+         and closing it puts you back on THAT page rather than on Inventory.
+         It keeps the slot Shop had because the question is unchanged: this
+         is still where you go to get more cards. See `app/(app)/packs.tsx`. */
+      { href: '/packs', label: 'Packs', icon: 'shop', takeover: true, detached: true },
     ],
   },
   {

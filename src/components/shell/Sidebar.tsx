@@ -63,7 +63,7 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
       <View style={styles.nav}>
         {NAV_TABS.map((tab) => {
           // The whole TRAIL is lit and only the leaf is filled — see `NavRow`.
-          // So /fantasy/collection/shop whitens Fantasy, Collection and Shop,
+          // So /fantasy/collection/sets whitens Fantasy, Collection and Sets,
           // and fills Shop alone.
           return (
             <View key={tab.href} style={styles.group}>

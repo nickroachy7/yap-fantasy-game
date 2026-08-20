@@ -39,11 +39,11 @@ import {
 } from 'react-native';
 
 import { ActionIcon, type ActionIconName } from '@/components/shell/ActionBar';
-import { Colors, Radius, Spacing, Type, selectionAccent } from '@/constants/theme';
+import { Colors, ControlDiameter, Radius, Spacing, Type, selectionAccent } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-/** Diameter. 32 matches the chips' 28 plus the ring that makes it a button. */
-const SIZE = 32;
+/** Diameter, shared with the action bar's detached button. See the theme. */
+const SIZE = ControlDiameter;
 /** Gap between the button's bottom edge and the panel's top. */
 const DROP = 6;
 /** Keeps a right-aligned panel from touching the screen edge. */

@@ -3,8 +3,8 @@
  * different answers.
  *
  * A brand-new player owns nothing, and a blank grid tells them nothing about
- * why or what to do — so that state names the free Starter Pack and sends them
- * to the Shop. A filtered-to-nothing grid is the player's own doing, so it just
+ * why or what to do — so that state names the free Starter Pack and opens the
+ * packs sheet. A filtered-to-nothing grid is the player's own doing, so it just
  * offers to undo it.
  */
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -61,9 +61,6 @@ export function EmptyCollection({ onGetCards }: { onGetCards: () => void }) {
       <View style={styles.actions}>
         <Action label="Open the Starter Pack" onPress={onGetCards} primary />
       </View>
-      <Text style={[Type.fine, { color: c.textTertiary }]}>
-        Packs live in Collection · Shop.
-      </Text>
     </View>
   );
 }

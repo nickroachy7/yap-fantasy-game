@@ -79,6 +79,9 @@ export function SectionNav({ section }: { /** e.g. `/fantasy/collection`. */ sec
       icon: child.icon,
       active: pathname === child.href,
       nav: true,
+      /* Declared per child, NOT derived from `takeover` — Search is a takeover
+         and belongs in the tray. See `detached` in `sections.ts`. */
+      detached: child.detached,
       /* Replace for the peers — pushing would build a back stack out of every
          toggle between three boards. Push for a takeover, so the page you left
          is still underneath it and closing puts you back on THAT page rather

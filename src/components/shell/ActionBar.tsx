@@ -40,7 +40,7 @@
  */
 import { ScrollView, StyleSheet, Pressable, Text, View, type ColorValue } from 'react-native';
 
-import { Colors, Radius, selectionAccent, Spacing, Type } from '@/constants/theme';
+import { ActionDiameter, Colors, Radius, selectionAccent, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { horizontalStrip } from '@/components/ui/scroll-strip';
 
@@ -64,6 +64,25 @@ export type Action = {
   active?: boolean;
   /** A link to a sibling page. Dropped on wide web — see the header. */
   nav?: boolean;
+  /**
+   * Drawn as a round button AFTER the tray rather than as a cell inside it.
+   *
+   * The tray is a set of peers with a position in it — the highlight says which
+   * one you are on, and every cell is somewhere you can BE. Packs is not: it is
+   * an errand, not a room. As a cell it looked like a fifth board you navigate
+   * to, and then had no highlight of its own to show once you were "on" it.
+   *
+   * NOT THE SAME QUESTION AS `takeover`, though it is tempting — this was
+   * derived from it for one revision and turned Search into a circle, which is
+   * wrong: Search is a third way to browse the players board and belongs beside
+   * Trend and Leaders. `sections.ts` declares the two independently and says
+   * why at length.
+   *
+   * The geometry is `ToggleButton`'s grown to `ActionDiameter` — the app
+   * already has a round-control language and this is the same object, just the
+   * loudest one.
+   */
+  detached?: boolean;
   onPress: () => void;
 };
 
@@ -75,58 +94,115 @@ export function ActionBar({ actions, wide }: { actions: Action[]; wide: boolean 
   const shown = wide ? actions.filter((a) => !a.nav) : actions;
   if (shown.length === 0) return null;
 
+  /* The tray holds the places; anything detached sits outside it. Split rather
+     than sorted, so a takeover declared FIRST in `sections.ts` — Search is —
+     still lands at the end of the row, where the app's other round controls
+     already live. */
+  const tray = shown.filter((a) => !a.detached);
+  const detached = shown.filter((a) => a.detached);
+
   return (
-    /* The bar SCROLLS when it has to.
-     *
-     * Items grow to share the width when they fit — five cells of equal size
-     * read as one control — and stop shrinking at 62pt, which is what "AVAILABLE"
-     * needs at 9pt. A Collection page carries seven items (three pages plus four
-     * facets) and that is 470pt of content in a 343pt phone: without the scroll
-     * the last two labels ellipsised into nothing, and with a hard cap on the
-     * item count the seventh would simply have been unreachable.
-     *
-     * AND ONLY WHEN IT HAS TO. `horizontalStrip` is what stops a three-item bar
-     * being draggable — a horizontal ScrollView bounces by default whether or
-     * not there is anywhere to go, which made every section nav in the app feel
-     * like a carousel with nothing in it. See that file. */
-    <ScrollView
-      horizontal
-      {...horizontalStrip}
-      showsHorizontalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      /* `flexGrow: 0`, and it is load-bearing. React-native-web gives every
-         ScrollView `flexGrow: 1, flexShrink: 1` by default, so inside a column
-         that has room to spare — a `scroll={false}` screen whose content is
-         short, e.g. Sets — the bar grew to fill the WHOLE page and its active
-         item rendered as a 370pt block. Nothing errored; the bar just quietly
-         became the page. */
-      style={styles.scroll}
-      contentContainerStyle={[styles.bar, { backgroundColor: c.surface, borderColor: c.border }]}>
-      {shown.map((a) => (
-        <Pressable
-          key={a.key}
-          onPress={a.onPress}
-          accessibilityRole="button"
-          accessibilityState={{ selected: Boolean(a.active) }}
-          accessibilityLabel={a.label}
-          /* No background and no border on either state — see the header. The
-             cell is a hit target now, nothing more, which is why both states
-             share one style and the row cannot change height as the selection
-             moves. */
-          style={({ pressed }) => [styles.item, pressed ? styles.pressed : null]}>
-          <ActionIcon
-            name={a.icon}
-            color={a.active ? accent : c.textSecondary}
-            focused={Boolean(a.active)}
-          />
-          <Text
-            numberOfLines={1}
-            style={[Type.micro, styles.label, { color: a.active ? accent : c.textTertiary }]}>
-            {a.label.toUpperCase()}
-          </Text>
-        </Pressable>
-      ))}
-    </ScrollView>
+    <View style={styles.row}>
+      {/* The tray HUGS its cells and the row pins it left, so it is only ever
+       * as wide as the words in it.
+       *
+       * It used to fill the row and share that width between equal cells. That
+       * was right when a Collection bar carried seven items, and wrong the day
+       * the takeovers moved out: every section is a TWO-item tray now, two
+       * cells wanted 159pt each, `maxWidth` capped them at 132, and centring
+       * the remainder left 54pt of empty tray split across the two ends. The
+       * cap could not be lifted to close it — 132 was measured precisely
+       * because a two-item bar at half a phone each was the one that sprawled —
+       * so the fix is the other direction: stop claiming width the cells do not
+       * want.
+       *
+       * IT STILL SCROLLS WHEN IT HAS TO. `flexShrink` lets a tray wider than
+       * the row give way rather than push the detached buttons off the edge,
+       * and `horizontalStrip` stops it bouncing when there is nowhere to go —
+       * a horizontal ScrollView bounces by default whether or not it has
+       * anywhere to scroll, which made every section nav feel like a carousel
+       * with nothing in it. See that file. */}
+      <ScrollView
+        horizontal
+        {...horizontalStrip}
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        // Fills whatever width the detached buttons leave. See `styles.scroll`.
+        style={styles.scroll}
+        contentContainerStyle={[styles.bar, { backgroundColor: c.surface, borderColor: c.border }]}>
+        {tray.map((a) => (
+          <Pressable
+            key={a.key}
+            onPress={a.onPress}
+            accessibilityRole="button"
+            accessibilityState={{ selected: Boolean(a.active) }}
+            accessibilityLabel={a.label}
+            /* No background and no border on either state — see the header. The
+               cell is a hit target now, nothing more, which is why both states
+               share one style and the row cannot change height as the selection
+               moves. */
+            style={({ pressed }) => [styles.item, pressed ? styles.pressed : null]}>
+            <ActionIcon
+              name={a.icon}
+              color={a.active ? accent : c.textSecondary}
+              focused={Boolean(a.active)}
+            />
+            <Text
+              numberOfLines={1}
+              style={[Type.micro, styles.label, { color: a.active ? accent : c.textTertiary }]}>
+              {a.label.toUpperCase()}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      {detached.length > 0 ? (
+        <View style={styles.detachedGroup}>
+          {detached.map((a) => (
+            <DetachedAction key={a.key} action={a} />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * An errand, as a round button beside the tray.
+ *
+ * FILLED IN THE APP'S GOLD rather than outlined like the inventory's filter
+ * buttons, and that is the one place this departs from `ToggleButton`. Those
+ * four are toggles whose fill IS their state, so an outlined resting state has
+ * something to mean. This one has no state — it opens a sheet — so an outline
+ * would read as a switch that is permanently off, and the fill is free to do
+ * the other job instead: the circle carries a glyph and no label, and gold is
+ * what makes it the thing to press rather than a mark nobody labelled.
+ *
+ * IT IS THE TALLEST THING IN THE ROW AFTER THE TRAY, at `ActionDiameter`
+ * rather than the `ControlDiameter` the filter buttons use. A 32pt disc beside
+ * a 53pt tray read as floating in a row built for something else; 44 closes
+ * most of that gap and takes the width it needs off the tray, which has it to
+ * give — see the note on `item`.
+ */
+function DetachedAction({ action }: { action: Action }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const accent = selectionAccent(scheme);
+
+  return (
+    <Pressable
+      onPress={action.onPress}
+      accessibilityRole="button"
+      accessibilityLabel={action.label}
+      style={({ pressed }) => [
+        styles.detached,
+        { backgroundColor: accent },
+        pressed ? styles.pressed : null,
+      ]}>
+      {/* `focused` so the glyph is the SOLID variant: it sits on the accent,
+          where a 1.6pt outline in the same dark ink reads as a smudge. */}
+      <ActionIcon name={action.icon} color={c.background} focused size={20} />
+    </Pressable>
   );
 }
 
@@ -439,50 +515,78 @@ export function ActionIcon({
 }
 
 const styles = StyleSheet.create({
-  scroll: { flexGrow: 0, flexShrink: 0 },
+  /* The tray and whatever sits beside it. `alignItems: 'center'` is what keeps
+     a 32pt button centred against a taller tray rather than stretched to its
+     height, which is the default in a row. */
+  /* The tray, then the detached buttons. No `justifyContent` is needed: the
+     tray takes every point the buttons do not, so it ends exactly one gap to
+     their left whatever the width. The buttons are still grouped into one node
+     so that gap stays theirs rather than opening up between them. */
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  detachedGroup: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  /* Takes the width the detached buttons leave, so the tray runs from the
+     gutter to one gap short of them.
+
+     `flexGrow: 0` used to live here as a guard, and the reason is worth
+     keeping: react-native-web gives every ScrollView `flexGrow: 1,
+     flexShrink: 1`, so inside a COLUMN with room to spare — a `scroll={false}`
+     screen whose content is short, e.g. Sets — the bar grew to fill the whole
+     page and its active item rendered as a 370pt block. Nothing errored; the
+     bar just quietly became the page.
+
+     It is safe here only because the parent is a ROW, where these values govern
+     the horizontal axis — the one the tray should fill — and height comes from
+     the row's `alignItems`. Do NOT lift this back out of the row without
+     putting `flexGrow: 0` back with it. */
+  scroll: { flex: 1 },
   bar: {
     flexDirection: 'row',
-    // Grows to the full width when the items do not fill it, so the bar is a
-    // bar rather than a huddle of buttons on the left; the items inside it are
-    // centred rather than left-packed, because a capped item cannot fill it.
+    alignItems: 'center',
+    // Grows with the ScrollView above it, so the tray is a bar rather than a
+    // huddle of cells at one end of one.
     flexGrow: 1,
-    justifyContent: 'center',
     borderRadius: Radius.panel,
     borderWidth: StyleSheet.hairlineWidth,
     padding: Spacing.one,
     gap: Spacing.one,
   },
-  /* Equal widths rather than hugging their labels: five cells of the same size
-     read as one control, where five different widths read as a sentence of
-     buttons.
-     
-     THE MAXIMUM IS BACK, AND WIDER THAN THE ONE THAT FAILED.
-     
-     A note here used to say there was no cap, on the grounds that a 104pt one
-     left dead tray at either end of a three-item bar. That reasoning also
-     asserted "Leaderboard was never two", which was simply wrong — it is
-     Standings and Scoring — so the case the cap existed to guard was live the
-     whole time, and the Leaderboard's two cells each took half a phone while
-     the Players' three took a third. The same control was a different size in
-     every tab.
-     
-     132 is measured, not chosen: three items on a 375pt phone have 327pt to
-     share after the page gutter, the tray padding and the gaps — 109 each — so
-     three and above still FILL and the old complaint cannot come back. Only a
-     two-item bar is capped, which is the one that sprawled. */
-  /* EXACTLY TWO CHILDREN, glyph over label, and that is a constraint rather
+  /* GLYPH OVER THE WORD, and the cells SHARE the tray with no cap on how wide
+     one may get.
+
+     There was a `maxWidth: 132`, and dropping it is the deliberate part. It was
+     measured for a bar with no button beside it: two uncapped cells each took
+     half a phone, which sprawled, so the cap held them in and centred the
+     remainder. The takeovers moving out changed the sum — the tray now ends one
+     gap short of a 32pt button — but the cap did not move with it, so a
+     two-item tray carried 54pt of empty tray split across its two ends. Capping
+     and centring is the wrong shape for a bar that already stops short of the
+     row: the dead space reads as the control failing to reach the button beside
+     it rather than as breathing room.
+
+     So the cells fill what the tray has. On a 402pt phone that is ~155pt each
+     for Collection and Players, and ~161 for Leaderboard, which has no button
+     to leave room for.
+
+     A FLAT VERSION WAS TRIED AND REVERTED — glyph beside the word, hugging its
+     labels, ~26pt instead of ~45. It bought real height back on three screens
+     and gave the cells unequal widths to do it. The height was not the problem
+     being solved.
+
+     EXACTLY TWO CHILDREN, glyph over label, and that is a constraint rather
      than a description. A cell is a flex column in a flex row, so a third line
      in ONE cell stretches every cell in the bar: the "Soon" badge Sets used to
      carry made the Collection strip 66pt where every other section's was 55,
-     and — because these cells centre their content — pushed Inventory and Shop
+     and — because these cells centre their content — pushed its siblings
      visibly lower than the same items elsewhere. Anything that wants to say
      more about a destination belongs in the rail, which is a list of rows, or
      on the destination itself. */
   item: {
     flexGrow: 1,
     flexBasis: 0,
+    // Still a floor: it is what "AVAILABLE" needs at 9pt, and it is what lets
+    // the bar scroll rather than ellipsise if a section ever carries enough
+    // items to overflow the row.
     minWidth: 62,
-    maxWidth: 132,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 3,
@@ -490,6 +594,14 @@ const styles = StyleSheet.create({
     borderRadius: Radius.control,
   },
   label: { letterSpacing: 0.4 },
+  detached: {
+    width: ActionDiameter,
+    height: ActionDiameter,
+    borderRadius: ActionDiameter / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
   box: { alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.65 },
 });

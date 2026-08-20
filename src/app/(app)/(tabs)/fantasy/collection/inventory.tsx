@@ -11,7 +11,7 @@
  * are worth ~120pt of screen once you have stopped using them.
  */
 import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -53,6 +53,13 @@ import { Screen } from '@/components/shell/Screen';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+
+/**
+ * Whether the packs sheet has already been offered to an empty collection this
+ * session. See the effect that reads it — it must survive a remount of this
+ * screen, which is what rules out `useState`/`useRef`.
+ */
+let starterOffered = false;
 
 const GUTTER = Spacing.three;
 const GAP = Spacing.two + 4;
@@ -222,6 +229,26 @@ export default function InventoryScreen() {
     await Promise.all([refresh(), refreshPlayer()]);
   }, [refresh, refreshPlayer]);
 
+  /**
+   * A player who owns nothing gets the packs sheet opened FOR them, once.
+   *
+   * The free Starter Pack is eight cards and a legal lineup — it is the whole
+   * first session — and making it depend on noticing a button is how a new
+   * account ends up staring at an empty grid. Owning zero cards is a sound
+   * enough proxy for "the starter is unclaimed" to skip a query for it: the
+   * pack deals eight, so nobody has opened it and has none.
+   *
+   * ONCE PER APP SESSION, and the flag is module-level rather than state for
+   * exactly that reason. Closing the sheet puts you back on this screen, which
+   * is still empty — so a re-runnable effect would push it straight back up and
+   * the player could not get out. Deciding not to claim has to stick.
+   */
+  useEffect(() => {
+    if (loading || error || all.length > 0 || starterOffered) return;
+    starterOffered = true;
+    router.push('/packs');
+  }, [loading, error, all.length, router]);
+
   /* ---- navigation ------------------------------------------------------ *
    * A cell in this grid is a COPY you own, not a player, so it opens
    * `/card/<card_instance_id>` — the copy's own tier, what it has earned, the
@@ -274,7 +301,7 @@ export default function InventoryScreen() {
             style={styles.fill}
             contentContainerStyle={styles.emptyContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-            <EmptyCollection onGetCards={() => router.push('/fantasy/collection/shop')} />
+            <EmptyCollection onGetCards={() => router.push('/packs')} />
           </ScrollView>
         ) : listWidth === 0 ? null : (
           <>

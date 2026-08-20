@@ -1,5 +1,13 @@
 /**
- * Collection · Shop — buy and open packs.
+ * The pack shelf and the pull that follows it — the two halves of `/packs`.
+ *
+ * WHAT THIS USED TO BE. `ShopPanel`, a `ScrollView` filling
+ * `collection/shop` — a whole sub-page, one third of the Collection strip, for
+ * a shelf that holds two rows and, once the free Starter Pack is claimed, one.
+ * Packs are now a sheet presented over the app (see `app/(app)/packs.tsx`), so
+ * everything here is presentational: the frame owns the scrolling, the gutter
+ * and the gaps between blocks, and a second `ScrollView` inside it would break
+ * both.
  *
  * Behaviour carried across verbatim where it was already right: a claimed
  * one-per-player pack must render as a disabled "Claimed" button rather than
@@ -14,30 +22,23 @@
  * are still being tuned, and printing them as odds would be a promise the game
  * does not currently keep.
  */
-import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { invalidateCollection } from '@/components/collection/use-collection';
-import { invalidateSets } from '@/components/collection/use-sets';
 import { Gem } from '@/components/shell/AppHeader';
-import { useTabBarInset } from '@/components/shell/useResponsive';
 import {
   Colors,
   NUMERIC,
+  Radius,
   Spacing,
   TierColors,
   Type,
   type CardTier,
 } from '@/constants/theme';
-import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useLoader, type Load } from '@/hooks/use-loader';
 import type { Json } from '@/lib/database.types';
-import { supabase } from '@/lib/supabase';
 import { PlayerCard, type PlayerCardModel } from './PlayerCard';
 
-type Pack = {
+export type Pack = {
   id: string;
   code: string;
   name: string;
@@ -47,7 +48,7 @@ type Pack = {
   guaranteed_positions: Json;
 };
 
-type Pulled = {
+export type Pulled = {
   card_instance_id: string;
   player_name: string | null;
   position_abbreviation: string | null;
@@ -65,10 +66,10 @@ const NEXT_TIER_LABEL = 'SILVER';
  */
 const POSITION_ORDER = ['QB', 'RB', 'WR', 'TE', 'PK'];
 
-type Coverage = { position: string; count: number };
+export type Coverage = { position: string; count: number };
 
 /** `guaranteed_positions` is jsonb, so it is `unknown` until proven otherwise. */
-function coverageOf(raw: Json): Coverage[] {
+export function coverageOf(raw: Json): Coverage[] {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
 
   return Object.entries(raw)
@@ -86,7 +87,7 @@ function coverageOf(raw: Json): Coverage[] {
     });
 }
 
-function countPositions(cards: Pulled[]): Coverage[] {
+export function countPositions(cards: Pulled[]): Coverage[] {
   const counts = new Map<string, number>();
   for (const card of cards) {
     const position = card.position_abbreviation?.toUpperCase() ?? '—';
@@ -96,112 +97,39 @@ function countPositions(cards: Pulled[]): Coverage[] {
   return coverageOf(Object.fromEntries(counts) as Json);
 }
 
-export function ShopPanel() {
+/* ---- the shelf --------------------------------------------------------- */
+
+export function PackShelf({
+  packs,
+  gems,
+  openings,
+  openingCode,
+  onOpen,
+}: {
+  /** null while the first read is in flight. */
+  packs: Pack[] | null;
+  gems: number;
+  /** pack_id -> how many times this player has opened it. */
+  openings: Map<string, number>;
+  /** The pack currently being opened, if any. */
+  openingCode: string | null;
+  onOpen: (code: string) => void;
+}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const router = useRouter();
-  // Single source of truth for the balance: the header reads the same value, so
-  // fetching it separately here is how the two drift apart.
-  const { gems, refresh } = usePlayer();
 
-  const [packs, setPacks] = useState<Pack[] | null>(null);
-  /** pack_id -> how many times this player has opened it. */
-  const [openings, setOpenings] = useState<Map<string, number>>(() => new Map());
-  const [silverAt, setSilverAt] = useState<number>(200);
-  const [openingCode, setOpeningCode] = useState<string | null>(null);
-  const [pulled, setPulled] = useState<Pulled[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  /* This one reports its own failures rather than handing them to useLoader:
-     the shelf and the pack-opening share a single error line, and splitting
-     them into two states would leave one of them stale on screen. */
-  const load = useCallback<Load>(async (live) => {
-    const [packRes, openedRes, tierRes] = await Promise.all([
-      supabase
-        .from('packs')
-        // is_active is filtered here rather than displayed: open_pack() rejects
-        // an inactive pack outright, so listing one is offering a button whose
-        // only possible outcome is an error.
-        .select('id, code, name, gem_cost, card_count, once_per_user, guaranteed_positions')
-        .eq('is_active', true)
-        .order('gem_cost'),
-      // RLS scopes this to the caller, so it is exactly "packs I have opened".
-      supabase.from('pack_openings').select('pack_id'),
-      // The silver floor is tunable in the database; reading it beats baking
-      // 200 into the client and having the card lie after a balance change.
-      supabase.from('tier_thresholds').select('min_career_fp').eq('tier', 'silver').maybeSingle(),
-    ]);
-    if (!live()) return;
-    if (packRes.error) return void setError(packRes.error.message);
-    if (openedRes.error) return void setError(openedRes.error.message);
-
-    setError(null);
-    setPacks(packRes.data as Pack[]);
-    const counts = new Map<string, number>();
-    for (const row of openedRes.data ?? []) {
-      counts.set(row.pack_id, (counts.get(row.pack_id) ?? 0) + 1);
-    }
-    setOpenings(counts);
-    if (!tierRes.error && tierRes.data) setSilverAt(Number(tierRes.data.min_career_fp));
-  }, []);
-
-  // Quiet by design: the shelf that is already drawn stays drawn while it is
-  // re-read after a pack is opened.
-  const { refresh: reloadShelf } = useLoader(load);
-
-  const open = useCallback(
-    async (code: string) => {
-      setOpeningCode(code);
-      setError(null);
-      setPulled(null);
-      // All RNG, gem math and minting happen inside this one call, server-side.
-      const { data, error: err } = await supabase.rpc('open_pack', { p_pack_code: code });
-      if (err) {
-        setError(err.message);
-      } else {
-        setPulled((data ?? []) as Pulled[]);
-        // The cards this just minted are in the collection now, and the
-        // inventory holds it for the session — so the held copy is wrong until
-        // it is dropped. See `invalidateCollection`.
-        invalidateCollection();
-        // Five new cards can move six sets, so the held progress is wrong too.
-        invalidateSets();
-        // Both matter: `load` re-reads the openings so a one-per-player pack
-        // flips to Claimed, `refresh` re-reads the balance the header shows.
-        await Promise.all([reloadShelf(), refresh()]);
-      }
-      setOpeningCode(null);
-    },
-    [reloadShelf, refresh],
-  );
-
-  const toModel = useCallback(
-    (p: Pulled): PlayerCardModel => ({
-      playerName: p.player_name ?? 'Unknown player',
-      positionAbbreviation: p.position_abbreviation,
-      teamAbbreviation: p.team_abbreviation,
-      // A freshly pulled card has never been started, so it starts at the floor.
-      tier: MINT_TIER,
-      careerFp: 0,
-      tierFloorFp: 0,
-      nextTierAt: silverAt,
-      nextTierLabel: NEXT_TIER_LABEL,
-    }),
-    [silverAt],
-  );
-
-  const tabInset = useTabBarInset();
-
-  const pulledPositions = useMemo(() => (pulled ? countPositions(pulled) : []), [pulled]);
+  if (packs === null) {
+    return (
+      <View style={styles.centred}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
 
   return (
-    <ScrollView
-      contentContainerStyle={[styles.content, { paddingBottom: tabInset + Spacing.four }]}
-      keyboardShouldPersistTaps="handled">
-      {packs === null && !error ? <ActivityIndicator /> : null}
-
+    <>
       <View style={styles.shelf}>
-        {packs?.map((p) => (
+        {packs.map((p) => (
           <PackCard
             key={p.id}
             pack={p}
@@ -211,79 +139,103 @@ export function ShopPanel() {
             // Any open in flight blocks every pack: the balance is about to
             // change, so a second purchase would be decided against a stale one.
             locked={openingCode !== null}
-            onOpen={() => void open(p.code)}
+            onOpen={() => onOpen(p.code)}
           />
         ))}
       </View>
 
-      {packs !== null ? (
-        <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
-          Pull rates are not published yet. Which cards a pack can contain is decided server-side —
-          the position guarantees above are the only promise a pack makes about its contents today.
-        </Text>
-      ) : null}
-
-      {error ? (
-        <View style={[styles.notice, { borderColor: c.negative, backgroundColor: c.surface }]}>
-          <View style={styles.noticeText}>
-            <Text style={[Type.micro, { color: c.negative }]}>THAT DID NOT WORK</Text>
-            <Text style={[Type.body, { color: c.text }]}>{error}</Text>
-          </View>
-          {/* Only when the shelf itself failed to load. Offering "try again"
-              after "insufficient gems" invites the player to retry something
-              that cannot succeed until the balance changes. */}
-          {packs === null ? (
-            <Pressable
-              onPress={() => void reloadShelf()}
-              accessibilityRole="button"
-              style={({ pressed }) => [
-                styles.retry,
-                { backgroundColor: c.backgroundElement },
-                pressed && styles.pressed,
-              ]}>
-              <Text style={[Type.strong, { color: c.text }]}>Try again</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
-
-      {pulled ? (
-        <View style={styles.pulledBlock}>
-          <View style={styles.pulledHead}>
-            <Text style={[Type.section, { color: c.text }]}>
-              {pulled.length === 1 ? 'You pulled 1 card' : `You pulled ${pulled.length} cards`}
-            </Text>
-            <Pressable
-              onPress={() => router.push('/fantasy/collection/inventory')}
-              accessibilityRole="button"
-              accessibilityLabel="See these cards in your inventory"
-              style={({ pressed }) => [pressed && styles.pressed]}>
-              <Text style={[Type.strong, { color: c.textSecondary }]}>See in Inventory →</Text>
-            </Pressable>
-          </View>
-
-          {/* What arrived, by position — the same shape the pack promised. */}
-          <View style={styles.chipRow}>
-            {pulledPositions.map((entry) => (
-              <CoverageChip key={entry.position} entry={entry} />
-            ))}
-          </View>
-
-          <View style={styles.grid}>
-            {pulled.map((p) => (
-              <PlayerCard key={p.card_instance_id} model={toModel(p)} size="grid" />
-            ))}
-          </View>
-          <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
-            New cards start at bronze. Start them in a lineup to earn their way up.
-          </Text>
-        </View>
-      ) : null}
-    </ScrollView>
+      <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
+        Pull rates are not published yet. Which cards a pack can contain is decided server-side —
+        the position guarantees above are the only promise a pack makes about its contents today.
+      </Text>
+    </>
   );
 }
 
-function CoverageChip({ entry }: { entry: Coverage }) {
+/* ---- the pull ---------------------------------------------------------- */
+
+/**
+ * What just arrived, and it REPLACES the shelf rather than sitting under it.
+ *
+ * Two reasons, and the first is the one that was actually broken. On the old
+ * page the pulled cards rendered below the shelf inside a scroll view, so on a
+ * phone you spent 100 gems and the payoff was off screen — the thing you paid
+ * for was the one thing you had to go looking for.
+ *
+ * The second is the faucet. A shelf still on screen under five new cards puts
+ * "Open" a thumb's width from the moment the last one landed, which is the
+ * cheapest possible second purchase. `Open another` is the same act made
+ * deliberate: one tap further away, and it says what it does.
+ */
+export function PullResult({
+  pulled,
+  silverAt,
+  onAgain,
+  onSeeInventory,
+}: {
+  pulled: Pulled[];
+  /** Career FP the next tier starts at, read from `tier_thresholds`. */
+  silverAt: number;
+  onAgain: () => void;
+  onSeeInventory: () => void;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
+  const toModel = (p: Pulled): PlayerCardModel => ({
+    playerName: p.player_name ?? 'Unknown player',
+    positionAbbreviation: p.position_abbreviation,
+    teamAbbreviation: p.team_abbreviation,
+    // A freshly pulled card has never been started, so it starts at the floor.
+    tier: MINT_TIER,
+    careerFp: 0,
+    tierFloorFp: 0,
+    nextTierAt: silverAt,
+    nextTierLabel: NEXT_TIER_LABEL,
+  });
+
+  return (
+    <>
+      <View style={styles.grid}>
+        {pulled.map((p) => (
+          <PlayerCard key={p.card_instance_id} model={toModel(p)} size="grid" />
+        ))}
+      </View>
+
+      <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
+        New cards start at bronze. Start them in a lineup to earn their way up.
+      </Text>
+
+      <View style={styles.afterRow}>
+        <Pressable
+          onPress={onSeeInventory}
+          accessibilityRole="button"
+          accessibilityLabel="See these cards in your inventory"
+          style={({ pressed }) => [
+            styles.after,
+            { backgroundColor: c.text },
+            pressed && styles.pressed,
+          ]}>
+          <Text style={[Type.strong, { color: c.background }]}>See in Inventory</Text>
+        </Pressable>
+        <Pressable
+          onPress={onAgain}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.after,
+            { backgroundColor: c.backgroundElement },
+            pressed && styles.pressed,
+          ]}>
+          <Text style={[Type.strong, { color: c.text }]}>Open another</Text>
+        </Pressable>
+      </View>
+    </>
+  );
+}
+
+/* ---- parts ------------------------------------------------------------- */
+
+export function CoverageChip({ entry }: { entry: Coverage }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
@@ -438,12 +390,11 @@ function PackCard({
 }
 
 const styles = StyleSheet.create({
-  content: {
-    padding: Spacing.three,
-    gap: Spacing.three,
-  },
-  // Packs sit side by side wherever there is room. maxWidth stops two packs
-  // stretching to 570pt each on a monitor, which reads as a banner, not a shelf.
+  centred: { alignItems: 'center', justifyContent: 'center', padding: Spacing.four },
+  /* Packs sit side by side wherever there is room — which in a sheet means the
+     wide-web dialog and nothing else. maxWidth stops the single remaining pack
+     stretching the full 720 once the starter is claimed, which reads as a
+     banner rather than as a shelf. */
   shelf: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three },
   pack: {
     flexGrow: 1,
@@ -451,7 +402,7 @@ const styles = StyleSheet.create({
     minWidth: 240,
     maxWidth: 480,
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
+    borderRadius: Radius.panel,
     padding: Spacing.three,
     gap: Spacing.two,
   },
@@ -483,7 +434,7 @@ const styles = StyleSheet.create({
   openButton: {
     paddingVertical: Spacing.two + 2,
     paddingHorizontal: Spacing.three,
-    borderRadius: 8,
+    borderRadius: Radius.chip,
     minWidth: 128,
     minHeight: 40,
     alignItems: 'center',
@@ -493,23 +444,16 @@ const styles = StyleSheet.create({
   money: { flexShrink: 1 },
   disabled: { opacity: 0.55 },
   pressed: { opacity: 0.8 },
-  notice: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 8,
-    padding: Spacing.two + 2,
-    gap: Spacing.two,
-    alignItems: 'flex-start',
-  },
-  noticeText: { gap: Spacing.half },
-  retry: { borderRadius: 8, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two - 2 },
-  // Sentences, not a grid: hold them to a readable line even at measure 'grid'.
+  // Sentences, not a grid: hold them to a readable line even in the wide dialog.
   measure: { maxWidth: 560 },
-  pulledBlock: { gap: Spacing.two + 2 },
-  pulledHead: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: Spacing.two,
-  },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three },
+  afterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  after: {
+    borderRadius: Radius.chip,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
