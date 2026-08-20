@@ -28,15 +28,15 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { TierBadge } from '@/components/cards/TierBadge';
+import { PlayerAvatar } from '@/components/cards/PlayerAvatar';
 import { invalidateCollection } from '@/components/collection/use-collection';
 import { invalidateSets } from '@/components/collection/use-sets';
 import { CardStanding } from '@/components/players/CardStanding';
 import { CommunityPanel } from '@/components/players/CommunityPanel';
 import { GameLogTab } from '@/components/players/GameLogTab';
 import { OverviewTab } from '@/components/players/OverviewTab';
-import { PlayerHero } from '@/components/players/PlayerHero';
-import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
+import { HERO_PORTRAIT, PlayerHero } from '@/components/players/PlayerHero';
+import { PlayerSheetFrame, SheetToneBand } from '@/components/players/PlayerSheetFrame';
 import { StartLog } from '@/components/players/StartLog';
 import { startKey } from '@/components/players/GameLog';
 import { parseCardProfile, type CardProfile } from '@/components/players/card-profile';
@@ -189,28 +189,36 @@ export default function CardDetailScreen() {
 
     return (
       <>
-        <PlayerHero
-          name={k.playerName}
-          bio={page.profile?.player ?? null}
-          team={k.teamAbbreviation}
-          position={k.positionAbbreviation}
-          injuryStatus={k.injuryStatus}
-          /* The copy's identity sits WITH the player's rather than a scroll
-             away — on this page the tier is half of what you came to see. */
-          accessory={<TierBadge tier={k.tier} size="detail" />}
-        />
-
-        <View style={[styles.tabBar, { borderColor: c.backgroundElement }]}>
-          <Tabs
-            tabs={TABS.map((t) =>
-              t.value === 'log' && page.sections.length > 0
-                ? { ...t, hint: String(page.sections.length) }
-                : t,
-            )}
-            value={tab}
-            onChange={setTab}
+        <SheetToneBand tone={TierColors.dark[k.tier].accent}>
+          <PlayerHero
+            name={k.playerName}
+            bio={page.profile?.player ?? null}
+            team={k.teamAbbreviation}
+            position={k.positionAbbreviation}
+            injuryStatus={k.injuryStatus}
+            /* The plain slot, wearing this copy's TIER as its edge — the same
+               edge the card in the grid has, so the header's portrait is
+               recognisably the object you tapped. It is the only structural
+               difference between this header and the directory's; everything
+               else that separates the two pages is the wash behind them. */
+            figure={
+              <PlayerAvatar size={HERO_PORTRAIT} frameColor={TierColors.dark[k.tier].frame} />
+            }
           />
-        </View>
+
+
+          <View style={[styles.tabBar, { borderColor: c.backgroundElement }]}>
+            <Tabs
+              tabs={TABS.map((t) =>
+                t.value === 'log' && page.sections.length > 0
+                  ? { ...t, hint: String(page.sections.length) }
+                  : t,
+              )}
+              value={tab}
+              onChange={setTab}
+            />
+          </View>
+        </SheetToneBand>
 
         {/* Card is the DEFAULT tab here, unlike the player profile. You did not
             arrive at a specific copy to read a bio. */}
@@ -292,6 +300,7 @@ export default function CardDetailScreen() {
               player={page.player}
               profile={page.profile}
               market={page.market}
+              sections={page.sections}
               /* Names the copy without duplicating card content into a player
                  tab — otherwise this tab is a dead end on a card page. */
               lead={
@@ -355,6 +364,11 @@ export default function CardDetailScreen() {
           : undefined
       }
       closeLabel="Close card"
+      /* The TIER, which is the thing this page exists to report and the one
+         fact about a copy that moves. A card climbing bronze to silver changes
+         the colour of its own page, which is the progression made visible on
+         the screen you go to check it. */
+      tone={card ? TierColors.dark[card.card.tier].accent : null}
       onClose={dismiss}>
       {body()}
     </PlayerSheetFrame>

@@ -58,8 +58,16 @@ function shortDate(iso: string | null): string | null {
   return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
 }
 
+/**
+ * The RESULT cell.
+ *
+ * A DNP row gets the real scoreline, not a date. His team played that game and
+ * the score is a fact about it — withholding it was an accident of treating
+ * "no stat line" as "nothing happened". Only a genuinely upcoming fixture has
+ * no result to print, and that is what the kickoff date is for.
+ */
 function resultOf(g: GameLogGame): { label: string; tone: 'win' | 'loss' | 'tie' | null } {
-  if (!g.played || g.teamScore === null || g.oppScore === null) {
+  if (g.status === 'upcoming' || g.teamScore === null || g.oppScore === null) {
     return { label: shortDate(g.startsAt) ?? DASH, tone: null };
   }
   const tone = g.teamScore > g.oppScore ? 'win' : g.teamScore < g.oppScore ? 'loss' : 'tie';
@@ -174,31 +182,47 @@ function SeasonSection({
         accessibilityState={{ expanded: open }}
         accessibilityLabel={`${section.label}, ${open ? 'collapse' : 'expand'}`}
         style={({ pressed }) => [styles.head, pressed && styles.pressed]}>
-        <Text style={[Type.micro, styles.chevron, { color: c.textTertiary }]}>
-          {open ? '▾' : '▸'}
+        {/* ONE glyph that ROTATES rather than two that swap. A `▸` becoming a
+            `▾` is two different shapes and reads as a state change you have to
+            decode; the same arrow turning a quarter is the state change itself,
+            and it is what every disclosure control on the platform does. */}
+        <Text
+          style={[
+            styles.chevron,
+            { color: c.textTertiary, transform: [{ rotate: open ? '90deg' : '0deg' }] },
+          ]}>
+          ›
         </Text>
         <Text style={[Type.strong, styles.headLabel, { color: c.text }]} numberOfLines={1}>
           {section.label}
         </Text>
 
         {/* The summary stays visible when collapsed, because it is usually the
-            answer the reader came for. */}
+            answer the reader came for.
+
+            THE SAME FOUR CELLS ON EVERY SEASON, dashes and all. They used to be
+            conditional on there being points to report, so a season that had
+            not started printed GP alone while the ones under it printed four
+            figures — every header a different shape, and the current season,
+            the one you look at first, the odd one out. A dash in a fixed column
+            says "nothing yet" and keeps the columns readable down the stack; an
+            absent cell just moves everything along. */}
         <View style={styles.summary}>
-          {section.totalPoints !== null ? (
-            <>
-              <Summary label="FP" value={section.totalPoints.toFixed(1)} />
-              <Summary label="AVG" value={section.pointsPerGame?.toFixed(1) ?? DASH} />
-              <Summary label="BEST" value={section.best?.toFixed(1) ?? DASH} />
-            </>
-          ) : null}
-          <Summary
-            label="GP"
-            value={
-              section.upcomingCount > 0
-                ? `${section.playedCount}+${section.upcomingCount}`
-                : String(section.playedCount)
-            }
-          />
+          <Summary label="FP" value={section.totalPoints?.toFixed(1) ?? DASH} />
+          <Summary label="AVG" value={section.pointsPerGame?.toFixed(1) ?? DASH} />
+          <Summary label="BEST" value={section.best?.toFixed(1) ?? DASH} />
+          {/* GAMES PLAYED, and only that.
+              It used to read `0+19` when a season had fixtures left, which is
+              not a number of games played — it is two different quantities
+              welded together in a cell labelled as one of them, sitting in a
+              row of averages and totals where every other figure is a plain
+              measure of what happened. A season not yet started has played
+              nought games; that is the honest answer and it is what the
+              column asks for.
+              The remaining fixtures are not lost: they are listed as rows with
+              their kickoff dates, and the note under an open section counts
+              them in words. */}
+          <Summary label="GP" value={String(section.playedCount)} />
         </View>
       </Pressable>
 
@@ -225,7 +249,30 @@ function SeasonSection({
                 ))}
               </View>
 
-              {section.games.map((g) => {
+              {section.stages.map((stage) => (
+                <View key={stage.seasonType}>
+                  {/* The break between stages. Only drawn when there IS more
+                      than one — a lone REGULAR SEASON bar over a season that
+                      only has one stage is a heading for nothing.
+
+                      `alignSelf: 'stretch'` is what makes it span the table
+                      rather than its own text: this sits inside a horizontal
+                      scroller whose content is as wide as its widest row, so
+                      stretching takes the full table width however many stat
+                      columns the position has. */}
+                  {section.stages.length > 1 ? (
+                    <View
+                      style={[
+                        styles.stageBreak,
+                        { borderColor: c.border, backgroundColor: c.surfaceSunken },
+                      ]}>
+                      <Text style={[Type.micro, { color: c.textSecondary }]}>
+                        {stage.label.toUpperCase()}
+                      </Text>
+                    </View>
+                  ) : null}
+
+              {stage.games.map((g) => {
                 const result = resultOf(g);
                 const tone =
                   result.tone === 'win'
@@ -237,7 +284,14 @@ function SeasonSection({
                 return (
                   <View
                     key={g.gameId}
-                    style={[styles.row, { borderColor: c.border }, !g.played && styles.upcoming]}>
+                    style={[
+                      styles.row,
+                      { borderColor: c.border },
+                      /* Only a fixture that has not happened is dimmed. A DNP
+                         row is a real game with a real result and stays at full
+                         weight; what marks it is DNP in the points column. */
+                      g.status === 'upcoming' && styles.upcoming,
+                    ]}>
                     {startedWeeks ? (
                       <Text
                         accessibilityLabel={
@@ -268,14 +322,23 @@ function SeasonSection({
                       numberOfLines={1}>
                       {result.label}
                     </Text>
+                    {/* DNP rather than a dash, because a dash here is
+                        ambiguous — it reads the same as a missing figure on a
+                        game he did play. Naming it is what turns an empty row
+                        into an explained one, and it is the convention every
+                        other fantasy log uses. */}
                     <Text
                       style={[
-                        g.played ? Type.strong : Type.body,
+                        g.status === 'played' ? Type.strong : Type.micro,
                         styles.fp,
-                        NUMERIC,
-                        { color: g.points === null ? c.textTertiary : c.text },
+                        g.status === 'played' && NUMERIC,
+                        { color: g.status === 'played' ? c.text : c.textTertiary },
                       ]}>
-                      {g.points === null ? DASH : g.points.toFixed(1)}
+                      {g.status === 'played'
+                        ? (g.points?.toFixed(1) ?? DASH)
+                        : g.status === 'dnp'
+                          ? 'DNP'
+                          : DASH}
                     </Text>
                     {columns.map((col) => (
                       <Text
@@ -287,6 +350,8 @@ function SeasonSection({
                   </View>
                 );
               })}
+                </View>
+              ))}
             </View>
           </ScrollView>
 
@@ -335,10 +400,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two + 2,
     paddingVertical: Spacing.two,
   },
-  chevron: { width: 12 },
+  chevron: { fontSize: 17, lineHeight: 20, fontWeight: '600', width: 14, textAlign: 'center' },
+  stageBreak: {
+    alignSelf: 'stretch',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+  },
   headLabel: { flexShrink: 1 },
   summary: { flexDirection: 'row', gap: Spacing.three, marginLeft: 'auto' },
-  summaryCell: { alignItems: 'flex-end', gap: 0 },
+  /**
+   * A floor width so the four figures line up as COLUMNS down the stack rather
+   * than each header packing to its own content. 36 holds `435.4`, the widest
+   * total a season is likely to carry, and a dash sits in the same track.
+   */
+  summaryCell: { alignItems: 'flex-end', gap: 0, minWidth: 36 },
   headRow: { paddingTop: 0 },
   row: {
     flexDirection: 'row',

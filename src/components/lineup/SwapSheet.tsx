@@ -146,12 +146,19 @@ export function SwapSheet({
           style={[
             styles.sheet,
             wide ? styles.dialog : styles.bottomSheet,
-            { backgroundColor: c.surface, borderColor: c.borderStrong },
+            /* `surfaceSheet`, the same layer both profile sheets and the set
+               checklist sit on. This was `surface` — a panel's fill, one step
+               too high — while the profile sheet was `background`, one step too
+               low, so the app's two sheets disagreed about what a sheet is
+               made of. One token now, and neither can drift. */
+            { backgroundColor: c.surfaceSheet, borderColor: c.borderStrong },
           ]}>
           {/* The grab handle is decoration — this sheet is not draggable — but
               it is the standard mark for "this came from the bottom and goes
               back there", and its absence made the panel read as a page. */}
-          {wide ? null : <View style={[styles.handle, { backgroundColor: c.borderStrong }]} />}
+          {/* Same weight as the profile sheets' grabber — one bar, one colour,
+              and `borderStrong` was too faint to find. See `PlayerSheetFrame`. */}
+          {wide ? null : <View style={[styles.handle, { backgroundColor: c.textTertiary }]} />}
 
           {request === null ? null : (
             <>

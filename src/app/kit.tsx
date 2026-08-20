@@ -704,7 +704,7 @@ function Kit() {
 
           <Section
             title="Player sheet"
-            note="The frame the player profile is presented in. On iOS and Android the route is a native formSheet and the OS draws the surface, so only what is inside it is ours. On web it is drawn here: a bottom sheet under 900px, a centred dialog above it — resize the window. Escape, the backdrop and the ✕ all close it.">
+            note="The frame both profiles and the set checklist are presented in. On iOS and Android the route is a native page sheet; the OS draws the corner and the drag, we draw the raised surface, the 1pt outline and — on iOS, in place of the ✕ — the grabber. On web it is drawn here: a bottom sheet under 900px, a centred dialog above it — resize the window. Escape, the backdrop and the ✕ all close it.">
             <View style={styles.row}>
               <Pressable
                 onPress={() => setSheetOpen(true)}

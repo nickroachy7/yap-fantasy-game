@@ -24,35 +24,49 @@
  * as well as in the row also means a player looks like the same player on the
  * list you tapped and the page you land on.
  *
- * `accessory` is the one seam: the card profile hangs its tier badge here so
- * the copy's identity sits with the player's rather than a scroll away.
+ * ONE ARRANGEMENT, BOTH PAGES, and that is a decision rather than an accident.
+ *
+ * The card page briefly had its own: a 140pt card face with the bio running
+ * down its side as a list. It read well on its own and was wrong next to its
+ * sibling — two headers with different portraits, different fact shapes and
+ * different proportions stop looking like two views of one player and start
+ * looking like two apps. The identity block is the part a reader uses to
+ * confirm they are where they think they are, so it is the last part that
+ * should vary.
+ *
+ * What separates the two pages is therefore COLOUR ALONE: the wash behind this
+ * block (`PlayerSheetFrame`'s `tone` — the club on one page, the tier on the
+ * other) and the tier edge on the portrait. Everything else — the portrait's
+ * size, the type, the fact tiles and their order — is identical by
+ * construction, because it is the same code with no branch in it.
+ *
+ * The colour band behind all of this is NOT drawn here; it belongs to
+ * `PlayerSheetFrame`, which can reach the sheet's edges and the title bar. See
+ * its `tone` prop.
+ *
+ * There is no `accessory` slot any more. It existed for the card profile's
+ * large tier badge, which hung off the hero's right edge; the badge is gone and
+ * the slot went with it rather than sitting here waiting for a caller.
  */
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { InjuryChip } from '@/components/cards/InjuryChip';
 import { PlayerAvatar } from '@/components/cards/PlayerAvatar';
-import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
+import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { injuryCode, injuryWeight } from '@/lib/injury';
 import type { PlayerBio } from './profile';
 
 /**
- * Side of the hero's portrait frame. 56 is the height of the name over the
- * identity line beneath it, so the frame squares off against the text block it
- * sits beside rather than overhanging it — and it stays clear of the fact tiles
- * below, which are the row that should be widest on the page.
+ * Side of the hero's portrait frame.
+ *
+ * 64. It was 56 against a two-line block and 84 when the vitals were briefly in
+ * the column beside it; the vitals have gone to the Overview tab, so the text
+ * is two lines again — 30pt of name over a 15pt identity run. The frame
+ * overhangs that slightly on purpose, which anchors the block rather than
+ * squaring off flush with it.
  */
-const HERO_PORTRAIT = 56;
-
-/**
- * "10th Season" -> "10th". The tile is 62pt wide and the label above it already
- * says EXP, so the word "Season" is the half that gets truncated AND the half
- * that carries no information — it rendered as "10th …" on a phone. "Rookie"
- * has no suffix and is left alone.
- */
-function experienceLabel(raw: string): string {
-  return raw.replace(/\s*seasons?$/i, '').trim() || raw;
-}
+export const HERO_PORTRAIT = 64;
 
 export function PlayerHero({
   name,
@@ -60,7 +74,8 @@ export function PlayerHero({
   team,
   position,
   injuryStatus,
-  accessory,
+  figure,
+  meta,
 }: {
   name: string;
   /** Null until the profile RPC lands; the hero still draws from the fallbacks. */
@@ -68,93 +83,113 @@ export function PlayerHero({
   team: string | null;
   position: string | null;
   injuryStatus: string | null;
-  /** Card-profile extras — the tier badge — beside the identity line. */
-  accessory?: ReactNode;
+  /**
+   * What sits in the portrait slot, at `HERO_PORTRAIT` either way. Defaults to
+   * the plain `PlayerAvatar` the directory row draws; the card profile passes
+   * the same avatar wearing its copy's tier edge.
+   *
+   * It is a slot rather than a flag because what goes in it is the caller's
+   * business, but the SIZE is not — a header whose portrait changes size
+   * between two pages is the thing this component exists to prevent.
+   */
+  figure?: ReactNode;
+  /**
+   * A line under the identity run, in the text column beside the portrait.
+   *
+   * The card profile's copy line lives here — tier mark, career total, and how
+   * far it is from promotion — which is the same line the lineup row prints
+   * under the same name. A reader who has learned to read that row does not
+   * have to learn this page.
+   *
+   * It replaced the large tier badge that used to hang off the hero's right
+   * edge. The badge said one word the line says as well, in a lozenge big
+   * enough to compete with the player's name for the top of the page, and it
+   * could not say the two things a reader actually wants next to a tier: what
+   * the copy has banked, and what is left to run.
+   */
+  meta?: ReactNode;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
-  /* Each fact is omitted entirely when unknown rather than rendered as a dash:
-     an empty "COLLEGE —" cell tells the reader nothing they wanted. College is
-     last and drops first, because it is the widest and the least load-bearing
-     of the six on a phone. */
-  const facts: { label: string; value: string }[] = [];
-  if (bio?.jerseyNumber) facts.push({ label: 'NO.', value: `#${bio.jerseyNumber}` });
-  if (bio?.age !== null && bio?.age !== undefined) facts.push({ label: 'AGE', value: String(bio.age) });
-  if (bio?.height) facts.push({ label: 'HT', value: bio.height });
-  if (bio?.weight) facts.push({ label: 'WT', value: bio.weight });
-  if (bio?.experience) facts.push({ label: 'EXP', value: experienceLabel(bio.experience) });
-  if (bio?.college) facts.push({ label: 'COLLEGE', value: bio.college });
+  /* The shirt number rides with the club and the position, because it is the
+     same KIND of fact as they are: it is how you refer to a player, not
+     something you measure about him. In the vitals it was the one cell nobody
+     compares between two players — 28 against 25 is a fact, #12 against #16 is
+     not — and moving it up left four columns, which is what the row wanted. */
+  const identity = [team?.toUpperCase(), position, bio?.jerseyNumber ? `#${bio.jerseyNumber}` : null]
+    .filter(Boolean)
+    .join(' · ');
 
-  const identity = [team?.toUpperCase(), position].filter(Boolean).join(' · ');
+  /* The designation rides ON the identity line as a one- or two-character
+     code, which is what both rows do. It used to be a full-width `InjuryChip`
+     on a line of its own printing QUESTIONABLE at detail size — a whole row of
+     the header, in the loudest colour on it, for a qualifier that is true of a
+     quarter of the league most weeks. See `injuryCode`. */
+  const weight = injuryWeight(injuryStatus);
+
+  const portrait = figure ?? <PlayerAvatar size={HERO_PORTRAIT} />;
 
   return (
-    <View style={styles.wrap}>
-      <View style={styles.head}>
-        {/* Portrait and type are one unit, centred against each other, and the
-            accessory hangs off the OUTSIDE of it still aligned to the top — a
-            tier badge belongs at the top edge of the block, not halfway down
-            beside a name that may run to two lines. */}
-        <View style={styles.identity}>
-          <PlayerAvatar size={HERO_PORTRAIT} />
-          <View style={styles.headText}>
-            <Text style={[Type.page, { color: c.text }]} numberOfLines={2}>
-              {name}
-            </Text>
-            {identity ? (
-              <Text style={[Type.label, { color: c.textSecondary }]} numberOfLines={1}>
-                {identity}
+    <View style={styles.head}>
+      {portrait}
+
+      {/* IDENTITY ONLY: the name, and the run that qualifies it. The
+          measurements that used to sit under here have gone to the Overview
+          tab — see `BioFacts`, which has the argument. */}
+      <View style={styles.headText}>
+        <Text style={[Type.page, { color: c.text }]} numberOfLines={2}>
+          {name}
+        </Text>
+
+        {identity ? (
+          /* SPELLED OUT for a screen reader, because the printed form is a
+             letter. `InjuryChip` used to carry this label and the chip went
+             with the big designation; the obligation did not. "CAR · QB Q"
+             read aloud is not a designation, it is a typo. */
+          <Text
+            style={[Type.label, { color: c.textSecondary }]}
+            numberOfLines={1}
+            accessibilityLabel={
+              weight && injuryStatus ? `${identity}, ${injuryStatus}` : identity
+            }>
+            {identity}
+            {weight && injuryStatus ? (
+              <Text style={{ color: weight === 'blocking' ? c.negative : c.warning }}>
+                {`  ${injuryCode(injuryStatus)}`}
               </Text>
             ) : null}
-          </View>
-        </View>
-        {accessory}
+          </Text>
+        ) : null}
+
+        {meta}
       </View>
-
-      {/* The designation is the one part of this block that is NEWS, so it sits
-          on its own line rather than being folded into the identity run. */}
-      {injuryStatus ? (
-        <View style={styles.injuryRow}>
-          <InjuryChip status={injuryStatus} size="detail" />
-        </View>
-      ) : null}
-
-      {facts.length > 0 ? (
-        <View style={styles.facts}>
-          {facts.map((f) => (
-            <View key={f.label} style={[styles.fact, { backgroundColor: c.backgroundElement }]}>
-              <Text style={[Type.micro, { color: c.textTertiary }]}>{f.label}</Text>
-              <Text numberOfLines={1} style={[Type.strong, NUMERIC, { color: c.text }]}>
-                {f.value}
-              </Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: Spacing.two },
-  head: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
-  identity: {
-    flex: 1,
-    minWidth: 0,
+  head: {
     flexDirection: 'row',
+    /* Centred against the portrait. The column is two lines again now the
+       measurements have gone to Overview — ~47pt against a 64pt frame — so
+       top-aligning left the name riding high with the frame hanging below it.
+       Centring squares the two off. A name that wraps to three lines outgrows
+       the frame instead, and then the frame centres against the text, which is
+       the same rule reading the other way. */
     alignItems: 'center',
     gap: Spacing.two + Spacing.one,
   },
   headText: { flex: 1, minWidth: 0, gap: 2 },
-  injuryRow: { flexDirection: 'row' },
-  facts: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one + 2 },
-  fact: {
-    flexGrow: 1,
-    flexBasis: 62,
-    minWidth: 62,
-    borderRadius: Radius.chip,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one + 2,
-    gap: 1,
-  },
+  /**
+   * NO FILL, and no wrap. The cells divide the width evenly however many there
+   * are, which is the invariant that lets them lose their boxes: five filled
+   * tiles needed a `flexBasis` to keep a sane width when they wrapped, and the
+   * basis is what let one long value escape onto a line of its own.
+   *
+   * Losing the fills is also what lets the header's colour wash be seen. Six
+   * `backgroundElement` boxes over a tinted band left the tint visible only in
+   * the gaps between them, which is a strange thing to build a colour system
+   * for and then cover up.
+   */
 });

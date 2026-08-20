@@ -24,6 +24,14 @@ export const Colors = {
     surface: '#FFFFFF',
     /** A row inside a panel that needs to separate from it. */
     surfaceSunken: '#F7F7F9',
+    /**
+     * The body of something presented OVER the app — see the dark value, which
+     * is where this token earns its keep. White here, deliberately the same as
+     * `background`: in a light scheme iOS's page-sheet dim is VISIBLE (dimming
+     * white gives grey), so the platform already separates the sheet from the
+     * page and a second, lighter-than-white layer does not exist to reach for.
+     */
+    surfaceSheet: '#FFFFFF',
     positive: '#1A7F49',
     negative: '#C4283C',
     warning: '#8A6100',
@@ -37,8 +45,50 @@ export const Colors = {
     textTertiary: '#7E8289',
     border: '#26282C',
     borderStrong: '#34373C',
-    surface: '#121316',
+    /**
+     * Lifted from #121316 when `surfaceSheet` arrived, because a panel has to
+     * clear the sheet it sits ON as well as the page. #121316 was 18 steps
+     * above the page and only 4 above the sheet, so "This copy" on the card
+     * profile was a hairline border around nothing. This clears both by a
+     * comparable margin, and keeps roughly the same distance to
+     * `backgroundElement` above it.
+     */
+    surface: '#17191E',
     surfaceSunken: '#0B0C0E',
+    /**
+     * The body of something presented OVER the app: both profile sheets, the
+     * set checklist, the lineup's swap sheet.
+     *
+     * IT EXISTS BECAUSE #000 OVER #000 IS NOT A SHEET. Every sheet used to fill
+     * with `background`, the same token the page uses, and the only thing UIKit
+     * does to separate a page sheet from what it covers is DIM the view behind
+     * it — which over pure black produces pure black. So the platform's one cue
+     * was invisible by construction, and a profile opening over the collection
+     * read as the collection having been replaced rather than covered. On web
+     * the same arithmetic killed the backdrop: `rgba(0,0,0,0.62)` over #000.
+     *
+     * IT IS NOT `surface`, and that is the whole reason it is a fourth step
+     * rather than a reuse. `Panel` fills with `surface`, so a sheet at the same
+     * value makes every panel inside it — "This copy", "Weeks started", the
+     * community block — vanish into its own background. (`surface` was nudged
+     * up at the same time for the same reason; see its note.) The ramp has to
+     * keep stacking:
+     *
+     *   background #000 → surfaceSheet #0E1013 → surface #17191E → element #212225
+     *
+     * with `surfaceSunken` (#0B0C0E) still darker than the sheet, so a sunken
+     * row inside a sheet still reads sunken.
+     *
+     * Do not use it for anything that is part of the page. A raised layer that
+     * appears in the flow of a screen is just a lighter page, and the next
+     * sheet then has nothing to be raised above.
+     *
+     * Nor for something floating OVER a sheet — `ConfirmDialog` and
+     * `DropdownChip` stay on `surface`, which is above this, because the sell
+     * confirmation opens on top of the card profile and has to read as raised
+     * from it.
+     */
+    surfaceSheet: '#0E1013',
     positive: '#4CC38A',
     negative: '#FF6369',
     warning: '#E0C46A',

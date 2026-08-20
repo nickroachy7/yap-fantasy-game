@@ -35,6 +35,8 @@
  * family that used to try to be both — six cards out of a pool of hundreds — is
  * retired, and the note on `SetFamily` says why.
  */
+import { positionColors } from '@/constants/positions';
+import { teamWash } from '@/constants/teams';
 import type { Database } from '@/lib/database.types';
 
 /**
@@ -515,4 +517,29 @@ export function fillWarning(set: CardSet, plan: FillPlan): string {
   }
 
   return parts.join(' ');
+}
+
+/**
+ * The colour to wash a set's checklist header with.
+ *
+ * Every sheet in the app is coloured by what it is ABOUT — a card profile by
+ * its tier, a player profile by his club — and a checklist was the one left
+ * over, so it opened as a plain dark panel while its siblings did not. It has
+ * a subject like the others; it just took a moment to notice what.
+ *
+ * The set's `code` is the subject, and it is already structured:
+ * `team-buf-2026`, `daily-rb-2026-08-20`, `position-qb-2026` — family, key,
+ * then when. A team set is about a club and takes the club's wash; a daily or
+ * position set is about a position and takes the accent that position wears on
+ * every other screen in the app.
+ *
+ * Parsed from the code rather than taken from a column because the code IS the
+ * identifier the claim RPC uses, so it cannot drift from what the set is. Null
+ * for anything unrecognised, which draws no wash rather than a guess.
+ */
+export function setTone(set: Pick<CardSet, 'code' | 'family'>): string | null {
+  const key = set.code.split('-')[1];
+  if (!key) return null;
+  if (set.family === 'team') return teamWash(key);
+  return positionColors(key, 'dark').accent;
 }

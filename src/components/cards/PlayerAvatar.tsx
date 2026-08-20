@@ -93,7 +93,27 @@ export function PlayerSilhouette({ height, color }: { height: number; color: str
   );
 }
 
-export function PlayerAvatar({ size = AVATAR_SIZE }: { size?: number }) {
+export function PlayerAvatar({
+  size = AVATAR_SIZE,
+  frameColor,
+}: {
+  size?: number;
+  /**
+   * An edge round the slot, in the colour of whatever the frame MEANS on that
+   * screen. Undefined draws none, which is every caller but one.
+   *
+   * The card profile's header is that one: its portrait is a copy you own, and
+   * the copy's tier is drawn as the edge of the card everywhere else in the
+   * app, so the same edge here makes the header's portrait the same object you
+   * tapped in the grid. It is deliberately the ONLY thing separating the two
+   * profile headers — see `PlayerHero`.
+   *
+   * Scaled off the size rather than fixed: 1.5 on a 40pt row slot is a thread,
+   * and the tier edge has to be findable at a glance or it is not saying
+   * anything.
+   */
+  frameColor?: string;
+}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
@@ -109,7 +129,15 @@ export function PlayerAvatar({ size = AVATAR_SIZE }: { size?: number }) {
       importantForAccessibility="no"
       style={[
         styles.well,
-        { width: size, height: size, borderRadius: frameRadius(size), backgroundColor: well },
+        {
+          width: size,
+          height: size,
+          borderRadius: frameRadius(size),
+          backgroundColor: well,
+          ...(frameColor
+            ? { borderWidth: Math.max(1.5, Math.round(size * 0.035)), borderColor: frameColor }
+            : null),
+        },
       ]}>
       {/* The figure sits ON the bottom edge rather than floating in the middle:
           that is where a head and shoulders land in a real headshot crop, and

@@ -34,9 +34,10 @@ import { CommunityPanel } from '@/components/players/CommunityPanel';
 import { GameLogTab } from '@/components/players/GameLogTab';
 import { OverviewTab } from '@/components/players/OverviewTab';
 import { PlayerHero } from '@/components/players/PlayerHero';
-import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
+import { PlayerSheetFrame, SheetToneBand } from '@/components/players/PlayerSheetFrame';
 import { usePlayerPage } from '@/components/players/use-player-page';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
+import { teamWash } from '@/constants/teams';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -127,34 +128,37 @@ export default function PlayerDetailScreen() {
 
     return (
       <>
-        <PlayerHero
-          name={player.name}
-          bio={profile?.player ?? null}
-          team={player.team}
-          position={player.position}
-          injuryStatus={player.injuryStatus}
-        />
-
-        <View style={[styles.tabBar, { borderColor: c.backgroundElement }]}>
-          <Tabs
-            tabs={TABS.map((t) => {
-              if (t.value === 'log' && sections.length > 0) {
-                return { ...t, hint: String(sections.length) };
-              }
-              // The count people actually want on this tab is "how many do I
-              // hold", not how many exist.
-              if (t.value === 'card' && owned.length > 0) {
-                return { ...t, hint: String(owned.length) };
-              }
-              return t;
-            })}
-            value={tab}
-            onChange={setTab}
+        <SheetToneBand tone={teamWash(player.team)}>
+          <PlayerHero
+            name={player.name}
+            bio={profile?.player ?? null}
+            team={player.team}
+            position={player.position}
+            injuryStatus={player.injuryStatus}
           />
-        </View>
+
+
+          <View style={[styles.tabBar, { borderColor: c.backgroundElement }]}>
+            <Tabs
+              tabs={TABS.map((t) => {
+                if (t.value === 'log' && sections.length > 0) {
+                  return { ...t, hint: String(sections.length) };
+                }
+                // The count people actually want on this tab is "how many do I
+                // hold", not how many exist.
+                if (t.value === 'card' && owned.length > 0) {
+                  return { ...t, hint: String(owned.length) };
+                }
+                return t;
+              })}
+              value={tab}
+              onChange={setTab}
+            />
+          </View>
+        </SheetToneBand>
 
         {tab === 'overview' ? (
-          <OverviewTab player={player} profile={profile} market={market} />
+          <OverviewTab player={player} profile={profile} market={market} sections={sections} />
         ) : null}
 
         {tab === 'card' ? (
@@ -190,6 +194,11 @@ export default function PlayerDetailScreen() {
               .join(' · ')
           : undefined
       }
+      /* The club, because this page is about the footballer and his side is
+         the one identity he has that is not yours. Normalised — see
+         `teamWash`, which is what stops Cincinnati shouting and Chicago
+         disappearing at the same alpha. */
+      tone={teamWash(player?.team)}
       onClose={dismiss}>
       {body()}
     </PlayerSheetFrame>

@@ -47,6 +47,7 @@ import {
   fillWarning,
   planFor,
   remainingOf,
+  setTone,
   type CardSet,
 } from '@/components/collection/sets';
 import { invalidateCollection } from '@/components/collection/use-collection';
@@ -204,6 +205,10 @@ export default function SetChecklistScreen() {
     <PlayerSheetFrame
       title={set?.name}
       subtitle={set?.subtitle ?? undefined}
+      /* The club for a team set, the position for a daily — see `setTone`. A
+         checklist is about something too, and was the last sheet opening as a
+         plain dark panel while its siblings carried a colour. */
+      tone={set ? setTone(set) : null}
       onClose={close}
       closeLabel="Close set checklist">
       {loading && members === null ? (

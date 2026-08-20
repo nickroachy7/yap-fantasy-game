@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import {
   CardSizes,
@@ -18,6 +18,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { injuryCode, injuryWeight } from '@/lib/injury';
 import type { Database } from '@/lib/database.types';
 import { tierProgressLabel } from '@/components/lineup/model';
+import { gradient } from '@/components/ui/gradient';
 import { PlayerSilhouette } from './PlayerAvatar';
 import { TierMark } from './TierMark';
 import { useTierTheme } from './use-tier-theme';
@@ -439,30 +440,6 @@ const fmt = (n: number | null) =>
     : Math.round(n)
         .toString()
         .replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-
-/**
- * A CSS gradient, addressed to whichever prop the platform calls it.
- *
- * React Native 0.86 takes one under `experimental_backgroundImage` and
- * react-native-web takes the same string under `backgroundImage`, so the value
- * is written once and only the key differs. Neither is in the other's style
- * type, which is what the cast is for.
- *
- * THIS REPLACED A STACK OF FLAT BANDS, and the bands are worth describing
- * because the idea was reasonable and the result was not. With no gradient
- * dependency in the project, the fade was drawn as N solid views of rising
- * alpha. To hide the seams the alpha step has to be below roughly 0.02, which
- * over a compact card's ~35pt ramp means forty-odd views — per scrim, per
- * card, in a grid that draws dozens. Trading that away for five or six bands
- * put a 0.17 step between them, and 0.17 of black over a flat placeholder is
- * not a subtle seam: it drew visible stripes across every card.
- *
- * A real gradient is one view and one interpolation done by the compositor.
- */
-const gradient = (css: string): ViewStyle =>
-  (Platform.OS === 'web'
-    ? { backgroundImage: css }
-    : { experimental_backgroundImage: css }) as ViewStyle;
 
 /**
  * A one-sided scrim: flat at `max` through the region the type occupies, then
