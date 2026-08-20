@@ -1,6 +1,16 @@
 import { Stack } from 'expo-router';
 
-/** Inventory and Sets are peers; Screen supplies the chrome. */
+import { SectionFrame } from '@/components/shell/SectionFrame';
+
+/**
+ * Inventory, Sets and Shop are peers; `Screen` supplies each page's chrome and
+ * the frame supplies the section's — header and nav, drawn once above this
+ * navigator so neither moves when you flip between the three.
+ */
 export default function CollectionLayout() {
-  return <Stack screenOptions={{ headerShown: false, animation: 'none' }} />;
+  return (
+    <SectionFrame section="/collection">
+      <Stack screenOptions={{ headerShown: false, animation: 'none' }} />
+    </SectionFrame>
+  );
 }

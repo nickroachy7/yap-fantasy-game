@@ -20,6 +20,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -54,7 +55,6 @@ import { useUpcomingFixtures } from '@/components/cards/use-fixtures';
 import { ChipRow, FilterChips, type FilterChip } from '@/components/ui/Chip';
 import { SearchField, SortChips } from '@/components/ui/Controls';
 import { Screen } from '@/components/shell/Screen';
-import { SectionNav } from '@/components/shell/SectionNav';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -78,12 +78,45 @@ const MAX_COLUMNS = 7;
  */
 const SEARCH_FROM = 24;
 
+/**
+ * The last width this grid was laid out at, and the window width it was
+ * measured under. Module scope on purpose: it has to outlive the screen, which
+ * is unmounted every time you visit the Shop. See `listWidth`.
+ */
+let lastMeasured: { window: number; list: number } | null = null;
+
+function measuredWidthFor(windowWidth: number): number {
+  return lastMeasured && lastMeasured.window === windowWidth ? lastMeasured.list : 0;
+}
+
 export default function InventoryScreen() {
   const router = useRouter();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  /** 0 until the list has been laid out; the grid waits rather than guess. */
-  const [listWidth, setListWidth] = useState(0);
+  /**
+   * 0 until the list has been laid out; the grid waits rather than guess.
+   *
+   * Seeded from the last measurement THIS SESSION, because the grid renders
+   * nothing at all while this is 0 and `onLayout` does not fire until after the
+   * mount — so every return to this page had a blank frame between the header
+   * and the cards even once the collection itself came back instantly.
+   *
+   * The seed is only taken when the window is still the width it was measured
+   * at, so a rotation or a resize while the page was away falls back to
+   * measuring rather than drawing one frame at the wrong column count. Any
+   * change is corrected by the `onLayout` below in the same pass regardless;
+   * the guard is about which single frame is wrong, not about correctness.
+   */
+  const windowWidth = useWindowDimensions().width;
+  const [listWidth, setListWidth] = useState(() => measuredWidthFor(windowWidth));
+
+  const rememberWidth = useCallback(
+    (width: number) => {
+      lastMeasured = { window: windowWidth, list: width };
+      setListWidth(width);
+    },
+    [windowWidth],
+  );
 
   const { cards, error, loading, refreshing, refresh } = useCollection();
   /* One read for the whole grid, not one per card. Decoration only: it
@@ -259,7 +292,7 @@ export default function InventoryScreen() {
   return (
     <Screen title="Inventory" context={context} scroll={false}>
 
-      <View style={styles.fill} onLayout={(e) => setListWidth(e.nativeEvent.layout.width)}>
+      <View style={styles.fill} onLayout={(e) => rememberWidth(e.nativeEvent.layout.width)}>
         {loading ? (
           <View style={styles.centred}>
             <ActivityIndicator />
@@ -288,13 +321,14 @@ export default function InventoryScreen() {
           </ScrollView>
         ) : listWidth === 0 ? null : (
           <>
-            {/* Pinned: where you are, then what you are filtering by. The
-                facets themselves — tiers, positions, sort — stay in the list's
-                header, where they scroll away once you have stopped using them.
-                The search FIELD cannot: a TextInput in a ListHeaderComponent is
-                remounted on every keystroke and loses focus after one
-                character, which is why it lives up here beside its chip. */}
-            <SectionNav section="/collection" />
+            {/* Pinned: what you are filtering by. Where you ARE is the section
+                nav, which now sits above this whole navigator — see
+                `SectionFrame`. The facets themselves — tiers, positions, sort —
+                stay in the list's header, where they scroll away once you have
+                stopped using them. The search FIELD cannot: a TextInput in a
+                ListHeaderComponent is remounted on every keystroke and loses
+                focus after one character, which is why it lives up here beside
+                its chip. */}
             <View style={styles.toolbar}>
               <ChipRow>
                 <FilterChips items={facets} />

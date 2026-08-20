@@ -294,21 +294,40 @@ async function fetchCardMarket(): Promise<Map<string, PlayerCardMarket>> {
  *
  * Held for the session and cleared by `invalidatePlayerDirectory()` — the
  * directory only changes when the nightly sync runs.
+ *
+ * `peekPlayerDirectory` is the half that was missing. Caching the PROMISE
+ * removed the network cost but not the spinner: every remount still awaited it,
+ * and an await resolves a microtask later, so Trend and Leaders each rendered
+ * once with nothing before rendering the board they already had in memory. The
+ * peek answers during the first render instead. See `lib/session-cache`.
  */
 let cached: Promise<DirectoryFetch> | null = null;
+let settled: DirectoryFetch | null = null;
 
 export function invalidatePlayerDirectory(): void {
   cached = null;
+  settled = null;
+}
+
+/** The directory IF it has already landed. Never starts a read. */
+export function peekPlayerDirectory(): DirectoryFetch | null {
+  return settled;
 }
 
 export function loadPlayerDirectory(): Promise<DirectoryFetch> {
   if (!cached) {
-    cached = fetchPlayerDirectory().catch((err) => {
-      // A failed read must not be cached, or the screen is stuck on the error
-      // until a reload.
-      cached = null;
-      throw err;
-    });
+    cached = fetchPlayerDirectory().then(
+      (result) => {
+        settled = result;
+        return result;
+      },
+      (err) => {
+        // A failed read must not be cached, or the screen is stuck on the error
+        // until a reload.
+        cached = null;
+        throw err;
+      },
+    );
   }
   return cached;
 }

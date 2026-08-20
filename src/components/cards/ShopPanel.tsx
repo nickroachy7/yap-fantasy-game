@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { invalidateCollection } from '@/components/collection/use-collection';
 import { Gem } from '@/components/shell/AppHeader';
 import { useTabBarInset } from '@/components/shell/useResponsive';
 import {
@@ -158,6 +159,10 @@ export function ShopPanel() {
         setError(err.message);
       } else {
         setPulled((data ?? []) as Pulled[]);
+        // The cards this just minted are in the collection now, and the
+        // inventory holds it for the session — so the held copy is wrong until
+        // it is dropped. See `invalidateCollection`.
+        invalidateCollection();
         // Both matter: `load` re-reads the openings so a one-per-player pack
         // flips to Claimed, `refresh` re-reads the balance the header shows.
         await Promise.all([reloadShelf(), refresh()]);

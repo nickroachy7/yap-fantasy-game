@@ -2,10 +2,13 @@
  * The app's colour scheme. One value, on every platform: dark.
  *
  * This is a product decision rather than a limitation. The chrome was already
- * fixed dark in both schemes — the header band and the web rail are both
- * `#0E0F12` regardless of the device setting — so honouring a light device gave
- * a white page hanging off black navigation, and the two builds of the same
- * screen did not look like the same app. Card tiers are also drawn from a
+ * fixed dark in both schemes — the web rail is `#0E0F12` regardless of the
+ * device setting, and the app header used to be too — so honouring a light
+ * device gave a white page hanging off black navigation, and the two builds of
+ * the same screen did not look like the same app. (The header has since dropped
+ * its band and draws on the page background instead, which is only sound
+ * BECAUSE of this constant: it is the decision that makes "the page" a known
+ * colour.) Card tiers are also drawn from a
  * palette tuned against a black surface (see TierColors.dark): the light set
  * exists, but the motifs and frames were designed on the dark one.
  *

@@ -25,20 +25,30 @@
  * On wide web it renders nothing at all: the rail already lists every sub-page
  * as a row, and `ActionBar` drops items marked `nav`.
  *
- * IT OWNS ITS OWN GUTTER, and that is the fix for the thing that went wrong.
+ * IT IS RENDERED BY THE SECTION, NOT BY THE PAGE. `SectionFrame` draws it once
+ * above the section's navigator, so flipping between sub-pages leaves it
+ * untouched — see that file for what went wrong while each page drew its own.
+ * The pages themselves no longer mention it.
+ *
+ * IT OWNS ITS OWN SPACING, all four sides, and that is the fix for the thing
+ * that went wrong before.
  *
  * `Screen` pads its content horizontally when it scrolls and NOT when it does
  * not — a `scroll={false}` page hands the gutter to the virtualised list inside
  * it, which needs to bleed. So whether this bar was inset depended on which
  * kind of page it landed on, and every screen was left to make up the
  * difference: Players wrapped it in a 16pt toolbar, Collection and Leaderboard
- * rendered it bare and it ran edge to edge. The same control looked like two
- * different components depending on which tab you were in.
+ * rendered it bare and it ran edge to edge, and `leaderboard/scoring` — the one
+ * page that scrolls — had to bleed the outer padding back with a negative
+ * margin. The same control looked like three different components depending on
+ * which page it landed on.
  *
- * The gutter lives here now, so a screen cannot get it wrong by doing nothing.
- * The one thing a CALLER must know: a page whose `Screen` already pads (i.e.
- * `scroll` left on) has to bleed that padding back — see `leaderboard/scoring`,
- * which is the only such page and says so at the call site.
+ * None of that survives the move. Sitting above the navigator it lands on the
+ * same surface every time, so the gutter and both vertical gaps are simply
+ * fixed here and no page can get them wrong by doing nothing. `paddingTop` is
+ * the 16 the content box used to give it; `paddingBottom` is the gap to the
+ * filters below. `Screen` gives its content no top padding while framed — see
+ * `flush` there — so these numbers are the whole story.
  */
 import { usePathname, useRouter } from 'expo-router';
 import { useMemo } from 'react';
@@ -59,7 +69,6 @@ export function SectionNav({ section }: { /** e.g. `/collection`. */ section: st
       key: child.href,
       label: child.label,
       icon: child.icon,
-      badge: child.badge,
       active: pathname === child.href,
       nav: true,
       /* Replace for the peers — pushing would build a back stack out of every
@@ -90,5 +99,9 @@ export function SectionNav({ section }: { /** e.g. `/collection`. */ section: st
 const styles = StyleSheet.create({
   /* The same 16 the rows below use, so the bar lines up with the content it
      navigates rather than sitting a few points inside or outside it. */
-  wrap: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
+  wrap: {
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.two,
+  },
 });

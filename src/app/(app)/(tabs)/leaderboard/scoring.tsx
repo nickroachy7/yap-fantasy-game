@@ -19,7 +19,6 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '@/components/shell/Screen';
-import { SectionNav } from '@/components/shell/SectionNav';
 import {
   parseScoringSheet,
   pointsText,
@@ -130,15 +129,6 @@ export default function ScoringScreen() {
       context="How a fantasy point is earned"
       refreshing={refreshing}
       onRefresh={() => void refresh()}>
-      {/* THE ONE PAGE THAT HAS TO BLEED IT BACK.
-          This screen scrolls, so `Screen` already pads its content by 16 —
-          every other page carrying a SectionNav sets `scroll={false}` and gets
-          none. The bar supplies its own gutter so a bare page cannot get it
-          wrong, which means this one has to give the outer padding back or the
-          strip sits 32 inside the page and matches nothing else in the app. */}
-      <View style={styles.navBleed}>
-        <SectionNav section="/leaderboard" />
-      </View>
       {body()}
       <View style={{ height: tabInset }} />
     </Screen>
@@ -183,7 +173,6 @@ function Row({ label, points, note }: { label: string; points: number; note?: st
 }
 
 const styles = StyleSheet.create({
-  navBleed: { marginHorizontal: -Spacing.three },
   pad: { paddingVertical: Spacing.four },
   meta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   row: {

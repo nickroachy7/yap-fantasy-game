@@ -35,6 +35,14 @@ import type { TabIconName } from '@/components/shell/TabIcon';
 export type NavChild = {
   href: string;
   label: string;
+  /**
+   * A word beside the label in the wide RAIL — and only there. The rail is a
+   * vertical list of rows, so a badge at the end of one costs nothing; the
+   * narrow bar stacks icon over label and a third line changes the height of
+   * every cell in the strip. `ActionBar` therefore has no badge at all.
+   *
+   * Nothing sets this today. See the note on Sets.
+   */
   badge?: string;
   /**
    * Drawn beside the label in the page's action bar.
@@ -95,9 +103,13 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: 'collection',
     children: [
       { href: '/collection/inventory', label: 'Inventory', icon: 'inventory' },
-      // Sets is a designed empty state until Week 3; the badge says so rather
-      // than the screen looking broken.
-      { href: '/collection/sets', label: 'Sets', badge: 'Soon', icon: 'sets' },
+      /* No "Soon" badge, though Sets is a designed empty state until Week 3.
+         The badge cost the whole Collection bar 11pt of height — it was a third
+         line in a cell, so it stretched its two siblings with it and the strip
+         sat lower than every other section's. And it was saying, at 7pt, a
+         weaker version of what the page itself opens with: NOT BUILT YET, over
+         "Nothing to collect here yet", over PLANNED — Week 3. */
+      { href: '/collection/sets', label: 'Sets', icon: 'sets' },
       { href: '/collection/shop', label: 'Shop', icon: 'shop' },
     ],
   },

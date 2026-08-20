@@ -11,10 +11,15 @@
  * Roughly 50 rows across three small reads — the upcoming slate, its games, and
  * the club list — rather than the whole season the scoreboard loads, because
  * the only thing this screen needs is "who does HOU play next, if anyone".
+ *
+ * READ ONCE PER SESSION. Small is not free: four screens draw fixture text —
+ * Trend, Leaders, Inventory and the directory — and every switch between two of
+ * them was re-running all three reads for a schedule that is fixed months
+ * ahead. It is a `sessionCache` now, so the second screen to ask gets the map
+ * synchronously and draws its fixture lines in its first render.
  */
-import { useEffect, useState } from 'react';
-
 import { kickoffLabel, matchupLabel, type GameContext } from '@/components/lineup/model';
+import { sessionCache, useSessionRead } from '@/lib/session-cache';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -35,56 +40,62 @@ export function fixtureLabel(game: GameContext | null | undefined): string {
   return `${kick ? `${kick} ` : ''}${matchupLabel(game)}`;
 }
 
+/**
+ * Every failure resolves to an EMPTY MAP rather than rejecting, and that is
+ * deliberate: this is decoration, the callers have no error path for it, and a
+ * rejection would be cached as "retry on the next mount" for something no
+ * screen is waiting on. An empty map simply renders no fixture text.
+ */
+async function fetchUpcomingFixtures(): Promise<FixtureMap> {
+  const empty: FixtureMap = new Map();
+  try {
+    const { data: slateRows, error: slateErr } = await supabase.rpc('upcoming_slate');
+    const slate = (slateRows as { season: number; season_type: number; week: number }[] | null)?.[0];
+    if (slateErr || !slate) return empty;
+
+    const [teamsRes, gamesRes] = await Promise.all([
+      supabase.from('teams').select('id, abbreviation'),
+      supabase
+        .from('games')
+        .select('home_team_id, visitor_team_id, starts_at')
+        .eq('season', slate.season)
+        .eq('season_type', slate.season_type)
+        .eq('week', slate.week),
+    ]);
+    if (teamsRes.error || gamesRes.error) return empty;
+
+    const abbrOf = new Map((teamsRes.data ?? []).map((t) => [t.id, t.abbreviation as string]));
+    const byTeam = new Map<string, GameContext>();
+    for (const g of gamesRes.data ?? []) {
+      const home = g.home_team_id ? abbrOf.get(g.home_team_id) : undefined;
+      const away = g.visitor_team_id ? abbrOf.get(g.visitor_team_id) : undefined;
+      if (home) byTeam.set(home, { opponent: away ?? null, home: true, startsAt: g.starts_at });
+      if (away) byTeam.set(away, { opponent: home ?? null, home: false, startsAt: g.starts_at });
+    }
+
+    const out: FixtureMap = new Map();
+    for (const abbr of abbrOf.values()) {
+      // A club absent from the week's schedule is on a bye — a real fact,
+      // and the one this line is most worth showing.
+      out.set(abbr, byTeam.get(abbr) ?? null);
+    }
+    return out;
+  } catch {
+    return empty;
+  }
+}
+
+/** One week, one map. The key is a constant; there is only ever one answer. */
+const fixtures = sessionCache<'upcoming', FixtureMap>(fetchUpcomingFixtures);
+
+/** Same object every time once it has landed, so `useMemo` deps downstream hold. */
+const EMPTY: FixtureMap = new Map();
+
 export function useUpcomingFixtures(): FixtureMap {
-  const [fixtures, setFixtures] = useState<FixtureMap>(new Map());
+  return useSessionRead(fixtures, 'upcoming').value ?? EMPTY;
+}
 
-  useEffect(() => {
-    let live = true;
-
-    void (async () => {
-      try {
-        const { data: slateRows, error: slateErr } = await supabase.rpc('upcoming_slate');
-        const slate = (slateRows as { season: number; season_type: number; week: number }[] | null)?.[0];
-        if (slateErr || !slate) return;
-
-        const [teamsRes, gamesRes] = await Promise.all([
-          supabase.from('teams').select('id, abbreviation'),
-          supabase
-            .from('games')
-            .select('home_team_id, visitor_team_id, starts_at')
-            .eq('season', slate.season)
-            .eq('season_type', slate.season_type)
-            .eq('week', slate.week),
-        ]);
-        if (!live || teamsRes.error || gamesRes.error) return;
-
-        const abbrOf = new Map(
-          (teamsRes.data ?? []).map((t) => [t.id, t.abbreviation as string]),
-        );
-        const byTeam = new Map<string, GameContext>();
-        for (const g of gamesRes.data ?? []) {
-          const home = g.home_team_id ? abbrOf.get(g.home_team_id) : undefined;
-          const away = g.visitor_team_id ? abbrOf.get(g.visitor_team_id) : undefined;
-          if (home) byTeam.set(home, { opponent: away ?? null, home: true, startsAt: g.starts_at });
-          if (away) byTeam.set(away, { opponent: home ?? null, home: false, startsAt: g.starts_at });
-        }
-
-        const out: FixtureMap = new Map();
-        for (const abbr of abbrOf.values()) {
-          // A club absent from the week's schedule is on a bye — a real fact,
-          // and the one this line is most worth showing.
-          out.set(abbr, byTeam.get(abbr) ?? null);
-        }
-        if (live) setFixtures(out);
-      } catch {
-        // Decoration only. An empty map renders no fixture text at all.
-      }
-    })();
-
-    return () => {
-      live = false;
-    };
-  }, []);
-
-  return fixtures;
+/** The nightly sync moves the schedule on. Nothing else should clear this. */
+export function invalidateUpcomingFixtures(): void {
+  fixtures.invalidate();
 }

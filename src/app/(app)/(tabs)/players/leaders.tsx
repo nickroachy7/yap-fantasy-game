@@ -30,12 +30,12 @@ import { PlayerList, type ListedPlayer } from '@/components/cards/PlayerList';
 import { ROW_GUTTER } from '@/components/cards/PlayerRow';
 import {
   loadPlayerDirectory,
+  peekPlayerDirectory,
   type DirectoryFetch,
   type DirectoryPlayer,
 } from '@/components/cards/player-directory';
 import { fixtureLabel, useUpcomingFixtures } from '@/components/cards/use-fixtures';
 import { Screen } from '@/components/shell/Screen';
-import { SectionNav } from '@/components/shell/SectionNav';
 import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Spacing } from '@/constants/theme';
@@ -46,7 +46,11 @@ const SHOWN = 50;
 export default function LeadersScreen() {
   const router = useRouter();
 
-  const [result, setResult] = useState<DirectoryFetch | null>(null);
+  /* Seeded from the cache's synchronous peek. The directory was already held
+     for the session, but awaiting the cached PROMISE still cost a render with
+     nothing in it — which is the flicker you saw flipping over from Trend. See
+     `lib/session-cache`. */
+  const [result, setResult] = useState<DirectoryFetch | null>(() => peekPlayerDirectory());
   const [failed, setFailed] = useState(false);
   const [pos, setPos] = useState<PosFilter>('ALL');
 
@@ -150,8 +154,6 @@ export default function LeadersScreen() {
     <Screen title="Leaders" measure="table" context={context} scroll={false}>
       {/* The list runs edge to edge, so the chrome supplies the gutter the
           page does not. See the same block on the Trend board. */}
-      {/* Outside `controls` — the bar brings its own gutter. See the Trend board. */}
-      <SectionNav section="/players" />
       <View style={styles.controls}>
 
         <PositionFilter value={pos} onChange={setPos} />

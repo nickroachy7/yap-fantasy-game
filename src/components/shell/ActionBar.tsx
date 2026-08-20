@@ -61,8 +61,6 @@ export type Action = {
   label: string;
   icon: ActionIconName;
   active?: boolean;
-  /** e.g. "Soon" on Sets — the same signal the rail gives. */
-  badge?: string;
   /** A link to a sibling page. Dropped on wide web — see the header. */
   nav?: boolean;
   onPress: () => void;
@@ -119,11 +117,6 @@ export function ActionBar({ actions, wide }: { actions: Action[]; wide: boolean 
             style={[Type.micro, styles.label, { color: a.active ? accent : c.textTertiary }]}>
             {a.label.toUpperCase()}
           </Text>
-          {a.badge ? (
-            <Text numberOfLines={1} style={[styles.badge, { color: c.textTertiary }]}>
-              {a.badge}
-            </Text>
-          ) : null}
         </Pressable>
       ))}
     </ScrollView>
@@ -464,6 +457,14 @@ const styles = StyleSheet.create({
      share after the page gutter, the tray padding and the gaps — 109 each — so
      three and above still FILL and the old complaint cannot come back. Only a
      two-item bar is capped, which is the one that sprawled. */
+  /* EXACTLY TWO CHILDREN, glyph over label, and that is a constraint rather
+     than a description. A cell is a flex column in a flex row, so a third line
+     in ONE cell stretches every cell in the bar: the "Soon" badge Sets used to
+     carry made the Collection strip 66pt where every other section's was 55,
+     and — because these cells centre their content — pushed Inventory and Shop
+     visibly lower than the same items elsewhere. Anything that wants to say
+     more about a destination belongs in the rail, which is a list of rows, or
+     on the destination itself. */
   item: {
     flexGrow: 1,
     flexBasis: 0,
@@ -476,7 +477,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.control,
   },
   label: { letterSpacing: 0.4 },
-  badge: { fontSize: 7, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
   box: { alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.65 },
 });

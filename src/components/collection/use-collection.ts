@@ -17,10 +17,29 @@
  * And the lookup had in any case been redundant since the migration that added
  * `player_id` to `my_collection` — the comment justifying it went stale without
  * anyone noticing, which is exactly how a per-load round trip survives review.
+ *
+ * HELD FOR THE SESSION, AND THE INVALIDATION IS THE INTERESTING PART.
+ *
+ * Inventory, Sets and Shop are three routes in one section, so glancing at the
+ * Shop and coming back unmounted the grid and re-paged the whole collection —
+ * the visible pause on the way back in.
+ *
+ * The other session caches in this app hold things the client cannot change:
+ * the fixture list, the season schedule, the card directory. This one is
+ * different. A collection is MUTABLE, and it is mutable by exactly two actions
+ * — opening a pack mints cards into it, selling removes one — so the cache is
+ * only safe because both of them call `invalidateCollection()` and the next
+ * read goes back to the network. Anything that comes to mutate `my_collection`
+ * in future must do the same, which is why the setter is exported next to the
+ * reader rather than hidden inside the hook.
+ *
+ * Pull-to-refresh also invalidates, because a refresh the user ASKED for that
+ * returns a cached answer is not a refresh.
  */
 import { useCallback, useState } from 'react';
 
 import { useLoader, type Load } from '@/hooks/use-loader';
+import { sessionCache } from '@/lib/session-cache';
 import { supabase } from '@/lib/supabase';
 import { normaliseRow, type CollectionCard, type CollectionViewRow } from './types';
 
@@ -65,12 +84,30 @@ async function fetchAllRows(): Promise<CollectionCard[]> {
   return out;
 }
 
+/** One collection, one key — RLS decides whose. */
+const collection = sessionCache<'mine', CollectionCard[]>(fetchAllRows);
+
+/**
+ * Forget the held collection. The next read pages it again.
+ *
+ * Call this from anything that mints or removes a card — `open_pack` and
+ * `sell_card` are the two today. Failing to call it does not error, it just
+ * quietly shows the wrong grid, which is the failure mode worth naming.
+ */
+export function invalidateCollection(): void {
+  collection.invalidate();
+}
+
 export function useCollection(): CollectionState {
-  const [cards, setCards] = useState<CollectionCard[] | null>(null);
+  /* Seeded from the cache's synchronous peek, so returning from the Shop draws
+     the grid you left in the first render rather than a spinner. `useLoader`
+     still runs on mount — on a hit it resolves from memory and writes back the
+     same rows. See `lib/session-cache`. */
+  const [cards, setCards] = useState<CollectionCard[] | null>(() => collection.peek('mine') ?? null);
 
   const load = useCallback<Load>(async (live) => {
     try {
-      const rows = await fetchAllRows();
+      const rows = await collection.read('mine');
       if (!live()) return;
       setCards(rows);
     } catch (e) {
@@ -80,5 +117,19 @@ export function useCollection(): CollectionState {
 
   const { loading, refreshing, error, refresh } = useLoader(load);
 
-  return { cards, error, loading, refreshing, refresh };
+  /* Pull-to-refresh must reach the server. It is also the user's own escape
+     hatch from a stale grid if some future mutation forgets to invalidate. */
+  const reread = useCallback(async () => {
+    invalidateCollection();
+    await refresh();
+  }, [refresh]);
+
+  return {
+    cards,
+    error,
+    // A seeded grid is not loading, whatever the read behind it is doing.
+    loading: loading && cards === null,
+    refreshing,
+    refresh: reread,
+  };
 }

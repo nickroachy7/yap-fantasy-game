@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppHeader } from '@/components/shell/AppHeader';
+import { useSectionFramed } from '@/components/shell/SectionFrame';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, ContentMeasure, Spacing, type Measure } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -22,7 +23,14 @@ type Props = {
    * the width was reclaimed for.
    */
   measure?: Measure;
-  /** Secondary line in the header, e.g. "Preseason · Week 3". */
+  /**
+   * Secondary line under the page heading, e.g. "Preseason · Week 3".
+   *
+   * WIDE ONLY. The narrow header is a fixed masthead — wordmark and balance,
+   * nothing that changes per screen — so there is no heading on a phone for
+   * this to sit under, and it used to hang off the wordmark instead. Screens
+   * still pass it unconditionally; it simply has no narrow presentation.
+   */
   context?: string;
   /**
    * A full-bleed band pinned between the chrome and the page, outside the
@@ -32,7 +40,7 @@ type Props = {
    * of where it has to sit, which is different on each platform and is not
    * expressible from inside the content box:
    *
-   *  - narrow: FLUSH against the bottom of the header band, with no page gutter
+   *  - narrow: FLUSH against the bottom of the header, with no page gutter
    *    and no content gap. Passed as content it inherited `styles.content`'s
    *    16pt padding and 14pt gap, so it floated below the header with a stripe
    *    of page background above it and read as the first item on the page
@@ -70,9 +78,21 @@ export function Screen({
   // rendering the header too would say all of it twice.
   const isWide = useIsWide();
 
+  /**
+   * True when a `SectionFrame` above this page has already drawn the header and
+   * the section nav — every page of Collection, Players and Leaderboard.
+   *
+   * Two consequences, and they are separate. The header is simply not drawn
+   * again. And the content box gives up its TOP padding: the nav above supplies
+   * that gap now, exactly as it did when it was the first child of this box,
+   * and leaving both in would put 16 above the nav and another 16 below it.
+   */
+  const framed = useSectionFramed();
+  const flush = framed && !isWide;
+
   const body = scroll ? (
     <ScrollView
-      contentContainerStyle={[styles.content, { maxWidth }]}
+      contentContainerStyle={[styles.content, flush && styles.flushTop, { maxWidth }]}
       keyboardShouldPersistTaps="handled"
       refreshControl={
         onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} /> : undefined
@@ -81,7 +101,7 @@ export function Screen({
     </ScrollView>
   ) : (
     // A virtualised list must own the scroll container, so only gutters here.
-    <View style={[styles.flexContent, { maxWidth }]}>{children}</View>
+    <View style={[styles.flexContent, flush && styles.flushTop, { maxWidth }]}>{children}</View>
   );
 
   return (
@@ -113,11 +133,16 @@ export function Screen({
         </>
       ) : (
         <>
-          {/* Narrow keeps the header as-is: the tab bar already names the screen,
-           * and vertical space is the scarce resource on a phone. */}
-          <AppHeader context={context} />
-          {/* Immediately under it, with nothing between the two: the band's own
-              top hairline becomes the header's bottom edge. */}
+          {/* The masthead only: the tab bar already names the screen, and
+           * vertical space is the scarce resource on a phone. `context` is not
+           * passed — see the prop.
+           *
+           * Skipped inside a section, where the frame above the navigator drew
+           * it once and must keep it — see `SectionFrame`. */}
+          {framed ? null : <AppHeader />}
+          {/* Immediately under it, with nothing between the two. The header
+              draws on the page background now, so the strip's own surface is
+              the first edge on the screen — which is the right one to be. */}
           {banner}
         </>
       )}
@@ -154,10 +179,13 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     /* The same top gap the scrolling branch gets from its `padding`. Without
        it a `scroll={false}` screen — the directory, the inventory — started its
-       first control flush against the header band, which read as the control
+       first control flush against the header, which read as the control
        belonging to the header rather than to the page. Vertical only: the
        horizontal gutter still belongs to the list inside, which measures its
        own box to lay out a grid. */
     paddingTop: Spacing.three,
   },
+  /* Applied last, so it wins over whichever branch's padding came before it.
+     See `flush` — inside a section frame the nav above owns this gap. */
+  flushTop: { paddingTop: 0 },
 });

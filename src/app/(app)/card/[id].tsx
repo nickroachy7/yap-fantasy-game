@@ -29,6 +29,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TierBadge } from '@/components/cards/TierBadge';
+import { invalidateCollection } from '@/components/collection/use-collection';
 import { CardStanding } from '@/components/players/CardStanding';
 import { CommunityPanel } from '@/components/players/CommunityPanel';
 import { GameLogTab } from '@/components/players/GameLogTab';
@@ -134,6 +135,9 @@ export default function CardDetailScreen() {
         p_card_instance_id: card.card.id,
       });
       if (err) throw new Error(sellErrorMessage(err.message));
+      // This copy is gone from the collection, which the inventory holds for
+      // the session — drop it or the grid still shows the card you just sold.
+      invalidateCollection();
       await refreshWallet();
       setSelling(false);
       dismiss();

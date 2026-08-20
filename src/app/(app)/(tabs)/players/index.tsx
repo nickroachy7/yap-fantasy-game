@@ -31,20 +31,29 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { PlayerList, type ListedPlayer } from '@/components/cards/PlayerList';
 import { ROW_GUTTER } from '@/components/cards/PlayerRow';
-import { loadPlayerDirectory, type DirectoryPlayer } from '@/components/cards/player-directory';
+import {
+  loadPlayerDirectory,
+  peekPlayerDirectory,
+  type DirectoryFetch,
+  type DirectoryPlayer,
+} from '@/components/cards/player-directory';
 import { fixtureLabel, useUpcomingFixtures } from '@/components/cards/use-fixtures';
 import { DASH } from '@/components/ui/DataTable';
 import { weekLabel } from '@/components/scores/scoreboard';
-import { useSeasonSchedule, useWeekLeaders, type Slate } from '@/components/scores/use-scores';
+import {
+  loadCurrentSeason,
+  peekCurrentSeason,
+  useSeasonSchedule,
+  useWeekLeaders,
+  type Slate,
+} from '@/components/scores/use-scores';
 import { Screen } from '@/components/shell/Screen';
-import { SectionNav } from '@/components/shell/SectionNav';
 import { SegmentedControl } from '@/components/shell/SegmentedControl';
 import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { computeMovers, deltaText } from '@/components/trend/movers';
-import { supabase } from '@/lib/supabase';
 
 const FALLBACK_SEASON = 2026;
 
@@ -66,8 +75,12 @@ export default function TrendScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
-  const [season, setSeason] = useState(FALLBACK_SEASON);
-  const [seeded, setSeeded] = useState(false);
+  /* Peeked, so a revisit starts on the season it ended on rather than on the
+     fallback — which would otherwise send `useSeasonSchedule` after the WRONG
+     season for one render and miss its cache. See `currentSeason`. */
+  const seededSeason = peekCurrentSeason();
+  const [season, setSeason] = useState(seededSeason ?? FALLBACK_SEASON);
+  const [seeded, setSeeded] = useState(seededSeason !== null);
   const [pos, setPos] = useState<PosFilter>('ALL');
   const [direction, setDirection] = useState<Direction>('up');
 
@@ -82,16 +95,23 @@ export default function TrendScreen() {
    * set of players, and saying so in the code is what keeps the two screens
    * from drifting into two ideas of what a player is.
    */
-  const [directory, setDirectory] = useState<Map<string, DirectoryPlayer> | null>(null);
+  /* Seeded from the cache's synchronous peek, so coming back from Leaders draws
+     the board in the first render instead of showing a spinner for a frame
+     while an already-resolved promise settles. See `lib/session-cache`. */
+  const [fetched, setFetched] = useState<DirectoryFetch | null>(() => peekPlayerDirectory());
   const [directoryFailed, setDirectoryFailed] = useState(false);
+
+  const directory = useMemo<Map<string, DirectoryPlayer> | null>(
+    () => (fetched ? new Map(fetched.players.map((p) => [p.playerId, p])) : null),
+    [fetched],
+  );
 
   useEffect(() => {
     let live = true;
     void (async () => {
-      const { data, error } = await supabase.rpc('current_slate');
-      const row = (data as { season: number }[] | null)?.[0];
+      const value = await loadCurrentSeason();
       if (!live) return;
-      if (!error && row) setSeason(row.season);
+      if (value !== null) setSeason(value);
       setSeeded(true);
     })();
     return () => {
@@ -105,7 +125,7 @@ export default function TrendScreen() {
       try {
         const result = await loadPlayerDirectory();
         if (!live) return;
-        setDirectory(new Map(result.players.map((p) => [p.playerId, p])));
+        setFetched(result);
       } catch {
         if (live) setDirectoryFailed(true);
       }
@@ -296,10 +316,6 @@ export default function TrendScreen() {
           supply its own, at the same 16 the rows use, or the controls sit two
           points inside every name below them. Same block as the directory's
           toolbar, down to the numbers. */}
-      {/* Outside `controls`, which supplies the 16pt gutter for the FILTERS.
-          The bar brings its own — see SectionNav — and nesting it here gave it
-          32. */}
-      <SectionNav section="/players" />
       <View style={styles.controls}>
 
         {/* ONE ROW OF FILTERS, position on the left and direction on the right.

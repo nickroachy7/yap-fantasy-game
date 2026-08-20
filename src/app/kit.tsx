@@ -630,7 +630,7 @@ function Kit() {
               wide={false}
               actions={[
                 { key: 'inventory', label: 'Inventory', icon: 'inventory', active: action === 'inventory', onPress: () => setAction('inventory') },
-                { key: 'sets', label: 'Sets', icon: 'sets', badge: 'Soon', active: action === 'sets', onPress: () => setAction('sets') },
+                { key: 'sets', label: 'Sets', icon: 'sets', active: action === 'sets', onPress: () => setAction('sets') },
                 { key: 'shop2', label: 'Shop', icon: 'shop', active: action === 'shop2', onPress: () => setAction('shop2') },
                 { key: 'directory', label: 'Directory', icon: 'directory', active: action === 'directory', onPress: () => setAction('directory') },
                 { key: 'standings', label: 'Standings', icon: 'standings', active: action === 'standings', onPress: () => setAction('standings') },
