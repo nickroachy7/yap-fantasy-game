@@ -62,9 +62,14 @@ export function SectionNav({ section }: { /** e.g. `/collection`. */ section: st
       badge: child.badge,
       active: pathname === child.href,
       nav: true,
-      // replace, not push: these are peers, and pushing would build a back
-      // stack of every toggle between them.
-      onPress: () => router.replace(child.href as never),
+      /* Replace for the peers — pushing would build a back stack out of every
+         toggle between three boards. Push for a takeover, so the page you left
+         is still underneath it and closing puts you back on THAT page rather
+         than on whichever one the takeover decided to send you to. */
+      onPress: () =>
+        child.takeover
+          ? router.push(child.href as never)
+          : router.replace(child.href as never),
     }));
     return pages;
   }, [section, pathname, router]);

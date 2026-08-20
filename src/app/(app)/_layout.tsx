@@ -107,7 +107,26 @@ export default function AppLayout() {
           name="search"
           options={{
             presentation: Platform.OS === 'web' ? undefined : 'fullScreenModal',
-            animation: Platform.OS === 'web' ? 'fade' : undefined,
+            /* NAMED, not left to the presentation's default, and that is what
+               makes it quick.
+               
+               `fullScreenModal` already slides up from the bottom, so this is
+               the same movement — but `animationDuration` is documented to
+               apply ONLY to slide_from_bottom, fade_from_bottom, fade and
+               simple_push. Against the `default` this was set to, the duration
+               was silently ignored and the modal took iOS's own 500ms.
+               
+               ONE DURATION COVERS BOTH DIRECTIONS. react-native-screens has no
+               way to give a screen a different animation coming than going —
+               checked, not assumed — so 200 is picked to read as a pop on the
+               way in and as barely anything on the way out. What actually made
+               closing feel slow was never the animation: it was `replace`
+               rebuilding a board from scratch. See `search.tsx`.
+               
+               iOS only, per the same docs. Android keeps its own duration for
+               this animation, which is already close to this. */
+            animation: Platform.OS === 'web' ? 'fade' : 'slide_from_bottom',
+            animationDuration: 200,
           }}
         />
       </Stack>

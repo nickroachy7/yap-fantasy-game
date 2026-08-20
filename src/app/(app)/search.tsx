@@ -99,7 +99,29 @@ export default function PlayersSearchScreen() {
     }));
   }, [result, query]);
 
-  const close = useCallback(() => router.replace('/players'), [router]);
+  /**
+   * Close, not navigate.
+   *
+   * This used to `replace('/players')`, which was wrong twice over. It sent
+   * everyone to Trend regardless of where they opened search from, so anyone
+   * arriving from Leaders was moved to a different board on the way out. And a
+   * replace is a NAVIGATION: it tears this screen down and mounts a board from
+   * scratch, refetching the directory and flashing a spinner to arrive at a
+   * page that was already sitting there a moment ago.
+   *
+   * Going back dismisses instead. The page underneath was never unmounted, so
+   * it reappears already scrolled where you left it, with no fetch and nothing
+   * to wait for — which is most of why closing now feels instant.
+   *
+   * The fallback is for arriving here cold: a deep link or a refreshed browser
+   * tab has no history to pop, and `back()` on an empty stack does nothing at
+   * all, which would strand the reader on a screen whose only exit had stopped
+   * working. Trend is the section's landing page and the right place to land.
+   */
+  const close = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/players');
+  }, [router]);
 
   const openPlayer = useCallback(
     (player: DirectoryPlayer) =>

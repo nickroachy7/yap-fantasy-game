@@ -45,6 +45,22 @@ export type NavChild = {
    * a time.
    */
   icon: ActionIconName;
+  /**
+   * Opened with a PUSH rather than a replace, and dismissed rather than
+   * navigated away from.
+   *
+   * The other children are peers — three boards you flip between — so replacing
+   * is right for them: pushing would build a back stack out of every toggle.
+   * Search is not a peer. It is a full-screen takeover living ABOVE the tab
+   * navigator, so it belongs on top of whatever you were reading, and the way
+   * out of it is to close it and find that page still there.
+   *
+   * Replacing was what made the way out wrong. With no entry left behind it,
+   * the screen had nothing to go back TO, so it hard-coded a return to Trend —
+   * and anyone who opened search from Leaders was quietly moved to a different
+   * board on the way out.
+   */
+  takeover?: boolean;
 };
 export type NavSection = {
   href: string;
@@ -104,7 +120,7 @@ export const NAV_SECTIONS: NavSection[] = [
     children: [
       /* Not `/players/search`: it is a full-screen takeover living above the
          tab navigator, so its path is a root one. See `app/search.tsx`. */
-      { href: '/search', label: 'Search', icon: 'search' },
+      { href: '/search', label: 'Search', icon: 'search', takeover: true },
       { href: '/players', label: 'Trend', icon: 'trend' },
       { href: '/players/leaders', label: 'Leaders', icon: 'standings' },
     ],
