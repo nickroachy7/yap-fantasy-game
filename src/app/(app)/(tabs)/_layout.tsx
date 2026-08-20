@@ -6,7 +6,7 @@ import { NAV_TABS, routeNameOf } from '@/components/shell/sections';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { TabIcon } from '@/components/shell/TabIcon';
 import { useIsWide } from '@/components/shell/useResponsive';
-import { Colors, TabBarContentHeight } from '@/constants/theme';
+import { Colors, SheetCorner, TabBarContentHeight } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 /**
@@ -82,8 +82,36 @@ export default function TabsLayout() {
             tabBarStyle: isWide
               ? { display: 'none' }
               : {
-                  backgroundColor: c.background,
-                  borderTopColor: c.backgroundElement,
+                  /* A SURFACE, LIFTED OFF THE PAGE, and curved at the top like
+                     the sheets are.
+
+                     It was `background` with a hairline over it — the same
+                     black as the page, separated by one grey line. That is the
+                     arrangement `AppHeader` already threw out at the top of the
+                     screen for the same reason: against #000 a near-black band
+                     is not chrome, it is a rectangle of very slightly different
+                     black whose only real signal is the seam. `surfaceSheet` is
+                     the app's answer to "a layer above the page" everywhere
+                     else, so the bar reads as one rather than as the page with
+                     a line drawn on it.
+
+                     THE BORDER GOES WITH IT. The fill is doing the separating
+                     now, and a hairline that only exists on one edge cannot
+                     follow the corner radius anyway — React Native needs a
+                     uniform border for that, so a top-only one would run
+                     straight off the curve. */
+                  backgroundColor: c.surfaceSheet,
+                  borderTopWidth: 0,
+                  /* `SheetCorner`, not a number picked here: this is the same
+                     curve the profile, card, set and packs sheets are drawn
+                     with, and the point is that the bar is recognisably the
+                     same kind of layer. They must move together. */
+                  borderTopLeftRadius: SheetCorner,
+                  borderTopRightRadius: SheetCorner,
+                  /* Android draws `elevation` as a rectangular shadow that
+                     ignores `borderRadius`, so the corners would sit in the
+                     square shadow of the bar they were rounded off. */
+                  elevation: 0,
                   /* The height is imposed rather than left to the navigator's
                      default, which is the whole reason `useTabBarInset()` can
                      promise screens an exact number to reserve. Content sits

@@ -7,8 +7,22 @@
  * players to one position — looked like navigation on one screen and like a
  * filter on the other. One component, both screens.
  *
- * Selection is not colour alone: the selected chip gains a heavier border and
- * a fill, both of which survive greyscale.
+ * SELECTION IS THE APP'S GOLD, FILLED. It was a white 1.5pt outline over a
+ * lifted grey fill, which is the same "raised tile" the action bar and the
+ * segmented control both moved off — a lot of furniture to say one word, and
+ * on a row of seven chips the outline was the loudest mark on the screen while
+ * being the one carrying the least meaning. Filling with `selectionAccent`
+ * makes the selected chip the only warm thing in a grey row, which is the
+ * treatment every other selected control in the app already uses.
+ *
+ * IT IS STILL NOT COLOUR ALONE, and it is now further from it than the outline
+ * was: the label INVERTS, dark ink on a light fill against light text on a dark
+ * one. That survives greyscale by a wide margin — #E3BE4A against
+ * `backgroundElement` is most of the luminance range — where two dark greys a
+ * border apart did not.
+ *
+ * The ink is the palette's own `gold.onAccent` rather than a black picked here,
+ * so it moves if the accent ever does. 10.5:1 against the fill.
  *
  * `FilterChips` is the same chip put to a second job: the page-level toggles —
  * search, sort, tiers — that used to sit in the section's action bar. They came
@@ -18,7 +32,7 @@
  */
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
+import { Colors, NUMERIC, Radius, Spacing, TierColors, Type, selectionAccent } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { horizontalStrip } from '@/components/ui/scroll-strip';
 
@@ -41,6 +55,10 @@ export function Chip({
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  const accent = selectionAccent(scheme);
+  /* The pair is fixed by construction — `selectionAccent` IS `gold.accent` —
+     so reading the ink from the same swatch is what stops the two drifting. */
+  const onAccent = TierColors[scheme].gold.onAccent;
 
   return (
     <Pressable
@@ -56,8 +74,10 @@ export function Chip({
         style={[
           styles.chip,
           {
-            backgroundColor: selected ? c.backgroundSelected : c.backgroundElement,
-            borderColor: selected ? c.text : c.border,
+            backgroundColor: selected ? accent : c.backgroundElement,
+            // Same colour as the fill, so the ring is invisible and the box
+            // keeps the geometry below rather than growing a second edge.
+            borderColor: selected ? accent : c.border,
             borderWidth: selected ? 1.5 : StyleSheet.hairlineWidth,
             // Keep the box identical either way so nothing shifts on press:
             // the heavier selected border eats half a point on each side, so
@@ -68,13 +88,13 @@ export function Chip({
         ]}>
         {children}
         {label ? (
-          <Text style={[Type.label, styles.label, { color: selected ? c.text : c.textSecondary }]}>
+          <Text style={[Type.label, styles.label, { color: selected ? onAccent : c.textSecondary }]}>
             {label}
           </Text>
         ) : null}
         {count === undefined ? null : (
           <Text
-            style={[Type.label, NUMERIC, styles.count, { color: selected ? c.text : c.textTertiary }]}>
+            style={[Type.label, NUMERIC, styles.count, { color: selected ? onAccent : c.textTertiary }]}>
             {count}
           </Text>
         )}
