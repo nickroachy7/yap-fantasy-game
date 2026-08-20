@@ -159,7 +159,16 @@ export function toCardModel(c: CollectionCard): PlayerCardModel {
   };
 }
 
-export function matchesPosition(c: CollectionCard, filter: PositionFilter): boolean {
+/**
+ * Takes the SHARED filter value, not this file's own.
+ *
+ * The inventory draws the Players boards' `PositionFilter` component now, whose
+ * value is a `PosFilter` — the five positions, `ALL`, and `other`. `other` is
+ * the key the palette gives a position it has no colour for; it is never in
+ * `POS_FILTERS`, so it cannot be selected, and if it somehow were it would
+ * match nothing, which is the honest answer for "positions we do not model".
+ */
+export function matchesPosition(c: CollectionCard, filter: PositionFilter | 'other'): boolean {
   return filter === 'ALL' || c.position === filter;
 }
 

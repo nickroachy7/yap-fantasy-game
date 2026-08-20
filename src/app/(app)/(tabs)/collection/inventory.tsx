@@ -25,17 +25,14 @@ import {
 } from 'react-native';
 
 import {
-  PositionFilterRow,
+  InventoryControls,
   ResultLine,
-  TierFilterRow,
 } from '@/components/collection/CollectionFilters';
 import { CollectionSummary } from '@/components/collection/CollectionSummary';
 import { EmptyCollection, EmptyFilterResult } from '@/components/collection/EmptyInventory';
 import { InventoryCard } from '@/components/collection/InventoryCard';
 import {
-  SORT_OPTIONS,
   SortDefaultDir,
-  countByPosition,
   countByTier,
   matchesAvailability,
   matchesPosition,
@@ -45,14 +42,13 @@ import {
   summarise,
   type AvailabilityFilter,
   type CollectionCard,
-  type PositionFilter,
   type SortDir,
   type SortKey,
   type TierFilter,
 } from '@/components/collection/types';
 import { useCollection } from '@/components/collection/use-collection';
-import { ChipRow, FilterChips, type FilterChip } from '@/components/ui/Chip';
-import { SearchField, SortChips } from '@/components/ui/Controls';
+import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
+import { SearchField } from '@/components/ui/Controls';
 import { Screen } from '@/components/shell/Screen';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
@@ -121,19 +117,18 @@ export default function InventoryScreen() {
   const { cardCount, refresh: refreshPlayer } = usePlayer();
 
   const [query, setQuery] = useState('');
-  const [position, setPosition] = useState<PositionFilter>('ALL');
+  const [position, setPosition] = useState<PosFilter>('ALL');
   const [tier, setTier] = useState<TierFilter>('ALL');
   const [availability, setAvailability] = useState<AvailabilityFilter>('ALL');
   const [sort, setSort] = useState<SortKey>('fp');
   const [dir, setDir] = useState<SortDir>(SortDefaultDir.fp);
 
-  /* Search, tiers and sort fold away behind the action bar; positions do not.
-     Four permanent control rows plus the summary put the first card ~260pt down
-     a phone screen, and the one facet people reach for every visit is position.
-     The rest are a tap away and say so. */
+  /* ONE flag, where there were three. `showTiers` and `showSort` each revealed
+     a row of chips, so the grid began at four different heights depending on
+     which you had left open; both are menus now and cost nothing when shut.
+     Search keeps its row, because a `TextInput` in a menu that closes on an
+     outside press is a field you cannot tap beside. */
   const [showSearch, setShowSearch] = useState(false);
-  const [showTiers, setShowTiers] = useState(false);
-  const [showSort, setShowSort] = useState(false);
 
   /* ---- grid geometry ------------------------------------------------- *
    * MEASURED, not recomputed. This used to derive the column width from the
@@ -182,12 +177,7 @@ export default function InventoryScreen() {
     () => pool.filter((card) => matchesPosition(card, position)),
     [pool, position],
   );
-  const forPositionCounts = useMemo(
-    () => pool.filter((card) => matchesTier(card, tier)),
-    [pool, tier],
-  );
   const tierCounts = useMemo(() => countByTier(forTierCounts), [forTierCounts]);
-  const positionCounts = useMemo(() => countByPosition(forPositionCounts), [forPositionCounts]);
 
   const visible = useMemo(
     () =>
@@ -201,6 +191,7 @@ export default function InventoryScreen() {
 
   const filtered =
     position !== 'ALL' || tier !== 'ALL' || availability !== 'ALL' || needle.length > 0;
+
   const clearFilters = useCallback(() => {
     setPosition('ALL');
     setTier('ALL');
@@ -251,39 +242,6 @@ export default function InventoryScreen() {
   const total = cards?.length ?? cardCount;
   const context = filtered ? `${visible.length} of ${total} cards` : `${total} cards`;
 
-  const facets = useMemo<FilterChip[]>(
-    () => [
-      // Search only appears above the size where scanning stops working — the
-      // same threshold that used to gate the field itself.
-      ...(searchable
-        ? [
-            {
-              key: 'search',
-              label: 'Search',
-              active: showSearch || needle.length > 0,
-              onPress: () => setShowSearch((v) => !v),
-            },
-          ]
-        : []),
-      {
-        key: 'tiers',
-        label: 'Tiers',
-        active: showTiers || tier !== 'ALL',
-        onPress: () => setShowTiers((v) => !v),
-      },
-      {
-        key: 'available',
-        label: 'Available',
-        // Not a disclosure — this one IS the filter. Pressing it hides the
-        // cards that are already in a lineup.
-        active: availability === 'AVAILABLE',
-        onPress: () => setAvailability((a) => (a === 'ALL' ? 'AVAILABLE' : 'ALL')),
-      },
-      { key: 'sort', label: 'Sort', active: showSort, onPress: () => setShowSort((v) => !v) },
-    ],
-    [searchable, showSearch, needle, showTiers, tier, availability, showSort],
-  );
-
   return (
     <Screen title="Inventory" context={context} scroll={false}>
 
@@ -316,19 +274,44 @@ export default function InventoryScreen() {
           </ScrollView>
         ) : listWidth === 0 ? null : (
           <>
-            {/* Pinned: what you are filtering by. Where you ARE is the section
-                nav, which now sits above this whole navigator — see
-                `SectionFrame`. The facets themselves — tiers, positions, sort —
-                stay in the list's header, where they scroll away once you have
-                stopped using them. The search FIELD cannot: a TextInput in a
-                ListHeaderComponent is remounted on every keystroke and loses
-                focus after one character, which is why it lives up here beside
-                its chip. */}
+            {/* ONE ROW, and it is the Players boards' row: the shared position
+                chips on the left, the page's own controls on the right. Both
+                are filters over the same grid, and side by side they read as
+                the two of them rather than as three bands of chrome before the
+                first card. See `CollectionFilters`.
+
+                The chips take the room that is left and SCROLL — `ChipRow` is a
+                horizontal ScrollView — while the buttons keep their size at
+                every width. Which is why the buttons are the side pinned and
+                the chips are the side that gives: a round button cannot be
+                narrowed, where chips you can push are merely narrower. Same
+                reasoning, same numbers, as the trend board. */}
             <View style={styles.toolbar}>
-              <ChipRow>
-                <FilterChips items={facets} />
-              </ChipRow>
-              {searchable && showSearch ? (
+              <View style={styles.chips}>
+                <PositionFilter value={position} onChange={setPosition} />
+              </View>
+              <InventoryControls
+                searchable={searchable}
+                searchOpen={showSearch}
+                onToggleSearch={() => setShowSearch((v) => !v)}
+                searching={needle.length > 0}
+                tier={tier}
+                onTier={setTier}
+                tierTotal={forTierCounts.length}
+                tierCounts={tierCounts}
+                sort={sort}
+                dir={dir}
+                onSort={pressSort}
+                availability={availability}
+                onAvailability={setAvailability}
+              />
+            </View>
+
+            {/* Pinned OUTSIDE the list, and it has to be: a TextInput in a
+                `ListHeaderComponent` is remounted on every keystroke and loses
+                focus after one character. */}
+            {searchable && showSearch ? (
+              <View style={styles.searchRow}>
                 <SearchField
                   value={query}
                   onChange={setQuery}
@@ -337,8 +320,8 @@ export default function InventoryScreen() {
                   accessibilityLabel="Search your collection"
                   autoFocus
                 />
-              ) : null}
-            </View>
+              </View>
+            ) : null}
 
             <FlatList
               // numColumns cannot change on a live list, so a width change that
@@ -359,25 +342,13 @@ export default function InventoryScreen() {
               keyboardDismissMode="on-drag"
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
               ListHeaderComponent={
+                /* What is LEFT here is the two things that are not controls:
+                   what you own, and what the controls did to it. Everything
+                   that could be pressed moved either onto the row above or into
+                   the sheet behind it, which is what stopped this header
+                   changing height as facets were opened and closed. */
                 <View style={styles.header}>
                   <CollectionSummary stats={stats} />
-                  {showTiers ? (
-                    <TierFilterRow
-                      value={tier}
-                      onChange={setTier}
-                      total={forTierCounts.length}
-                      counts={tierCounts}
-                    />
-                  ) : null}
-                  <PositionFilterRow
-                    value={position}
-                    onChange={setPosition}
-                    total={forPositionCounts.length}
-                    counts={positionCounts}
-                  />
-                  {showSort ? (
-                    <SortChips options={SORT_OPTIONS} value={sort} dir={dir} onPress={pressSort} />
-                  ) : null}
                   <ResultLine
                     shown={visible.length}
                     total={all.length}
@@ -407,10 +378,23 @@ export default function InventoryScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  /* The same block as the Players boards' `controls`, down to the numbers: one
-     gutter, one gap between controls, one gap before the list. Two screens with
-     the same controls at different rhythms is what this was written to stop. */
-  toolbar: { paddingHorizontal: GUTTER, paddingBottom: Spacing.two, gap: Spacing.two },
+  /* The same block as the Players boards' `filters`, down to the numbers: one
+     gutter, one gap between the two controls, one gap before the list. Two
+     screens with the same controls at different rhythms is what this was
+     written to stop. */
+  toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: GUTTER,
+    paddingBottom: Spacing.two,
+  },
+  /* `minWidth: 0` is load-bearing, and it is the trend board's note verbatim:
+     without it the chips' ScrollView reports its full content width as its
+     minimum and pushes the buttons off the row instead of scrolling inside what
+     is left. */
+  chips: { flex: 1, minWidth: 0 },
+  searchRow: { paddingHorizontal: GUTTER, paddingBottom: Spacing.two },
   list: { paddingHorizontal: GUTTER, paddingBottom: Spacing.six, gap: GAP },
   row: { gap: GAP },
   header: { gap: Spacing.two, paddingBottom: Spacing.two },

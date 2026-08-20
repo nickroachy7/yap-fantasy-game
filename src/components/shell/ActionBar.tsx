@@ -133,10 +133,16 @@ export function ActionBar({ actions, wide }: { actions: Action[]; wide: boolean 
  * SECTIONS of the app, drawn at 24pt in the tab bar and the rail; these are
  * verbs inside a page, drawn at 18. Merging them would put "sort" in a union
  * whose whole job is naming a destination.
+ *
+ * EXPORTED, because the bar is no longer the only thing that draws these verbs.
+ * The collection's filter buttons are `search`, `tiers`, `sort` and `available`
+ * — the exact four this set was drawn for — and a second hand-rolled set of
+ * glyphs meaning the same four things is precisely the drift this file's own
+ * header warns about.
  */
 const STROKE = 1.6;
 
-function ActionIcon({
+export function ActionIcon({
   name,
   color,
   focused,
