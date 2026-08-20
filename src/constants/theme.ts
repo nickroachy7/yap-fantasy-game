@@ -482,10 +482,11 @@ export function selectionAccent(scheme: 'light' | 'dark'): string {
  * the directory row and both profile headers is a square frame, so the day real
  * imagery lands one asset fits every slot in the product.
  *
- * It costs height, and the cost is worth stating: a square photo on a 106pt
- * compact card is 106pt of a ~182pt cell, where the band it replaced was 44 of
- * 119. That is the trade — a picture you can actually see, against roughly a
- * third fewer cards per screen.
+ * IT NO LONGER COSTS HEIGHT, and that is new. A square photo used to sit on
+ * top of a five-line block, which made a 106pt compact cell ~166pt tall and
+ * bought the picture at the price of a third fewer cards per screen. The card
+ * draws its facts ON the square now (see `PlayerCard`), so the cell is the
+ * square plus one footer line — ~118pt — and the picture is free.
  *
  * `silhouette` beside each size is the placeholder figure's height, at the 0.62
  * of the frame `PlayerAvatar` uses, computed against that size's NOMINAL width.
@@ -503,35 +504,53 @@ export const CardSizes = {
    */
   compact: {
     width: 106,
+    /**
+     * Inset for everything overlaid on the square — the two corner blocks and
+     * the nameplate all sit this far from the card's edges. It is the card's
+     * only spacing value now that nothing stacks inside it.
+     */
     padding: Spacing.one + 1,
-    gap: Spacing.one,
+    /**
+     * The tier frame's thickness — the card's border is drawn in the tier's
+     * `frame` colour and it is the only place tier appears on the square.
+     *
+     * 1.5 rather than a hairline: a hairline in a saturated colour reads as a
+     * thread and disappears against a busy photograph, and this edge has to be
+     * findable across a grid of nine at arm's length. It scales UP with the
+     * card rather than staying fixed, because a frame that is 1.4% of a 106pt
+     * card and 0.5% of a 320pt one is not the same frame.
+     */
+    frame: 1.5,
     artAspect: PHOTO_ASPECT,
     silhouette: 66,
-    nameSize: 11,
-    nameLines: 1,
-    labelSize: 7,
-    statSize: 10,
     /**
-     * The one number the card ends on (career FP).
+     * The name, on BOTH of its lines — the card stacks the given name over the
+     * surname rather than wrapping (see `splitName`), so this size has to hold
+     * a surname alone rather than a whole name. That is what makes 11 viable
+     * in 94pt: "McCaffrey" is ~58pt at 11pt bold where "Christian McCaffrey"
+     * was ~112 and ellipsised on most of the league.
      *
-     * 14 is a WEIGHT decision, not a fit one, and it used to be the other way
-     * round: 16 was picked because the bottom row was "14 STARTS" beside a
-     * four-digit total and 18 clipped the left column. That column is gone, so
-     * the row is a 7pt label and a figure with ~66pt of the 94 spare — nothing
-     * about the width argues for any size at all now.
+     * There is no `nameLines` beside it any more. The stack is structurally
+     * two lines at every size — a name is a given name and a surname — so it
+     * was a field that could only ever hold one value.
+     */
+    nameSize: 11,
+    labelSize: 7,
+    /**
+     * Career FP, in the card's top-right corner.
      *
-     * What argues for 12 is the card being small. At 16 the total sat 5pt above
-     * the name and read as the card shouting one number at you. 12 is one point
-     * above it, and the size is no longer what makes it the headline — weight
+     * 12 is a WEIGHT decision rather than a fit one. It sits one point above
+     * the 11pt name, and the size is not what makes it the headline — weight
      * and colour are: 800 against the name's 700, full `text` against the
      * meta's tertiary grey, and tabular figures so a column of them lines up
-     * down the grid. That is enough for a cell this size, and it lets the
-     * portrait and the name be the loud things instead.
+     * down the grid.
      *
-     * IT IS ALSO THE FLOOR. The name is 11, so anything below 12 makes the
-     * total smaller than the player it belongs to, and a card whose headline
-     * number is the smallest type on it has stopped having a headline. The meta
-     * is 9 and the labels are 7.
+     * IT IS ALSO THE FLOOR. Anything below 12 makes the total smaller than the
+     * player it belongs to, and a card whose headline number is the smallest
+     * type on it has stopped having a headline. The meta is 9 and the labels
+     * are 7. The ceiling is the corner: a four-digit total is ~30pt at 12, and
+     * the card is 94pt wide between its insets — the tier at the other end
+     * needs the rest.
      */
     figureSize: 12,
     glyph: 16,
@@ -540,29 +559,25 @@ export const CardSizes = {
   grid: {
     width: 168,
     padding: Spacing.two,
-    gap: Spacing.two,
+    frame: 2,
     /** Art slot aspect ratio (w/h). Fixed so layout is stable pre/post art. */
     artAspect: PHOTO_ASPECT,
     silhouette: 104,
     nameSize: 15,
-    nameLines: 1,
     labelSize: 9,
-    statSize: 13,
-    figureSize: 26,
+    figureSize: 18,
     glyph: 22,
     pip: 5,
   },
   detail: {
     width: 320,
     padding: Spacing.three,
-    gap: Spacing.three,
+    frame: 3,
     artAspect: PHOTO_ASPECT,
     silhouette: 198,
     nameSize: 24,
-    nameLines: 2,
     labelSize: 11,
-    statSize: 20,
-    figureSize: 38,
+    figureSize: 26,
     glyph: 32,
     pip: 8,
   },

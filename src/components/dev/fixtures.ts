@@ -5,10 +5,9 @@
  * two galleries disagree it is never clear whether a difference is the layout
  * or the data. Deliberately awkward on purpose: one name long enough to
  * ellipsise at every size, one apostrophe-and-hyphen name, a maxed card with no
- * next tier, and both injury weights — plus all three fixture states the card
- * can be in: a home game, an away game, a bye (`game: null`), and no schedule
- * loaded at all (`game` omitted), which renders no fixture line rather than
- * claiming a bye nobody checked for.
+ * next tier, and both injury weights — plus all four fixture states the card's
+ * footer can be in: a home game, an away game, a bye, and no schedule loaded at
+ * all, which draws nothing rather than claiming a bye nobody checked for.
  */
 import type { PlayerCardModel } from '@/components/cards';
 import type { SetMember } from '@/components/collection/SetChecklist';
@@ -32,6 +31,7 @@ export const SAMPLE_CARDS: Sample[] = [
     teamAbbreviation: 'TEN',
     tier: 'bronze',
     careerFp: 20.32,
+    matchup: 'vs BUF',
     starts: 1,
     tierFloorFp: 0,
     nextTierAt: 200,
@@ -44,6 +44,7 @@ export const SAMPLE_CARDS: Sample[] = [
     teamAbbreviation: 'KC',
     tier: 'silver',
     careerFp: 412.5,
+    matchup: '@ ARI',
     starts: 14,
     tierFloorFp: 200,
     nextTierAt: 750,
@@ -56,6 +57,7 @@ export const SAMPLE_CARDS: Sample[] = [
     teamAbbreviation: 'SF',
     tier: 'gold',
     careerFp: 1284.75,
+    matchup: 'BYE',
     starts: 41,
     tierFloorFp: 750,
     nextTierAt: 2500,
@@ -111,6 +113,20 @@ export const OWNED_CARDS: CollectionCard[] = SAMPLE_CARDS.map((m, i) => ({
   season: 2026,
   acquiredAt: 0,
 }));
+
+/**
+ * Club -> its week, in the shape the grid hands to `InventoryCard`.
+ *
+ * The inventory screen builds this from `useUpcomingFixtures`; the galleries
+ * cannot, because they draw without a session. CIN is ABSENT on purpose —
+ * "the schedule has not loaded" is a real state and it must draw nothing, not
+ * a bye.
+ */
+export const SAMPLE_MATCHUPS: Record<string, string | undefined> = {
+  TEN: 'vs BUF',
+  KC: '@ ARI',
+  SF: 'BYE',
+};
 
 /** Enough cards to fill several rows and prove the grid wraps evenly. */
 export const OWNED_MANY: CollectionCard[] = Array.from({ length: 14 }, (_, i) => {

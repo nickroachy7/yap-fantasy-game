@@ -41,8 +41,15 @@ import { useTierTheme } from './use-tier-theme';
  * that follows this on every row is a figure in a column that has to line up.
  * A letter free to set its own width would step that column left and right down
  * the page for no reason anyone could name.
+ *
+ * `size` exists because the collection card's footer sets its whole line at
+ * 8pt and a 12pt letter leading it read as a dropped capital. Everything scales
+ * off it — the box, the leading — so a caller picks one number and the letter
+ * still cannot set its own width. Omitting it keeps the lineup row's 12.
  */
-export function TierMark({ tier }: { tier: CardTier }) {
+const DEFAULT_SIZE = 12;
+
+export function TierMark({ tier, size = DEFAULT_SIZE }: { tier: CardTier; size?: number }) {
   const t = useTierTheme(tier);
 
   return (
@@ -50,7 +57,15 @@ export function TierMark({ tier }: { tier: CardTier }) {
       accessible
       accessibilityRole="text"
       accessibilityLabel={`${t.label} tier`}
-      style={[styles.letter, { color: t.colors.accent }]}>
+      style={[
+        styles.letter,
+        {
+          color: t.colors.accent,
+          fontSize: size,
+          lineHeight: Math.round(size * 1.25),
+          width: Math.round(size * 0.84),
+        },
+      ]}>
       {t.label[0]}
     </Text>
   );
@@ -58,10 +73,7 @@ export function TierMark({ tier }: { tier: CardTier }) {
 
 const styles = StyleSheet.create({
   letter: {
-    width: 10,
     fontFamily: Fonts.sans,
-    fontSize: 12,
-    lineHeight: 15,
     fontWeight: '800',
     letterSpacing: 0.2,
     textAlign: 'center',

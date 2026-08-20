@@ -139,11 +139,13 @@ export function normaliseRow(row: CollectionViewRow): CollectionCard {
 /**
  * `CollectionCard` -> what `PlayerCard` draws.
  *
- * It used to take the club's game as a second argument, threaded down from the
- * grid so the card could print a fixture line. The card no longer shows one —
- * a matchup is a fact about a Sunday, not about a copy you hold — so the
- * parameter went, and with it the schedule read the collection screen was
- * making purely to feed it.
+ * IT DOES NOT CARRY THE FIXTURE, and that is a boundary rather than an
+ * oversight. Everything mapped here comes off the collection row: a name, a
+ * club, a position, a tier, a career total — facts about a copy you hold. The
+ * matchup is a fact about a Sunday, it arrives from a different read on a
+ * different cadence (`useUpcomingFixtures`), and `PlayerCard` draws it off the
+ * frame for exactly that reason. `InventoryCard` spreads it onto the model at
+ * the call site, so this function stays a pure projection of one row.
  */
 export function toCardModel(c: CollectionCard): PlayerCardModel {
   return {

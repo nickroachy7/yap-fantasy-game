@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import {
   CardSizes,
@@ -30,107 +30,129 @@ const _tierParity: TierParity = true;
 void _tierParity;
 
 /**
- * A collectible card.
+ * A collectible card: ONE SQUARE, with everything drawn on it.
  *
- * WHAT THIS REDESIGN REMOVED, AND WHY
+ * WHAT CHANGED, AND THE ONE IDEA BEHIND IT
  *
- * The card used to signal tier on four simultaneous axes: a 1-3pt coloured
- * frame, an inset inner ring, L-shaped corner ticks, a filled tier badge with
- * rank pips, a geometric motif behind the art, and a shadow whose depth rose
- * with tier. Each was defensible alone. Together they made a 106pt grid cell
- * that was mostly CHROME — five nested boxes around three numbers — and the
- * effect was busy rather than precious. A card should feel valuable because of
- * what it says, not because of how much is drawn around it.
+ * The card used to be a picture with a form underneath it. The square art sat
+ * at the top and below it came five stacked lines — name, then position and
+ * club, then a progress phrase, then a `TFP` label beside a figure — each one
+ * left-aligned in its own row. That block was as tall as the picture it
+ * belonged to, so a "card" was half photograph and half spreadsheet, and the
+ * photograph is the part that makes it feel like a thing you own.
  *
- * So the frame is now a hairline, the rings and ticks are gone, the art slot
- * has lost its border and its motif, and the tier badge is a dot and a word.
+ * So the card IS the picture now. Nothing sits under the art inside the frame;
+ * the facts are laid ON it, in the places a trading card has always put them,
+ * and the frame's aspect ratio is 1:1 exactly as `artAspect` already said it
+ * was. A compact cell went from ~166pt tall to ~118, which is a third more
+ * cards in a screen without a single fact leaving.
  *
- * THE TIER NO LONGER TINTS THE CARD, and that is the largest change here.
+ * WHERE EACH FACT WENT, AND WHY THERE
  *
- * Every surface on it — the card, the art band, the border — was drawn from the
- * tier palette, so a bronze card was a brown object and a diamond one was a
- * teal object. Four differently coloured objects in a three-across grid is a
- * lot of noise for one fact, and it was the wrong fact to spend the whole cell
- * on: tier is a consequence of career FP, which is already the biggest number
- * on the card. The card now sits on the app's own `surface` with the app's own
- * `border`, exactly like every other panel, and the only tier colour left is
- * the LETTER at the head of the progress line.
+ *   the frame     TIER, as the colour of the card's border. See below.
+ *   top-left      POSITION, in its position accent, with the injury
+ *                 designation beside it.
+ *   bottom, on    NAME over TOTAL FP, centred: what the card is, and what this
+ *   the centre    copy of it has earned.
+ *   line
  *
- * That is not a weakening of the accessibility rule, it is the rule's own
- * argument taken to its conclusion. `TierMark` already says it: bronze and gold
- * are a brown and a yellow, the first pair to collapse in greyscale or under a
- * red-green deficiency, so `B` / `S` / `G` / `D` is what actually carries the
- * meaning and the hue only makes it faster. A tint that cannot be relied on is
- * a tint that was only ever decoration.
+ * THE TIER IS THE FRAME. It spent two passes as a letter in the top-left, and
+ * a letter is the wrong instrument for it in a grid: tier is the fact you scan
+ * nine cells for and it was the smallest mark on any of them. An edge is read
+ * without being looked at, which is what rarity wants and what printed cards
+ * have always done with it.
  *
- * IT IS THE LINEUP ROW, STACKED — but only the half of it that is about the
- * CARD. The row is read while deciding who plays on Sunday, so it leads with
- * the week: fixture, kickoff, this week's points against a projection. A
- * collection cell is not that. You are looking at what you own, and the two
- * questions it answers are what this copy has earned and how close it is to
- * promoting. So the row's type, order and colours came across; its week did
- * not.
+ * THAT IS ONLY SAFE BECAUSE THE LETTER SURVIVED, on the footer line below. The
+ * rule `theme.ts` sets and `TierMark` keeps is that tier is never colour alone
+ * — bronze and gold are a brown and a yellow, the first pair to collapse in
+ * greyscale or under a red-green deficiency. The frame is the fast channel;
+ * the letter is the one that actually carries the meaning. The border width
+ * rises with the card size (`CardSizes.frame`) so the edge reads the same at
+ * 106pt and at 320.
  *
- *   portrait          the reserved photo region, holding a silhouette
- *   name              on its own, because it cannot share a line here
- *   position, club    position in its POSITION accent, club subordinate
- *   progress          `812/2500 Gold`
- *   total             the one number the card exists to show
+ * THE POSITION TOOK THE CORNER THE TIER GAVE UP, and it is the third place it
+ * has been. Beside the surname it competed with the biggest word on the card
+ * for the same 94pt — "Chase-Williamson TE" has nowhere to go. On its own line
+ * above the name it cost the plate a whole line of picture. In the top-left it
+ * costs neither: that corner has to be reserved for a scrim regardless, and
+ * two letters is all it ever needs.
  *
- * WHAT WAS DROPPED, AND WHY IT WAS THE WEEK'S HALF. The fixture line went, and
- * the start count with it. A matchup is a fact about a club on a Sunday, not
- * about a copy you hold, and it was the one line on the card that went stale
- * between visits. Starts went for a quieter reason: it is the denominator of
- * the total above it, interesting exactly once — on the card profile, where
- * `CardStanding` prints "FP earned over 14 starts" and has the room to say it
- * in words.
+ * THE NAME IS ONE LINE, AND IT ELLIPSISES. The plate has ~93pt at compact and
+ * a name is set at 11pt bold, which fits most of the league — "Dean Patterson"
+ * is 86, "Davante Adams" 87 — and does not fit the long ones: "Christian
+ * McCaffrey" is 112 and "Ja'Marr Chase-Williamson" 147. The alternative, and
+ * this is what it replaced, is splitting at the first space and always drawing
+ * two lines; that fits everyone but spends a third line of the square and puts
+ * a surname on the card at the same weight as a given name. One line is the
+ * trade: a shorter plate, more picture, and a tail on four names in a hundred.
  *
- * THE DESIGNATION SURVIVED THE FIXTURE LINE IT LIVED ON, moved up beside the
- * club. On the lineup row it sits with the fixture because there it is a doubt
- * about a game; with no game on the card it attaches to the player instead,
- * which is what the directory row does with it. It costs no height and no width
- * — `WR — SF` leaves half the line free — and dropping it would have quietly
- * removed the only availability signal from a screen that has a filter for it.
+ * THE TOTAL SITS UNDER THE NAME rather than in a corner, because it is the one
+ * number the card exists to show and a corner is where you put something you
+ * want out of the way. It was diagonally opposite the tier for two passes, and
+ * the two-line stat stack it needed up there is exactly why the top of the
+ * card carried a scrim heavy enough to read as a dark band.
  *
- * WHAT WOULD NOT COME ACROSS, MEASURED. The row puts name, position and club on
- * ONE line and gives that line ~245pt. A collection cell has 96pt of content at
- * three-across on a 375pt phone. That run measures 115pt, and the long names it
- * has to hold are worse: "Christian McCaffrey" is 112pt at 11pt bold, so it
- * does not fit even alone. Every FACT from the row fits; none of its line
- * structure does. So the card stacks into five short lines what the row says in
- * three wide ones, and long names truncate — which they already did, and which
- * no amount of rearranging fixes at this width.
+ * THE CLUB IS NOT ON THE CARD. It used to hold a bottom corner and it was the
+ * weakest thing on the square: three letters that repeat down a grid — half a
+ * collection is the same dozen clubs — and that on their own answer nothing
+ * you came to the screen to ask.
  *
- * Drawing it at all is what retired the red flag that used to hang UNDER the
- * card in the grid. `InventoryCard` drew it there because the card had nowhere
- * to put it, and a flag outside the cell gave every row of nine a ragged bottom
- * edge.
+ * It went to the fixture line below, where it was needed anyway. A matchup is
+ * "my club against theirs", so `CAR @ JAX` says both in the width `CAR` alone
+ * was taking, and the corners it left are what let the name block have the
+ * whole bottom of the card to itself.
  *
- * THE PROGRESS IS A SENTENCE, NOT A BAR. It was a twelve-segment rule along the
- * bottom edge carrying no text, defended on the grounds that a countable
- * boundary survives greyscale. True, and it still answered "am I nearly there"
- * with a fraction you had to estimate. `tierProgressLabel` — the row's own
- * function, shared rather than reimplemented — prints "812/2500 to Gold", which
- * is the same answer exactly, in less height than the bar took.
+ * The two halves degrade independently, which is why this is composed on the
+ * card rather than handed in pre-joined: with no fixture loaded the club still
+ * stands alone, and with no club the fixture still prints.
  *
- * ART SITS AT THE VERY TOP, FULL BLEED. It used to be the second row, under a
- * header carrying a position chip and the club abbreviation, which put a strip
- * of chrome above the one region that will eventually hold a picture. Both of
- * those facts found better homes and the header row went away entirely:
+ * THE MATCHUP AND THE PROGRESS ARE BELOW THE FRAME, ON THE PAGE.
  *
- *   position  to the right of the name, where you read it in the same glance
- *             as the name it qualifies.
- *   club      folded into the fixture line, which needs it anyway — a matchup
- *             is "my club against theirs", so `PHI @ CAR` says both in the
- *             space one of them used to take.
+ * Both are facts with a clock on them: the progress phrase moves every Sunday
+ * a card is started, and the fixture is stale by Monday. Everything ON the
+ * square is durable — a name, a position, a tier, a career total — so putting
+ * the two perishable facts outside the frame is not just a space saving, it is
+ * the actual boundary between "what this card is" and "what is happening to it
+ * this week". The club is the one fact that reads either way; it follows the
+ * fixture because that is the line that gives it something to say.
  *
- * That trade is what pays for the fixture line: a row was removed and a row
- * was added, so the card is no taller than before while saying more.
+ * They share ONE line, progress left and fixture right, and that is a grid
+ * decision. `InventoryCard` used to hang an injury flag under the card and the
+ * note it left behind is the reason this is one line and not two: anything
+ * below the frame that only SOME cards have gives a row of nine a ragged
+ * bottom edge. One row of fixed height cannot do that, whether or not the
+ * fixture half is present.
  *
- * NO PHOTO, NO LOGO, NO JERSEY: unlicensed. The art slot is kept as reserved
- * space with its aspect ratio fixed, so dropping a real <Image> in later
- * changes nothing about the surrounding layout. Until then it holds a text
- * monogram, quietly.
+ * THE SCRIMS EXIST FOR A PHOTOGRAPH WE DO NOT HAVE YET.
+ *
+ * There is no licensed player imagery — no photo, no logo, no jersey — so the
+ * square holds the same `PlayerSilhouette` the directory row and both profile
+ * headers hold, standing where a head and shoulders land in a real headshot
+ * crop. Over a flat grey placeholder the overlaid text would be legible with
+ * no help at all. It is drawn over a ramped scrim anyway, because the day an
+ * <Image> lands behind it the type has to survive whatever is in the picture,
+ * and discovering that on the day is how a card ships with an unreadable name.
+ *
+ * The scrim is the SCHEME'S BACKGROUND at rising alpha, not black. A black
+ * scrim with white type is what a trading card normally does, and it would
+ * have forced every accent on the card into a second, dark-only set: the light
+ * palette's position accents (`#14568F`) and tier accents are picked to carry
+ * white text, so they are illegible ON darkness. Fading to white in light mode
+ * and to black in dark mode keeps `positionColors` and `TierMark` doing
+ * exactly what they do everywhere else in the app, which is the whole reason a
+ * WR is one colour on every screen. It is built from stacked bands rather than
+ * a gradient because this project has no gradient dependency and eight bands
+ * on an eased ramp is indistinguishable from one at these sizes.
+ *
+ * WHAT IS STILL DELIBERATELY ABSENT. Starts, which is the denominator of the
+ * total and interesting exactly once — `CardStanding` prints "FP earned over
+ * 14 starts" on the profile, where there is room to say it in words. And the
+ * tier TINT: the tier colours the EDGE and nothing else. The card used to draw
+ * its surface, its art band and its border from the tier palette, so a bronze
+ * card was a brown object and a diamond one was a teal object; four
+ * differently coloured objects in a three-across grid is a lot of noise for
+ * one fact. The square is the app's own `backgroundElement`, as every other
+ * panel is.
  *
  * This component is PURE — it never touches Supabase. Callers join
  * card_instances -> cards -> players -> teams (and tier_thresholds for
@@ -143,8 +165,8 @@ export type PlayerCardModel = {
   /**
    * OPTIONAL. The feed's designation — 'Questionable', 'Out', 'IR'.
    *
-   * Drawn beside the club as a one-or-two character code. Undefined or null is
-   * "nothing reported", which is the common case and draws nothing.
+   * Drawn beside the position as a one-or-two character code. Undefined or null
+   * is "nothing reported", which is the common case and draws nothing.
    */
   injuryStatus?: string | null;
   tier: CardTier;
@@ -158,6 +180,18 @@ export type PlayerCardModel = {
   tierFloorFp?: number;
   /** OPTIONAL. Display name of the next tier, e.g. 'GOLD'. */
   nextTierLabel?: string;
+  /**
+   * OPTIONAL. This club's next game, already formatted — "vs BUF", "@ ARI",
+   * "BYE" — and WITHOUT the club itself, which the card prefixes from
+   * `teamAbbreviation` so that either half can be missing. Drawn on the line
+   * BELOW the frame, opposite the progress phrase.
+   *
+   * A STRING, not a game object, and handed in rather than looked up: the card
+   * is pure, and the schedule is a session-cached read one screen makes once
+   * for every cell it draws (`useUpcomingFixtures`). Omitted is fine and
+   * common — the line simply keeps the progress phrase and nothing else.
+   */
+  matchup?: string | null;
 };
 
 export type PlayerCardProps = {
@@ -174,6 +208,94 @@ const fmt = (n: number) =>
     .toString()
     .replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
+/**
+ * A CSS gradient, addressed to whichever prop the platform calls it.
+ *
+ * React Native 0.86 takes one under `experimental_backgroundImage` and
+ * react-native-web takes the same string under `backgroundImage`, so the value
+ * is written once and only the key differs. Neither is in the other's style
+ * type, which is what the cast is for.
+ *
+ * THIS REPLACED A STACK OF FLAT BANDS, and the bands are worth describing
+ * because the idea was reasonable and the result was not. With no gradient
+ * dependency in the project, the fade was drawn as N solid views of rising
+ * alpha. To hide the seams the alpha step has to be below roughly 0.02, which
+ * over a compact card's ~35pt ramp means forty-odd views — per scrim, per
+ * card, in a grid that draws dozens. Trading that away for five or six bands
+ * put a 0.17 step between them, and 0.17 of black over a flat placeholder is
+ * not a subtle seam: it drew visible stripes across every card.
+ *
+ * A real gradient is one view and one interpolation done by the compositor.
+ */
+const gradient = (css: string): ViewStyle =>
+  (Platform.OS === 'web'
+    ? { backgroundImage: css }
+    : { experimental_backgroundImage: css }) as ViewStyle;
+
+/**
+ * A one-sided scrim: flat at `max` through the region the type occupies, then
+ * eased away to nothing over `ramp`.
+ *
+ * `edge` is the side it is anchored to and the side it is opaque at, so a
+ * bottom scrim is solid along the card's bottom edge and vanishes upward.
+ *
+ * THE FLAT PART IS WHAT MAKES IT WORK. A pure fade reaches full strength only
+ * at the card's very edge, which is BELOW the type it is protecting: the name
+ * sits two thirds of the way up its own strip, where a linear fade has spent
+ * about a third of its alpha. Behind a placeholder that reads fine and behind
+ * a photograph it does not. So the text sits on a flat band and the fade
+ * exists only to reach it without an edge.
+ *
+ * The two middle stops are what keep the fade from looking like a ruler laid
+ * over the picture: alpha falls off fast just above the flat band and then
+ * crawls, which is roughly how a shadow behaves and nothing like a straight
+ * interpolation looks.
+ */
+function Scrim({
+  edge,
+  base,
+  ramp,
+  rgb,
+  max,
+}: {
+  edge: 'top' | 'bottom';
+  /** Height of the flat band at full `max`. Cover the type with this. */
+  base: number;
+  /** Height of the fade that carries `max` down to nothing. */
+  ramp: number;
+  rgb: string;
+  max: number;
+}) {
+  const total = base + ramp;
+  const at = (px: number) => `${((px / total) * 100).toFixed(1)}%`;
+  /* Fully transparent is written as the scrim's OWN colour at zero alpha, not
+     as `transparent`: the keyword is transparent BLACK, so a white scrim would
+     grey off through the middle of its fade. */
+  const step = (alpha: number, px: number) => `rgba(${rgb}, ${alpha.toFixed(3)}) ${at(px)}`;
+
+  const css =
+    `linear-gradient(${edge === 'bottom' ? 'to top' : 'to bottom'}, ` +
+    [
+      step(max, 0),
+      step(max, base),
+      step(max * 0.45, base + ramp * 0.35),
+      step(max * 0.14, base + ramp * 0.68),
+      step(0, total),
+    ].join(', ') +
+    ')';
+
+  return (
+    <View
+      style={[
+        styles.scrim,
+        { height: total },
+        edge === 'top' ? { top: 0 } : { bottom: 0 },
+        gradient(css),
+      ]}
+    />
+  );
+}
+
 export function PlayerCard({
   model,
   size = 'grid',
@@ -187,14 +309,58 @@ export function PlayerCard({
   const dims = CardSizes[size];
   const compact = size === 'compact';
 
-  /* The one accent left on the card, and it is the POSITION's rather than the
-     tier's — the same colour the lineup row and the directory row put on it, so
-     a WR is one colour everywhere in the app. */
+  /* The one accent on the square is the POSITION's — the same colour the
+     lineup row and the directory row put on it, so a WR is one colour
+     everywhere in the app. */
   const accent = positionColors(model.positionAbbreviation, scheme).accent;
 
-  const team = model.teamAbbreviation?.toUpperCase() ?? '—';
+  const team = model.teamAbbreviation?.toUpperCase() ?? null;
   const weight = injuryWeight(model.injuryStatus);
   const progress = tierProgressLabel(model, { short: compact });
+
+  /* THE CLUB IS PART OF THE FIXTURE, not a fact of its own — see the header.
+     "CAR @ JAX" costs the same width the club alone used to take on the card
+     and answers a question the club alone could not.
+
+     Both halves degrade independently. No fixture (the schedule has not
+     loaded) leaves the club standing alone, which is what the card said
+     before; no club leaves the fixture, which is what it said a moment ago. */
+  const fixture = [team, model.matchup].filter(Boolean).join(' ') || null;
+
+  /* Line heights are pinned here rather than left to the platform because the
+     scrim behind the plate and the silhouette's stand-off both need the
+     plate's height BEFORE the text has measured itself. Pinning them makes
+     `plateH` exact instead of an estimate with a fudge factor in it. */
+  const lineH = Math.round(dims.nameSize * 1.12);
+  const totalH = Math.round(dims.figureSize * 1.25);
+
+  /* The position label. Set from the LABEL size, one step below the meta type
+     it used to be, because the tracking below is what carries it at that size
+     and a corner token does not need body weight. */
+  const browSize = dims.labelSize + 1;
+  const browH = Math.round(browSize * 1.3);
+
+  /* Two lines: the name, and the total under it. Fixed whether or not either
+     needs its full width, so a row of cells has one baseline rather than
+     several. */
+  const plateH = lineH + totalH + dims.padding * 2;
+
+  /* The top corner holds ONE small label now. It used to hold a two-line stat
+     stack as well, which is why the scrim over it was tall enough to read as a
+     dark band across the top of the card with nothing much in it. */
+  const headH = dims.padding + browH;
+
+  /* The two lines below the card. THREE steps above the label size, not one:
+     at `labelSize + 1` in tertiary grey this row was 8pt of #7E8289 under a
+     card carrying 11pt white, and it read as a caption you had to go looking
+     for rather than as half the information on the cell. Bigger type and one
+     rank up the text scale is most of the fix; putting each fact on its own
+     line is the rest, because at this size they no longer share one. */
+  const footSize = dims.labelSize + 3;
+  const footLine = Math.round(footSize * 1.3);
+
+  /* Fades toward the scheme's own page colour — see the header. */
+  const rgb = scheme === 'dark' ? '0, 0, 0' : '255, 255, 255';
 
   const a11yLabel =
     `${model.playerName}, ${t.label} tier, ` +
@@ -202,146 +368,158 @@ export function PlayerCard({
     `${model.teamAbbreviation ?? 'no team'}, ` +
     `${fmt(model.careerFp)} career fantasy points` +
     (model.injuryStatus ? `, designated ${model.injuryStatus}` : '') +
-    (progress === null ? ', top tier' : `, ${progress}`);
+    (progress === null ? ', top tier' : `, ${progress}`) +
+    (model.matchup ? `, ${model.matchup}` : '');
+
 
   const body = (
     <View
       style={[
-        styles.card,
+        styles.wrap,
         {
           width: fixedWidth ? dims.width : undefined,
           alignSelf: fixedWidth ? 'flex-start' : 'stretch',
-          padding: dims.padding,
-          gap: dims.gap,
-          borderRadius: Radius.panel,
-          /* The app's own surface and the app's own hairline. No tier tint —
-             see the header. */
-          borderColor: c.border,
-          backgroundColor: c.surface,
         },
         style,
       ]}>
-      {/* ================= PHOTO ======================================== *
-        * The region a licensed portrait will occupy, full bleed at the top —  *
-        * negative margins cancel the card's padding so the image will meet    *
-        * the card's own edges. Its box is driven by `artAspect`, so dropping   *
-        * a real <Image> in here changes NOTHING about the surrounding layout.  *
-        *                                                                       *
-        * It holds the SAME SILHOUETTE the directory row and both profile       *
-        * headers hold — see `PlayerSilhouette`, which is shared rather than    *
-        * redrawn. It used to be a two-letter monogram, which was the wrong     *
-        * placeholder for two reasons: initials down a grid read as a second    *
-        * badge column, and a monogram does not look like a thing waiting for a  *
-        * photograph, so the region read as decoration rather than as reserved   *
-        * space. The figure stands ON the bottom edge, where a head and         *
-        * shoulders land in a real headshot crop.                               *
+      {/* ================= THE CARD ===================================== *
+        * A square, edge to edge, with no padding of its own — every child on   *
+        * it is positioned against its corners. `overflow: hidden` is what      *
+        * lets the scrims run to the rounded edges.                             *
         * ================================================================ */}
       <View
-        // Decorative placeholder: keep it out of the accessibility tree.
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
         style={[
-          styles.photo,
+          styles.card,
           {
             aspectRatio: dims.artAspect,
+            borderRadius: Radius.panel,
+            /* THE FRAME IS THE TIER — see the header. `frame` rather than
+               `accent`: the palette keeps a separate value for an edge, which
+               is a touch deeper than the one meant for type. */
+            borderWidth: dims.frame,
+            borderColor: t.colors.frame,
             backgroundColor: c.backgroundElement,
-            marginTop: -dims.padding,
-            marginHorizontal: -dims.padding,
-            width: undefined,
           },
         ]}>
-        <PlayerSilhouette height={dims.silhouette} color={c.textTertiary} />
-
-        {/* THE TIER RIDES IN THE PHOTO'S TOP-LEFT, which is where trading cards
-            have always put rarity and — more to the point — where the eye goes
-            first in a grid of nine. On the lineup row this letter leads the
-            last line, and that is right for a LIST: you read a row left to
-            right and the tier is the first word of the sentence about the card.
-            A grid is not read that way. Nine bottom-left corners in 8pt grey is
-            somewhere a tier goes to hide.
-
-            The chip is the card's own surface, not a tint — it is a scrim, so
-            the letter stays legible the day a real portrait lands under it. */}
-        <View style={[styles.tierChip, { backgroundColor: c.surface }]}>
-          <TierMark tier={model.tier} />
+        {/* The reserved photo region's occupant. It stands ON the bottom edge
+            with only a little clearance, so its shoulders run UNDER the
+            nameplate — which is what a real headshot crop does, and the reason
+            the stand-off is a fraction of the plate rather than all of it. */}
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[styles.figure, { paddingBottom: Math.round(plateH * 0.45) }]}>
+          <PlayerSilhouette height={dims.silhouette} color={c.textTertiary} />
         </View>
-      </View>
 
-      {/* ---- identity, in the lineup row's order ------------------------ *
-        * Name, then position and club. Two lines here where the row gets one,  *
-        * because 94pt of content cannot hold the 115pt run — see the header.   *
-        * ================================================================ */}
-      <View style={styles.identity}>
-        <Text
-          numberOfLines={dims.nameLines}
-          ellipsizeMode="tail"
-          style={[styles.name, { color: c.text, fontSize: dims.nameSize }]}>
-          {model.playerName}
-        </Text>
+        {/* The base covers the type exactly; the ramp is what stops the band
+            from reading as a rectangle laid over the picture.
 
-        {/* Position in its accent, club subordinate to it and set as such —
-            the row's exact treatment. No club mark and no logo: unlicensed. */}
-        <View style={styles.metaLine}>
+            THE TOP ONE IS NOW MUCH THE WEAKER, and it was the thing that made
+            the top of the card look wrong. It was sized and weighted for a
+            two-line stat stack in one corner and a tier badge in the other, so
+            on a placeholder it read as a dark band across a fifth of the
+            square with nothing much sitting in it. All it has to cover now is
+            two letters of position, so it is a third of the height at half the
+            strength — enough to keep the label off a bright shoulder, not
+            enough to be seen as a band. */}
+        <Scrim edge="top" base={headH} ramp={Math.round(headH * 1.1)} rgb={rgb} max={0.42} />
+        <Scrim edge="bottom" base={plateH} ramp={Math.round(plateH * 0.7)} rgb={rgb} max={0.86} />
+
+        {/* ---- top-left: what he is ------------------------------------ *
+          * The position, alone in the corner where the tier letter used to be.  *
+          * It has been three places in as many passes and this is the one that  *
+          * costs nothing: beside the name it took width off the biggest word on  *
+          * the card, above the name it took a whole line off the picture, and    *
+          * here it takes a corner that had to be reserved for the scrim anyway.  *
+          *                                                                       *
+          * The injury designation rides with it. One or two characters, in two   *
+          * colours — Out and Questionable are not the same warning and the feed   *
+          * emits four times as many of the second.                                *
+          * ================================================================ */}
+        <View style={[styles.corner, { top: dims.padding, left: dims.padding }]}>
           <Text
             numberOfLines={1}
-            style={[styles.meta, { color: accent, fontSize: dims.labelSize + 2 }]}>
+            style={[styles.brow, { color: accent, fontSize: browSize, lineHeight: browH }]}>
             {model.positionAbbreviation?.toUpperCase() ?? '—'}
+            {weight && model.injuryStatus ? (
+              <Text style={{ color: weight === 'blocking' ? c.negative : c.warning }}>
+                {`  ${injuryCode(model.injuryStatus)}`}
+              </Text>
+            ) : null}
           </Text>
+        </View>
+
+        {/* ---- the nameplate ------------------------------------------- *
+          * The name on ONE line with the total under it, both centred on the     *
+          * card's axis. Long names ellipsise: "Christian McCaffrey" measures      *
+          * ~112pt at 11pt bold against 94pt of plate, and no arrangement of one    *
+          * line fixes that. It is the deliberate trade for a block that is two     *
+          * lines instead of three, and for every card in a grid having its name    *
+          * on the same baseline whatever the name is.                              *
+          *                                                                          *
+          * The TOTAL sits under the name rather than in a corner because it is      *
+          * the one number the card exists to show, and a corner is where you put    *
+          * something you want out of the way. Tabular figures, so a column of       *
+          * them lines up down the grid.                                             *
+          * ================================================================ */}
+        <View style={[styles.plate, { padding: dims.padding }]}>
           <Text
             numberOfLines={1}
-            style={[styles.meta, styles.club, { color: c.textTertiary, fontSize: dims.labelSize + 2 }]}>
-            {`— ${team}`}
+            ellipsizeMode="tail"
+            style={[styles.name, { color: c.text, fontSize: dims.nameSize, lineHeight: lineH }]}>
+            {model.playerName}
           </Text>
-          {/* One or two characters, and it may not shrink: a truncated `Q` is
-              nothing. Two colours, because Out and Questionable are not the
-              same warning and the feed emits four times as many of the second. */}
-          {weight && model.injuryStatus ? (
+
+          <Text numberOfLines={1} style={[styles.total, { lineHeight: totalH }]}>
             <Text
-              numberOfLines={1}
-              style={[
-                styles.designation,
-                {
-                  color: weight === 'blocking' ? c.negative : c.warning,
-                  fontSize: dims.labelSize + 1,
-                },
-              ]}>
-              {injuryCode(model.injuryStatus)}
+              style={[styles.figureText, NUMERIC, { color: c.text, fontSize: dims.figureSize }]}>
+              {fmt(model.careerFp)}
             </Text>
-          ) : null}
+            <Text style={[styles.cornerLabel, { color: c.textTertiary, fontSize: dims.labelSize }]}>
+              {'  TFP'}
+            </Text>
+          </Text>
         </View>
       </View>
 
-      {/* ---- how close this copy is, then what it has earned ------------- *
-        * The distance first and the total last, so the biggest thing on the    *
-        * card is also the last thing on it — a grid is scanned down, and a     *
-        * figure anchored to the bottom edge of every cell gives that scan a    *
-        * line to follow. `TFP` sits on the left as a column heading rather      *
-        * than under the number: with the start count gone there is nothing      *
-        * else on that row, and a lone right-aligned stack left half the cell    *
-        * empty.                                                                 *
+      {/* ---- off the card: the tier, and the two facts with a clock ---- *
+        * One row of fixed height whether or not the fixture is known, so a     *
+        * grid row cannot come out ragged. At diamond the phrase says "Top      *
+        * tier" rather than nothing, because a blank line there would read as   *
+        * missing data on the best card you own.                                *
         *                                                                        *
-        * At diamond the phrase says "Top tier" rather than nothing, because a   *
-        * blank line there would read as missing data on the best card you own.  *
+        * THE TIER LETTER LEADS IT, and that is what makes a coloured frame      *
+        * safe. `theme.ts` sets the rule and `TierMark` keeps it: bronze and     *
+        * gold are a brown and a yellow, the first pair to collapse in           *
+        * greyscale or under a red-green deficiency, so tier can never be a      *
+        * colour alone. The frame is the fast channel and this is the one that   *
+        * actually carries the meaning — and it reads as the first word of the   *
+        * sentence it begins, "B, 0/200 to Silver", which is exactly what the    *
+        * lineup row's third line does with it.                                  *
         * ================================================================ */}
-      <Text
-        numberOfLines={1}
-        /* One step below the identity above it, and the reason is width rather
-           than hierarchy — see `tierProgressLabel`, which measures it. */
-        style={[styles.progress, { color: c.textTertiary, fontSize: dims.labelSize + 1 }]}>
-        {progress ?? 'Top tier'}
-      </Text>
-
-      <View style={styles.earned}>
-        <Text
-          numberOfLines={1}
-          style={[styles.rowLabel, { color: c.textTertiary, fontSize: dims.labelSize }]}>
-          TFP
-        </Text>
-        <Text
-          numberOfLines={1}
-          style={[styles.figure, NUMERIC, { color: c.text, fontSize: dims.figureSize }]}>
-          {fmt(model.careerFp)}
-        </Text>
+      <View style={[styles.footer, { minHeight: footLine * 2 }]}>
+        <View style={styles.progress}>
+          <TierMark tier={model.tier} size={footSize} />
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.footerText,
+              { color: c.textSecondary, fontSize: footSize, lineHeight: footLine },
+            ]}>
+            {progress ?? 'Top tier'}
+          </Text>
+        </View>
+        {fixture ? (
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.footerText,
+              { color: c.textTertiary, fontSize: footSize, lineHeight: footLine },
+            ]}>
+            {fixture}
+          </Text>
+        ) : null}
       </View>
     </View>
   );
@@ -366,81 +544,96 @@ export function PlayerCard({
 }
 
 const styles = StyleSheet.create({
+  wrap: { gap: Spacing.one },
+  /* No `borderWidth` here — it is per size and per tier, set inline. */
   card: {
     position: 'relative',
     overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
   },
-  /* The three identity lines sit tighter to each other than the card's own
-     `gap` — they are one paragraph about one player, and spacing them like
-     separate blocks was what made the old card read as a stack of rows. */
-  identity: { gap: 1 },
+  /* The silhouette's box is the WHOLE square, not the part above the plate:
+     centring it in a shortened box would slide the head off the card's own
+     centre line, and a portrait that is not centred left-to-right reads as a
+     mistake. Vertical placement is the padding's job. */
+  figure: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  /* `pointerEvents` in the STYLE, not as a prop — the prop is deprecated in
+     0.86 and warns once per mount, which is once per cell in a grid. */
+  scrim: { position: 'absolute', left: 0, right: 0, pointerEvents: 'none' },
+  corner: { position: 'absolute' },
+  cornerLabel: {
+    fontFamily: Fonts.sans,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+  figureText: {
+    fontFamily: Fonts.sans,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  plate: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   name: {
     fontFamily: Fonts.sans,
     fontWeight: '700',
     letterSpacing: -0.2,
+    textAlign: 'center',
   },
-  metaLine: { flexDirection: 'row', alignItems: 'baseline', gap: 3 },
-  meta: {
-    fontFamily: Fonts.sans,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-    flexShrink: 0,
-  },
-  /* The CLUB may shrink; the position and the designation may not. A clipped
-     `— S…` is still recognisably a club, where a clipped `Q` is nothing. */
-  club: { flexShrink: 1, minWidth: 0 },
-  designation: {
+  /* The TOTAL, under the name and on the same centre line. The figure and its
+     unit are inline spans of one text box so the pair centres together — as
+     siblings in a row the block would have centred the ROW, which puts the
+     figure left of the card's axis by half the width of "TFP". */
+  total: { textAlign: 'center' },
+  /* Set as a LABEL — uppercase, tracked out, small — which is what keeps two
+     letters legible in a corner and stops them reading as a truncated word. */
+  brow: {
     fontFamily: Fonts.sans,
     fontWeight: '800',
-    letterSpacing: 0.4,
-    flexShrink: 0,
+    letterSpacing: 0.8,
   },
-  earned: {
+  /* TWO LINES, NOT ONE, and it is width that decided it rather than taste.
+     Side by side these two ran ~116pt at the new size against the 103 a
+     compact cell has, so one of them was always going to be truncating — and
+     the progress phrase, which is the one that gives way, loses the tier it is
+     counting toward. Stacked, both are whole.
+
+     `minHeight` reserves the second line whether or not there is a fixture to
+     put on it. A cell that is a line shorter than its neighbours is the ragged
+     bottom edge this file has been avoiding since the injury flag lived down
+     here.
+
+     CENTRED, on the same axis as the name and the total above it. Left-aligned
+     it was a caption pinned to one corner of a cell whose every other element
+     is centred, which read as two blocks that had been laid out by different
+     people. Flush to the card's edges either way — an inset would only cost
+     the phrases width. */
+  footer: { minHeight: 0, alignItems: 'center' },
+  /* The letter and the phrase are a ROW rather than one text box, because
+     `TierMark` is a component with its own fixed box and inlining it would
+     have meant reimplementing it here. `flexShrink` on the group so the phrase
+     is what gives way; the letter never does. */
+  progress: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: Spacing.one,
+    gap: 3,
+    /* The row sizes to its content so it can centre, and this is what stops it
+       sizing PAST the card when the phrase is long. The text inside shrinks;
+       the tier letter never does. */
+    maxWidth: '100%',
   },
-  /* The LABEL shrinks, never the value: a truncated "413" is a wrong number,
-     where a truncated label is still a recognisable word. */
-  rowLabel: {
+  /* 600, where this was 500. A weight below the card's own type at a size
+     below it too is two reasons to overlook the same line. */
+  footerText: {
     fontFamily: Fonts.sans,
-    fontWeight: '700',
-    letterSpacing: 0.6,
+    fontWeight: '600',
+    textAlign: 'center',
     flexShrink: 1,
     minWidth: 0,
-  },
-  figure: {
-    fontFamily: Fonts.sans,
-    fontWeight: '800',
-    flexShrink: 0,
-  },
-  tierChip: {
-    position: 'absolute',
-    top: 3,
-    left: 3,
-    paddingHorizontal: 3,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  progress: {
-    fontFamily: Fonts.sans,
-    fontWeight: '500',
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  /* `flex-end`, so the figure STANDS ON the region's bottom edge — which is the
-     line the information block starts at. Centred, it floated in the square
-     with grey under its shoulders, and a placeholder with air beneath it reads
-     as a pictogram of a person rather than as a crop waiting for a photograph.
-     `PlayerAvatar` does the same thing for the same reason, and it is only
-     possible because the frame is square: a circle's bottom edge is a point. */
-  photo: {
-    alignSelf: 'stretch',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    overflow: 'hidden',
   },
   pressed: {
     opacity: 0.82,
