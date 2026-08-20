@@ -30,7 +30,7 @@ export default function SetsScreen() {
     <Screen title="Sets" measure="table" context={context} scroll={false}>
       <SetsPanel
         onOpenSet={(code) => router.push({ pathname: '/set/[code]', params: { code } })}
-        onBackToInventory={() => router.replace('/collection/inventory')}
+        onBackToInventory={() => router.replace('/fantasy/collection/inventory')}
       />
     </Screen>
   );

@@ -10,7 +10,7 @@ import { SectionFrame } from '@/components/shell/SectionFrame';
  */
 export default function LeaderboardLayout() {
   return (
-    <SectionFrame section="/leaderboard">
+    <SectionFrame section="/fantasy/leaderboard">
       <Stack screenOptions={{ headerShown: false, animation: 'none' }} />
     </SectionFrame>
   );

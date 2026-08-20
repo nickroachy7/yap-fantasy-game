@@ -52,7 +52,18 @@ import { Colors, Spacing, Type } from '@/constants/theme';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-const TAB_ICONS: TabIconName[] = ['lineup', 'leaderboard', 'players', 'collection', 'profile'];
+/* Bar order, then rail order: the two the bottom bar draws, then the four the
+   top nav and the rail draw under Fantasy. Every name in `TabIconName` appears
+   — an icon missing from here is an icon nobody looks at until it ships. */
+const TAB_ICONS: TabIconName[] = [
+  'fantasy',
+  'scores',
+  'profile',
+  'lineup',
+  'collection',
+  'players',
+  'leaderboard',
+];
 
 const NO_STATS = {
   receptions: 0,

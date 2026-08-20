@@ -23,7 +23,14 @@
  */
 import { StyleSheet, View, type ColorValue } from 'react-native';
 
-export type TabIconName = 'lineup' | 'leaderboard' | 'players' | 'collection' | 'profile';
+export type TabIconName =
+  | 'fantasy'
+  | 'scores'
+  | 'lineup'
+  | 'leaderboard'
+  | 'players'
+  | 'collection'
+  | 'profile';
 
 export type TabIconProps = {
   name: TabIconName;
@@ -51,6 +58,61 @@ export function TabIcon({ name, color, focused, size = 24 }: TabIconProps) {
   const box = [styles.box, { width: size, height: size }];
 
   switch (name) {
+    case 'fantasy':
+      /* A crest. The tab is the game itself, so the glyph has to be the one
+         thing on the bar that is not a picture of a screen — a roster, a
+         podium and a grid are all pictures of the boards INSIDE it, and any of
+         them borrowed for the parent would put the same shape at two levels of
+         the rail.
+
+         Built from one rounded rect with asymmetric corners rather than a real
+         shield outline: the house rule is rectangles and circles (see the
+         header), and heavy bottom radii against light top ones is the whole of
+         what makes a rectangle read as a crest. */
+      return (
+        <View style={box} accessibilityElementsHidden importantForAccessibility="no">
+          <View
+            style={[
+              {
+                width: 15 * u,
+                height: 17 * u,
+                borderTopLeftRadius: 3.5 * u,
+                borderTopRightRadius: 3.5 * u,
+                borderBottomLeftRadius: 7.5 * u,
+                borderBottomRightRadius: 7.5 * u,
+              },
+              skin,
+            ]}
+          />
+        </View>
+      );
+
+    case 'scores':
+      /* A fixture: two sides with a rule between them. Not a scoreboard panel
+         and not a pair of bars — a bordered box loses its inner detail the
+         moment it fills, and two bars of different heights is the podium
+         glyph with one column missing.
+
+         The rule stays SOLID in both states. It is the divider, not one of the
+         two things being divided, so hollowing it out would make the glyph read
+         as three shapes rather than as one relationship. */
+      return (
+        <View style={[box, styles.fixture]} accessibilityElementsHidden importantForAccessibility="no">
+          <View style={[{ width: 8 * u, height: 8 * u, borderRadius: 2.5 * u }, skin]} />
+          <View
+            style={{
+              width: stroke,
+              height: 16 * u,
+              borderRadius: u,
+              marginHorizontal: 3 * u,
+              backgroundColor: color,
+              opacity: focused ? 1 : 0.75,
+            }}
+          />
+          <View style={[{ width: 8 * u, height: 8 * u, borderRadius: 2.5 * u }, skin]} />
+        </View>
+      );
+
     case 'lineup':
       /* A roster: three slots, each a marker and the name beside it. The
          markers carry the fill state; the name bars stay solid because a
@@ -165,6 +227,7 @@ export function TabIcon({ name, color, focused, size = 24 }: TabIconProps) {
 const styles = StyleSheet.create({
   box: { alignItems: 'center', justifyContent: 'center' },
   slotRow: { flexDirection: 'row', alignItems: 'center' },
+  fixture: { flexDirection: 'row', alignItems: 'center' },
   podium: { flexDirection: 'row', alignItems: 'flex-end' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', alignContent: 'center', justifyContent: 'center' },
   profile: { justifyContent: 'center' },

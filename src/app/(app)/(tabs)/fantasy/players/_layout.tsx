@@ -12,7 +12,7 @@ import { SectionFrame } from '@/components/shell/SectionFrame';
  */
 export default function CardsLayout() {
   return (
-    <SectionFrame section="/players">
+    <SectionFrame section="/fantasy/players">
       <Stack screenOptions={{ headerShown: false, animation: 'none' }} />
     </SectionFrame>
   );

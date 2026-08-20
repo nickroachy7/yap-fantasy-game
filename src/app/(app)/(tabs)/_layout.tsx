@@ -2,7 +2,7 @@ import { Tabs, type Href } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { NAV_SECTIONS, routeNameOf } from '@/components/shell/sections';
+import { NAV_TABS, routeNameOf } from '@/components/shell/sections';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { TabIcon } from '@/components/shell/TabIcon';
 import { useIsWide } from '@/components/shell/useResponsive';
@@ -10,25 +10,40 @@ import { Colors, TabBarContentHeight } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 /**
- * The five bottom tabs.
+ * The bottom bar, which is the WHOLE APP's navigation and not the fantasy
+ * game's.
  *
- * `href` is the load-bearing part, not decoration. Four of these five routes
- * are FOLDERS with sub-pages, and a tab whose route is a nested navigator
- * restores that navigator's last state when you return to it — so after a trip
- * to Scores, pressing "Lineup" put you back on Scores, and the tab labelled
- * Lineup never showed the lineup again. `popToTopOnBlur` does not fix it
- * either: `SectionNav` navigates with `replace`, so the sub-page IS the stack root
- * and there is nothing to pop.
+ * It used to be the five boards — Lineup, Collection, Players, Board, Profile —
+ * which meant the bar could only ever name things inside one product. Those
+ * four moved to a strip under the header inside Fantasy (see `FantasyTopNav`),
+ * and what is left down here is Fantasy, Scores and Profile: three places the
+ * app can be, with room for the ones that do not exist yet.
  *
- * Naming the href makes the tab button a link to that exact path rather than a
- * "switch to this navigator" action, which resets the section in both cases —
- * returning from another tab, and pressing the tab you are already on. Verified
- * against expo-router 57 rather than assumed.
+ * ONLY LEAF TABS ARE PINNED TO AN href, and that distinction is load-bearing.
  *
- * The tabs themselves come from NAV_SECTIONS rather than a list kept here.
- * That file is the single declaration of the navigation — its own header warns
- * about exactly this — and the first version of this layout carried a parallel
- * array of five sections that had already begun to drift from it.
+ * A tab whose route is a nested navigator restores that navigator's last state
+ * when you return to it. When the bar was five boards that was a bug: after a
+ * trip to Scores, pressing "Lineup" put you back on Scores, and the tab
+ * labelled Lineup never showed the lineup again. Naming the href made the tab
+ * button a link to that exact path rather than a "switch to this navigator"
+ * action, which reset the section.
+ *
+ * Fantasy is the same mechanism and the OPPOSITE call, because the tab's name
+ * is now true of everything under it. Coming back from Scores should find the
+ * collection you were part-way through sorting, not throw you back to the
+ * lineup — so Fantasy gets no href and keeps its state. What that also buys,
+ * free, is the platform gesture: pressing the tab you are already on resets its
+ * navigator to the route it opens on, which here means "take me back to my
+ * lineup".
+ *
+ * Scores and Profile are single pages with no navigator and nothing to restore,
+ * so an href on them would be identity. They keep one anyway — see `href`
+ * below — so the bar is one rule rather than two.
+ *
+ * The tabs come from NAV_TABS rather than a list kept here. That file is the
+ * single declaration of the navigation — its own header warns about exactly
+ * this — and the first version of this layout carried a parallel array of five
+ * sections that had already begun to drift from it.
  */
 
 export default function TabsLayout() {
@@ -50,9 +65,9 @@ export default function TabsLayout() {
            *
            * react-navigation defaults to `firstRoute`, which meant backing
            * out of a player profile always landed on Lineup — the profile is
-           * an href:null sibling of the five tabs, so leaving it popped to
-           * the navigator's initial route rather than to the directory you
-           * opened it from. Verified with a probe: default lands on tab one,
+           * an href:null sibling of the tabs, so leaving it popped to the
+           * navigator's initial route rather than to the directory you opened
+           * it from. Verified with a probe: default lands on tab one,
            * `history` lands where you were.
            *
            * It also makes Android's hardware back walk the tabs you actually
@@ -80,18 +95,18 @@ export default function TabsLayout() {
                   paddingTop: 6,
                 },
           }}>
-          {NAV_SECTIONS.map((section) => (
+          {NAV_TABS.map((tab) => (
             <Tabs.Screen
-              key={section.href}
-              name={routeNameOf(section)}
+              key={tab.href}
+              name={routeNameOf(tab)}
               options={{
-                // `title` stays the full name — it is the route's name, not
-                // just the bar's. Only the bar shortens, via tabBarLabel.
-                title: section.label,
-                tabBarLabel: section.tabLabel ?? section.label,
-                href: section.href as Href,
+                title: tab.label,
+                /* `undefined` restores the navigator's own state; a path resets
+                   it. Only Fantasy has a navigator to restore — see the header
+                   for why it is the one tab that wants to. */
+                href: (tab.sections ? undefined : tab.href) as Href | undefined,
                 tabBarIcon: ({ color, focused }) => (
-                  <TabIcon name={section.icon} color={color} focused={focused} size={24} />
+                  <TabIcon name={tab.icon} color={color} focused={focused} size={24} />
                 ),
               }}
             />
@@ -110,9 +125,8 @@ const styles = StyleSheet.create({
   shell: { flex: 1 },
   shellWide: { flexDirection: 'row' },
   content: { flex: 1 },
-  /* 10, not 11. At 11 both "Leaderboard" and "Collection" truncated on a
-     320pt viewport once icons were sitting above them. 10 clears every label
-     at 320 except Leaderboard, which gets a shorter word instead. Measured,
-     not guessed. */
+  /* Three labels now rather than five, so there is room — but the size stays
+     at 10 because the bar's height is fixed (see TabBarContentHeight) and a
+     bigger label would only crowd the glyph above it. */
   tabLabel: { fontSize: 10, fontWeight: '600' },
 });

@@ -9,7 +9,7 @@ import { SectionFrame } from '@/components/shell/SectionFrame';
  */
 export default function CollectionLayout() {
   return (
-    <SectionFrame section="/collection">
+    <SectionFrame section="/fantasy/collection">
       <Stack screenOptions={{ headerShown: false, animation: 'none' }} />
     </SectionFrame>
   );

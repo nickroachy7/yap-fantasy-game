@@ -102,7 +102,7 @@ export default function PlayersSearchScreen() {
   /**
    * Close, not navigate.
    *
-   * This used to `replace('/players')`, which was wrong twice over. It sent
+   * This used to `replace('/fantasy/players')`, which was wrong twice over. It sent
    * everyone to Trend regardless of where they opened search from, so anyone
    * arriving from Leaders was moved to a different board on the way out. And a
    * replace is a NAVIGATION: it tears this screen down and mounts a board from
@@ -120,7 +120,7 @@ export default function PlayersSearchScreen() {
    */
   const close = useCallback(() => {
     if (router.canGoBack()) router.back();
-    else router.replace('/players');
+    else router.replace('/fantasy/players');
   }, [router]);
 
   const openPlayer = useCallback(

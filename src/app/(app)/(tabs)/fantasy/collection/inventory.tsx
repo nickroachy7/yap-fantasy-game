@@ -304,7 +304,7 @@ export default function InventoryScreen() {
             style={styles.fill}
             contentContainerStyle={styles.emptyContent}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-            <EmptyCollection onGetCards={() => router.push('/collection/shop')} />
+            <EmptyCollection onGetCards={() => router.push('/fantasy/collection/shop')} />
           </ScrollView>
         ) : listWidth === 0 ? null : (
           <>

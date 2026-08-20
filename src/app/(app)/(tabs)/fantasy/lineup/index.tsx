@@ -6,10 +6,12 @@
  * the player has actually produced, and whether he is trending up — so the row
  * carries all of it and the bench is drawn in the same columns for comparison.
  *
- * The screen reads top to bottom as the week does: what is on (the scoreboard
- * strip), where you stand (the contest card, which places your score inside the
- * whole community's range rather than against an opponent — there are no
- * pairings in this game), who is starting, and who is not.
+ * The screen reads top to bottom as the week does: where you stand (the contest
+ * card, which places your score inside the whole community's range rather than
+ * against an opponent — there are no pairings in this game), who is starting,
+ * and who is not. What is ON this week — the fixtures, the live scores — was a
+ * band above all of it until the scoreboard was given its own tab; see
+ * `(tabs)/scores.tsx` for why it moved and what it gained.
  * The starters and the bench used to be two tabs;
  * they are now one scroll, because choosing between them is the entire task and
  * a tab pair meant only ever seeing half of it.
@@ -54,9 +56,6 @@ import {
   type SortKey,
 } from '@/components/lineup/model';
 import { useLineupData } from '@/components/lineup/use-lineup-data';
-import { ScoreStrip } from '@/components/scores/ScoreStrip';
-import { shortWeekLabel } from '@/components/scores/scoreboard';
-import { useSlateGames } from '@/components/scores/use-scores';
 import { Screen } from '@/components/shell/Screen';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, Spacing, Type } from '@/constants/theme';
@@ -208,36 +207,14 @@ export default function LineupScreen() {
     return JSON.stringify(a) !== JSON.stringify(b);
   }, [picks, savedPicks]);
 
-  /* The scoreboard reads its own week, in the scores module's vocabulary. Built
-     from the slate's VALUES rather than passing the slate object through, so the
-     once-a-second tick above cannot make it look like a new week. */
-  const scoreSlate = useMemo(
-    () =>
-      slate
-        ? { season: slate.season, seasonType: slate.season_type, week: slate.week }
-        : null,
-    [slate],
-  );
-  const { games: weekGames, loading: gamesLoading } = useSlateGames(scoreSlate);
-
   /**
    * The opponent: the whole base, reduced to its median score.
    *
-   * Keyed off the slate's values for the same reason the score strip is — this
-   * screen rebuilds `slate` on every countdown tick, and a hook that depended
-   * on the object would re-read the season once a second.
+   * Keyed off the slate's VALUES rather than the object — this screen rebuilds
+   * `slate` on every countdown tick, and a hook that depended on the object
+   * would re-read the season once a second.
    */
   const { current: field, record, reload: reloadField } = useFieldRecord(slate);
-
-  /** Your starters per club, so the strip can mark the games you are in. */
-  const startersByTeam = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const { card } of starters) {
-      if (!card.team) continue;
-      map.set(card.team, (map.get(card.team) ?? 0) + 1);
-    }
-    return map;
-  }, [starters]);
 
   /* Both of these clear the failure state as well as the error text: a new
      choice is a new thing to try, and it deserves an attempt of its own. */
@@ -433,17 +410,7 @@ export default function LineupScreen() {
       measure="table"
       context={context}
       refreshing={refreshing}
-      onRefresh={() => void onRefresh()}
-      banner={
-        slate ? (
-          <ScoreStrip
-            games={weekGames}
-            week={shortWeekLabel(slate.season_type, slate.week)}
-            startersByTeam={startersByTeam}
-            loading={gamesLoading}
-          />
-        ) : null
-      }>
+      onRefresh={() => void onRefresh()}>
       <ContestCard
         displayName={displayName}
         weekLabel={week}

@@ -11,10 +11,16 @@
  * top of the screen, and gives the wordmark and the balance back the quiet they
  * were fighting.
  *
- * NO ACCOUNT BUTTON. Profile is the fifth bottom tab now (see `NAV_SECTIONS`),
- * so the avatar up here was a second door to a room that already has one — and
- * the more expensive of the two, since it cost the header its only interactive
+ * NO ACCOUNT BUTTON. Profile is a bottom tab now (see `NAV_TABS`), so the
+ * avatar up here was a second door to a room that already has one — and the
+ * more expensive of the two, since it cost the header its only interactive
  * element and the reader a decision about which way in to use.
+ *
+ * AND STILL NO BACK ARROW. One was added for a Fantasy hub and removed with it:
+ * the four boards are peers reached from the strip below, so there is no
+ * "up" for an arrow to point at, and a chevron that only ever pops a stack
+ * nobody built is furniture. If a screen inside this chrome ever does have a
+ * parent, that is the moment to bring it back — not before.
  *
  * NO PAGE TITLE EITHER. It used to carry a `context` line under the wordmark —
  * "Packs & pulls", "Deferred to Week 3 · nothing tracked" — which made the
@@ -29,6 +35,13 @@
  * inset fill, a 8pt "GEMS" label above the figure — was three pieces of
  * decoration around one fact, stacked into two lines to fit. The gem glyph
  * already says what the number counts, so the label was reading it out twice.
+ *
+ * ONE PROP, AND IT IS ABOUT THE GAP BELOW. `attached` says another row of
+ * chrome sits directly under this one, so the masthead gives up most of its
+ * bottom padding. Without it the header's 14 and the row's own top padding both
+ * claim the same joint and you get 27pt of nothing between a wordmark and a tab
+ * label — measured, on the Fantasy tab, which is where it was found. The row
+ * below owns that space now; this one just stops adding to it.
  *
  * The gem is a rotated square rather than an icon font so it stays crisp
  * everywhere and costs no dependency. It is exported: the shop, the collection
@@ -74,7 +87,10 @@ export function Gem({ size = 11, color }: { size?: number; color: string }) {
   );
 }
 
-export function AppHeader() {
+export function AppHeader({
+  /** Another row of chrome follows immediately. See the header. */
+  attached = false,
+}: { attached?: boolean } = {}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const accent = TierColors[scheme].gold.accent;
@@ -83,7 +99,7 @@ export function AppHeader() {
 
   return (
     <View style={[styles.base, { paddingTop: top, backgroundColor: c.background }]}>
-      <View style={styles.row}>
+      <View style={[styles.row, attached && styles.rowAttached]}>
         <Text style={[styles.wordmark, { color: c.text }]}>YAP FANTASY</Text>
 
         <View style={styles.balance}>
@@ -111,6 +127,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: Spacing.three,
   },
+  /* Not zero: the two rows should read as stacked, not as one squashed block,
+     and 4 is enough to keep the wordmark off the labels below while letting the
+     row underneath set the actual gap. */
+  rowAttached: { paddingBottom: 4 },
   wordmark: {
     fontSize: 14,
     fontWeight: '800',

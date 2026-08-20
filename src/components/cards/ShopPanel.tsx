@@ -254,7 +254,7 @@ export function ShopPanel() {
               {pulled.length === 1 ? 'You pulled 1 card' : `You pulled ${pulled.length} cards`}
             </Text>
             <Pressable
-              onPress={() => router.push('/collection/inventory')}
+              onPress={() => router.push('/fantasy/collection/inventory')}
               accessibilityRole="button"
               accessibilityLabel="See these cards in your inventory"
               style={({ pressed }) => [pressed && styles.pressed]}>

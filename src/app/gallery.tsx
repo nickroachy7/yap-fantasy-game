@@ -55,6 +55,9 @@ import { Panel } from '@/components/ui/Panel';
 import { Tabs } from '@/components/ui/Tabs';
 import { Screen } from '@/components/shell/Screen';
 import { SegmentedControl, type Segment } from '@/components/shell/SegmentedControl';
+import { AppHeader } from '@/components/shell/AppHeader';
+import { FantasyTopNav } from '@/components/shell/FantasyTopNav';
+import { FrameProvider } from '@/components/shell/frame';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { WIDE_BREAKPOINT, useIsWide } from '@/components/shell/useResponsive';
 import { Colors, Spacing, Type, type Measure } from '@/constants/theme';
@@ -139,12 +142,12 @@ const VIEW_TITLE: Record<View_, string> = {
 
 /** Drives the rail's active/nested state, which is otherwise unreachable here. */
 const VIEW_PATH: Record<View_, string> = {
-  inventory: '/collection/inventory',
-  sets: '/collection/sets',
-  checklist: '/collection/sets',
-  leaderboard: '/leaderboard',
-  lineup: '/lineup',
-  profile: '/players',
+  inventory: '/fantasy/collection/inventory',
+  sets: '/fantasy/collection/sets',
+  checklist: '/fantasy/collection/sets',
+  leaderboard: '/fantasy/leaderboard',
+  lineup: '/fantasy/lineup',
+  profile: '/fantasy/players',
 };
 
 /* ---- fixture content ---------------------------------------------------- */
@@ -473,6 +476,23 @@ function GalleryBody() {
     <View style={[styles.shell, isWide && styles.shellWide, { backgroundColor: c.background }]}>
       {isWide ? <Sidebar pathnameOverride={VIEW_PATH[view]} /> : null}
       <View style={styles.content}>
+        {/* The narrow chrome, in the arrangement `FantasyFrame` builds it: the
+            masthead, then the strip, then the page. Reproduced here rather than
+            by rendering the frame itself because the frame reads the router and
+            a gallery route matches no nav href — the override is how both this
+            and the rail are made inspectable. `FrameProvider` is what stops
+            `Screen` drawing a second masthead underneath this one.
+
+            It is here because the gap between these two rows is a JOINT, owned
+            by neither component, and a joint nobody can look at is a joint that
+            drifts. */}
+        {isWide ? null : (
+          <>
+            <AppHeader attached />
+            <FantasyTopNav pathnameOverride={VIEW_PATH[view]} />
+          </>
+        )}
+        <FrameProvider value={{ header: !isWide }}>
         <Screen
           title={VIEW_TITLE[view]}
           measure={VIEW_MEASURE[view]}
@@ -505,6 +525,7 @@ function GalleryBody() {
           {view === 'lineup' ? <LineupFixture /> : null}
           {view === 'profile' ? <ProfileFixture /> : null}
         </Screen>
+        </FrameProvider>
       </View>
     </View>
   );

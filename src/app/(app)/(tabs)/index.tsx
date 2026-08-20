@@ -6,8 +6,12 @@ import { Redirect } from 'expo-router';
  * it, visiting the deployed domain root 404s, and every `<Redirect href="/" />`
  * in the auth flow lands nowhere.
  *
+ * It lands on `/fantasy`, which is the first tab's own entry and redirects on
+ * to the lineup — rather than naming the lineup here. Two files deciding where
+ * the app opens is how they come to disagree.
+ *
  * Hidden from the tab bar via `href: null` in the layout.
  */
 export default function AppIndex() {
-  return <Redirect href="/lineup" />;
+  return <Redirect href="/fantasy" />;
 }

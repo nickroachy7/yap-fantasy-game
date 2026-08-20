@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppHeader } from '@/components/shell/AppHeader';
-import { useSectionFramed } from '@/components/shell/SectionFrame';
+import { useFrame } from '@/components/shell/frame';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, ContentMeasure, Spacing, type Measure } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -34,7 +34,14 @@ type Props = {
   context?: string;
   /**
    * A full-bleed band pinned between the chrome and the page, outside the
-   * scroll — the score strip is the one that exists.
+   * scroll.
+   *
+   * NOTHING IN THE PRODUCT PASSES ONE TODAY. `ScoreStrip` was the band this
+   * slot was built for, and the scoreboard has a tab of its own now — so the
+   * only thing exercising it is the shell gallery, which still draws the strip
+   * in this slot because the placement is the part worth being able to look at.
+   * Kept rather than deleted: the geometry below is the hard-won half, and the
+   * next band (a live-week banner, a lock warning) will want exactly it.
    *
    * It is a slot on the frame rather than the first child of `children` because
    * of where it has to sit, which is different on each platform and is not
@@ -79,16 +86,20 @@ export function Screen({
   const isWide = useIsWide();
 
   /**
-   * True when a `SectionFrame` above this page has already drawn the header and
-   * the section nav — every page of Collection, Players and Leaderboard.
+   * What the frames above this page have already drawn — see `frame.tsx`.
    *
-   * Two consequences, and they are separate. The header is simply not drawn
-   * again. And the content box gives up its TOP padding: the nav above supplies
-   * that gap now, exactly as it did when it was the first child of this box,
-   * and leaving both in would put 16 above the nav and another 16 below it.
+   * Two consequences, and they are separate, which is why they are two flags.
+   * A masthead already on screen is simply not drawn again. And a NAV BAR
+   * directly above the page takes over the gap between the chrome and the
+   * content, exactly as it did when it was the first child of this box, so the
+   * content gives up its top padding — leaving both in would put 16 above the
+   * bar and another 16 below it.
+   *
+   * The lineup is the case that needs them apart: a masthead and the top nav
+   * above it, but no action bar — so it keeps its padding.
    */
-  const framed = useSectionFramed();
-  const flush = framed && !isWide;
+  const frame = useFrame();
+  const flush = frame.nav && !isWide;
 
   const body = scroll ? (
     <ScrollView
@@ -137,9 +148,9 @@ export function Screen({
            * vertical space is the scarce resource on a phone. `context` is not
            * passed — see the prop.
            *
-           * Skipped inside a section, where the frame above the navigator drew
-           * it once and must keep it — see `SectionFrame`. */}
-          {framed ? null : <AppHeader />}
+           * Skipped inside a frame, which drew it once above the navigator and
+           * must keep it — see `FantasyFrame`. */}
+          {frame.header ? null : <AppHeader />}
           {/* Immediately under it, with nothing between the two. The header
               draws on the page background now, so the strip's own surface is
               the first edge on the screen — which is the right one to be. */}

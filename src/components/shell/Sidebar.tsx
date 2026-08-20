@@ -1,23 +1,25 @@
 /**
  * Web navigation. Replaces the bottom tab bar on a wide window.
  *
- * The point of the rail is that it can show the sub-pages as real destinations
- * — Players and Shop are separate rows here, where on mobile they collapse into
- * a segmented control because there is no room for eight targets.
+ * The point of the rail is that it can show every level of the navigation as
+ * real destinations at once — Fantasy, its four boards, and their sub-pages are
+ * separate rows here, where on a phone they are three stacked strips (bottom
+ * bar, top nav, action bar) because there is no room for fifteen targets.
  *
- * EVERY sub-page is drawn, not just the ones inside the section you are in.
- * The rail used to expand only the active section, which meant the shortest
- * path from Inventory to Trend was two clicks with a guess in the middle: you
- * could not see that Trend existed until you were already in Cards. Eleven rows
- * fit a browser window comfortably, and being able to read the whole app at
- * once is most of what a sidebar is for. The active section keeps its filled
- * row and accent marker, so "where am I" is still answered at a glance.
+ * THREE LEVELS, DRAWN IN FULL, and none of them collapse. The rail used to
+ * expand only the active section, which meant the shortest path from Inventory
+ * to Trend was two clicks with a guess in the middle: you could not see that
+ * Trend existed until you were already in Cards. Fifteen rows fit a browser
+ * window comfortably, and being able to read the whole app at once is most of
+ * what a sidebar is for. The active row keeps its fill and accent marker, so
+ * "where am I" is still answered at a glance.
  *
- * Section rows carry the same glyphs as the bottom tab bar, from the same
- * `icon` field on NAV_SECTIONS. Without them the two presentations of one
+ * INDENT IS THE ONLY THING THAT SAYS "INSIDE". Tab and board rows carry the
+ * glyphs the bottom bar and the top nav use, from the same `icon` fields on
+ * NAV_TABS and FANTASY_SECTIONS — without them the presentations of one
  * navigation shared no visual vocabulary at all, so moving between a phone and
  * a desktop meant relearning the app by its labels. Sub-page rows stay
- * text-only: they are children of a row that is already marked, and five more
+ * text-only: they are children of a row that is already marked, and six more
  * glyphs would flatten the hierarchy the indent exists to show.
  */
 import { Link, usePathname } from 'expo-router';
@@ -25,7 +27,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Gem, initialsOf } from '@/components/shell/AppHeader';
-import { NAV_SECTIONS } from '@/components/shell/sections';
+import { NAV_TABS } from '@/components/shell/sections';
 import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
 import { RailWidth, TierColors } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
@@ -59,27 +61,38 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
       </View>
 
       <View style={styles.nav}>
-        {NAV_SECTIONS.map((item) => {
-          // A parent is active when the path is inside it, so /cards/shop keeps
-          // Cards lit as well as Shop.
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+        {NAV_TABS.map((tab) => {
+          // The whole TRAIL is lit and only the leaf is filled — see `NavRow`.
+          // So /fantasy/collection/shop whitens Fantasy, Collection and Shop,
+          // and fills Shop alone.
           return (
-            <View key={item.href} style={styles.group}>
+            <View key={tab.href} style={styles.group}>
               <NavRow
-                href={item.href}
-                label={item.label}
-                icon={item.icon}
-                active={active}
+                href={tab.href}
+                label={tab.label}
+                icon={tab.icon}
+                active={isInside(pathname, tab.href)}
+                current={pathname === tab.href}
                 accent={accent}
               />
-              {/* A section's first child shares the section's own href — the
-                  mobile segmented control needs a segment for the landing page.
-                  The rail does not: the parent row IS that link and already
-                  shows its active state, so rendering the child too puts two
-                  rows pointing at one destination directly under each other. */}
-              {item.children
-                ? item.children
-                    .filter((child) => child.href !== item.href)
+              {tab.sections?.map((section) => (
+                <View key={section.href}>
+                  <NavRow
+                    href={section.href}
+                    label={section.label}
+                    icon={section.icon}
+                    active={isInside(pathname, section.href)}
+                    current={pathname === section.href}
+                    accent={accent}
+                    depth={1}
+                  />
+                  {/* A section's first child shares the section's own href — the
+                      phone's action bar needs an item for the landing page. The
+                      rail does not: the parent row IS that link, so rendering
+                      the child too puts two rows pointing at one destination
+                      directly under each other. */}
+                  {section.children
+                    ?.filter((child) => child.href !== section.href)
                     .map((child) => (
                       <NavRow
                         key={child.href}
@@ -87,11 +100,13 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
                         label={child.label}
                         badge={child.badge}
                         active={pathname === child.href}
+                        current={pathname === child.href}
                         accent={accent}
-                        nested
+                        depth={2}
                       />
-                    ))
-                : null}
+                    ))}
+                </View>
+              ))}
             </View>
           );
         })}
@@ -116,24 +131,54 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
   );
 }
 
+/**
+ * Is `pathname` at or inside `href`?
+ *
+ * The boundary check is not decoration: a bare `startsWith` would light
+ * `/fantasy/lineup` for a future `/fantasy/lineups`, and a rail that marks the
+ * wrong row is worse than one that marks none.
+ */
+function isInside(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 function NavRow({
   href,
   label,
   badge,
   icon,
   active,
+  current,
   accent,
-  nested,
+  depth = 0,
 }: {
   href: string;
   label: string;
-  /** e.g. "Soon" on Sets — the same signal the mobile segmented control gives. */
+  /** e.g. "Soon" on Sets — the same signal the mobile action bar gives. */
   badge?: string;
-  /** Section rows only. Sub-pages are text, see the header. */
+  /** Tab and board rows only. Sub-pages are text, see the header. */
   icon?: TabIconName;
+  /**
+   * The path is at or inside this row. Lights the label, the glyph and the
+   * marker, so the whole trail down to the open page reads as one run.
+   */
   active: boolean;
+  /**
+   * The path IS this row — the leaf of that trail, and the only row that fills.
+   *
+   * Two flags rather than one because three levels changed what "active" can
+   * mean. With a flat rail they were the same question; with a nested one,
+   * filling every ancestor gives three highlighted rectangles and three answers
+   * to "where am I", while filling only the leaf and leaving the ancestors grey
+   * hides which branch you are in. Lighting the trail and filling its end says
+   * both at once — and it is the reason the Fantasy row can show anything at
+   * all now that `/fantasy` redirects straight through to the lineup and is
+   * never a page you are ON.
+   */
+  current: boolean;
   accent: string;
-  nested?: boolean;
+  /** 0 tab, 1 board, 2 sub-page. Drives the indent and the type. */
+  depth?: 0 | 1 | 2;
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -160,8 +205,8 @@ function NavRow({
           <View
             style={[
               styles.row,
-              nested && styles.nestedRow,
-              active && !nested && styles.activeRow,
+              INDENT[depth],
+              current && styles.activeRow,
               hovered && !active && styles.hoveredRow,
               pressed && styles.pressed,
             ]}>
@@ -179,13 +224,13 @@ function NavRow({
                 name={icon}
                 color={active ? '#FFFFFF' : 'rgba(255,255,255,0.62)'}
                 focused={active}
-                size={18}
+                size={depth === 0 ? 18 : 16}
               />
             ) : null}
             <Text
               numberOfLines={1}
               style={[
-                nested ? styles.nestedLabel : styles.label,
+                LABEL[depth],
                 { color: active ? '#FFFFFF' : 'rgba(255,255,255,0.62)' },
               ]}>
               {label}
@@ -230,15 +275,20 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     minHeight: 40,
   },
-  /* Indented past the marker and the icon column, so a sub-page sits visibly
-     INSIDE its parent rather than aligning with it. Aligning the two labels
-     exactly reads as two peers, which is the relationship this row is not in. */
-  nestedRow: { paddingVertical: 7, paddingLeft: 40, minHeight: 32 },
+  /* Each rank is indented past the one above it, so a row sits visibly INSIDE
+     its parent rather than aligning with it — aligning two labels exactly reads
+     as two peers, which is the relationship these rows are not in. The step
+     shrinks (16 then 12) because by the third rank the indent is competing with
+     the rail's own width for the label. */
+  tabRow: {},
+  sectionRow: { paddingVertical: 8, paddingLeft: 26, minHeight: 36 },
+  childRow: { paddingVertical: 7, paddingLeft: 48, minHeight: 32 },
   marker: { width: 3, height: 14, borderRadius: 2, backgroundColor: 'transparent' },
   activeRow: { backgroundColor: 'rgba(255,255,255,0.07)' },
   hoveredRow: { backgroundColor: 'rgba(255,255,255,0.035)' },
-  label: { fontSize: 14, fontWeight: '600' },
-  nestedLabel: { fontSize: 13, fontWeight: '500' },
+  tabLabel: { fontSize: 14, fontWeight: '700' },
+  sectionLabel: { fontSize: 13.5, fontWeight: '600' },
+  childLabel: { fontSize: 13, fontWeight: '500' },
   badge: {
     color: 'rgba(255,255,255,0.45)',
     fontSize: 9,
@@ -269,3 +319,7 @@ const styles = StyleSheet.create({
   accountName: { color: 'rgba(255,255,255,0.8)', fontSize: 13, flexShrink: 1 },
   pressed: { opacity: 0.7 },
 });
+
+/** Indent and type per rank, so `NavRow` reads as one row with three sizes. */
+const INDENT = [styles.tabRow, styles.sectionRow, styles.childRow] as const;
+const LABEL = [styles.tabLabel, styles.sectionLabel, styles.childLabel] as const;

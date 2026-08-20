@@ -9,11 +9,19 @@
  * thing I want". They are one control now, in one row, and the segmented
  * control is gone from the app.
  *
+ * THERE IS A SECOND ROW ABOVE THIS ONE AGAIN — `FantasyTopNav`, since the
+ * bottom bar became the whole app's — and that is not the mistake above coming
+ * back. The pair that failed were two takes on the same rank of navigation
+ * competing for one job. These are two ranks: the strip above names the BOARD
+ * you are on, this one names the PAGE within it. They are allowed to coexist
+ * only for as long as they look nothing alike — a word with a rule under it
+ * against a glyph with a word beside it. See the note there.
+ *
  * The current page is INCLUDED, marked active. It is tempting to drop it — you
  * are already there — but on a phone nothing else says which sub-page you are
- * on: the tab bar names the section, and `Screen` only draws a page heading on
- * wide web. The active item is the answer, and it doubles as the way back from
- * a filter you left open.
+ * on: the strip above names the section, not the page, and `Screen` only draws
+ * a page heading on wide web. The active item is the answer, and it doubles as
+ * the way back from a filter you left open.
  *
  * PAGES ONLY. The screen's filters used to be appended here, which made the
  * bar a different shape on every page of a section — three items on Sets and
@@ -59,7 +67,7 @@ import { childrenOf } from '@/components/shell/sections';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Spacing } from '@/constants/theme';
 
-export function SectionNav({ section }: { /** e.g. `/collection`. */ section: string }) {
+export function SectionNav({ section }: { /** e.g. `/fantasy/collection`. */ section: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const wide = useIsWide();
