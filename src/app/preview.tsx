@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PlayerCard } from '@/components/cards';
 import { InventoryCard } from '@/components/collection/InventoryCard';
-import { OWNED_CARDS, SAMPLE_CARDS, SAMPLE_FIXTURES } from '@/components/dev/fixtures';
+import { OWNED_CARDS, SAMPLE_CARDS } from '@/components/dev/fixtures';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -48,8 +48,6 @@ function InventoryRow({ label, content, columns }: {
             key={`${label}-${card.id}`}
             card={card}
             width={width}
-            /* Handed in separately, exactly as the inventory screen does. */
-            game={card.team ? SAMPLE_FIXTURES.get(card.team.toUpperCase()) : undefined}
           />
         ))}
       </View>

@@ -180,7 +180,6 @@ export function ShopPanel() {
       // A freshly pulled card has never been started, so it starts at the floor.
       tier: MINT_TIER,
       careerFp: 0,
-      lineupStarts: 0,
       tierFloorFp: 0,
       nextTierAt: silverAt,
       nextTierLabel: NEXT_TIER_LABEL,

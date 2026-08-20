@@ -59,6 +59,40 @@ function frameRadius(size: number): number {
   return Math.max(Radius.chip, Math.round(size * 0.2));
 }
 
+/**
+ * The figure ALONE, with no well around it.
+ *
+ * Split out because the collection card's photo region is already a frame — a
+ * full-bleed band across the top of the card — and nesting `PlayerAvatar`
+ * inside it would have drawn a rounded box inside a rounded box, which reads as
+ * a thumbnail pasted onto a card rather than as the card's own picture area.
+ * The card supplies the frame; this supplies what stands in it.
+ *
+ * `height` is the figure's total height, so a caller sizes it against the space
+ * it has rather than against a notional avatar diameter. Everything else is a
+ * proportion of that, and the proportions are the same ones the row's avatar
+ * uses — one silhouette in the app, at two scales.
+ */
+export function PlayerSilhouette({ height, color }: { height: number; color: string }) {
+  /* The same 0.28 / 0.62 of a SQUARE the avatar draws, restated against height:
+     the figure's own box is 0.62 tall where the avatar's is 1.0, so a head that
+     is 0.28 of the square is 0.45 of the figure. Derived rather than re-picked,
+     so the two cannot drift apart. */
+  const square = height / 0.62;
+  const head = square * 0.28;
+  const body = square * 0.62;
+
+  return (
+    <>
+      <View style={{ width: head, height: head, borderRadius: head / 2, backgroundColor: color }} />
+      <View
+        style={{ width: body, height: body * 0.42, overflow: 'hidden', marginTop: square * 0.07 }}>
+        <View style={{ width: body, height: body, borderRadius: body / 2, backgroundColor: color }} />
+      </View>
+    </>
+  );
+}
+
 export function PlayerAvatar({ size = AVATAR_SIZE }: { size?: number }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -68,10 +102,6 @@ export function PlayerAvatar({ size = AVATAR_SIZE }: { size?: number }) {
      nobody, and two quiet steps do that where a single silhouette on the page
      background would sit forward of the name beside it. */
   const well = scheme === 'dark' ? c.surface : c.surfaceSunken;
-  const ink = c.textTertiary;
-
-  const head = size * 0.28;
-  const body = size * 0.62;
 
   return (
     <View
@@ -87,12 +117,7 @@ export function PlayerAvatar({ size = AVATAR_SIZE }: { size?: number }) {
           pictogram of a person. The square is what makes it possible — a
           circle's bottom edge is a point, so anything resting on it has to
           float clear of it instead. */}
-      <View style={{ width: head, height: head, borderRadius: head / 2, backgroundColor: ink }} />
-      <View style={{ width: body, height: body * 0.42, overflow: 'hidden', marginTop: size * 0.07 }}>
-        <View
-          style={{ width: body, height: body, borderRadius: body / 2, backgroundColor: ink }}
-        />
-      </View>
+      <PlayerSilhouette height={size * 0.62} color={c.textTertiary} />
     </View>
   );
 }

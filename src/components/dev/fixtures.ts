@@ -12,21 +12,29 @@
  */
 import type { PlayerCardModel } from '@/components/cards';
 import type { CollectionCard } from '@/components/collection/types';
-import type { GameContext } from '@/components/lineup/model';
 
-export const SAMPLE_CARDS: PlayerCardModel[] = [
+/**
+ * The four sample cards, one per tier.
+ *
+ * `starts` and `perGame` are NOT on `PlayerCardModel` — the card stopped
+ * drawing either — but the `CollectionCard` rows built from these below still
+ * carry them, and the card profile draws them there. They live beside the model
+ * rather than inside it so the gallery keeps exercising the real type.
+ */
+type Sample = PlayerCardModel & { starts: number; perGame: number | null };
+
+export const SAMPLE_CARDS: Sample[] = [
   {
     playerName: 'Drew Allar',
     positionAbbreviation: 'QB',
     teamAbbreviation: 'TEN',
     tier: 'bronze',
     careerFp: 20.32,
-    lineupStarts: 1,
+    starts: 1,
     tierFloorFp: 0,
     nextTierAt: 200,
     nextTierLabel: 'SILVER',
-    fpPerGame: 14.2,
-    game: { opponent: 'CAR', home: false, startsAt: '2026-09-13T17:05:00Z' },
+    perGame: 14.2,
   },
   {
     playerName: 'Amar Johnson',
@@ -34,12 +42,11 @@ export const SAMPLE_CARDS: PlayerCardModel[] = [
     teamAbbreviation: 'KC',
     tier: 'silver',
     careerFp: 412.5,
-    lineupStarts: 14,
+    starts: 14,
     tierFloorFp: 200,
     nextTierAt: 750,
     nextTierLabel: 'GOLD',
-    fpPerGame: 21.7,
-    game: { opponent: 'BUF', home: true, startsAt: '2026-09-13T20:25:00Z' },
+    perGame: 21.7,
   },
   {
     playerName: 'Christian McCaffrey',
@@ -47,12 +54,11 @@ export const SAMPLE_CARDS: PlayerCardModel[] = [
     teamAbbreviation: 'SF',
     tier: 'gold',
     careerFp: 1284.75,
-    lineupStarts: 41,
+    starts: 41,
     tierFloorFp: 750,
     nextTierAt: 2500,
     nextTierLabel: 'DIAMOND',
-    fpPerGame: 8.4,
-    game: null,
+    perGame: 8.4,
   },
   {
     playerName: 'Ja"Marr Chase-Williamson',
@@ -60,7 +66,8 @@ export const SAMPLE_CARDS: PlayerCardModel[] = [
     teamAbbreviation: 'CIN',
     tier: 'diamond',
     careerFp: 3140.2,
-    lineupStarts: 96,
+    starts: 96,
+    perGame: null,
     tierFloorFp: 2500,
     nextTierAt: null,
   },
@@ -85,7 +92,7 @@ export const OWNED_CARDS: CollectionCard[] = SAMPLE_CARDS.map((m, i) => ({
   // The PLAYER's season average, not the card's earnings. The last card leaves
   // it null on purpose: a player with no scored games yet is a real state and
   // the card must draw it as absence rather than as a zero.
-  fpPerGame: m.fpPerGame ?? null,
+  fpPerGame: m.perGame,
   id: `sample-${i}`,
   cardId: `card-${i}`,
   playerName: m.playerName,
@@ -95,7 +102,7 @@ export const OWNED_CARDS: CollectionCard[] = SAMPLE_CARDS.map((m, i) => ({
   tier: m.tier,
   sellValue: FIXTURE_SELL_VALUE[m.tier],
   careerFp: m.careerFp,
-  lineupStarts: m.lineupStarts,
+  lineupStarts: m.starts,
   tierFloorFp: m.tierFloorFp,
   nextTierAt: m.nextTierAt,
   nextTierLabel: m.nextTierLabel,
@@ -109,23 +116,3 @@ export const OWNED_MANY: CollectionCard[] = Array.from({ length: 14 }, (_, i) =>
   return { ...base, id: `many-${i}`, cardId: `many-card-${i}` };
 });
 
-/**
- * Club -> this week's game, the shape `useUpcomingFixtures` returns.
- *
- * `OWNED_CARDS` is the `CollectionCard` shape and deliberately carries no
- * fixture: in the product the schedule is a SEPARATE read on a different
- * cadence, loaded once for the whole grid rather than per card. The galleries
- * have to hand it in the same way, or the compact size — the one the inventory
- * actually uses — would silently never exercise the fixture line.
- *
- * Clubs with no game are OMITTED rather than mapped to null, so `get()` returns
- * undefined for them. That is the fourth state and a real one — the shop shows
- * freshly pulled cards before any schedule is loaded — and mapping it to null
- * would have made the gallery claim a bye for a week nobody looked up.
- */
-export const SAMPLE_FIXTURES: Map<string, GameContext | null> = new Map(
-  SAMPLE_CARDS.filter((m) => m.game !== undefined).map((m) => [
-    m.teamAbbreviation?.toUpperCase() ?? '',
-    m.game ?? null,
-  ]),
-);

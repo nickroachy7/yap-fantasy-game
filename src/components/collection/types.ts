@@ -7,7 +7,6 @@
  * cannot prove otherwise through a join), so normalisation is not optional.
  */
 import type { PlayerCardModel } from '@/components/cards';
-import type { GameContext } from '@/components/lineup/model';
 import { TierOrder, type CardTier } from '@/constants/theme';
 import type { Database } from '@/lib/database.types';
 import { injuryWeight } from '@/lib/injury';
@@ -138,27 +137,25 @@ export function normaliseRow(row: CollectionViewRow): CollectionCard {
 }
 
 /**
- * Presentational view-model for <PlayerCard>. The card never touches Supabase.
+ * `CollectionCard` -> what `PlayerCard` draws.
  *
- * `game` is passed separately because it comes from a different read on a
- * different cadence — the week's schedule, which is fixed months ahead and is
- * loaded once for the whole grid rather than per card. Undefined means no
- * schedule was loaded, which the card renders as "no fixture line" rather than
- * as a bye.
+ * It used to take the club's game as a second argument, threaded down from the
+ * grid so the card could print a fixture line. The card no longer shows one —
+ * a matchup is a fact about a Sunday, not about a copy you hold — so the
+ * parameter went, and with it the schedule read the collection screen was
+ * making purely to feed it.
  */
-export function toCardModel(c: CollectionCard, game?: GameContext | null): PlayerCardModel {
+export function toCardModel(c: CollectionCard): PlayerCardModel {
   return {
     playerName: c.playerName,
     positionAbbreviation: c.position,
     teamAbbreviation: c.team,
+    injuryStatus: c.injuryStatus,
     tier: c.tier,
     careerFp: c.careerFp,
-    lineupStarts: c.lineupStarts,
     tierFloorFp: c.tierFloorFp,
     nextTierAt: c.nextTierAt,
     nextTierLabel: c.nextTierLabel,
-    fpPerGame: c.fpPerGame,
-    game,
   };
 }
 

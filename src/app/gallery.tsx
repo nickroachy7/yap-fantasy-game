@@ -32,7 +32,7 @@ import {
   MCCAFFREY_PROFILE,
   USAGE_SAMPLE,
 } from '@/components/dev/profile-fixture';
-import { OWNED_MANY, SAMPLE_FIXTURES } from '@/components/dev/fixtures';
+import { OWNED_MANY } from '@/components/dev/fixtures';
 import { PlayerHero } from '@/components/players/PlayerHero';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { CardStanding } from '@/components/players/CardStanding';
@@ -171,7 +171,6 @@ function InventoryFixture() {
               card={card}
               width={itemWidth}
               /* Handed in separately, exactly as the inventory screen does. */
-              game={card.team ? SAMPLE_FIXTURES.get(card.team.toUpperCase()) : undefined}
             />
           ))}
         </View>

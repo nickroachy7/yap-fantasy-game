@@ -79,12 +79,35 @@ export type LineupCard = {
  * Silver Tier" beside a bronze chip reads as a bug in the promotion trigger.
  *
  * Null at diamond — there is no tier above it, so there is no distance to one.
+ *
+ * STRUCTURALLY TYPED rather than taking a `LineupCard`, because the collection
+ * card says the same sentence about the same copy and must not say it in
+ * slightly different words. Three fields is the whole input.
+ *
+ * `short` drops both "Tier" and the "to", giving "1284/2500 Diamond".
+ *
+ * MEASURED, because this is the one line on a collection cell that does not
+ * fit. The cell has 96pt of content at three-across on a 375pt phone, and the
+ * tier letter in front of the phrase takes 12 of it. The full form measures
+ * 102.9 at 9pt against the worst case — a gold card, whose next tier is the
+ * longest word of the four. Dropping "Tier" alone still leaves 102.9; dropping
+ * the "to" as well and setting it at 8pt gives 82.1 against 84 available.
+ *
+ * Both words are pure connective tissue: the slash already says the number is a
+ * position within a total, and a tier name after it can only mean the tier it
+ * is counting towards. Truncating instead would have eaten the tier NAME, which
+ * is the informative half — "1284/2500 to Di…" tells you less than the short
+ * form does in less space.
  */
-export function tierProgressLabel(card: LineupCard): string | null {
+export function tierProgressLabel(
+  card: { careerFp: number; nextTierAt: number | null; nextTierLabel?: string | null },
+  options?: { short?: boolean },
+): string | null {
   if (card.nextTierAt === null || !card.nextTierLabel) return null;
   const next = card.nextTierLabel;
   const titled = next.charAt(0).toUpperCase() + next.slice(1).toLowerCase();
-  return `${Math.floor(card.careerFp)}/${Math.round(card.nextTierAt)} to ${titled} Tier`;
+  const span = `${Math.floor(card.careerFp)}/${Math.round(card.nextTierAt)}`;
+  return options?.short ? `${span} ${titled}` : `${span} to ${titled} Tier`;
 }
 
 /** How many games the FORM column shows. Five is a month of NFL football. */

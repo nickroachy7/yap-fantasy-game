@@ -472,6 +472,29 @@ export function selectionAccent(scheme: 'light' | 'dark'): string {
 }
 
 /** Card geometry per size variant. Art slot keeps its box when real art lands. */
+/**
+ * The photo region's aspect ratio (w/h), and it is SQUARE at every card size.
+ *
+ * One number rather than three, because a player's picture is the same object
+ * on a 106pt grid cell as on a 320pt detail card and cropping it differently by
+ * size would mean commissioning or licensing three crops of every portrait.
+ * Square is also what the rest of the app already reserves: `PlayerAvatar` on
+ * the directory row and both profile headers is a square frame, so the day real
+ * imagery lands one asset fits every slot in the product.
+ *
+ * It costs height, and the cost is worth stating: a square photo on a 106pt
+ * compact card is 106pt of a ~182pt cell, where the band it replaced was 44 of
+ * 119. That is the trade — a picture you can actually see, against roughly a
+ * third fewer cards per screen.
+ *
+ * `silhouette` beside each size is the placeholder figure's height, at the 0.62
+ * of the frame `PlayerAvatar` uses, computed against that size's NOMINAL width.
+ * The compact card stretches past its nominal 106 on a wide window (up to ~153
+ * at seven across), where the figure will sit a little small in its square —
+ * acceptable for a placeholder, and moot the day a real image replaces it.
+ */
+const PHOTO_ASPECT = 1;
+
 export const CardSizes = {
   /**
    * Three-across on a phone gives each card ~106pt. The grid size is drawn for
@@ -482,7 +505,8 @@ export const CardSizes = {
     width: 106,
     padding: Spacing.one + 1,
     gap: Spacing.one,
-    artAspect: 1.25,
+    artAspect: PHOTO_ASPECT,
+    silhouette: 66,
     nameSize: 11,
     nameLines: 1,
     labelSize: 7,
@@ -504,7 +528,8 @@ export const CardSizes = {
     padding: Spacing.two,
     gap: Spacing.two,
     /** Art slot aspect ratio (w/h). Fixed so layout is stable pre/post art. */
-    artAspect: 1.25,
+    artAspect: PHOTO_ASPECT,
+    silhouette: 104,
     nameSize: 15,
     nameLines: 1,
     labelSize: 9,
@@ -517,7 +542,8 @@ export const CardSizes = {
     width: 320,
     padding: Spacing.three,
     gap: Spacing.three,
-    artAspect: 1.35,
+    artAspect: PHOTO_ASPECT,
+    silhouette: 198,
     nameSize: 24,
     nameLines: 2,
     labelSize: 11,
