@@ -25,12 +25,13 @@ import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { BenchRow } from './LineupRow';
-import { isLocked, type LineupCard } from './model';
+import { type LineupCard } from './model';
 
 function BenchBoardImpl({
   cards,
   targetSlotFor,
   startableFor,
+  lockedIds,
   onOpen,
   onOpenProfile,
   offSeasonCount,
@@ -40,6 +41,8 @@ function BenchBoardImpl({
   targetSlotFor: (card: LineupCard) => string | null;
   /** Whether any slot at all accepts him — a taken slot still counts. */
   startableFor: (card: LineupCard) => boolean;
+  /** Which cards have kicked off, by id. See the note on SlotBoard. */
+  lockedIds: Set<string>;
   /** The badge opens the swap sheet for this card. */
   onOpen: (card: LineupCard) => void;
   /** Everything else opens the player. */
@@ -63,7 +66,7 @@ function BenchBoardImpl({
              the badge must not offer it. Everyone else stays available, which
              is the point: a receiver playing on Sunday night is a live option
              all Sunday afternoon. */
-          const cardLocked = isLocked(card.game);
+          const cardLocked = lockedIds.has(card.id);
           return (
           <BenchRow
             key={card.id}

@@ -16,7 +16,7 @@ import { memo } from 'react';
 import { View } from 'react-native';
 
 import { StarterRow } from './LineupRow';
-import { isLocked, type LineupCard, type SlotConfig } from './model';
+import { type LineupCard, type SlotConfig } from './model';
 
 function SlotBoardImpl({
   slots,
@@ -24,6 +24,7 @@ function SlotBoardImpl({
   picks,
   eligibleCounts,
   openSlot,
+  lockedIds,
   savedPoints,
   scored,
   onOpenSlot,
@@ -36,6 +37,16 @@ function SlotBoardImpl({
   eligibleCounts: Map<string, number>;
   /** The slot whose sheet is open, so its row stays visibly the subject. */
   openSlot: string | null;
+  /**
+   * Which cards have kicked off, by id, decided once by the screen.
+   *
+   * A set rather than each row asking `isLocked` for itself, because that
+   * question is about the CLOCK — so re-deriving it per row would have to
+   * happen on a timer, and a timer this board could see would rebuild every row
+   * on every tick. The screen owns one timer that fires on the next actual lock
+   * boundary; between boundaries this identity is stable and the memo holds.
+   */
+  lockedIds: Set<string>;
   /** Per-slot scored points, and whether the week has been swept at all. */
   savedPoints: Record<string, number | null>;
   scored: boolean;
@@ -53,7 +64,7 @@ function SlotBoardImpl({
            player in it to have kicked off — which is exactly the case that lets
            you fill a hole on Sunday morning with somebody playing that
            afternoon. */
-        const slotLocked = isLocked(card?.game ?? null);
+        const slotLocked = card ? lockedIds.has(card.id) : false;
         return (
         <StarterRow
           key={cfg.slot}

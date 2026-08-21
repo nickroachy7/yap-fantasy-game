@@ -233,9 +233,43 @@ export function liveLabel(game: GameContext | null): string | null {
  * is what lets you fill a hole on Sunday morning with somebody playing that
  * afternoon.
  */
-export function isLocked(game: GameContext | null): boolean {
+export function isLocked(game: GameContext | null, atMs: number): boolean {
   if (!game || !game.opponent) return false;
-  return game.status !== 'scheduled';
+  // The feed's word, when it has one worth having.
+  if (game.status !== 'scheduled') return true;
+  // Otherwise the clock, evaluated NOW rather than when the row was fetched.
+  //
+  // `status` is a snapshot: `resolveStatus` runs in the loader, so a player
+  // whose game starts while the screen is open keeps a stale `scheduled` until
+  // something re-reads — and before any game is live nothing does, because the
+  // poll is gated on there being one. Without this a kickoff would pass with
+  // the badge still offering a swap, and the first sign would be the server
+  // refusing it.
+  if (!game.startsAt) return false;
+  const t = Date.parse(game.startsAt);
+  return Number.isFinite(t) && t <= atMs;
+}
+
+/**
+ * When the next player locks, given what is held now, or null when none will.
+ *
+ * Depends only on the CARDS, not on the current time: an unlocked card's
+ * kickoff is by definition still ahead, so the earliest of them is the next
+ * boundary and it does not move as the clock runs. That is what lets the screen
+ * schedule a single timer for the exact moment instead of re-deciding every
+ * second.
+ */
+export function nextLockAtMs(cards: { game: GameContext | null }[], atMs: number): number | null {
+  let soonest: number | null = null;
+  for (const card of cards) {
+    if (isLocked(card.game, atMs)) continue;
+    const startsAt = card.game?.startsAt;
+    if (!startsAt) continue;
+    const t = Date.parse(startsAt);
+    if (!Number.isFinite(t) || t <= atMs) continue;
+    if (soonest === null || t < soonest) soonest = t;
+  }
+  return soonest;
 }
 
 /**

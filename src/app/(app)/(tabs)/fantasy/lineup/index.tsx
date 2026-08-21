@@ -51,6 +51,7 @@ import {
   isEligible,
   isLocked,
   lockCaption,
+  nextLockAtMs,
   sortByPosition,
   sortCards,
   type LineupCard,
@@ -115,6 +116,7 @@ export default function LineupScreen() {
     loading,
     error: loadError,
     reload,
+    reloadLineup,
   } = useLineupData();
   const { displayName } = usePlayer();
 
@@ -172,14 +174,55 @@ export default function LineupScreen() {
    * the same instant, and it is the one the caption's absolute time is written
    * from.
    */
-  const nextLockAt = useMemo(() => {
-    const upcoming = cards
-      .map((card) => (isLocked(card.game) ? null : card.game?.startsAt ?? null))
-      .filter((t): t is string => Boolean(t))
-      .map((t) => new Date(t).getTime())
-      .filter((t) => Number.isFinite(t) && t > now);
-    return upcoming.length > 0 ? new Date(Math.min(...upcoming)).toISOString() : null;
-  }, [cards, now]);
+  /**
+   * LOCKS TICK ON THEIR OWN BOUNDARY, not on the countdown's second.
+   *
+   * Whether a player is locked is a function of the clock, so something has to
+   * re-evaluate it as time passes. Doing that on the one-second countdown tick
+   * would work and would also rebuild every bench row once a second — which on
+   * a three-hundred-card collection is three hundred rows a second to discover
+   * that nothing changed. Both boards are memoised precisely to stop that.
+   *
+   * So instead: one timer, set for the exact instant the next player locks.
+   * Nothing between now and then can change any lock, because a lock only ever
+   * arrives — it never lifts — and the earliest unlocked kickoff is by
+   * definition the first one that can. When it fires, `lockTick` advances,
+   * `lockedIds` is rebuilt once, and the effect re-arms for the boundary after.
+   */
+  /**
+   * The instant the locks were last evaluated at. NOT `now`.
+   *
+   * It carries the timestamp rather than a counter so the derivations below can
+   * stay pure — reading `Date.now()` inside a `useMemo` is exactly what
+   * `react-hooks/purity` is for, and it would also make them silently
+   * un-memoisable.
+   */
+  const [lockNow, setLockNow] = useState(() => Date.now());
+
+  const lockedIds = useMemo(() => {
+    const out = new Set<string>();
+    for (const card of cards) if (isLocked(card.game, lockNow)) out.add(card.id);
+    return out;
+  }, [cards, lockNow]);
+
+  const nextLockMs = useMemo(() => nextLockAtMs(cards, lockNow), [cards, lockNow]);
+
+  useEffect(() => {
+    if (nextLockMs === null) return;
+    // A quarter-second past the whistle, so a clock that is fractionally behind
+    // the server's cannot fire this before the kickoff it is waiting for.
+    const delay = Math.max(0, nextLockMs - Date.now()) + 250;
+    const t = setTimeout(() => setLockNow(Date.now()), delay);
+    return () => clearTimeout(t);
+  }, [nextLockMs]);
+
+  const nextLockAt = nextLockMs === null ? null : new Date(nextLockMs).toISOString();
+
+  /** Locked by id, so the boards never have to re-derive it per row per second. */
+  const isCardLocked = useCallback(
+    (card: LineupCard | null | undefined) => (card ? lockedIds.has(card.id) : false),
+    [lockedIds],
+  );
 
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const usedIds = useMemo(() => new Set(Object.values(picks)), [picks]);
@@ -202,8 +245,7 @@ export default function LineupScreen() {
    * whose game is at eight o'clock, and calling that "locked" would hide the
    * only move left.
    */
-  const allLocked =
-    seasonCards.length > 0 && seasonCards.every((card) => isLocked(card.game));
+  const allLocked = seasonCards.length > 0 && seasonCards.every((card) => lockedIds.has(card.id));
 
   const eligibleBySlot = useMemo(() => {
     const map = new Map<string, LineupCard[]>();
@@ -215,12 +257,12 @@ export default function LineupScreen() {
           /* A player whose game has begun cannot be brought in, so he is not a
              candidate. He stays visible on the bench with his live figure —
              this only removes him from the list of people you could START. */
-          !isLocked(card.game),
+          !lockedIds.has(card.id),
       );
       map.set(cfg.slot, sortCards(list, sort));
     }
     return map;
-  }, [slots, seasonCards, usedIds, picks, sort]);
+  }, [slots, seasonCards, usedIds, picks, sort, lockedIds]);
 
   /** What the empty rows advertise. The lists themselves live in the sheet. */
   const eligibleCounts = useMemo(
@@ -355,7 +397,7 @@ export default function LineupScreen() {
       const occupant = pickedId ? (byId.get(pickedId) ?? null) : null;
       // An empty slot is always openable; a filled one only while its occupant
       // can still be taken out.
-      if (isLocked(occupant?.game ?? null)) return null;
+      if (isCardLocked(occupant)) return null;
       return {
         kind: 'slot',
         slot: cfg.slot,
@@ -365,7 +407,7 @@ export default function LineupScreen() {
       };
     }
     const card = byId.get(swap.cardId);
-    if (!card || isLocked(card.game)) return null;
+    if (!card || isCardLocked(card)) return null;
     return {
       kind: 'bench',
       card,
@@ -377,9 +419,9 @@ export default function LineupScreen() {
           slot: cfg.slot,
           occupant: picks[cfg.slot] ? (byId.get(picks[cfg.slot]) ?? null) : null,
         }))
-        .filter((d) => !isLocked(d.occupant?.game ?? null)),
+        .filter((d) => !isCardLocked(d.occupant)),
     };
-  }, [swap, slots, picks, byId, eligibleBySlot]);
+  }, [swap, slots, picks, byId, eligibleBySlot, isCardLocked]);
 
   /**
    * Re-read both halves of the fixture, without the pull-to-refresh spinner.
@@ -456,13 +498,28 @@ export default function LineupScreen() {
       setSaving(false);
       return;
     }
-    setSaving(false);
-    // Re-read rather than trusting the payload: the server is the only thing
-    // that knows what actually stuck, and clearing the edit overlay against a
-    // stale saved lineup would show the change as unsaved forever.
+    /**
+     * ORDER IS THE WHOLE FIX HERE.
+     *
+     * This used to clear the overlay and then re-read, which meant `picks` fell
+     * back to `savedPicks` — the state from BEFORE the swap — for the entire
+     * duration of the re-read. The board visibly reverted to the old lineup and
+     * then jumped forward again when the answer landed. That flash is what read
+     * as glitchiness, and it got worse the more cards you owned, because the
+     * re-read was fetching all of them.
+     *
+     * Re-reading first and clearing after leaves the two states overlapping for
+     * one render, and an overlap is invisible: `savedPicks` now says what
+     * `edits` said, so `picks` is unchanged through the handover and the row
+     * never moves.
+     *
+     * Still a re-read rather than trusting the payload — the server is the only
+     * thing that knows what actually stuck — but only of the row that changed.
+     */
+    await reloadLineup();
     setEdits({});
-    await reload();
-  }, [slate, picks, reload]);
+    setSaving(false);
+  }, [slate, picks, reloadLineup]);
 
   /**
    * The autosave.
@@ -602,6 +659,7 @@ export default function LineupScreen() {
               picks={picks}
               eligibleCounts={eligibleCounts}
               openSlot={swap?.kind === 'slot' ? swap.slot : null}
+              lockedIds={lockedIds}
               savedPoints={savedPoints}
               scored={scoredAt !== null}
               onOpenSlot={openSlot}
@@ -619,6 +677,7 @@ export default function LineupScreen() {
               cards={bench}
               targetSlotFor={targetSlotFor}
               startableFor={startableFor}
+              lockedIds={lockedIds}
               onOpen={openBenchCard}
               onOpenProfile={openProfile}
               offSeasonCount={offSeasonCount}

@@ -226,6 +226,27 @@ function buildSchedule(
   return out;
 }
 
+/** The one row a submission changes, and the only thing worth re-reading after one. */
+type PriorLineup = {
+  total_points: number | null;
+  scored_at: string | null;
+  finalized_at: string | null;
+  lineup_slots?: { slot: string; card_instance_id: string; points: number | null }[];
+} | null;
+
+const LINEUP_SELECT =
+  'id, total_points, scored_at, finalized_at, lineup_slots(slot, card_instance_id, points)';
+
+function readLineup(slate: Slate) {
+  return supabase
+    .from('lineups')
+    .select(LINEUP_SELECT)
+    .eq('season', slate.season)
+    .eq('season_type', slate.season_type)
+    .eq('week', slate.week)
+    .maybeSingle();
+}
+
 export type LineupData = {
   slate: Slate | null;
   /**
@@ -270,7 +291,10 @@ export type LineupData = {
   finalizedAt: string | null;
   loading: boolean;
   error: string | null;
+  /** Re-read everything. The pull-to-refresh and the live poll. */
   reload: () => Promise<void>;
+  /** Re-read just the lineup row — what a submission actually changes. */
+  reloadLineup: () => Promise<void>;
 };
 
 export function useLineupData(): LineupData {
@@ -285,6 +309,34 @@ export function useLineupData(): LineupData {
   const [totalPoints, setTotalPoints] = useState<number | null>(null);
   const [scoredAt, setScoredAt] = useState<string | null>(null);
   const [finalizedAt, setFinalizedAt] = useState<string | null>(null);
+
+  /**
+   * Write one lineup row into the five pieces of state it feeds. Shared by the
+   * full load and by the lineup-only re-read, so the two cannot disagree about
+   * what an absent lineup means — both resolve it to empty rather than leaving
+   * whatever was there before.
+   */
+  const applyLineup = useCallback((prior: PriorLineup) => {
+    setSavedPicks(
+      prior?.lineup_slots
+        ? Object.fromEntries(prior.lineup_slots.map((r) => [r.slot, r.card_instance_id]))
+        : {},
+    );
+    setSavedPoints(
+      prior?.lineup_slots
+        ? Object.fromEntries(
+            prior.lineup_slots.map((r) => [r.slot, r.points === null ? null : Number(r.points)]),
+          )
+        : {},
+    );
+    setTotalPoints(
+      prior?.total_points === null || prior?.total_points === undefined
+        ? null
+        : Number(prior.total_points),
+    );
+    setScoredAt(prior?.scored_at ?? null);
+    setFinalizedAt(prior?.finalized_at ?? null);
+  }, []);
 
   const load = useCallback<Load>(async (live) => {
     // `lineup_slate()` names the one week this screen is about. The collection,
@@ -331,15 +383,7 @@ export function useLineupData(): LineupData {
             p_week: s.week,
           })
         : Promise.resolve({ data: null, error: null }),
-      s
-        ? supabase
-            .from('lineups')
-            .select('id, total_points, scored_at, finalized_at, lineup_slots(slot, card_instance_id, points)')
-            .eq('season', s.season)
-            .eq('season_type', s.season_type)
-            .eq('week', s.week)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
+      s ? readLineup(s) : Promise.resolve({ data: null, error: null }),
       s
         ? supabase
             .from('games')
@@ -390,29 +434,31 @@ export function useLineupData(): LineupData {
     );
 
     // Re-hydrate a lineup already submitted for this week.
-    const prior = existing.data as {
-      total_points: number | null;
-      scored_at: string | null;
-      finalized_at: string | null;
-      lineup_slots?: { slot: string; card_instance_id: string; points: number | null }[];
-    } | null;
-    setSavedPicks(
-      prior?.lineup_slots
-        ? Object.fromEntries(prior.lineup_slots.map((r) => [r.slot, r.card_instance_id]))
-        : {},
-    );
-    setSavedPoints(
-      prior?.lineup_slots
-        ? Object.fromEntries(
-            prior.lineup_slots.map((r) => [r.slot, r.points === null ? null : Number(r.points)]),
-          )
-        : {},
-    );
-    setTotalPoints(prior?.total_points === null || prior?.total_points === undefined ? null : Number(prior.total_points));
-    setScoredAt(prior?.scored_at ?? null);
-    setFinalizedAt(prior?.finalized_at ?? null);
+    applyLineup(existing.data as PriorLineup);
     return failure;
-  }, []);
+  }, [applyLineup]);
+
+  /**
+   * Re-read ONLY the lineup row.
+   *
+   * What a submission changes is one row and its slots. `reload()` re-reads the
+   * slate, the slot config, the whole paged collection, the team list, the lock
+   * time, the week's fixtures and every stat line for every player you own —
+   * chunked, so several round trips — and every one of those answers is
+   * identical to the one it already had. Doing that after each swap is what made
+   * moving a player feel slow: the board sat on stale state for as long as the
+   * heaviest query took.
+   *
+   * Points are deliberately not chased here. A swapped slot keeps the OLD card's
+   * points until the next sweep recomputes them, so there is nothing fresher to
+   * fetch; the 60s poll brings them in when they exist.
+   */
+  const reloadLineup = useCallback(async () => {
+    if (!slate) return;
+    const { data, error: err } = await readLineup(slate);
+    if (err) return;
+    applyLineup(data as PriorLineup);
+  }, [slate, applyLineup]);
 
   // Quiet, like the old `reload`: it cleared the error and re-read, but never
   // put the screen back into its first-load spinner.
@@ -433,5 +479,6 @@ export function useLineupData(): LineupData {
     loading,
     error,
     reload: refresh,
+    reloadLineup,
   };
 }
