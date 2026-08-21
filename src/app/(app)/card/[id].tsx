@@ -116,7 +116,7 @@ export default function CardDetailScreen() {
 
   const dismiss = useCallback(() => {
     if (router.canGoBack()) router.back();
-    else router.replace('/fantasy/collection');
+    else router.dismissTo('/fantasy/collection');
   }, [router]);
 
   /**

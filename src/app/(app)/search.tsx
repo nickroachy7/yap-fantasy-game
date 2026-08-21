@@ -120,7 +120,7 @@ export default function PlayersSearchScreen() {
    */
   const close = useCallback(() => {
     if (router.canGoBack()) router.back();
-    else router.replace('/players');
+    else router.dismissTo('/players');
   }, [router]);
 
   const openPlayer = useCallback(

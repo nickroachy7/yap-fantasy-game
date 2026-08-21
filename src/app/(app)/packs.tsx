@@ -133,12 +133,45 @@ export default function PacksScreen() {
     [reloadShelf, refresh],
   );
 
-  const close = useCallback(() => router.back(), [router]);
+  /**
+   * `back()` is a DISMISSAL — the tabs are still mounted underneath, so this
+   * puts the sheet down and leaves you where you were.
+   *
+   * THE FALLBACK IS NOT THEORETICAL. `back()` on an empty stack does nothing at
+   * all, silently, so arriving here with no history — a refreshed browser tab
+   * on /packs, a link straight to it, or a cold deep link — left the close
+   * button dead and the player with no way out of the sheet at all. It looked
+   * like the shelf had jammed, which is why it got reported alongside not
+   * having the gems to buy anything: the two happen to co-occur, since a player
+   * short on gems is the one who lingers here long enough to try to leave.
+   *
+   * `dismissTo` rather than `replace`, and the difference is the whole fix.
+   * `replace` swapped the route UNDERNEATH and left the sheet sitting on top of
+   * it — the inventory appeared behind, the panel stayed up, and the URL was
+   * still /packs. `dismissTo` pops back to the href when it is already in the
+   * stack and REPLACES THE CURRENT SCREEN when it is not, which is exactly the
+   * two cases a sheet has.
+   *
+   * `search`, `card/[id]` and `player/[id]` guard the same way, and carried the
+   * same `replace` defect in their cold path until this went in.
+   */
+  const close = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.dismissTo('/fantasy/collection');
+  }, [router]);
 
   /* Dismiss FIRST, then navigate. A push out of a modal that is still up leaves
      the sheet stacked over the page it sent you to, and the way out of that is
-     a back gesture the player has no reason to expect. */
+     a back gesture the player has no reason to expect.
+
+     With no history there is nothing to dismiss, and pushing would stack a
+     second entry on a stack whose first entry is this sheet — so dismissTo,
+     which replaces the sheet outright rather than sliding a page under it. */
   const seeInventory = useCallback(() => {
+    if (!router.canGoBack()) {
+      router.dismissTo('/fantasy/collection');
+      return;
+    }
     router.back();
     router.push('/fantasy/collection');
   }, [router]);

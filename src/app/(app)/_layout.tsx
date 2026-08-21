@@ -8,6 +8,31 @@ import { useAuth } from '@/context/AuthContext';
 import { PlayerProvider } from '@/context/PlayerContext';
 
 /**
+ * KEEP THE TABS UNDERNEATH A DEEP-LINKED SHEET.
+ *
+ * Every sheet in this Stack — the two profiles, the set checklist, packs — is
+ * presented OVER the tabs, and that presentation assumes the tabs are there. On
+ * a cold arrival they are not: loading /packs straight from a link or a
+ * refreshed browser tab builds a stack whose only entry is the sheet, so there
+ * is nothing behind it and nothing to dismiss to. The sheet floated over a void
+ * and its close button did nothing at all.
+ *
+ * `anchor` is Expo Router's answer: the named route is kept in the background
+ * as the stack's initial entry whenever a modal is presented into it, so the
+ * app is always behind the sheet and `back()` is always a real dismissal.
+ *
+ * This is the FIX; the `canGoBack()` fallbacks in the sheets themselves are the
+ * belt to its braces. Those were written first, and on their own they could not
+ * work: with no anchor there was no screen to go back TO, and both `replace`
+ * and `dismissTo` slid a page in underneath while leaving the sheet on top —
+ * the inventory appeared behind the packs panel and the URL stayed at /packs.
+ * The stack has to be right before dismissal has anything to mean.
+ */
+export const unstable_settings = {
+  anchor: '(tabs)',
+};
+
+/**
  * The signed-in shell: a Stack whose only ordinary screen is the tab navigator.
  *
  * WHY A STACK SITS ABOVE THE TABS
