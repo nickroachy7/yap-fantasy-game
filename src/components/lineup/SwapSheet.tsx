@@ -62,9 +62,9 @@ import { PositionBadge, positionsForSlot, slotBadgeLabel } from '@/components/ui
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-import { BADGE_SIZE, BADGE_WIDTH, BandFigure, PlayerBand } from './LineupRow';
+import { BADGE_SIZE, BADGE_WIDTH, PlayerBand, WeekFigure } from './LineupRow';
 import { SortBar } from './SortBar';
-import { matchupLabel, type LineupCard, type SortKey } from './model';
+import { matchupLabel, weekFigureFor, type LineupCard, type SortKey } from './model';
 
 /** A slot this bench player is legal for, and whoever is currently in it. */
 export type SwapDestination = { slot: string; occupant: LineupCard | null };
@@ -291,19 +291,11 @@ function SlotBody({
           <PlayerBand
             card={current}
             badge={<PositionBadge label={current.position} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />}
-            right={<BandFigure {...figureFor(current, sort)} />}
+            right={<WeekFigure {...weekFigure(current)} />}
             selected
             accessibilityLabel={`${current.name} is starting at ${slot}`}
           />
-          <Pressable
-            onPress={() => onClear(slot)}
-            accessibilityRole="button"
-            accessibilityLabel={`Bench ${current.name} and leave ${slot} empty`}
-            style={({ pressed }) => [styles.clear, pressed && styles.pressed]}>
-            <Text style={[Type.fine, { color: c.negative }]}>
-              Bench {current.name} — leave {slot} empty
-            </Text>
-          </Pressable>
+          <ClearRow slot={slot} name={current.name} onPress={() => onClear(slot)} />
         </View>
       ) : null}
 
@@ -331,7 +323,7 @@ function SlotBody({
             key={card.id}
             card={card}
             badge={<PositionBadge label={card.position} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />}
-            right={<BandFigure {...figureFor(card, sort)} />}
+            right={<WeekFigure {...weekFigure(card)} />}
             onPress={() => onPick(slot, card.id)}
             accessibilityLabel={
               current
@@ -349,17 +341,76 @@ function SlotBody({
             card={card}
             dimmed
             badge={<PositionBadge label={card.position} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />}
-            /* LOCKED replaces the figure's unit, which is where the eye already
-               is and which costs no width — the alternative was a lead column,
-               and that column is exactly what was truncating names. The number
-               above it keeps its meaning; what changes is the one word that was
-               only ever restating the sort. */
-            right={<BandFigure {...figureFor(card, sort)} label="LOCKED" />}
+            right={<WeekFigure {...weekFigure(card)} />}
             accessibilityLabel={`${card.name} has already started and cannot be brought in`}
           />
         ))}
       </View>
     </>
+  );
+}
+
+/**
+ * Take the current starter out and leave the slot empty.
+ *
+ * It was a line of small red text sitting between the player and the divider —
+ * `Bench Dallas Goedert — leave TE empty` — with no border, no target and no
+ * shape. On a sheet where everything else is a row, the one thing that was not
+ * a row was the only destructive action on it, and red text with no affordance
+ * reads as an error message about something that already happened rather than a
+ * button offering to do it.
+ *
+ * So it is a row, in the same rhythm as the players above and below it: same
+ * badge column, same two-line block, same press. What it says in that badge is
+ * a dashed outline — the shape of a slot with nobody in it, which is exactly
+ * what pressing it produces.
+ *
+ * THE COLOUR IS ON THE VERB ONLY. `ConfirmDialog` is the house rule here —
+ * destructive is one coloured thing, not a coloured paragraph — so the action
+ * carries the negative and the consequence underneath is stated in plain
+ * secondary text. The old version put every word in red, including the player's
+ * name, which made benching a tight end look like a data loss warning.
+ */
+function ClearRow({
+  slot,
+  name,
+  onPress,
+}: {
+  slot: string;
+  name: string;
+  onPress: () => void;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Bench ${name} and leave ${slot} empty`}
+      style={({ pressed }) => [
+        styles.clearRow,
+        pressed && { backgroundColor: c.backgroundElement },
+      ]}>
+      <View style={styles.clearBadgeCol}>
+        {/* Neutral, not red. The rule cited above is that destructive is ONE
+            coloured thing, and the verb is it — a red badge as well makes two,
+            and puts the loudest of them in the column the eye scans down to
+            compare positions. The dashes carry the meaning here; the colour is
+            not doing any of the work. */}
+        <View style={[styles.clearBadge, { borderColor: c.border }]}>
+          <Text style={[Type.micro, { color: c.textTertiary }]}>–</Text>
+        </View>
+      </View>
+      <View style={styles.clearLines}>
+        <Text numberOfLines={1} style={[Type.strong, { color: c.negative }]}>
+          Leave {slot} empty
+        </Text>
+        <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
+          {name} goes back to your bench
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -412,7 +463,7 @@ function BenchBody({
         <PlayerBand
           card={card}
           badge={<PositionBadge label={card.position} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />}
-          right={<BandFigure {...figureFor(card, 'fp')} />}
+          right={<WeekFigure {...weekFigure(card)} />}
           selected
           accessibilityLabel={`${card.name} is on the bench`}
         />
@@ -441,7 +492,7 @@ function BenchBody({
                 tone="neutral"
               />
             }
-            right={<BandFigure {...figureFor(occupant, 'fp')} />}
+            right={<WeekFigure {...weekFigure(occupant)} />}
             emptyPrimary={`${slot} is empty`}
             emptySecondary="Nothing is starting here yet"
             onPress={() => onPick(slot, card.id)}
@@ -465,11 +516,32 @@ function BenchBody({
  * the rows in an order the numbers on them do not explain, which is worse than
  * showing less.
  */
-function figureFor(card: LineupCard | null, sort: SortKey) {
-  if (sort === 'fppg') {
-    return { label: 'FP/G', value: card?.form ? card.form.fpPerGame.toFixed(1) : null };
-  }
-  return { label: 'FP', value: card?.form ? card.form.seasonFp.toFixed(1) : null };
+/**
+ * The right-hand figure, which is the LINEUP ROW'S figure and nothing else.
+ *
+ * It used to be the card's season total — `198.2 FP` — under a sort that could
+ * switch it to points per game. That was the same quantity the row already
+ * carries two lines down as `2610.0 TFP`, so the sheet printed a card's career
+ * production twice and its week not at all, in the one column the board uses
+ * for the week.
+ *
+ * Now it is `weekFigureFor` over the player's own line, which is exactly what a
+ * bench row shows on the board: a dash before kickoff, the running total while
+ * he plays, the final figure after — with PROJ reserved underneath.
+ *
+ * The player's line and not a slot's credit, deliberately. A sheet has no slot
+ * points to read and does not need them: the two agree the moment a sweep runs,
+ * and what the reader is weighing here is players against each other.
+ *
+ * `sort` still orders the list — best option first is worth having — it simply
+ * no longer decides what the column says.
+ */
+function weekFigure(card: LineupCard | null) {
+  const value = weekFigureFor(card?.form?.weekFp ?? null, card?.game ?? null);
+  return {
+    points: value === null ? null : value.toFixed(1),
+    status: card?.game?.status ?? null,
+  };
 }
 
 /**
@@ -551,7 +623,29 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.one,
   },
   rule: { flex: 1, height: StyleSheet.hairlineWidth },
-  clear: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
+  /* The player rows' own geometry: `Spacing.three` gutter, a BADGE_WIDTH column,
+     a Spacing.two gap. Anything else and the left edge of this row would not
+     line up with the left edge of the player it is about. */
+  clearRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
+  clearBadgeCol: { width: BADGE_WIDTH, alignItems: 'center' },
+  /* Dashed, because the badge is drawing the ABSENCE of a player — a solid
+     outline here would read as one more position badge in the column. */
+  clearBadge: {
+    width: BADGE_SIZE + 8,
+    height: BADGE_SIZE,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearLines: { flex: 1, minWidth: 0, gap: 2 },
   empty: { padding: Spacing.three },
   footer: {
     borderTopWidth: StyleSheet.hairlineWidth,

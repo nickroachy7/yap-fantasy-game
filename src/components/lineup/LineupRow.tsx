@@ -575,7 +575,7 @@ function Identity({
  * projection sits under it at reading weight, subordinate, which is the correct
  * relationship between a result and a guess even once we have real ones.
  */
-function WeekFigure({ points, status }: { points: string | null; status: GameStatus | null }) {
+export function WeekFigure({ points, status }: { points: string | null; status: GameStatus | null }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
@@ -628,36 +628,6 @@ function WeekFigure({ points, status }: { points: string | null; status: GameSta
   );
 }
 
-/**
- * The swap sheet's figure: one number under its own name.
- *
- * The sheet is a picker, so its right-hand column follows the SORT rather than
- * the week — you are choosing between candidates on whatever basis you just
- * chose to rank them by, and a column of week scores that are all dashes before
- * kickoff would rank nothing. The label is what stops the number being
- * ambiguous once the sort bar has scrolled out of view.
- */
-export function BandFigure({ label, value }: { label: string; value: string | null }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-
-  return (
-    <View style={styles.right}>
-      {value !== null ? (
-        <Text numberOfLines={1} style={[styles.figure, NUMERIC, { color: c.text }]}>
-          {value}
-        </Text>
-      ) : (
-        <Text numberOfLines={1} style={[styles.figureEmpty, NUMERIC, { color: c.textTertiary }]}>
-          {DASH}
-        </Text>
-      )}
-      <Text numberOfLines={1} style={[Type.micro, styles.figureLabel, { color: c.textTertiary }]}>
-        {label}
-      </Text>
-    </View>
-  );
-}
 
 /**
  * A player as the swap sheet lists him — the same three lines and the same
