@@ -23,6 +23,7 @@ export function ConfirmDialog({
   visible,
   title,
   body,
+  warning,
   confirmLabel,
   cancelLabel = 'Cancel',
   destructive = false,
@@ -34,6 +35,17 @@ export function ConfirmDialog({
   visible: boolean;
   title: string;
   body?: string;
+  /**
+   * A consequence the reader would not predict from the title, set apart from
+   * `body` rather than folded into it.
+   *
+   * `body` is the terms of the act — what it costs, what it leaves. A warning is
+   * something that happens SOMEWHERE ELSE as a result, and a sentence about a
+   * different screen buried in the fourth line of a paragraph about this one is
+   * a sentence nobody reads. Bordered in the warning tone for the same reason
+   * the error line below is bordered in the negative one.
+   */
+  warning?: string | null;
   confirmLabel: string;
   cancelLabel?: string;
   destructive?: boolean;
@@ -61,6 +73,12 @@ export function ConfirmDialog({
           <Text style={[Type.section, { color: c.text }]}>{title}</Text>
           {body ? (
             <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>{body}</Text>
+          ) : null}
+
+          {warning ? (
+            <Text style={[Type.fine, styles.warning, { color: c.warning, borderColor: c.warning }]}>
+              {warning}
+            </Text>
           ) : null}
 
           {error ? (
@@ -120,6 +138,12 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   error: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+    padding: Spacing.two,
+  },
+  /* Same frame as the error line — it is the same job, one step less severe. */
+  warning: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 8,
     padding: Spacing.two,

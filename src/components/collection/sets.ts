@@ -597,3 +597,42 @@ export function setTone(set: Pick<CardSet, 'code' | 'family'>): string | null {
   if (set.family === 'team') return teamWash(key);
   return positionColors(key, 'dark').accent;
 }
+
+/**
+ * The warning shown when a card about to be burned belongs to someone the
+ * player is currently starting.
+ *
+ * WHY IT IS SEPARATE FROM `fillWarning`. That one states the terms of the act —
+ * what it costs, what it leaves, how close it gets you. This is about a
+ * different screen: the lineup loses a starter and gains an empty slot. Folded
+ * into the same paragraph it became the fourth sentence of five and read as
+ * more small print; on its own, in the warning tone, it is the thing the reader
+ * did not already know.
+ *
+ * PHRASED AS "IF", NOT "WILL", AND THAT IS PRECISION RATHER THAN HEDGING. The
+ * server burns the lowest-earning copy you hold (`commit_candidate`), so a
+ * player holding a spare may well keep the one on the field. The checklist
+ * cannot tell which without reimplementing that ordering, and a second copy of
+ * that rule is the exact divergence this codebase keeps paying for. The result
+ * notice afterwards says what actually happened.
+ *
+ * The kicked-off case is not mentioned. It is refused server-side rather than
+ * warned about, and naming a rule that stops the act inside a dialog offering
+ * to do it would be describing two different outcomes at once.
+ */
+export function lineupWarning(names: readonly string[]): string | null {
+  if (names.length === 0) return null;
+
+  const listed =
+    names.length === 1
+      ? names[0]
+      : names.length === 2
+        ? `${names[0]} and ${names[1]}`
+        : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+
+  const one = names.length === 1;
+
+  return one
+    ? `${listed} is in your lineup right now. If the copy that gets added is the one starting, they leave the lineup and the slot is left empty for you to refill.`
+    : `${listed} are in your lineup right now. Any of them whose starting copy gets added leaves the lineup, and the slot is left empty for you to refill.`;
+}

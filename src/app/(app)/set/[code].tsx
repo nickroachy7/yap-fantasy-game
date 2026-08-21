@@ -52,6 +52,7 @@ import {
 import {
   autofillSelection,
   fillWarning,
+  lineupWarning,
   planFor,
   remainingOf,
   setTone,
@@ -66,6 +67,12 @@ import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
+
+/** The shape of the nested lineup read in `load`. */
+type LineupRead = {
+  week: number;
+  lineup_slots: { card_instances: { card_id: string } | null }[] | null;
+};
 
 export default function SetChecklistScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
@@ -107,15 +114,57 @@ export default function SetChecklistScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   /** What the last submission actually did, kept until the next one starts. */
-  const [added, setAdded] = useState<{ added: number; skipped: number; paid: number } | null>(null);
+  const [added, setAdded] = useState<{
+    added: number;
+    skipped: number;
+    paid: number;
+    /** Lineup slots the server emptied to make the burn safe. */
+    freed: number;
+  } | null>(null);
+  /**
+   * Card ids the player is currently STARTING, in any week not yet scored.
+   *
+   * By card rather than by copy, and that is the honest granularity available
+   * here: `commit_candidate` picks the lowest-earning copy you hold, so with a
+   * duplicate the copy that burns may not be the one on the field. The
+   * checklist cannot know which without reimplementing that ordering, and a
+   * second copy of the rule is exactly the kind of drift this codebase keeps
+   * paying for. So the warning is phrased as a possibility and the RESULT
+   * reports what actually happened — see `added.freed`.
+   */
+  const [starting, setStarting] = useState<Set<string>>(() => new Set());
 
   const load = useCallback<Load>(
     async (live) => {
       if (!code) return 'No set was named.';
-      const { data, error } = await supabase.rpc('set_checklist', { p_set_code: code });
+      /* The lineup read rides along with the checklist rather than getting its
+         own effect: they are drawn by the same screen at the same moment, and
+         two loaders would let the grid render before it knows which of its
+         cards are on the field. RLS scopes both to the caller. */
+      const [checklist, lineups] = await Promise.all([
+        supabase.rpc('set_checklist', { p_set_code: code }),
+        supabase
+          .from('lineups')
+          .select('week, lineup_slots(card_instances(card_id))')
+          .is('scored_at', null),
+      ]);
       if (!live()) return;
-      if (error) return error.message;
-      setMembers((data ?? []) as SetMember[]);
+      if (checklist.error) return checklist.error.message;
+      setMembers((checklist.data ?? []) as SetMember[]);
+
+      /* A failed lineup read costs the warning, not the screen. The server
+         refuses or frees the slot on its own either way, so the checklist is
+         still correct without it — just quieter than it should be. */
+      if (!lineups.error) {
+        const ids = new Set<string>();
+        for (const row of (lineups.data ?? []) as LineupRead[]) {
+          for (const slot of row.lineup_slots ?? []) {
+            const cardId = slot.card_instances?.card_id;
+            if (cardId) ids.add(cardId);
+          }
+        }
+        setStarting(ids);
+      }
     },
     [code],
   );
@@ -158,6 +207,22 @@ export default function SetChecklistScreen() {
     [quick, members, plan],
   );
 
+  /**
+   * The players in this submission who are currently starting.
+   *
+   * Named rather than counted: "2 of these are in your lineup" makes the reader
+   * go and work out which two, and the whole point of the warning is that they
+   * may not have realised any were.
+   */
+  const startingInPlan = useMemo(() => {
+    if (!members) return [];
+    const ids = new Set(confirmPlan.cardIds);
+    return members
+      .filter((m) => ids.has(m.card_id) && starting.has(m.card_id))
+      .map((m) => m.player_name);
+  }, [members, confirmPlan, starting]);
+
+
   const toggle = useCallback((member: SetMember) => {
     setSelected((held) =>
       held.includes(member.card_id)
@@ -195,11 +260,17 @@ export default function SetChecklistScreen() {
       return;
     }
 
-    const result = (data ?? {}) as { added?: number; skipped?: number; paid?: number };
+    const result = (data ?? {}) as {
+      added?: number;
+      skipped?: number;
+      paid?: number;
+      lineup_freed?: number;
+    };
     setAdded({
       added: result.added ?? 0,
       skipped: result.skipped ?? 0,
       paid: result.paid ?? 0,
+      freed: result.lineup_freed ?? 0,
     });
 
     /* THREE THINGS MOVED, and all three are held for the session: the checklist
@@ -208,6 +279,9 @@ export default function SetChecklistScreen() {
        too, which is the header's. Missing any one of them shows a card that no
        longer exists. */
     invalidateCollection();
+    /* `reloadMembers` re-runs the lineup read as well, which matters here: a
+       commit that freed a slot has changed who is starting, and the warning
+       must not go on naming a player who is no longer on the field. */
     /* The set LIST too, and its absence here is what made a freshly-committed
        set show its old progress when you went back. The comment above has named
        the set list as one of the three things that moved since this was
@@ -229,7 +303,13 @@ export default function SetChecklistScreen() {
     setConfirming(false);
   }, [set, confirmPlan, reloadMembers, reload, refreshPlayer]);
 
-  const close = useCallback(() => router.back(), [router]);
+  /* Guarded for the same reason as `packs` and `search`: `back()` on an empty
+     stack does nothing, so a checklist opened from a link or a refreshed tab
+     had a close button that did not close. Sets is this sheet's landing page. */
+  const close = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.dismissTo('/fantasy/sets');
+  }, [router]);
 
   return (
     <PlayerSheetFrame
@@ -298,6 +378,14 @@ export default function SetChecklistScreen() {
                   added.skipped > 0
                     ? ` ${added.skipped} could not be added — check the list below.`
                     : ''
+                }${
+                  /* Stated as fact, because by now it IS one. The dialog could
+                     only warn that this might happen — see `starting`. */
+                  added.freed > 0
+                    ? added.freed === 1
+                      ? ' One of them came out of your lineup, leaving an empty slot.'
+                      : ` ${added.freed} of them came out of your lineup, leaving empty slots.`
+                    : ''
                 }`}
               </Text>
             </View>
@@ -339,6 +427,9 @@ export default function SetChecklistScreen() {
             : ''
         }
         body={set ? fillWarning(set, confirmPlan) : undefined}
+        /* The one consequence that lands on a DIFFERENT screen, so it is set
+           apart rather than folded into the paragraph above. See ConfirmDialog. */
+        warning={lineupWarning(startingInPlan)}
         confirmLabel={`Add ${confirmPlan.cards} for ${confirmPlan.gems}`}
         destructive
         busy={submitting}
