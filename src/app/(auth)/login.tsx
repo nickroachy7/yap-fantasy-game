@@ -17,10 +17,21 @@ import { Colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 
 /**
- * Magic link is the primary path — it is what real users get, and it keeps the
- * app free of password-reset flows. Password is a secondary path so development
- * and testing do not depend on the email sender, which is rate limited until
- * custom SMTP lands.
+ * PASSWORD IS THE PRIMARY PATH, AND THAT IS TEMPORARY.
+ *
+ * Magic link is the better door and is still meant to be the default: no
+ * password to remember, no reset flow to build. It leads while the project has
+ * a working sender of its own — and it does not have one yet. Until custom SMTP
+ * lands, Supabase sends from its shared address, which is rate limited to a
+ * handful of messages an hour across the WHOLE project. That limit is invisible
+ * until it is not: the third person to sign up in the same hour gets a link
+ * that never arrives, with nothing on screen to say why, and the app looks
+ * broken to exactly the people being asked to try it.
+ *
+ * A password has no such ceiling. So for the friends beta the order is flipped
+ * and magic link stays one tap away. FLIP IT BACK the moment SMTP is live —
+ * this is a two-line change: the initial `mode` below, and the two button
+ * labels that name the other path.
  *
  * Note: email+password does NOT trigger Apple's Sign in with Apple requirement.
  * That applies only to third-party social login.
@@ -34,7 +45,7 @@ export default function LoginScreen() {
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
   const { sendMagicLink, verifyCode, signInWithPassword, signUpWithPassword } = useAuth();
 
-  const [mode, setMode] = useState<Mode>('link');
+  const [mode, setMode] = useState<Mode>('password');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
@@ -77,8 +88,8 @@ export default function LoginScreen() {
               {mode === 'sent'
                 ? `We sent a sign-in link to ${email.trim()}.`
                 : mode === 'password'
-                  ? 'Sign in with an email and password.'
-                  : 'Sign in with your email. No password to remember.'}
+                  ? 'Sign in, or make an account with an email and password.'
+                  : 'We will email you a link. No password to remember.'}
             </ThemedText>
 
             {mode !== 'sent' ? (
@@ -171,7 +182,7 @@ export default function LoginScreen() {
                   onPress={() => run(() => signUpWithPassword(email, password))}
                 />
                 <SecondaryButton
-                  label="Back to magic link"
+                  label="Email me a link instead"
                   disabled={busy}
                   onPress={() => { setMode('link'); setPassword(''); setError(null); }}
                 />
