@@ -6,6 +6,7 @@
  * the week's decision is made out of these derivations, so they need to be
  * readable on their own and not buried in JSX.
  */
+import { statusOf, type GameStatus } from '@/components/scores/scoreboard';
 import { POSITION_ORDER } from '@/constants/positions';
 import type { CardTier } from '@/constants/theme';
 
@@ -18,6 +19,27 @@ export type GameContext = {
   opponent: string | null;
   home: boolean;
   startsAt: string | null;
+  /**
+   * Whether that game is ahead, being played, or over.
+   *
+   * The row could not previously tell the three apart, because this hook only
+   * ever selected `starts_at` from `games` — so a blank in the points column
+   * meant both "has not played" and "played and scored nothing", and a number
+   * that was still climbing looked exactly like a settled one.
+   *
+   * `GameStatus` and `statusOf` come from the scoreboard rather than being
+   * defined again here. They already carry the one thing that is easy to get
+   * wrong — the provider spells in-progress more than one way, and a game
+   * called scheduled while it is being played is the error that matters most.
+   */
+  status: GameStatus;
+  /**
+   * The provider's own words for the status: `Final/OT`, or a quarter and a
+   * clock while the game is on. Kept because we cannot re-derive either, and
+   * the clock is the difference between "these points are live" and "these
+   * points are live and there are eleven minutes left".
+   */
+  statusText: string | null;
 };
 
 /** Season production, derived from stat_lines x fantasy_points. */
@@ -138,6 +160,58 @@ export function kickoffLabel(game: GameContext | null): string | null {
   const h = h24 % 12 === 0 ? 12 : h24 % 12;
   const m = String(d.getMinutes()).padStart(2, '0');
   return `${DAY_NAMES[d.getDay()]} ${h}:${m}${h24 < 12 ? 'a' : 'p'}`;
+}
+
+/**
+ * A game's state, decided from the clock as well as from the feed.
+ *
+ * `statusOf` alone trusts the provider to say `in_progress`, and the scoreboard
+ * already carries a note that it spells that more than one way. What neither of
+ * them can survive is a spelling we have not seen — and we have not seen ANY of
+ * them: every stored row is `final` or `scheduled` today, because the only
+ * in-progress values we have ever held were overwritten by the next sweep. So
+ * the vocabulary this depends on is, strictly speaking, unverified.
+ *
+ * A clock is not. A game that has kicked off and is not final is being played,
+ * whatever the feed calls it, and that fact needs no vocabulary at all. The feed
+ * still wins when it says `live` or `final` — it knows about delays and it knows
+ * the moment the whistle goes, and both of those are things a start time cannot
+ * tell you. The clock only fills the gap where the feed is still saying
+ * `scheduled` about a game that started an hour ago.
+ *
+ * The asymmetry is deliberate: this can promote `scheduled` to `live` but never
+ * demote `final` back to it. Calling a finished game live re-opens a result that
+ * had settled, which is the worse of the two errors.
+ */
+export function resolveStatus(statusState: string | null, startsAt: string | null): GameStatus {
+  const feed = statusOf(statusState);
+  if (feed !== 'scheduled') return feed;
+  if (!startsAt) return feed;
+  const t = Date.parse(startsAt);
+  return Number.isFinite(t) && t <= Date.now() ? 'live' : feed;
+}
+
+/**
+ * What the fixture line says about the state of the game, or null before it
+ * starts — where the kickoff time is already the answer and a second label
+ * saying "scheduled" would only repeat it.
+ *
+ * Prefers the provider's own words while a game is live, because "Q3 04:22" is
+ * strictly more than "LIVE" tells you and it is the sentence a reader is
+ * already holding in their head from the broadcast. Falls back to the bare word
+ * when the feed gives us nothing usable — which includes the case where the
+ * status string is still the pre-game placeholder (`8/21 - 7:00 PM EDT`),
+ * spotted by the date it opens with rather than by trusting status_state alone.
+ */
+export function liveLabel(game: GameContext | null): string | null {
+  if (!game) return null;
+  if (game.status === 'final') return game.statusText?.toLowerCase().startsWith('final')
+    ? game.statusText.toUpperCase()
+    : 'FINAL';
+  if (game.status !== 'live') return null;
+  const text = game.statusText?.trim();
+  const usable = text && !/^\d{1,2}\/\d{1,2}\b/.test(text) && !/^tbd$/i.test(text);
+  return usable ? text!.toUpperCase() : 'LIVE';
 }
 
 /** "vs ARI" / "@ ARI" / "BYE". */

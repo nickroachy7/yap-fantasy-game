@@ -77,11 +77,25 @@ update public.profiles p set display_name = m.handle
 -- Each manager gets a slice of the mintable pool, offset by their index so no
 -- two hold the same cards, and career_fp is assigned by position in the slice
 -- so every shelf spans the tiers. The thresholds are bronze 0 / silver 200 /
--- gold 750 / diamond 2500, and `card_instances_sync_tier` derives `tier` from
--- career_fp on insert — so setting the points is the whole job.
-insert into public.card_instances (user_id, card_id, career_fp, lineup_starts, acquired_at)
+-- gold 750 / diamond 2500.
+--
+-- BOTH POINT COLUMNS GET THE SAME FIGURE, and the tier depends on the second.
+-- `card_instances_sync_tier` used to derive tier from career_fp on insert, so
+-- setting the points was the whole job. Since 20260821140000 it derives from
+-- `settled_fp` — the total restricted to weeks that are over — so that a live
+-- swing cannot promote a card and then take it back. A seeded shelf is entirely
+-- fabricated history, every week of it notionally finished, so the two columns
+-- are equal here by definition. Writing only career_fp would insert 392 cards
+-- at a default settled_fp of 0 and every shelf would come out bronze.
+--
+-- The figure is computed once in the subquery and used twice, rather than the
+-- CASE being written out under both names: they are not two decisions that
+-- happen to agree, they are one number.
+insert into public.card_instances (user_id, card_id, career_fp, settled_fp, lineup_starts, acquired_at)
+select uid, card_id, fp, fp, starts, acquired_at
+  from (
 select m.uid,
-       c.id,
+       c.id as card_id,
        case
          -- One diamond at the top of the two biggest shelves only, so the tier
          -- means something on the board rather than being universal.
@@ -93,9 +107,9 @@ select m.uid,
          when c.rn <= m.played then 205 + (m.i * 173 + c.rn * 131) % 520
          when c.rn <= m.played + 8 then 15 + (c.rn * 47) % 170
          else 0
-       end,
-       case when c.rn <= m.played then 3 + (c.rn % 9) else 0 end,
-       now() - (c.rn || ' hours')::interval
+       end as fp,
+       case when c.rn <= m.played then 3 + (c.rn % 9) else 0 end as starts,
+       now() - (c.rn || ' hours')::interval as acquired_at
   from demo_mgr m
   join lateral (
     select s.id, row_number() over () as rn
@@ -106,7 +120,8 @@ select m.uid,
          offset m.i * 90
          limit m.cards
       ) s
-  ) c on true;
+  ) c on true
+  ) seeded;
 
 -- Four duplicates each, so CARDS and UNIQUE differ on the collection board —
 -- the gap between those two columns is the whole point of showing both.
@@ -140,8 +155,21 @@ update public.card_instances ci
 -- Preseason weeks 1 and 2 are final; week 3 is the slate in play. All three are
 -- scored, so the points and best-week boards read all three, and the record
 -- board grades only the two that are over.
-insert into public.lineups (user_id, season, season_type, week, total_points, scored_at, submitted_at)
-select m.uid, 2026, 1::smallint, w.week, w.pts, now(), now() - interval '3 days'
+--
+-- `scored_at` and `finalized_at` are both set, and they are NOT the same claim.
+-- Since 20260821140000 the live sweep stamps scored_at on every pass, so it is
+-- non-null from the first snap of a week and says only "this was recomputed
+-- recently"; finalized_at is what says the week is over. Seeding scored_at
+-- alone would leave weeks 1 and 2 looking like they were still being played,
+-- which is the exact confusion those two columns were split to end.
+--
+-- `week_is_complete` is asked rather than the week number being hardcoded, so a
+-- reseed against a schedule that has moved on stays truthful instead of
+-- asserting a fact about preseason week 2 that stopped being true.
+insert into public.lineups (user_id, season, season_type, week, total_points, scored_at, finalized_at, submitted_at)
+select m.uid, 2026, 1::smallint, w.week, w.pts, now(),
+       case when public.week_is_complete(2026, 1::smallint, w.week) then now() end,
+       now() - interval '3 days'
   from demo_mgr m
   cross join lateral (values (1, m.wk1), (2, m.wk2), (3, m.wk3)) w(week, pts);
 

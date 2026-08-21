@@ -177,18 +177,23 @@ $$;
 -- or failed by coin flip and did so on the second run. A test of "takes the
 -- cheapest" has to have exactly one cheapest.
 reset role;
-insert into public.card_instances (id, user_id, card_id, career_fp)
+-- BOTH POINT COLUMNS. `card_instances_sync_tier` derives tier from `settled_fp`
+-- (20260821140000), not career_fp, so that a live in-game swing cannot promote a
+-- card and then take it back. These fixtures are settled history — no week of
+-- theirs is in play — so the two figures are equal. Setting only career_fp inserts
+-- every copy at a default settled_fp of 0 and the whole fixture reads bronze.
+insert into public.card_instances (id, user_id, card_id, career_fp, settled_fp)
 values ('54444444-0000-0000-0000-00000000000b',
         '51111111-1111-1111-1111-111111111111',
-        (select id from set_test_cards where n = 1), 0),
+        (select id from set_test_cards where n = 1), 0, 0),
        ('54444444-0000-0000-0000-00000000000f',
         '51111111-1111-1111-1111-111111111111',
-        (select id from set_test_cards where n = 1), 800);
+        (select id from set_test_cards where n = 1), 800, 800);
 -- A third copy, so "three copies fill one slot" is a real case rather than an
 -- assumed one.
-insert into public.card_instances (user_id, card_id, career_fp)
+insert into public.card_instances (user_id, card_id, career_fp, settled_fp)
 values ('51111111-1111-1111-1111-111111111111',
-        (select id from set_test_cards where n = 1), 10);
+        (select id from set_test_cards where n = 1), 10, 10);
 -- And one copy of card 6, which is not in the set.
 insert into public.card_instances (user_id, card_id)
 values ('51111111-1111-1111-1111-111111111111', (select id from set_test_cards where n = 6));

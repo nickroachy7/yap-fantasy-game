@@ -97,6 +97,7 @@ import { useState } from 'react';
 import { StyleSheet, Pressable, Text, View } from 'react-native';
 
 import { TierMark } from '@/components/cards/TierMark';
+import type { GameStatus } from '@/components/scores/scoreboard';
 import { DASH } from '@/components/ui/DataTable';
 import { PositionBadge, positionsForSlot, slotBadgeLabel } from '@/components/ui/PositionBadge';
 import { positionColors } from '@/constants/positions';
@@ -104,7 +105,13 @@ import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { injuryCode, injuryWeight } from '@/lib/injury';
 
-import { kickoffLabel, matchupLabel, tierProgressLabel, type LineupCard } from './model';
+import {
+  kickoffLabel,
+  liveLabel,
+  matchupLabel,
+  tierProgressLabel,
+  type LineupCard,
+} from './model';
 
 /**
  * Three lines on the left — 20 for the name, 15 for the fixture, 15 for the
@@ -222,7 +229,7 @@ export function StarterRow({
           tone="neutral"
         />
       }
-      right={<WeekFigure points={week} />}
+      right={<WeekFigure points={week} status={card?.game?.status ?? null} />}
       emptyPrimary={eligibleCount > 0 ? `Choose a ${eligiblePositions}` : `No ${eligiblePositions} cards`}
       emptySecondary={eligibleCount > 0 ? `${eligibleCount} eligible` : 'Open a pack to fill this slot'}
       selected={selected}
@@ -281,7 +288,7 @@ export function BenchRow({
       badge={
         <PositionBadge label={BENCH_BADGE} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />
       }
-      right={<WeekFigure points={week} />}
+      right={<WeekFigure points={week} status={card.game?.status ?? null} />}
       selected={selected}
       disabled={disabled}
       onSwap={onSwap}
@@ -426,7 +433,12 @@ function Identity({
   const c = Colors[scheme];
   const accent = positionColors(card?.position, scheme).accent;
   const weight = injuryWeight(card?.injuryStatus);
-  const kick = kickoffLabel(card?.game ?? null);
+  /* The kickoff time answers "when", and stops being worth the space the moment
+     the answer is "now" — so once the game is under way the state takes its
+     place: "Q3 04:22 vs BUF", then "FINAL vs BUF". The matchup is what
+     identifies the fixture and stays put through all three. */
+  const state = liveLabel(card?.game ?? null);
+  const kick = state ?? kickoffLabel(card?.game ?? null);
   const progress = card ? tierProgressLabel(card) : null;
 
   return (
@@ -461,7 +473,18 @@ function Identity({
                 numberOfLines={1}
                 style={[
                   styles.fixture,
-                  { color: card.game?.opponent ? c.textTertiary : c.negative },
+                  /* Three colours for three states, and only one of them is an
+                     alarm. BYE is the negative because it is a failure you can
+                     still fix; LIVE is the positive because it is the row
+                     asking to be looked at; everything else is quiet grey. */
+                  {
+                    color: !card.game?.opponent
+                      ? c.negative
+                      : card.game.status === 'live'
+                        ? c.positive
+                        : c.textTertiary,
+                  },
+                  card.game?.status === 'live' && styles.fixtureLive,
                 ]}>
                 {card.game?.opponent
                   ? `${kick ? `${kick} ` : ''}${matchupLabel(card.game)}`
@@ -539,18 +562,26 @@ function Identity({
  * projection sits under it at reading weight, subordinate, which is the correct
  * relationship between a result and a guess even once we have real ones.
  */
-function WeekFigure({ points }: { points: string | null }) {
+function WeekFigure({ points, status }: { points: string | null; status: GameStatus | null }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+
+  const live = status === 'live';
 
   return (
     <View style={styles.right}>
       {/* An em dash at figure weight is a black bar, not an absence — it reads
           as a redaction, which the directory row learned the same way. An
           unscored week drops to the projection's weight and colour, so the
-          column reads as empty rather than as struck out. */}
+          column reads as empty rather than as struck out.
+
+          A LIVE figure takes the positive colour, because the number itself is
+          the thing that changed and colouring the label instead would put the
+          signal next to the fact rather than on it. */}
       {points !== null ? (
-        <Text numberOfLines={1} style={[styles.figure, NUMERIC, { color: c.text }]}>
+        <Text
+          numberOfLines={1}
+          style={[styles.figure, NUMERIC, { color: live ? c.positive : c.text }]}>
           {points}
         </Text>
       ) : (
@@ -558,13 +589,24 @@ function WeekFigure({ points }: { points: string | null }) {
           {DASH}
         </Text>
       )}
+      {/* WHAT THIS LINE USED TO SAY WAS `PROJ —`, AND IT SAID IT FOREVER.
+          There is no projection source in this app and the comment under it
+          promised there would never be a made-up one, so the line was 9pt of a
+          row's scarcest column reserved for a number that has never existed.
+          It now carries one that does: whether the figure above it is settled,
+          still moving, or not yet begun.
+
+          That distinction is not decoration. Without it a `0.0` and a blank are
+          the only two things this column can say, and neither of them can tell
+          "played and scored nothing" from "has not kicked off" — which are
+          opposite facts for anyone deciding whether to keep watching.
+
+          PROJ can come back here the day there is something real to put in it. */}
       <View style={styles.projLine}>
-        <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
-          PROJ
-        </Text>
-        {/* A dash, and never a number we made up. See the head of this file. */}
-        <Text numberOfLines={1} style={[styles.projValue, NUMERIC, { color: c.textTertiary }]}>
-          {DASH}
+        <Text
+          numberOfLines={1}
+          style={[Type.micro, { color: live ? c.positive : c.textTertiary }]}>
+          {status === 'live' ? 'LIVE' : status === 'final' ? 'FINAL' : DASH}
         </Text>
       </View>
     </View>
@@ -734,6 +776,9 @@ const styles = StyleSheet.create({
      after it is one or two characters and truncating those loses the warning
      entirely. */
   fixture: { fontSize: 11, lineHeight: 15, fontWeight: '500', flexShrink: 1, minWidth: 0 },
+  /* One step heavier while the game is on. The colour alone carries in light
+     mode and is nearly invisible against a dark ground at 11pt. */
+  fixtureLive: { fontWeight: '700' },
   /* `gap` is the SMALL one; the wider space before the progress phrase is set
      on that element, so `B 812.0 TFP` binds into one token and the distance to
      the next tier reads as the separate statement it is. */
@@ -759,7 +804,6 @@ const styles = StyleSheet.create({
      ink changes. */
   figureEmpty: { fontSize: 12, lineHeight: 19, fontWeight: '500' },
   projLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one, height: 15 },
-  projValue: { fontSize: 12, lineHeight: 15, fontWeight: '500' },
   figureLabel: { lineHeight: 15 },
   /* The only thing on the tier line that gives way, and it is last for a
      reason: the chip and the earned total are fixed-length, the phrase is not. */

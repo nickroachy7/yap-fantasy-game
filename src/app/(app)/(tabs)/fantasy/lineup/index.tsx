@@ -38,7 +38,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BenchBoard } from '@/components/lineup/BenchBoard';
 import { ContestCard } from '@/components/lineup/ContestCard';
@@ -55,8 +55,9 @@ import {
   type LineupCard,
   type SortKey,
 } from '@/components/lineup/model';
-import { useLineupData } from '@/components/lineup/use-lineup-data';
+import { useLineupData, type LineupView } from '@/components/lineup/use-lineup-data';
 import { Screen } from '@/components/shell/Screen';
+import { SegmentedControl } from '@/components/shell/SegmentedControl';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -78,14 +79,42 @@ type Swap = { kind: 'slot'; slot: string } | { kind: 'bench'; cardId: string };
  */
 const DEBOUNCE_MS = 700;
 
+/**
+ * How often the screen re-reads while a game is being played.
+ *
+ * Matched to the server's sweep, which moved to once a minute for this
+ * (20260821150000). Polling faster would only re-read numbers that cannot have
+ * changed; polling slower would add the client's own lag on top of the sweep's,
+ * and the two delays compound into the gap between a touchdown and the row
+ * moving — which is the entire thing being built here.
+ *
+ * It runs ONLY while a game in the shown week is actually live. A week in play
+ * on a Friday afternoon has nothing happening in it, and a screen that polled
+ * on that basis would re-read a static answer 1,440 times before Sunday.
+ */
+const LIVE_POLL_MS = 60_000;
+
 export default function LineupScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const router = useRouter();
   const wide = useIsWide();
 
+  /**
+   * Which week is on screen.
+   *
+   * Only ever a real choice while a week is in play — the rest of the time the
+   * week you are watching and the week you can set are the same one, and the
+   * switcher below does not render at all.
+   */
+  const [view, setView] = useState<LineupView>('current');
+
   const {
     slate,
+    inPlay,
+    currentSlate,
+    nextSlate,
+    hasLiveGame,
     lockAt,
     slots,
     cards,
@@ -93,10 +122,11 @@ export default function LineupScreen() {
     savedPoints,
     totalPoints,
     scoredAt,
+    finalizedAt,
     loading,
     error: loadError,
     reload,
-  } = useLineupData();
+  } = useLineupData(view);
   const { displayName } = usePlayer();
 
   /**
@@ -310,15 +340,59 @@ export default function LineupScreen() {
     };
   }, [swap, locked, slots, picks, byId, eligibleBySlot]);
 
+  /**
+   * Re-read both halves of the fixture, without the pull-to-refresh spinner.
+   *
+   * Together, not in sequence: your total and the field's median are two halves
+   * of one fixture, and refreshing them a round trip apart is a visible moment
+   * where the margin on the card is arithmetic between two different instants.
+   *
+   * Separated from `onRefresh` because the SPINNER is the difference between a
+   * refresh you asked for and one that happens on its own. A poll that flashed
+   * the pull-to-refresh indicator once a minute would turn a screen you are
+   * watching a game on into a screen that appears to be struggling.
+   */
+  const reread = useCallback(async () => {
+    await Promise.all([reload(), reloadField()]);
+  }, [reload, reloadField]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    // Together, not in sequence: your total and the field's median are two
-    // halves of one fixture, and refreshing them a round trip apart is a
-    // visible moment where the margin on the card is arithmetic between two
-    // different instants.
-    await Promise.all([reload(), reloadField()]);
+    await reread();
     setRefreshing(false);
-  }, [reload, reloadField]);
+  }, [reread]);
+
+  /**
+   * Keep it moving while a game is on.
+   *
+   * Nothing on this screen used to re-read after the first mount. The server
+   * has been recomputing every lineup on a schedule since the sweep was built,
+   * and the client simply never asked again — so the only way to see a point
+   * land was to force-quit the app. That is the second half of why last week's
+   * live scoring was invisible; the first half was reading the wrong week
+   * entirely.
+   */
+  useEffect(() => {
+    if (!hasLiveGame) return;
+    const t = setInterval(() => void reread(), LIVE_POLL_MS);
+    return () => clearInterval(t);
+  }, [hasLiveGame, reread]);
+
+  /**
+   * And on the way back in.
+   *
+   * A phone put down at kickoff and picked up at half time has missed thirty
+   * polls, and the interval above cannot fire while the app is backgrounded.
+   * Without this the first thing a returning reader sees is a stale board that
+   * corrects itself a minute later, which is a worse first impression than a
+   * slow load.
+   */
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void reread();
+    });
+    return () => sub.remove();
+  }, [reread]);
 
   const submit = useCallback(async () => {
     if (!slate) return;
@@ -402,7 +476,27 @@ export default function LineupScreen() {
   const week = slate
     ? `${slate.season_type === 1 ? 'Preseason' : 'Season'} · Week ${slate.week}`
     : 'No slate scheduled';
-  const context = slate && locked ? `${week} · Locked` : week;
+
+  /**
+   * What state the week is in, in one word, or nothing when there is nothing to
+   * add. Four cases and they are strictly ordered — a week can be live AND
+   * locked, and "Live" is the one worth the space.
+   *
+   * `finalizedAt` and not `scoredAt`: the sweep stamps scored_at on every pass,
+   * so it is non-null from the first snap of the week and reading it as "done"
+   * is how a lineup came to describe itself as final in the opening quarter.
+   */
+  const phase = hasLiveGame
+    ? 'Live'
+    : finalizedAt
+      ? 'Final'
+      : locked
+        ? 'Locked'
+        : null;
+  const context = slate && phase ? `${week} · ${phase}` : week;
+
+  /** Short form for the switcher, where the season prefix is repeated noise. */
+  const weekTab = (sl: typeof slate) => (sl ? `Week ${sl.week}` : '—');
 
   return (
     <Screen
@@ -411,6 +505,31 @@ export default function LineupScreen() {
       context={context}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}>
+      {/* TWO WEEKS EXIST AT ONCE, for five days out of every seven, and this is
+          the only honest way to draw that.
+ 
+          An NFL week opens on Thursday night and closes on Monday, and it locks
+          at its first kickoff — so from Thursday onwards the week you are
+          WATCHING and the week you can still SET are different weeks. The screen
+          used to show only the second, which meant that for the whole of Sunday
+          your players were on the field and the board in front of you was an
+          empty form for a game four days away.
+ 
+          It renders only when those two weeks are genuinely different, which is
+          exactly when a week is in play. The rest of the time there is one week
+          and a switcher offering to show it to you would be a control with one
+          real option. */}
+      {nextSlate ? (
+        <SegmentedControl<LineupView>
+          segments={[
+            { value: 'current', label: weekTab(currentSlate), badge: hasLiveGame ? 'LIVE' : undefined },
+            { value: 'next', label: weekTab(nextSlate), badge: 'OPEN' },
+          ]}
+          value={view}
+          onChange={setView}
+        />
+      ) : null}
+
       <ContestCard
         displayName={displayName}
         weekLabel={week}
@@ -425,7 +544,25 @@ export default function LineupScreen() {
         record={record}
       />
 
-      {lockCaption(lockAt, locked) ? (
+      {/* ONE CAPTION, AND WHICH ONE DEPENDS ON WHETHER THE WEEK HAS STARTED.
+ 
+          Before kickoff the useful fact is the deadline. Once the week is in
+          play that deadline is in the past and unactionable, and the useful
+          fact becomes how old the numbers are — because every figure on the
+          board below is now a moving one, and a reader watching a game needs to
+          know whether a total that has not changed is a total that has not
+          changed or a screen that has stopped asking.
+ 
+          The staleness is stated rather than implied. `scoredAt` is when the
+          sweep last recomputed this lineup, not when this screen last read it,
+          so it is the honest number: it accounts for the minute the server may
+          be behind as well as the minute the client may be. */}
+      {inPlay && scoredAt ? (
+        <Text style={[Type.fine, { color: c.textTertiary }]}>
+          {`Points as of ${new Date(scoredAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
+          {hasLiveGame ? ' · updating every minute' : ''}
+        </Text>
+      ) : lockCaption(lockAt, locked) ? (
         <Text style={[Type.fine, { color: c.textTertiary }]}>{lockCaption(lockAt, locked)}</Text>
       ) : null}
 

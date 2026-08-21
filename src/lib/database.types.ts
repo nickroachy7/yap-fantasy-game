@@ -51,6 +51,7 @@ export type Database = {
           is_held: boolean | null
           lineup_starts: number
           pack_opening_id: string | null
+          settled_fp: number
           sold_at: string | null
           sold_for: number | null
           source: Database["public"]["Enums"]["acquisition_source"]
@@ -68,6 +69,7 @@ export type Database = {
           is_held?: boolean | null
           lineup_starts?: number
           pack_opening_id?: string | null
+          settled_fp?: number
           sold_at?: string | null
           sold_for?: number | null
           source?: Database["public"]["Enums"]["acquisition_source"]
@@ -85,6 +87,7 @@ export type Database = {
           is_held?: boolean | null
           lineup_starts?: number
           pack_opening_id?: string | null
+          settled_fp?: number
           sold_at?: string | null
           sold_for?: number | null
           source?: Database["public"]["Enums"]["acquisition_source"]
@@ -573,6 +576,7 @@ export type Database = {
       }
       lineups: {
         Row: {
+          finalized_at: string | null
           id: string
           scored_at: string | null
           season: number
@@ -583,6 +587,7 @@ export type Database = {
           week: number
         }
         Insert: {
+          finalized_at?: string | null
           id?: string
           scored_at?: string | null
           season: number
@@ -593,6 +598,7 @@ export type Database = {
           week: number
         }
         Update: {
+          finalized_at?: string | null
           id?: string
           scored_at?: string | null
           season?: number
@@ -1435,6 +1441,15 @@ export type Database = {
           weeks_played: number
         }[]
       }
+      lineup_slate: {
+        Args: never
+        Returns: {
+          in_play: boolean
+          season: number
+          season_type: number
+          week: number
+        }[]
+      }
       median_record: {
         Args: { p_season: number; p_season_type?: number }
         Returns: {
@@ -1516,6 +1531,14 @@ export type Database = {
         }
         Returns: string
       }
+      slate_in_play: {
+        Args: never
+        Returns: {
+          season: number
+          season_type: number
+          week: number
+        }[]
+      }
       slate_is_live: { Args: never; Returns: boolean }
       upcoming_slate: {
         Args: never
@@ -1526,6 +1549,10 @@ export type Database = {
         }[]
       }
       verify_sync_secret: { Args: { candidate: string }; Returns: boolean }
+      week_is_complete: {
+        Args: { p_season: number; p_season_type: number; p_week: number }
+        Returns: boolean
+      }
       week_lock_time: {
         Args: { p_season: number; p_season_type: number; p_week: number }
         Returns: string

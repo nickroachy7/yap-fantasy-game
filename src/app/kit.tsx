@@ -137,7 +137,12 @@ const STARTERS: {
       injuryStatus: null, tier: 'gold', careerFp: 812, season: 2026,
       nextTierAt: 2500, nextTierLabel: 'diamond',
       form: { seasonFp: 288.1, gamesPlayed: 17, fpPerGame: 16.9, recent: [12.4, 22.1, 8.6, 26.9, 19.2], weekFp: 24.6 },
-      game: { opponent: 'CAR', home: false, startsAt: '2026-09-13T17:00:00Z' },
+      // LIVE, with the provider's own clock. The 24.6 beside it is a number
+      // that is still moving, and the row has to say so.
+      game: {
+        opponent: 'CAR', home: false, startsAt: '2026-09-13T17:00:00Z',
+        status: 'live', statusText: 'Q3 04:22',
+      },
     },
   },
   {
@@ -155,13 +160,23 @@ const STARTERS: {
   },
   {
     slot: 'FLEX',
-    points: null,
+    // 0, not null. A STARTER's figure is what the slot was credited, and this
+    // is the case that only exists once the row can say FINAL: a player who
+    // took the field and scored nothing. Left null it renders as a dash and is
+    // indistinguishable from a player who has not kicked off — which is the
+    // confusion the state line was added to end.
+    points: 0,
     card: {
       id: 's3', playerId: 's3', name: 'Bartholomew Vandersteen III', position: 'TE', team: 'NYJ',
       injuryStatus: 'Questionable', tier: 'bronze', careerFp: 14, season: 2026,
       nextTierAt: 200, nextTierLabel: 'silver',
-      form: null,
-      game: { opponent: 'BUF', home: true, startsAt: '2026-09-13T17:00:00Z' },
+      // Played and scored nothing, which a bare dash could never tell apart
+      // from "has not kicked off". FINAL beside a 0.0 is the distinction.
+      form: { seasonFp: 14, gamesPlayed: 3, fpPerGame: 4.7, recent: [6.2, 7.8, 0], weekFp: 0 },
+      game: {
+        opponent: 'BUF', home: true, startsAt: '2026-09-13T17:00:00Z',
+        status: 'final', statusText: 'Final/OT',
+      },
     },
   },
   { slot: 'K', points: null, card: null },
@@ -178,7 +193,10 @@ const SWAP_OPTIONS: LineupCard[] = [
     injuryStatus: null, tier: 'gold', careerFp: 1420, season: 2026,
     nextTierAt: 2500, nextTierLabel: 'diamond',
     form: { seasonFp: 262.4, gamesPlayed: 16, fpPerGame: 16.4, recent: [18.2, 24.6, 11.0, 27.4, 9.8], weekFp: 18.4 },
-    game: { opponent: 'TB', home: true, startsAt: '2026-09-13T17:00:00Z' },
+    game: {
+      opponent: 'TB', home: true, startsAt: '2026-09-13T17:00:00Z',
+      status: 'live', statusText: 'Q2 11:40',
+    },
   },
   {
     id: 'o2', playerId: 'o2', name: 'Tyjae Spears', position: 'RB', team: 'TEN',
@@ -186,7 +204,10 @@ const SWAP_OPTIONS: LineupCard[] = [
     nextTierAt: 750, nextTierLabel: 'gold',
     // Not yet swept, which is every row before kickoff.
     form: { seasonFp: 96.2, gamesPlayed: 14, fpPerGame: 6.9, recent: [4.1, 9.8, 2.6, 11.4, 6.6], weekFp: null },
-    game: { opponent: 'IND', home: false, startsAt: '2026-09-13T17:00:00Z' },
+    game: {
+      opponent: 'IND', home: false, startsAt: '2026-09-13T17:00:00Z',
+      status: 'scheduled', statusText: '9/13 - 1:00 PM EDT',
+    },
   },
   {
     id: 'o3', playerId: 'o3', name: 'Rookie Nobody', position: 'RB', team: 'LV',

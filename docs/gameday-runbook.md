@@ -28,13 +28,15 @@ Three derived moments that matter:
   ahead of the first kickoff on purpose. Nothing else happens: `slate_is_live()`
   is still false and **no provider call is made.**
 - **2026-08-21 00:00** — first kickoff. From the next sweep onward the sweep
-  calls the provider every five minutes.
+  calls the provider **every minute** (raised from five in 20260821150000, once
+  the lineup screen started rendering live points and the cadence became the
+  feature rather than a background detail).
 - **~2026-08-24 06:00** — six hours past the last kickoff. The sweep stands down
   only if every week-3 game has `status_state = 'final'`. See failure mode F3.
 
 ## How the machine works
 
-`cron.job` runs `select public.gameday_sweep();` every five minutes, forever.
+`cron.job` runs `select public.gameday_sweep();` **every minute**, forever.
 Each tick:
 
 1. `current_slate()` — most recent week to have kicked off (+1h lookahead).
@@ -91,7 +93,7 @@ select jobid, jobname, schedule, active from cron.job order by jobid;
 ```
 ```
 2 | sync-reference-nightly | 15 9 * * *   | true
-3 | gameday-sweep          | */5 * * * *  | true
+3 | gameday-sweep          | * * * * *    | true
 ```
 
 ```sql
@@ -109,7 +111,7 @@ gameday-sweep          | 334 | 334 | 0 | 2026-08-19 05:40:00+00
 sync-reference-nightly |   1 |   1 | 0 | 2026-08-18 09:15:00+00
 ```
 
-**Good answer: `last_run` within the last five minutes and `not_succeeded` = 0.**
+**Good answer: `last_run` within the last minute and `not_succeeded` = 0.**
 
 **Know the limit of this table.** `return_message` for every sweep is the string
 `1 row` — pg_cron records that the statement returned a row, not *what* it
@@ -293,14 +295,14 @@ select d.runid, d.start_time, d.status, left(d.return_message, 80) as msg
 …
 ```
 
-Healthy: a row every five minutes on the clock, `succeeded`, `1 row`. Sick: a
+Healthy: a row every minute on the clock, `succeeded`, `1 row`. Sick: a
 gap, or `failed` with a real message in `return_message` (that column *is*
 populated on error, just never on success).
 
 ### D2. Did it actually call the provider, and what came back?
 
 This is the question `cron.job_run_details` cannot answer. **A new
-`net._http_response` row every five minutes is the proof the sweep fired.**
+`net._http_response` row every minute is the proof the sweep fired.**
 
 ```sql
 select id, status_code, timed_out, created, left(content::text, 300) as content
@@ -386,10 +388,16 @@ select ls.slot, p.last_name, t.abbreviation as team, ls.points,
  order by ls.slot;
 ```
 
-`scored_at` should advance every five minutes from the first kickoff onward,
+`scored_at` should advance **every minute** from the first kickoff onward,
 *even while every `points` is still 0.00* — an empty rescore is a clean no-op by
 design, and a moving `scored_at` with static points is exactly right before any
-box score exists. Baseline: one lineup, 8 slots, `total_points` 0.00,
+box score exists.
+
+**`scored_at` is not "this week is finished".** The sweep stamps it on every
+pass, so it is non-null from the first snap. `finalized_at` on the same row is
+the column that means the week is over, and it is set only once every game in
+the week has `status_state = 'final'`. If you are checking whether a week has
+closed, check that one. Baseline: one lineup, 8 slots, `total_points` 0.00,
 `scored_at` 2026-08-18 03:06:22+00.
 
 Then the leaderboard, which is what a tester would see:
@@ -517,7 +525,7 @@ The sweep sets `timeout_milliseconds := 120000`. The 2025 regular-season
 backfill — 272 games, 16,370 stat lines — finished in 34.4s, so 120s is generous
 for 16 games. A timeout means the vendor is stalling, not that we are slow.
 
-**First move:** nothing. The next tick is five minutes away and the ingest is
+**First move:** nothing. The next tick is a minute away and the ingest is
 idempotent, so a dropped call self-heals. Only act if three consecutive sweeps
 time out; then check `select count(*) from net.http_request_queue` (should be 0
 at rest — it is now) for a backed-up worker, and `select net.worker_restart();`
@@ -608,10 +616,10 @@ By **Sunday 2026-08-24**, all of the following must be true. If any is not,
 week 4 (Aug 27–29) has to be burned on a retry, and that is the last chance
 before Sept 9.
 
-1. `gameday-sweep` ran every five minutes across the whole window with zero
+1. `gameday-sweep` ran every minute across the whole window with zero
    `failed` rows in `cron.job_run_details`.
 2. It made **no** provider call before 2026-08-21 00:00, and its first call was
-   within five minutes after it.
+   within a minute after it.
 3. The pre-first-box-score sweeps returned **200** with `no stat lines yet` —
    not 502. (This is the specific regression the Aug 18 fix targets.)
 4. `stat_lines` for 2026 / season\_type 1 / week 3 is in the ~1400–1600 range,
@@ -629,6 +637,31 @@ before Sept 9.
 8. `public.leaderboard(2026, 1, 3, 10)` shows `nickroachy` with that same
    non-zero total.
 
-Items 4, 6 and 7 are the ones that cannot be checked any other way than by
-playing real games. Items 1–3 and 5 are the plumbing. **If 6 or 7 fails, retry on
-week 4 immediately** — do not spend the window on anything else.
+### And, new for this rehearsal, the part a tester actually sees
+
+Everything above was already true on 2026-08-21 and none of it reached the
+screen, because the lineup read `upcoming_slate()` — the next week still OPEN —
+and so from the first kickoff onward it showed an empty week-4 board while week
+3 was being played. The plumbing passing is no longer evidence that the feature
+works.
+
+9. **The lineup screen shows week 3 while week 3 is being played.**
+   `select * from public.lineup_slate();` must return week 3 with
+   `in_play = true` at every point between the first kickoff and roughly twelve
+   hours after the last, and week 4 with `in_play = false` after that.
+10. **A started card's row moves during the game.** Watch one slot's `points` in
+    `lineup_slots` climb across successive sweeps, and the same figure on the
+    row. `career_fp` on that card climbs with it.
+11. **A benched card's row shows the player's points and credits the card
+    nothing.** This is the claim with no server-side symptom at all — the card
+    simply must not appear in `lineup_slots` — so it can only be checked on
+    screen.
+12. **No tier moves until the week is complete.** `settled_fp` stays behind
+    `career_fp` for every card started in week 3 until the last game goes final,
+    and the tier chip does not change before then. If a card promotes on
+    Saturday and is still promoted on Monday that is luck, not correctness —
+    check `settled_fp`, not the chip.
+
+Items 4, 6, 7 and 9–12 are the ones that cannot be checked any other way than by
+playing real games. Items 1–3 and 5 are the plumbing. **If 6, 7, 9 or 10 fails,
+retry on week 4 immediately** — do not spend the window on anything else.

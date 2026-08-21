@@ -33,11 +33,16 @@ insert into public.gem_balances (user_id, balance) values
 on conflict (user_id) do update set balance = 100;
 
 -- A silver card, so the payout under test is not the bronze default.
-insert into public.card_instances (id, user_id, card_id, career_fp)
+-- BOTH POINT COLUMNS. `card_instances_sync_tier` derives tier from `settled_fp`
+-- (20260821140000), not career_fp, so that a live in-game swing cannot promote a
+-- card and then take it back. These fixtures are settled history — no week of
+-- theirs is in play — so the two figures are equal. Setting only career_fp inserts
+-- every copy at a default settled_fp of 0 and the whole fixture reads bronze.
+insert into public.card_instances (id, user_id, card_id, career_fp, settled_fp)
 values ('33333333-3333-3333-3333-333333333333',
         '31111111-1111-1111-1111-111111111111',
         (select id from public.cards where player_id = (select id from public.players where external_id = 9101)),
-        250);
+        250, 250);
 
 do $$
 declare

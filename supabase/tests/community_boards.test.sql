@@ -132,20 +132,26 @@ begin
   -- B: two gold (800 fp)      ->  2 cards, 300 gems
   -- C: one diamond (3000 fp)  ->  1 card,  500 gems
   -- Value ranks C > B > A. Count ranks A > B > C. Exactly inverted.
+  -- BOTH POINT COLUMNS. `card_instances_sync_tier` derives tier from `settled_fp`
+  -- (20260821140000), not career_fp, so that a live in-game swing cannot promote a
+  -- card and then take it back. These fixtures are settled history — no week of
+  -- theirs is in play — so the two figures are equal. Setting only career_fp inserts
+  -- every copy at a default settled_fp of 0 and the whole fixture reads bronze.
   for i in 1 .. 10 loop
-    insert into public.card_instances (user_id, card_id, career_fp) values (v_a, v_card1, 0);
+    insert into public.card_instances (user_id, card_id, career_fp, settled_fp)
+    values (v_a, v_card1, 0, 0);
   end loop;
 
-  insert into public.card_instances (user_id, card_id, career_fp, lineup_starts)
-  values (v_b, v_card1, 800, 10), (v_b, v_card2, 800, 10);
+  insert into public.card_instances (user_id, card_id, career_fp, settled_fp, lineup_starts)
+  values (v_b, v_card1, 800, 800, 10), (v_b, v_card2, 800, 800, 10);
 
-  insert into public.card_instances (user_id, card_id, career_fp, lineup_starts)
-  values (v_c, v_card1, 3000, 20);
+  insert into public.card_instances (user_id, card_id, career_fp, settled_fp, lineup_starts)
+  values (v_c, v_card1, 3000, 3000, 20);
 
   -- The two copies that must not count ANYWHERE, both scoring more than every
   -- held copy above. A sold card and a burnt one are gone from the game.
-  insert into public.card_instances (user_id, card_id, career_fp, lineup_starts, sold_at, sold_for)
-  values (v_a, v_card2, 5000, 40, now(), 500);
+  insert into public.card_instances (user_id, card_id, career_fp, settled_fp, lineup_starts, sold_at, sold_for)
+  values (v_a, v_card2, 5000, 5000, 40, now(), 500);
 
   insert into public.card_sets (code, name, family, season, required_count, sort_order)
   values ('zz-boards-team-2026', 'Boards Test Team', 'team', v_season, 4, 9001)
@@ -154,9 +160,9 @@ begin
   values ('zz-boards-daily-2026', 'Boards Daily', 'daily', v_season, 3, 9002)
   returning id into v_set_d;
 
-  insert into public.card_instances (user_id, card_id, career_fp, lineup_starts,
+  insert into public.card_instances (user_id, card_id, career_fp, settled_fp, lineup_starts,
                                      committed_at, committed_to, committed_for)
-  values (v_c, v_card2, 4000, 30, now(), v_set_t, 250);
+  values (v_c, v_card2, 4000, 4000, 30, now(), v_set_t, 250);
 
   -- ---- three scored weeks each -------------------------------------------
   --   week 96: A  50, B 120, C 200  -> median 120 -> A L, B T, C W

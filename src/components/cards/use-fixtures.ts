@@ -18,7 +18,13 @@
  * ahead. It is a `sessionCache` now, so the second screen to ask gets the map
  * synchronously and draws its fixture lines in its first render.
  */
-import { kickoffLabel, matchupLabel, type GameContext } from '@/components/lineup/model';
+import {
+  kickoffLabel,
+  liveLabel,
+  matchupLabel,
+  resolveStatus,
+  type GameContext,
+} from '@/components/lineup/model';
 import { sessionCache, useSessionRead } from '@/lib/session-cache';
 import { supabase } from '@/lib/supabase';
 
@@ -33,11 +39,19 @@ import { supabase } from '@/lib/supabase';
  */
 export type FixtureMap = Map<string, GameContext | null>;
 
-/** The directory row's one-line form. "Sun 1:05p vs BUF", or "BYE". */
+/**
+ * The directory row's one-line form. "Sun 1:05p vs BUF", or "BYE".
+ *
+ * Once the game is under way the kickoff time stops being the useful half — it
+ * is answering "when", to a reader who can see for themselves that the answer
+ * is "now" — so the state takes its place: "Q3 04:22 vs BUF", then "FINAL vs
+ * BUF". The matchup stays put in both, because it is what identifies the
+ * fixture and it is the part that never changes.
+ */
 export function fixtureLabel(game: GameContext | null | undefined): string {
   if (!game) return 'BYE';
-  const kick = kickoffLabel(game);
-  return `${kick ? `${kick} ` : ''}${matchupLabel(game)}`;
+  const lead = liveLabel(game) ?? kickoffLabel(game);
+  return `${lead ? `${lead} ` : ''}${matchupLabel(game)}`;
 }
 
 /**
@@ -49,7 +63,12 @@ export function fixtureLabel(game: GameContext | null | undefined): string {
 async function fetchUpcomingFixtures(): Promise<FixtureMap> {
   const empty: FixtureMap = new Map();
   try {
-    const { data: slateRows, error: slateErr } = await supabase.rpc('upcoming_slate');
+    /* `lineup_slate()`, not `upcoming_slate()`, so this line agrees with the
+       lineup screen about which week everyone is talking about. Asking for the
+       next OPEN week meant that from Thursday night onwards a collection cell
+       advertised a fixture four days away while the player on it was on the
+       field — see the head of `lineup/use-lineup-data.ts`. */
+    const { data: slateRows, error: slateErr } = await supabase.rpc('lineup_slate');
     const slate = (slateRows as { season: number; season_type: number; week: number }[] | null)?.[0];
     if (slateErr || !slate) return empty;
 
@@ -57,7 +76,7 @@ async function fetchUpcomingFixtures(): Promise<FixtureMap> {
       supabase.from('teams').select('id, abbreviation'),
       supabase
         .from('games')
-        .select('home_team_id, visitor_team_id, starts_at')
+        .select('home_team_id, visitor_team_id, starts_at, status, status_state')
         .eq('season', slate.season)
         .eq('season_type', slate.season_type)
         .eq('week', slate.week),
@@ -69,8 +88,17 @@ async function fetchUpcomingFixtures(): Promise<FixtureMap> {
     for (const g of gamesRes.data ?? []) {
       const home = g.home_team_id ? abbrOf.get(g.home_team_id) : undefined;
       const away = g.visitor_team_id ? abbrOf.get(g.visitor_team_id) : undefined;
-      if (home) byTeam.set(home, { opponent: away ?? null, home: true, startsAt: g.starts_at });
-      if (away) byTeam.set(away, { opponent: home ?? null, home: false, startsAt: g.starts_at });
+      const status = resolveStatus(g.status_state, g.starts_at);
+      if (home) {
+        byTeam.set(home, {
+          opponent: away ?? null, home: true, startsAt: g.starts_at, status, statusText: g.status,
+        });
+      }
+      if (away) {
+        byTeam.set(away, {
+          opponent: home ?? null, home: false, startsAt: g.starts_at, status, statusText: g.status,
+        });
+      }
     }
 
     const out: FixtureMap = new Map();

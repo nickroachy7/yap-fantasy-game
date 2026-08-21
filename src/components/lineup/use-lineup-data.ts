@@ -6,6 +6,24 @@
  * does that game start, what has he produced this season, and how has he looked
  * lately. All four come from tables the client can already read, so this is a
  * wider query rather than a new RPC.
+ *
+ * ---------------------------------------------------------------------------
+ * WHICH WEEK, WHICH IS NOT THE QUESTION IT LOOKS LIKE
+ * ---------------------------------------------------------------------------
+ *
+ * This hook used to ask `upcoming_slate()` and use the answer for everything.
+ * That is the right week to SUBMIT for and the wrong week to LOOK at, and an
+ * NFL week is long enough for the difference to matter for five days out of
+ * seven: `upcoming_slate()` returns the first week whose earliest kickoff is
+ * still ahead, so the instant Thursday night kicks off it moves on — and the
+ * screen showed an empty week 2 board through the whole of the Sunday and
+ * Monday that week 1 was being played.
+ *
+ * `lineup_slate()` (20260821130000) answers the third question: the week that
+ * has begun and is not finished, falling back to the next open week when no
+ * week is in play. Both are fetched, because when a week IS in play they are
+ * different weeks and the screen legitimately offers both — the one you are
+ * watching, and the one you can still set.
  */
 import { useCallback, useState } from 'react';
 
@@ -16,12 +34,22 @@ import { supabase } from '@/lib/supabase';
 
 import {
   FORM_GAMES,
+  resolveStatus,
   type GameContext,
   type LineupCard,
   type SeasonForm,
   type Slate,
   type SlotConfig,
 } from './model';
+
+/**
+ * Which of the two weeks this hook is reading.
+ *
+ * `'current'` is whatever `lineup_slate()` names — the week in play, or the
+ * next open one when nothing is being played. `'next'` is always
+ * `upcoming_slate()`, and is only a distinct week while a week is in play.
+ */
+export type LineupView = 'current' | 'next';
 
 type CollectionRow = {
   id: string | null;
@@ -160,24 +188,75 @@ function aggregate(rows: StatRow[], slate: Slate | null): Map<string, SeasonForm
   return out;
 }
 
-/** Team abbreviation -> this week's game. Absent means the team is idle. */
+type GameRow = {
+  home_team_id: string | null;
+  visitor_team_id: string | null;
+  starts_at: string | null;
+  status: string | null;
+  status_state: string | null;
+};
+
+/**
+ * Team abbreviation -> this week's game. Absent means the team is idle.
+ *
+ * Now carries the game's STATE as well as its time. Selecting only `starts_at`
+ * was what left the row unable to distinguish a player who had not kicked off
+ * from one who had played and scored nothing — both rendered as the same blank
+ * — and unable to say that a number it was showing was still moving.
+ */
 function buildSchedule(
   teams: { id: string; abbreviation: string }[],
-  games: { home_team_id: string | null; visitor_team_id: string | null; starts_at: string | null }[],
+  games: GameRow[],
 ): Map<string, GameContext> {
   const abbrOf = new Map(teams.map((t) => [t.id, t.abbreviation]));
   const out = new Map<string, GameContext>();
   for (const g of games) {
     const home = g.home_team_id ? abbrOf.get(g.home_team_id) : undefined;
     const away = g.visitor_team_id ? abbrOf.get(g.visitor_team_id) : undefined;
-    if (home) out.set(home, { opponent: away ?? null, home: true, startsAt: g.starts_at });
-    if (away) out.set(away, { opponent: home ?? null, home: false, startsAt: g.starts_at });
+    const status = resolveStatus(g.status_state, g.starts_at);
+    if (home) {
+      out.set(home, {
+        opponent: away ?? null, home: true, startsAt: g.starts_at, status, statusText: g.status,
+      });
+    }
+    if (away) {
+      out.set(away, {
+        opponent: home ?? null, home: false, startsAt: g.starts_at, status, statusText: g.status,
+      });
+    }
   }
   return out;
 }
 
 export type LineupData = {
   slate: Slate | null;
+  /**
+   * True when the week being shown has kicked off and is not yet done with.
+   * The board is a scoreboard in that state and a form otherwise, and this is
+   * the single flag that decides which.
+   */
+  inPlay: boolean;
+  /**
+   * The week `lineup_slate()` named, whichever view is showing. Needed
+   * separately from `slate` so a switcher can label the option it is offering
+   * to switch BACK to while the reader is looking at the other one.
+   */
+  currentSlate: Slate | null;
+  /**
+   * The next week still open for submission, when that is a DIFFERENT week from
+   * the one on screen — which is exactly when a week is in play. Null the rest
+   * of the time, because offering to switch to the week you are already looking
+   * at is not an offer.
+   */
+  nextSlate: Slate | null;
+  /**
+   * True while at least one game in the shown week is actually being played.
+   * Narrower than `inPlay`, which stays true through the days between a
+   * Thursday night game and the Sunday ones, and it is the right test for
+   * whether to keep re-reading: polling a week whose next kickoff is 60 hours
+   * away is just traffic.
+   */
+  hasLiveGame: boolean;
   lockAt: string | null;
   slots: SlotConfig[];
   cards: LineupCard[];
@@ -191,15 +270,30 @@ export type LineupData = {
   savedPoints: Record<string, number | null>;
   /** The week's total, straight from the server rather than re-added here. */
   totalPoints: number | null;
-  /** Non-null once the week has been swept. Gates every actual figure. */
+  /**
+   * When the sweep last recomputed this lineup. On a gameday that is a minute
+   * ago, so it is a FRESHNESS stamp and nothing more — the screen prints it as
+   * "as of" rather than treating it as a verdict.
+   *
+   * It used to be read as "the week has been scored", which stopped being true
+   * the moment scoring went live: score_week stamps it on every pass, so it is
+   * non-null from the first snap of Thursday night and the screen was calling a
+   * week finished while its first game was in the opening quarter.
+   */
   scoredAt: string | null;
+  /** Non-null once every game in the week is final. THIS is "the week is over". */
+  finalizedAt: string | null;
   loading: boolean;
   error: string | null;
   reload: () => Promise<void>;
 };
 
-export function useLineupData(): LineupData {
+export function useLineupData(view: LineupView = 'current'): LineupData {
   const [slate, setSlate] = useState<Slate | null>(null);
+  const [inPlay, setInPlay] = useState(false);
+  const [currentSlate, setCurrentSlate] = useState<Slate | null>(null);
+  const [nextSlate, setNextSlate] = useState<Slate | null>(null);
+  const [hasLiveGame, setHasLiveGame] = useState(false);
   const [lockAt, setLockAt] = useState<string | null>(null);
   const [slots, setSlots] = useState<SlotConfig[]>([]);
   const [cards, setCards] = useState<LineupCard[]>([]);
@@ -207,15 +301,20 @@ export function useLineupData(): LineupData {
   const [savedPoints, setSavedPoints] = useState<Record<string, number | null>>({});
   const [totalPoints, setTotalPoints] = useState<number | null>(null);
   const [scoredAt, setScoredAt] = useState<string | null>(null);
+  const [finalizedAt, setFinalizedAt] = useState<string | null>(null);
 
   const load = useCallback<Load>(async (live) => {
-    // upcoming_slate(), not current_slate(): the latter returns the week already
-    // in progress, whose lock time is by definition in the past — which made this
-    // screen render as permanently locked.
+    // BOTH slates, in the same round trip as everything else.
     //
-    // The collection, slot config and team list do not depend on the slate, so
-    // they ride along rather than waiting a round trip for it.
-    const [slateRes, cfg, coll, teamsRes] = await Promise.all([
+    // `lineup_slate()` is the week to show and `upcoming_slate()` the week that
+    // is still open. They name the same week whenever nothing is being played,
+    // and different ones whenever something is — see the note at the head of
+    // this file for what reading only the second one cost.
+    //
+    // The collection, slot config and team list do not depend on either, so
+    // they ride along rather than waiting a round trip for them.
+    const [slateRes, nextRes, cfg, coll, teamsRes] = await Promise.all([
+      supabase.rpc('lineup_slate'),
       supabase.rpc('upcoming_slate'),
       supabase
         .from('lineup_slot_config')
@@ -234,8 +333,25 @@ export function useLineupData(): LineupData {
     if (!live()) return;
     if (slateRes.error) return slateRes.error.message;
 
-    const s = (slateRes.data as Slate[] | null)?.[0] ?? null;
+    const shown = (slateRes.data as (Slate & { in_play: boolean })[] | null)?.[0] ?? null;
+    const next = (nextRes.data as Slate[] | null)?.[0] ?? null;
+    /* Same week means there is nothing to switch to. Compared on all three
+       fields rather than on `week` alone: preseason week 3 and regular-season
+       week 3 are both "week 3" and are four weeks apart. */
+    const sameWeek =
+      shown !== null &&
+      next !== null &&
+      shown.season === next.season &&
+      shown.season_type === next.season_type &&
+      shown.week === next.week;
+
+    // `'next'` is only a real choice while a week is in play; the rest of the
+    // time both views resolve to the one week that exists.
+    const s = view === 'next' && !sameWeek && next ? next : shown;
     setSlate(s);
+    setInPlay(s === shown && (shown?.in_play ?? false));
+    setCurrentSlate(shown);
+    setNextSlate(sameWeek || !next ? null : next);
     /* Same precedence as before: the collection's failure is the one reported
        if both the slot config and the collection fail, because it is the one
        that empties the screen. */
@@ -258,7 +374,7 @@ export function useLineupData(): LineupData {
       s
         ? supabase
             .from('lineups')
-            .select('id, total_points, scored_at, lineup_slots(slot, card_instance_id, points)')
+            .select('id, total_points, scored_at, finalized_at, lineup_slots(slot, card_instance_id, points)')
             .eq('season', s.season)
             .eq('season_type', s.season_type)
             .eq('week', s.week)
@@ -267,7 +383,7 @@ export function useLineupData(): LineupData {
       s
         ? supabase
             .from('games')
-            .select('home_team_id, visitor_team_id, starts_at')
+            .select('home_team_id, visitor_team_id, starts_at, status, status_state')
             .eq('season', s.season)
             .eq('season_type', s.season_type)
             .eq('week', s.week)
@@ -280,13 +396,16 @@ export function useLineupData(): LineupData {
     if (!live()) return;
     if (!lock.error && lock.data) setLockAt(String(lock.data));
 
+    const weekGames = (gamesRes.data ?? []) as GameRow[];
     const schedule = buildSchedule(
       (teamsRes.data ?? []) as { id: string; abbreviation: string }[],
-      (gamesRes.data ?? []) as {
-        home_team_id: string | null;
-        visitor_team_id: string | null;
-        starts_at: string | null;
-      }[],
+      weekGames,
+    );
+    /* Whether to keep re-reading, decided from the week's own fixtures rather
+       than from any of the cards: a game is live whether or not you own anybody
+       in it, and the contest card's median moves with the whole community. */
+    setHasLiveGame(
+      weekGames.some((g) => resolveStatus(g.status_state, g.starts_at) === 'live'),
     );
     const form = aggregate(stats, s);
 
@@ -314,6 +433,7 @@ export function useLineupData(): LineupData {
     const prior = existing.data as {
       total_points: number | null;
       scored_at: string | null;
+      finalized_at: string | null;
       lineup_slots?: { slot: string; card_instance_id: string; points: number | null }[];
     } | null;
     setSavedPicks(
@@ -330,8 +450,9 @@ export function useLineupData(): LineupData {
     );
     setTotalPoints(prior?.total_points === null || prior?.total_points === undefined ? null : Number(prior.total_points));
     setScoredAt(prior?.scored_at ?? null);
+    setFinalizedAt(prior?.finalized_at ?? null);
     return failure;
-  }, []);
+  }, [view]);
 
   // Quiet, like the old `reload`: it cleared the error and re-read, but never
   // put the screen back into its first-load spinner.
@@ -339,6 +460,10 @@ export function useLineupData(): LineupData {
 
   return {
     slate,
+    inPlay,
+    currentSlate,
+    nextSlate,
+    hasLiveGame,
     lockAt,
     slots,
     cards,
@@ -346,6 +471,7 @@ export function useLineupData(): LineupData {
     savedPoints,
     totalPoints,
     scoredAt,
+    finalizedAt,
     loading,
     error,
     reload: refresh,

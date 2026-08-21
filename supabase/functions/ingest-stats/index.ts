@@ -109,9 +109,31 @@ Deno.serve(async (req) => {
       if (error) throw error;
     }
 
+    /**
+     * Which games to ask for stats about.
+     *
+     * `finalOnly` targets finished games and nothing else — the nightly
+     * backfill's job. The gameday sweep passes false, and that used to mean
+     * EVERY game in the week, including the fourteen that do not kick off until
+     * Sunday. That was affordable at one sweep every five minutes and is not at
+     * one a minute: it asks the provider about games that cannot have stats,
+     * then reads back and rescores every line in the week on each pass, so the
+     * work grows with the week while the useful part of it does not.
+     *
+     * A game that has not started cannot have a box score. Targeting the ones
+     * that have — plus anything already final, whose start time we might not
+     * hold — is the same answer for a fraction of the work. Early on a Thursday
+     * that is 1 game rather than 16.
+     */
+    const nowMs = Date.now();
+    const hasStarted = (startsAt: string | null) => {
+      if (!startsAt) return false;
+      const t = Date.parse(startsAt);
+      return Number.isFinite(t) && t <= nowMs;
+    };
     const targetGames = finalOnly
       ? games.filter((g) => g.statusState === 'final')
-      : games;
+      : games.filter((g) => g.statusState === 'final' || hasStarted(g.startsAt));
 
     if (targetGames.length === 0) {
       return json({
