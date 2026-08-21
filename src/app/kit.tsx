@@ -179,7 +179,24 @@ const STARTERS: {
       },
     },
   },
-  { slot: 'K', points: null, card: null },
+  {
+    slot: 'K',
+    // 0, and the row must NOT print it. score_week stamps every slot with
+    // coalesce(sum, 0) on each pass, so a lineup set on Tuesday has eight
+    // stored noughts against games that kick off on Sunday. The figure is
+    // gated on the FIXTURE, not on whether a sweep has run.
+    points: 0,
+    card: {
+      id: 's4', playerId: 's4', name: 'Cameron Dicker', position: 'PK', team: 'LAC',
+      injuryStatus: null, tier: 'silver', careerFp: 402, season: 2026,
+      nextTierAt: 750, nextTierLabel: 'gold',
+      form: { seasonFp: 148.0, gamesPlayed: 17, fpPerGame: 8.7, recent: [9, 11, 6, 8, 12], weekFp: null },
+      game: {
+        opponent: 'DEN', home: true, startsAt: '2026-09-13T20:05:00Z',
+        status: 'scheduled', statusText: '9/13 - 4:05 PM EDT',
+      },
+    },
+  },
 ];
 
 /**
@@ -210,11 +227,18 @@ const SWAP_OPTIONS: LineupCard[] = [
     },
   },
   {
-    id: 'o3', playerId: 'o3', name: 'Rookie Nobody', position: 'RB', team: 'LV',
+    id: 'o3', playerId: 'o3', name: 'Josiah Nobody', position: 'RB', team: 'LV',
     injuryStatus: null, tier: 'bronze', careerFp: 0, season: 2026,
     nextTierAt: 200, nextTierLabel: 'silver',
+    /* THE DEGUARA CASE. His game is over and he has no stat line at all,
+       because the provider only emits a box-score row for a player who recorded
+       something. A dash here beside a fixture line reading FINAL is the row
+       refusing to answer a question it knows the answer to: nothing. */
     form: null,
-    game: null,
+    game: {
+      opponent: 'HOU', home: false, startsAt: '2026-09-13T17:00:00Z',
+      status: 'final', statusText: 'Final',
+    },
   },
 ];
 

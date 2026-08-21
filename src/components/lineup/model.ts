@@ -214,6 +214,53 @@ export function liveLabel(game: GameContext | null): string | null {
   return usable ? text!.toUpperCase() : 'LIVE';
 }
 
+/**
+ * The number a row should show for this week, or null for a dash.
+ *
+ * ---------------------------------------------------------------------------
+ * THE COLUMN WAS FOLLOWING THE SWEEP, NOT THE GAME
+ * ---------------------------------------------------------------------------
+ *
+ * `score_week` writes `coalesce(sum(points), 0)` into every slot on every pass,
+ * so from the first sweep of a week — days before anyone kicks off — a starter's
+ * credited figure is a real, stored 0. The row printed it. A lineup set on
+ * Tuesday therefore read as eight players who had all scored nothing, which is
+ * indistinguishable from eight players who had played and blanked.
+ *
+ * The bench had the opposite fault from the same cause. Its figure comes from a
+ * stat line, and the provider only emits a box-score row for a player who
+ * recorded something — so a tight end who dressed and was never targeted has no
+ * row at all, and stayed a dash long after his game was over. Josiah Deguara
+ * finished SF @ LAC with 0 of anything and 0 stat lines, and his card said "—"
+ * against a fixture line that already said FINAL.
+ *
+ * Both are the same mistake: asking what the DATABASE has rather than what the
+ * GAME has done.
+ *
+ * ---------------------------------------------------------------------------
+ * THE RULE
+ * ---------------------------------------------------------------------------
+ *
+ *   no game (bye)  -> null. The row says BYE in the negative colour already.
+ *   not kicked off -> null. Nothing has happened; a 0 would be a claim.
+ *   live           -> the figure, 0 included. It is a running total and a real
+ *                     one; a receiver with no catches yet genuinely has 0.0.
+ *   final          -> the figure, and 0 when there is nothing to draw on.
+ *                     Once the whistle has gone the answer is KNOWN, and it is
+ *                     zero. This is the half that fixes Deguara.
+ *
+ * A missing figure on a finished game resolving to 0 is safe because the
+ * server already alarms on the case that would make it a lie: `ingest-stats`
+ * returns 502 rather than 200 if a completed game yields no stat lines at all,
+ * so "the whole box score failed to land" cannot arrive here disguised as a
+ * column of noughts.
+ */
+export function weekFigureFor(points: number | null, game: GameContext | null): number | null {
+  if (!game || !game.opponent) return null;
+  if (game.status === 'scheduled') return null;
+  return points ?? 0;
+}
+
 /** "vs ARI" / "@ ARI" / "BYE". */
 export function matchupLabel(game: GameContext | null): string {
   if (!game) return 'BYE';

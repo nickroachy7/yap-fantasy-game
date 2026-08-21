@@ -110,6 +110,7 @@ import {
   liveLabel,
   matchupLabel,
   tierProgressLabel,
+  weekFigureFor,
   type LineupCard,
 } from './model';
 
@@ -206,9 +207,15 @@ export function StarterRow({
      claims: this is what the slot was credited. The two agree once a week is
      swept, and only this one is the number the total above the board was built
      from — a row disagreeing with its own contest card is a support ticket.
-     Null, never "0.0": an unplayed week has no score, and a nought here would
-     be indistinguishable from a starter who blanked. */
-  const week = scored && points !== null ? oneDp(points) : null;
+
+     GATED ON THE GAME, not on whether a sweep has run. `scored` only says the
+     lineup has been through score_week, which now happens every minute from the
+     start of the week — so on its own it let a Tuesday lineup print eight
+     stored noughts for games that had not kicked off. `weekFigureFor` decides
+     from the fixture; `scored` stays as the guard against showing a credited
+     figure for a week that genuinely has none. */
+  const figure = scored ? weekFigureFor(points, card?.game ?? null) : null;
+  const week = figure === null ? null : oneDp(figure);
 
   return (
     <Row
@@ -280,7 +287,13 @@ export function BenchRow({
   onSwap,
   onOpenProfile,
 }: LineupRowProps & { card: LineupCard; destination: string | null }) {
-  const week = card.form?.weekFp != null ? oneDp(card.form.weekFp) : null;
+  /* Same rule as a starter's, deliberately. The two figures come from different
+     places — a slot's credit against a player's own line — but "has this number
+     happened yet" is a question about the fixture, and answering it two ways in
+     one column is how a benched tight end came to show a dash beside the word
+     FINAL. */
+  const figure = weekFigureFor(card.form?.weekFp ?? null, card.game);
+  const week = figure === null ? null : oneDp(figure);
 
   return (
     <Row
@@ -589,24 +602,26 @@ function WeekFigure({ points, status }: { points: string | null; status: GameSta
           {DASH}
         </Text>
       )}
-      {/* WHAT THIS LINE USED TO SAY WAS `PROJ —`, AND IT SAID IT FOREVER.
-          There is no projection source in this app and the comment under it
-          promised there would never be a made-up one, so the line was 9pt of a
-          row's scarcest column reserved for a number that has never existed.
-          It now carries one that does: whether the figure above it is settled,
-          still moving, or not yet begun.
-
-          That distinction is not decoration. Without it a `0.0` and a blank are
-          the only two things this column can say, and neither of them can tell
-          "played and scored nothing" from "has not kicked off" — which are
-          opposite facts for anyone deciding whether to keep watching.
-
-          PROJ can come back here the day there is something real to put in it. */}
+      {/* PROJ KEEPS ITS LINE, and the state does not take it.
+ 
+          This slot briefly carried LIVE/FINAL instead, on the reasoning that a
+          label printing a dash forever was dead space. It was the wrong trade
+          twice over. The fixture line two lines left already says FINAL @ LAC
+          and Q3 04:22 — so the state was being printed twice in one row — and
+          projections are coming, which makes this a reserved slot rather than
+          an empty one. Taking it would have meant giving it back later.
+ 
+          What tells you a figure is live is the figure itself, in the positive
+          colour, with the clock beside the fixture. That is one signal on the
+          thing it is about, not two competing for the same row.
+ 
+          A dash, and never a number we made up. See the head of this file. */}
       <View style={styles.projLine}>
-        <Text
-          numberOfLines={1}
-          style={[Type.micro, { color: live ? c.positive : c.textTertiary }]}>
-          {status === 'live' ? 'LIVE' : status === 'final' ? 'FINAL' : DASH}
+        <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
+          PROJ
+        </Text>
+        <Text numberOfLines={1} style={[styles.projValue, NUMERIC, { color: c.textTertiary }]}>
+          {DASH}
         </Text>
       </View>
     </View>
@@ -804,6 +819,7 @@ const styles = StyleSheet.create({
      ink changes. */
   figureEmpty: { fontSize: 12, lineHeight: 19, fontWeight: '500' },
   projLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one, height: 15 },
+  projValue: { fontSize: 12, lineHeight: 15, fontWeight: '500' },
   figureLabel: { lineHeight: 15 },
   /* The only thing on the tier line that gives way, and it is last for a
      reason: the chip and the earned total are fixed-length, the phrase is not. */
