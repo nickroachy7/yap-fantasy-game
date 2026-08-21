@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 
 import { SetsPanel } from '@/components/collection/SetsPanel';
+import { PacksButton } from '@/components/shell/PacksButton';
 import { summariseSets } from '@/components/collection/sets';
 import { useSets } from '@/components/collection/use-sets';
 import { Screen } from '@/components/shell/Screen';
@@ -30,7 +31,8 @@ export default function SetsScreen() {
     <Screen title="Sets" measure="table" context={context} scroll={false}>
       <SetsPanel
         onOpenSet={(code) => router.push({ pathname: '/set/[code]', params: { code } })}
-        onBackToInventory={() => router.replace('/fantasy/collection/inventory')}
+        onBackToInventory={() => router.replace('/fantasy/collection')}
+        action={<PacksButton />}
       />
     </Screen>
   );

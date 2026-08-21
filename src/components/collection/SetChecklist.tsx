@@ -49,12 +49,13 @@
  * and an em dash where the figure goes. That is the empty slot in the album,
  * and it is most of what a position set contains.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PlayerCard } from '@/components/cards';
+import { SheetToneBand } from '@/components/players/PlayerSheetFrame';
 import { Gem } from '@/components/shell/AppHeader';
-import { Chip, ChipRow } from '@/components/ui/Chip';
+import { Tabs } from '@/components/ui/Tabs';
 import {
   Colors,
   NUMERIC,
@@ -71,6 +72,7 @@ import {
   planFor,
   progressOf,
   remainingOf,
+  setTone,
   statusOf,
   type CardSet,
   type Milestone,
@@ -95,7 +97,16 @@ export type SetMember = {
   commit_tier: CardTier | null;
 };
 
-type Filter = 'ALL' | 'IN_SET' | 'CAN_ADD' | 'MISSING';
+/**
+ * Which slice of the set is on screen.
+ *
+ * OWNED BY THE ROUTE, not by the checklist, and that is what the sheet's pinned
+ * bar is paid for. The filters have to be drawn twice — once in the list where
+ * they belong, and once in the bar that takes over when the list has scrolled
+ * past them — and two rows reading one piece of state is the only version of
+ * that which cannot show you "Missing" in one place and "All" in the other.
+ */
+export type SetFilter = 'ALL' | 'IN_SET' | 'CAN_ADD' | 'MISSING';
 
 /**
  * Cards drawn before the "Show all" button appears. Comfortably more than any
@@ -104,16 +115,99 @@ type Filter = 'ALL' | 'IN_SET' | 'CAN_ADD' | 'MISSING';
  */
 const HEAD = 60;
 
-/** The inventory grid's numbers, so the two screens wrap at the same widths. */
+/**
+ * The inventory grid's numbers, ALL of them, so a card is the same object on
+ * both screens and not merely a similar one.
+ *
+ * The bounds used to be 2 and 6 against the inventory's 3 and 7, which nobody
+ * would notice on a phone — both land on three columns there — and which pulled
+ * the two apart at every other width. Same rule, whatever box it is given.
+ */
 const GAP = Spacing.two + 4;
 const MIN_CARD_WIDTH = 100;
+const MIN_COLUMNS = 3;
+const MAX_COLUMNS = 7;
 
-const FILTERS: { key: Filter; label: string }[] = [
+const FILTERS: { key: SetFilter; label: string }[] = [
   { key: 'ALL', label: 'All' },
   { key: 'IN_SET', label: 'In set' },
   { key: 'CAN_ADD', label: 'Can add' },
   { key: 'MISSING', label: 'Missing' },
 ];
+
+/** How many members each filter would leave on screen. */
+function countsOf(members: SetMember[]): Record<SetFilter, number> {
+  let inSet = 0;
+  let canAdd = 0;
+  for (const m of members) {
+    if (m.committed) inSet += 1;
+    else if (m.held > 0) canAdd += 1;
+  }
+
+  return {
+    ALL: members.length,
+    IN_SET: inSet,
+    CAN_ADD: canAdd,
+    MISSING: members.length - inSet - canAdd,
+  };
+}
+
+/** The members a filter leaves. */
+export function filterMembers(members: SetMember[], filter: SetFilter): SetMember[] {
+  if (filter === 'IN_SET') return members.filter((m) => m.committed);
+  if (filter === 'CAN_ADD') return members.filter((m) => !m.committed && m.held > 0);
+  if (filter === 'MISSING') return members.filter((m) => !m.committed && m.held === 0);
+
+  return members;
+}
+
+/**
+ * The filter row, on its own so the sheet's pinned bar can draw the SAME one
+ * rather than a copy that drifts.
+ *
+ * It is exported for that one caller. Every other row on this screen belongs to
+ * a position in the page; this one has to exist in two places at once, because
+ * a grid of thirty cards is exactly the case where narrowing it matters and the
+ * only place the control had been was above all of it.
+ *
+ * TABS RATHER THAN CHIPS, which is the opposite of what the inventory and the
+ * players directory do, and the difference is what the row sits on. Everywhere
+ * else a filter row sits on the page and a filled pill is the only mark strong
+ * enough to be seen. This one sits at the bottom of the tone band — the last
+ * line of a coloured header — and four filled pills there read as four buttons
+ * stuck onto a header rather than as the header's own last line. `Tabs` is the
+ * control that treatment already belongs to: it is what the section strip above
+ * the sheet uses, and the band collapses into a bar of exactly that shape.
+ *
+ * Selection survives greyscale on two channels, as the chip's did: the label
+ * goes from secondary to full strength AND the underline appears.
+ */
+export function SetFilters({
+  members,
+  filter,
+  onFilter,
+}: {
+  members: SetMember[];
+  filter: SetFilter;
+  onFilter: (next: SetFilter) => void;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const counts = useMemo(() => countsOf(members), [members]);
+
+  return (
+    <Tabs
+      value={filter}
+      onChange={onFilter}
+      /* The app's selection colour, same as the strip this now matches. */
+      accent={selectionAccent(scheme)}
+      tabs={FILTERS.map((f) => ({
+        value: f.key,
+        label: f.label,
+        hint: counts[f.key].toLocaleString(),
+      }))}
+    />
+  );
+}
 
 export function SetChecklist({
   set,
@@ -128,6 +222,9 @@ export function SetChecklist({
   onAutofill,
   onClear,
   onSubmit,
+  filter,
+  onFilter,
+  onFiltersEnd,
 }: {
   /** Null until the set's own row is known — the members can arrive first. */
   set: CardSet | null;
@@ -150,18 +247,31 @@ export function SetChecklist({
   onAutofill: () => void;
   onClear: () => void;
   onSubmit: () => void;
+  /** Which slice is on screen. Owned by the caller — see `SetFilter`. */
+  filter: SetFilter;
+  onFilter: (next: SetFilter) => void;
+  /**
+   * Where the filter row ENDS in the scroll content, reported so the sheet can
+   * put the same row in its bar the moment this one is out of sight — not at
+   * the top of the sheet, where it would sit above a screen of hero and then be
+   * met by its own twin scrolling up.
+   */
+  onFiltersEnd?: (offset: number) => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const gold = TierColors[scheme].gold.accent;
 
-  const [filter, setFilter] = useState<Filter>('ALL');
   /**
    * How many rows are drawn. See the "Show all" button below for why there is
    * a head at all — the short version is that a position set is up to 398
    * cards and the sheet owns its own scroll container.
    */
-  const [limit, setLimit] = useState(HEAD);
+  const [raised, setRaised] = useState<{ filter: SetFilter; to: number } | null>(null);
+  /* A head of 60 is a promise about the TOP of a list, so a new list gets a new
+     head. Tying the raise to the filter it was made under is what expires it on
+     a filter change without a line of code anywhere near the filter. */
+  const limit = raised && raised.filter === filter ? raised.to : HEAD;
 
   /* The sheet owns the scroll container, so this cannot be a FlatList — nesting
      a VirtualizedList inside a ScrollView is an error rather than a slow path.
@@ -169,31 +279,32 @@ export function SetChecklist({
      the inventory, and the head below is what keeps a 398-card position set
      from mapping all of it on open. */
   const [width, setWidth] = useState(0);
-  const columns = Math.max(2, Math.min(6, Math.floor((width + GAP) / (MIN_CARD_WIDTH + GAP))));
+  const columns = Math.max(
+    MIN_COLUMNS,
+    Math.min(MAX_COLUMNS, Math.floor((width + GAP) / (MIN_CARD_WIDTH + GAP))),
+  );
   const cardWidth = Math.floor((width - GAP * (columns - 1)) / columns);
 
-  const counts = useMemo(() => {
-    let inSet = 0;
-    let canAdd = 0;
-    for (const m of members) {
-      if (m.committed) inSet += 1;
-      else if (m.held > 0) canAdd += 1;
-    }
+  const counts = useMemo(() => countsOf(members), [members]);
 
-    return { inSet, canAdd, missing: members.length - inSet - canAdd };
-  }, [members]);
+  const shown = useMemo(() => filterMembers(members, filter), [members, filter]);
 
-  const shown = useMemo(() => {
-    if (filter === 'IN_SET') return members.filter((m) => m.committed);
-    if (filter === 'CAN_ADD') return members.filter((m) => !m.committed && m.held > 0);
-    if (filter === 'MISSING') return members.filter((m) => !m.committed && m.held === 0);
+  /* Two measurements, one number: where the row sits in the content and how
+     tall it is. The sheet wants the offset at which it has gone.
 
-    return members;
-  }, [members, filter]);
-
-  const choose = (next: Filter) => {
-    setFilter(next);
-    setLimit(HEAD);
+     A ref rather than state, because nothing here draws it — the pair is
+     reported upward and never read back, so keeping it in state would be a
+     re-render of thirty cards per layout pass for a number this component does
+     not use. */
+  const filtersBox = useRef({ bandY: 0, y: 0, height: 0 });
+  const measure = (box: { bandY?: number; y?: number; height?: number }) => {
+    const next = { ...filtersBox.current, ...box };
+    filtersBox.current = next;
+    /* The row is measured inside the band and the frame is asking about the
+       content, so the band's own offset is the third term. Every part or none:
+       an offset built on a height of zero would put the takeover at the top of
+       the sheet. */
+    if (next.height > 0) onFiltersEnd?.(next.bandY + next.y + next.height);
   };
 
   const chosen = useMemo(() => new Set(selected), [selected]);
@@ -216,7 +327,17 @@ export function SetChecklist({
 
   return (
     <>
-      {set ? (
+      {/* THE BAND IS THE HEADER, and it ends on the filters rather than on the
+          hero. Everything inside it answers "which set is this and how far in
+          am I"; the grid below answers "what is in it". Running the colour to
+          the last control before the cards is what makes that one block instead
+          of a coloured title with a loose row of chips under it — and it is the
+          same fill at the same strength as the bar that takes over on scroll,
+          so the band does not change colour when it collapses. */}
+      <SheetToneBand
+        tone={set ? setTone(set) : null}
+        onLayout={(e) => measure({ bandY: e.nativeEvent.layout.y })}>
+        {set ? (
         <View style={styles.hero}>
           <Text style={[Type.page, { color: c.text }]}>{set.name}</Text>
           <Text style={[Type.fine, { color: c.textTertiary }]}>
@@ -283,7 +404,8 @@ export function SetChecklist({
               three rungs missing. It is left off there; the reward row below
               already says what clearing it pays. */}
           {set.family === 'daily' ? null : (
-          <View style={[styles.ladder, { borderColor: c.border }]}>
+          <View
+            style={[styles.ladder, { borderColor: c.border, backgroundColor: c.surfaceSheet }]}>
             {set.milestones.map((m, i) => (
               <Rung key={m.pct} milestone={m} committed={set.committed} first={i === 0} />
             ))}
@@ -319,7 +441,11 @@ export function SetChecklist({
               )}
             </Pressable>
           ) : status === 'claimed' ? (
-            <View style={[styles.rewardRow, { borderColor: c.border }]}>
+            <View
+              style={[
+                styles.rewardRow,
+                { borderColor: c.border, backgroundColor: c.surfaceSheet },
+              ]}>
               <Text style={[Type.micro, { color: c.textTertiary }]}>SET FINISHED</Text>
               <View style={styles.gemRow}>
                 <Gem color={c.textTertiary} size={9} />
@@ -329,7 +455,11 @@ export function SetChecklist({
               </View>
             </View>
           ) : (
-            <View style={[styles.rewardRow, { borderColor: c.border }]}>
+            <View
+              style={[
+                styles.rewardRow,
+                { borderColor: c.border, backgroundColor: c.surfaceSheet },
+              ]}>
               <Text style={[Type.micro, { color: c.textTertiary }]}>
                 {(() => {
                   const gap = (set.nextAt ?? set.required) - set.committed;
@@ -347,42 +477,38 @@ export function SetChecklist({
           )}
 
           {claimError ? (
-            <View style={[styles.notice, { borderColor: c.negative }]}>
+            <View
+              style={[styles.notice, { borderColor: c.negative, backgroundColor: c.surfaceSheet }]}>
               <Text style={[Type.micro, { color: c.negative }]}>THAT DID NOT WORK</Text>
               <Text style={[Type.body, { color: c.text }]}>{claimError}</Text>
             </View>
           ) : null}
         </View>
-      ) : null}
+        ) : null}
+
+        {/* The last block inside the band, and NOTHING UNDER IT. `Tabs` puts
+            its underline at the very bottom of its own box, so with no padding
+            here the mark lands ON the band's hard edge — the relationship the
+            masthead strip has with its hairline, where the rules read as marks
+            on a baseline rather than as dashes floating above one. Any gap and
+            the underline detaches from the edge and the strip stops reading as
+            the bottom of the header. */}
+        <View
+          onLayout={(e) =>
+            measure({ y: e.nativeEvent.layout.y, height: e.nativeEvent.layout.height })
+          }>
+          <SetFilters members={members} filter={filter} onFilter={onFilter} />
+        </View>
+      </SheetToneBand>
 
       <View style={styles.list}>
-        <ChipRow>
-          {FILTERS.map((f) => (
-            <Chip
-              key={f.key}
-              selected={filter === f.key}
-              label={f.label}
-              count={
-                f.key === 'ALL'
-                  ? members.length
-                  : f.key === 'IN_SET'
-                    ? counts.inSet
-                    : f.key === 'CAN_ADD'
-                      ? counts.canAdd
-                      : counts.missing
-              }
-              onPress={() => choose(f.key)}
-              accessibilityLabel={`${f.label} cards in this set`}
-            />
-          ))}
-        </ChipRow>
 
         {/* AUTOFILL PROPOSES, THE TICKS DECIDE. The button seeds a selection
             from the rules in `autofillSelection` — bronze, duplicates first —
             and then gets out of the way: every row is a toggle, so taking two
             out and putting a different one in is two taps rather than a
             different screen. Nothing here is destructive; the submit bar is. */}
-        {counts.canAdd > 0 ? (
+        {counts.CAN_ADD > 0 ? (
           <View style={styles.pickRow}>
             {plan.cards > 0 ? (
               <>
@@ -495,7 +621,7 @@ export function SetChecklist({
                 is the whole point of the screen. */}
             {shown.length > limit ? (
               <Pressable
-                onPress={() => setLimit(shown.length)}
+                onPress={() => setRaised({ filter, to: shown.length })}
                 accessibilityRole="button"
                 accessibilityLabel={`Show all ${shown.length} cards`}
                 style={({ pressed }) => [
@@ -844,9 +970,7 @@ function MemberCard({
      missing one has nothing to do it with, so making either pressable would be
      offering a gesture that does nothing. */
   if (!addable) {
-    return (
-      <View style={[styles.cell, { width }, !member.committed && styles.faded]}>{card}</View>
-    );
+    return <View style={[{ width }, !member.committed && styles.faded]}>{card}</View>;
   }
 
   return (
@@ -856,7 +980,6 @@ function MemberCard({
       accessibilityRole="checkbox"
       accessibilityState={{ checked: picked, disabled: locked }}
       style={({ pressed }) => [
-        styles.cell,
         { width },
         locked && styles.disabled,
         pressed && !locked && styles.pressed,
@@ -880,7 +1003,19 @@ const styles = StyleSheet.create({
   ghostBar: { position: 'absolute', left: 0, top: 0, opacity: 0.28 },
   rung: { position: 'absolute', top: 0, width: 2, height: 6 },
 
-  ladder: { borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.chip, overflow: 'hidden' },
+  /**
+   * FILLED, not transparent, and that is what the tone band asks of anything
+   * drawn on it. A bordered box with no background lets the wash through, so
+   * the ladder and the reward row came out as tinted panels — the colour is
+   * meant to be the header's, and these are the header's CONTENT. `surfaceSheet`
+   * is the sheet's own fill, so they read exactly as they did before the band
+   * existed: dark boxes on a coloured ground.
+   */
+  ladder: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.chip,
+    overflow: 'hidden',
+  },
   rungRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -923,7 +1058,9 @@ const styles = StyleSheet.create({
     gap: Spacing.half,
   },
 
-  list: { gap: Spacing.two, paddingTop: Spacing.three },
+  /* No `paddingTop`: the band above ends on a hard edge and the scroll
+     container's own gap is the separation. */
+  list: { gap: Spacing.two },
   pickRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   /* Filled once something is selected, because at that point it IS the page's
      next action. Autofill is outlined: it proposes, and proposing should not
@@ -957,10 +1094,6 @@ const styles = StyleSheet.create({
   },
   pickNote: { paddingHorizontal: Spacing.one },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, alignItems: 'flex-start' },
-  /* The cell is padded on every card, selected or not, so the tint has
-     somewhere to sit without a selected card being a different size from its
-     neighbours and stepping the whole row. */
-  cell: { padding: Spacing.half, borderRadius: Radius.chip },
   /* A card you do not own is present but not in the album yet. Opacity says
      that in one channel; the grey frame and the word MISSING say it in two
      more, so nothing here rests on the dimming alone. */

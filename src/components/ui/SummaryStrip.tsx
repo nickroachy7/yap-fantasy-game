@@ -78,12 +78,33 @@ export type SummaryCell = {
   accessibilityLabel: string;
 };
 
-export function SummaryStrip({ cells }: { cells: SummaryCell[] }) {
+export function SummaryStrip({
+  cells,
+  action,
+}: {
+  cells: SummaryCell[];
+  /**
+   * One control on the strip's own line, to the right of it and OUTSIDE its
+   * frame.
+   *
+   * The collection and the sets board both draw a round Packs button, and it
+   * used to sit on a line of its own above this — a full row of chrome holding
+   * one 44pt circle and otherwise empty, on the two screens where vertical
+   * space pays for cards. Beside the strip it costs nothing: the strip is
+   * shorter than the row it was already given, and the button is the same
+   * height as it.
+   *
+   * OUTSIDE the border rather than as a last cell, because it is not a figure.
+   * The frame draws a row of counts divided by hairlines, and a control inside
+   * it would read as one of them.
+   */
+  action?: ReactNode;
+}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
-  return (
-    <View style={[styles.strip, { borderColor: c.borderStrong }]}>
+  const strip = (
+    <View style={[styles.strip, action ? styles.stripInRow : null, { borderColor: c.borderStrong }]}>
       {cells.map((cell, i) => {
         const weight = cell.weight ?? 1;
         return (
@@ -117,9 +138,22 @@ export function SummaryStrip({ cells }: { cells: SummaryCell[] }) {
       })}
     </View>
   );
+
+  if (!action) return strip;
+
+  return (
+    <View style={styles.row}>
+      {strip}
+      {action}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  /* Takes the width the action leaves. Without it the strip sizes to its cells
+     and the pair sits huddled at the left of the row. */
+  stripInRow: { flex: 1, minWidth: 0 },
   strip: {
     flexDirection: 'row',
     borderWidth: 1.5,

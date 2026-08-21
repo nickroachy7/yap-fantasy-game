@@ -102,7 +102,11 @@ export function ActionBar({ actions, wide }: { actions: Action[]; wide: boolean 
   const detached = shown.filter((a) => a.detached);
 
   return (
-    <View style={styles.row}>
+    /* Pinned RIGHT when there is no tray, so the lone round button sits where
+       round buttons always sit rather than at the gutter. With a tray it is
+       inert: the tray takes the width and pushes the buttons to that edge
+       anyway. */
+    <View style={[styles.row, tray.length === 0 && styles.rowDetachedOnly]}>
       {/* The tray HUGS its cells and the row pins it left, so it is only ever
        * as wide as the words in it.
        *
@@ -122,6 +126,12 @@ export function ActionBar({ actions, wide }: { actions: Action[]; wide: boolean 
        * a horizontal ScrollView bounces by default whether or not it has
        * anywhere to scroll, which made every section nav feel like a carousel
        * with nothing in it. See that file. */}
+      {/* NOT DRAWN EMPTY. The tray paints its own surface and border, so a
+          section whose only child is detached — Collection and Sets, which have
+          Packs and nothing else — would otherwise show an empty pill sitting
+          beside the round button, which reads as a control that failed to
+          load rather than as a section with one action. */}
+      {tray.length === 0 ? null : (
       <ScrollView
         horizontal
         {...horizontalStrip}
@@ -155,6 +165,7 @@ export function ActionBar({ actions, wide }: { actions: Action[]; wide: boolean 
           </Pressable>
         ))}
       </ScrollView>
+      )}
 
       {detached.length > 0 ? (
         <View style={styles.detachedGroup}>
@@ -184,7 +195,13 @@ export function ActionBar({ actions, wide }: { actions: Action[]; wide: boolean 
  * most of that gap and takes the width it needs off the tray, which has it to
  * give — see the note on `item`.
  */
-function DetachedAction({ action }: { action: Action }) {
+/**
+ * The round control, exported because the bar is no longer the only place one
+ * is drawn — `PacksButton` puts the same object on the summary strip. Two
+ * hand-rolled circles meaning the same thing is exactly the drift this file's
+ * header warns about.
+ */
+export function DetachedAction({ action }: { action: Action }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const accent = selectionAccent(scheme);
@@ -523,6 +540,7 @@ const styles = StyleSheet.create({
      their left whatever the width. The buttons are still grouped into one node
      so that gap stays theirs rather than opening up between them. */
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  rowDetachedOnly: { justifyContent: 'flex-end' },
   detachedGroup: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   /* Takes the width the detached buttons leave, so the tray runs from the
      gutter to one gap short of them.

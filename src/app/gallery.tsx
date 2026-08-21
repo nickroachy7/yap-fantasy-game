@@ -33,7 +33,7 @@ import {
   USAGE_SAMPLE,
 } from '@/components/dev/profile-fixture';
 import { OWNED_MANY, SETS_FIXTURE, SET_MEMBERS_FIXTURE } from '@/components/dev/fixtures';
-import { SetChecklist } from '@/components/collection/SetChecklist';
+import { SetChecklist, type SetFilter } from '@/components/collection/SetChecklist';
 import { SetsList, SetsStrip } from '@/components/collection/SetsList';
 import { autofillSelection, remainingOf, summariseSets } from '@/components/collection/sets';
 import { PlayerHero } from '@/components/players/PlayerHero';
@@ -157,12 +157,12 @@ const VIEW_TITLE: Record<View_, string> = {
 
 /** Drives the rail's active/nested state, which is otherwise unreachable here. */
 const VIEW_PATH: Record<View_, string> = {
-  inventory: '/fantasy/collection/inventory',
-  sets: '/fantasy/collection/sets',
-  checklist: '/fantasy/collection/sets',
+  inventory: '/fantasy/collection',
+  sets: '/fantasy/sets',
+  checklist: '/fantasy/sets',
   leaderboard: '/fantasy/leaderboard',
   lineup: '/fantasy/lineup',
-  profile: '/fantasy/players',
+  profile: '/players',
 };
 
 /* ---- fixture content ---------------------------------------------------- */
@@ -217,10 +217,19 @@ function SetsFixture() {
 function ChecklistFixture() {
   const [claiming, setClaiming] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
+  /* The route holds this so the sheet's bar and the row in the list can be the
+     same control; on the page there is no bar, and it is simply state. */
+  const [filter, setFilter] = useState<SetFilter>('ALL');
   const set = SETS_FIXTURE.find((s) => s.code === 'team-jax-2026') ?? null;
 
+    /* CLIPPED, which the sheet does for free and a page does not. The tone
+       band reaches well above its own top so a bounce at the top of the sheet
+       reveals more band rather than the fill behind it; the sheet's scroll view
+       clips that away at rest, and on a page it would paint straight up over
+       the strip above. The negative margins put the clip box on the page edges,
+       so the band still bleeds sideways the way it does in the product. */
   return (
-    <View style={styles.profile}>
+    <View style={styles.checklist}>
       <SetChecklist
         set={set}
         members={SET_MEMBERS_FIXTURE}
@@ -228,6 +237,8 @@ function ChecklistFixture() {
         claimError={null}
         selected={selected}
         submitting={false}
+        filter={filter}
+        onFilter={setFilter}
         onClaim={() => setClaiming((v) => !v)}
         /* Inert, like the submission: the quick add's whole point is the
            confirmation behind it, and the gallery has no session to commit
@@ -738,6 +749,13 @@ const styles = StyleSheet.create({
   banner: { fontSize: 11, letterSpacing: 0.3, fontVariant: ['tabular-nums'] },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, alignItems: 'flex-start' },
   profile: { gap: Spacing.three },
+  /** See the note where it is used. */
+  checklist: {
+    gap: Spacing.three,
+    overflow: 'hidden',
+    marginHorizontal: -Spacing.three,
+    paddingHorizontal: Spacing.three,
+  },
   sheetButton: { alignSelf: 'flex-start' },
   pressed: { opacity: 0.6 },
   board: { gap: 14 },

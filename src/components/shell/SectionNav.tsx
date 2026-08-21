@@ -97,8 +97,13 @@ export function SectionNav({ section }: { /** e.g. `/fantasy/collection`. */ sec
   /* Early, before the wrapper. `ActionBar` would render nothing on wide anyway
      — every item here is a nav item and it drops those — but the padded View
      around it would still be in the tree, leaving a band of dead space at the
-     top of every wide page. */
-  if (wide) return null;
+     top of every wide page.
+
+     Same reason for the second test, which is not hypothetical: Collection and
+     Sets declare no children at all now (Packs is drawn by the page, on its
+     summary strip), so without it both would reserve a padded row to draw
+     nothing in. */
+  if (wide || actions.length === 0) return null;
 
   return (
     <View style={styles.wrap}>

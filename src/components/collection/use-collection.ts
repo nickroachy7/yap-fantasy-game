@@ -20,7 +20,7 @@
  *
  * HELD FOR THE SESSION, AND THE INVALIDATION IS THE INTERESTING PART.
  *
- * Inventory, Sets and Shop are three routes in one section, so glancing at the
+ * Collection, Sets and the packs sheet all read the same cards, so glancing at the
  * Shop and coming back unmounted the grid and re-paged the whole collection —
  * the visible pause on the way back in.
  *

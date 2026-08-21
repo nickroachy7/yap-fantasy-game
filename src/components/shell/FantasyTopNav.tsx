@@ -118,8 +118,10 @@ export function FantasyTopNav({
     <View style={[styles.bar, { borderBottomColor: c.border }]}>
       <View style={styles.inner}>
         {FANTASY_SECTIONS.map((section) => {
-          // A section is active anywhere inside it, so `/fantasy/collection/sets`
-          // keeps Collection lit.
+          // A section is active anywhere INSIDE it, not just on its own path.
+          // None of the four has a sub-page today — Collection and Sets stopped
+          // being folders when Sets came up to sit beside Collection — but a
+          // section that grows one must not go dark the moment you open it.
           const active =
             pathname === section.href || pathname.startsWith(`${section.href}/`);
           return (

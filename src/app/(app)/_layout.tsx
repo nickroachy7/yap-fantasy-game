@@ -20,7 +20,7 @@ import { PlayerProvider } from '@/context/PlayerContext';
  *
  * A modal presentation needs a Stack; a Tabs navigator has no concept of one.
  * Hence this layer. The tabs moved into the `(tabs)` group, which is a GROUP —
- * it does not appear in any URL, so `/lineup`, `/collection/sets` and
+ * it does not appear in any URL, so `/lineup`, `/fantasy/sets` and
  * `/player/<id>` are all exactly the paths they were before. Nothing that links
  * to them changed.
  *

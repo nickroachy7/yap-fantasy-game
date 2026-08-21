@@ -47,33 +47,62 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { AppHeader } from '@/components/shell/AppHeader';
 import { FrameProvider } from '@/components/shell/frame';
 import { SectionNav } from '@/components/shell/SectionNav';
+import { childrenOf } from '@/components/shell/sections';
 import { useIsWide } from '@/components/shell/useResponsive';
 
 export function SectionFrame({
   section,
+  masthead = false,
   children,
 }: {
   /** e.g. `/fantasy/collection`. The section whose sub-pages the nav lists. */
   section: string;
+  /**
+   * Draw the masthead above the nav, for a frame with nothing above it.
+   *
+   * A SECTION INSIDE FANTASY LEAVES THIS ALONE: `FantasyFrame` is already
+   * drawing the masthead once for the whole tab, and a second one here would be
+   * two. Players is the case that needs it — it is a bottom TAB now, so there
+   * is no frame above it, and without this the page's own `Screen` drew the
+   * masthead from inside the navigator: below the section nav rather than above
+   * it, with the nav left sitting under the status bar.
+   *
+   * It has to be the frame's rather than the page's for the same reason the nav
+   * is: chrome rendered by a screen is torn down and rebuilt on every
+   * navigation, and this bar sits directly above the control you just pressed.
+   */
+  masthead?: boolean;
   /** The section's navigator. */
   children: ReactNode;
 }) {
   const wide = useIsWide();
+  /* CLAIMED ONLY IF THERE IS ONE, and the test is the same one `SectionNav`
+     makes: a section with no children draws no bar. `nav` tells the page below
+     "something above me has already put a bar on top of you, so do not add your
+     own gap" — and Collection and Sets have no children now (Packs moved onto
+     their summary strip), so asserting it left both pages pressed up against
+     the top nav's hairline with nothing between them. */
+  const nav = !wide && childrenOf(section).length > 0;
 
   return (
-    /* Only `nav` is claimed. Whether a masthead is on screen is the business of
-       the frame above this one, and a provider that asserted it here would tell
-       every page in the section there was no header the day this frame is used
-       somewhere without one. */
-    <FrameProvider value={{ nav: !wide }}>
+    /* `header` is claimed only when this frame is the one drawing it —
+       otherwise the flag stays inherited, because whether a masthead is on
+       screen is the business of the frame above this one, and asserting it here
+       would tell every page in the section there was no header the day this
+       frame is used somewhere without one. */
+    <FrameProvider value={masthead ? { header: !wide, nav } : { nav }}>
       {/* The nav and the navigator are a column, and this is what makes them
           one: the navigator below takes the rest of the height rather than
           measuring to its content. No background — the frame above already
           painted the page, and a second opaque layer here is a full-screen
           overdraw on every section. */}
       <View style={styles.fill}>
+        {/* Above the nav, and only when asked. Wide draws neither: the rail is
+            the navigation there and `WebHeader` is the masthead. */}
+        {masthead && !wide ? <AppHeader attached /> : null}
         {/* Renders nothing on wide — it decides that itself, see there. */}
         <SectionNav section={section} />
         {children}

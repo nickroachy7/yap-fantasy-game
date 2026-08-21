@@ -92,7 +92,7 @@ export default function PlayerDetailScreen() {
    */
   const dismiss = useCallback(() => {
     if (router.canGoBack()) router.back();
-    else router.replace('/fantasy/players');
+    else router.replace('/players');
   }, [router]);
 
   const body = () => {

@@ -45,6 +45,15 @@
  * the header. The threshold is a little past the name's own height, so the two
  * never both read as headings at once.
  *
+ * WHAT ELSE THE BAR CAN HOLD
+ *
+ * The same argument applies to a CONTROL, and more sharply: the set checklist's
+ * filters sat above a grid of thirty cards, so from the second row down they
+ * were somewhere you had to scroll back to. `pinned` puts that row in the bar
+ * on the same terms the title takes — it appears when the one in the content
+ * has gone under, and it is the same row rather than a copy of it, because the
+ * screen that owns the state draws both. See `pinned` and `pinnedAt`.
+ *
  * WHY THE BACKDROP IS A SIBLING, NOT A PARENT
  *
  * A Pressable WRAPPING the card renders a <button> containing <button>s on
@@ -63,6 +72,7 @@ import {
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type ViewProps,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -84,6 +94,8 @@ export function PlayerSheetFrame({
   onClose,
   closeLabel = 'Close player profile',
   tone,
+  pinned,
+  pinnedAt,
   children,
 }: {
   /** The player's name once known; undefined while loading. */
@@ -112,6 +124,31 @@ export function PlayerSheetFrame({
    * about a player and has neither a club nor a tier to be the colour of.
    */
   tone?: string | null;
+  /**
+   * A row that TAKES OVER from one in the content once that row has scrolled
+   * under the bar — the set checklist's filters, which are the only control on
+   * that sheet and used to be unreachable from the moment the grid began.
+   *
+   * It is drawn inside the same block as the title, which is what puts it under
+   * the `tone` wash rather than beside it: the coloured band a reader still
+   * sees after the hero has gone now runs down over the filters instead of
+   * stopping at a line above them.
+   *
+   * Undefined draws nothing and costs nothing, which is what every sheet but
+   * the checklist gets.
+   */
+  pinned?: ReactNode;
+  /**
+   * The content offset past which `pinned` is worth showing — the bottom of the
+   * row it stands in for, measured by whatever drew it.
+   *
+   * WITHOUT IT the row would appear at the title's own threshold, which is 44pt
+   * into a sheet whose hero is ten times that: the pinned filters would sit
+   * above a screen of hero, and then a second identical row would scroll up to
+   * meet them. Handing the offset over is what makes this a takeover rather
+   * than a duplicate. Omitted, it falls back to the title's threshold.
+   */
+  pinnedAt?: number;
   children: ReactNode;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -143,13 +180,38 @@ export function PlayerSheetFrame({
      per-frame re-render: the comparison is done on every scroll event but
      setState is called only on a crossing. */
   const [titleShown, setTitleShown] = useState(false);
+  /* The same, for the row that takes over from one in the content. It crosses
+     at its own offset, much further down, and never at the title's. */
+  const [pinnedShown, setPinnedShown] = useState(false);
   /* useState, not useRef: reading `.current` during render trips React 19's
      refs rule, and the lazy initialiser gives the same once-per-mount value. */
   const [titleFade] = useState(() => new Animated.Value(0));
 
+  /**
+   * The title bar's own height, measured rather than guessed, and only the bar:
+   * the pinned row is a sibling of it precisely so that revealing the row
+   * cannot change the number the reveal is decided by.
+   *
+   * It matters because on iOS this bar FLOATS over the content, so a row is out
+   * of sight a bar's height before it reaches the top of the window. Measuring
+   * is what keeps the takeover on the right pixel across text sizes.
+   */
+  const [barHeight, setBarHeight] = useState(0);
+
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const past = e.nativeEvent.contentOffset.y > TITLE_REVEAL_AT;
+    const y = e.nativeEvent.contentOffset.y;
+    const past = y > TITLE_REVEAL_AT;
     if (past !== titleShown) setTitleShown(past);
+
+    if (pinned) {
+      /* The floating bar covers the top of the content; the in-flow one sits
+         above it and covers nothing. So the row it replaces is gone a bar
+         earlier on iOS than it is anywhere else. */
+      const covered = draggable ? HANDLE_BLOCK + barHeight : 0;
+      const at = pinnedAt === undefined ? TITLE_REVEAL_AT : pinnedAt - covered;
+      const on = y > at;
+      if (on !== pinnedShown) setPinnedShown(on);
+    }
   };
 
   useEffect(() => {
@@ -209,8 +271,16 @@ export function PlayerSheetFrame({
    * these platforms and must never be absent. iOS has the grabber instead and
    * gets the floating version below.
    */
-  const header = (
-    <View collapsable={false} style={[styles.header, { borderBottomColor: c.border }]}>
+  const bar = (
+    <View
+      onLayout={(e) => setBarHeight(e.nativeEvent.layout.height)}
+      style={[
+        styles.header,
+        /* The rule belongs to the BOTTOM of the block, wherever that now is.
+           With a pinned row under it, a line here would draw a second edge
+           across the middle of one band. */
+        { borderBottomColor: pinnedShown ? 'transparent' : c.border },
+      ]}>
       {/* `pointerEvents="none"` so the invisible title never eats a tap meant
           for the sheet behind it. Kept mounted rather than conditionally
           rendered: mounting on scroll would resize the header mid-gesture. */}
@@ -231,6 +301,32 @@ export function PlayerSheetFrame({
           <Text style={[styles.closeGlyph, { color: c.textSecondary }]}>✕</Text>
         </Pressable>
       )}
+    </View>
+  );
+
+  /**
+   * The takeover row, under the title and inside the same band.
+   *
+   * MOUNTED ON THE CROSSING, not kept and faded, and that is the whole
+   * behaviour rather than a shortcut past an animation. The band is drawn by
+   * the block this sits in, so a row held at zero opacity is a row of EMPTY
+   * COLOUR hanging under the title — which is exactly what a reader sees during
+   * the handover, when the inline row is halfway under the bar and its
+   * replacement has not arrived. Mounting it makes the band's height and its
+   * contents the same fact.
+   *
+   * The title fades because it replaces nothing. This replaces something, and
+   * arrives at the moment that thing is gone.
+   */
+  const pinnedRow = pinned && pinnedShown ? (
+    <View style={[styles.pinned, { borderBottomColor: c.border }]}>{pinned}</View>
+  ) : null;
+
+  /** The bar as it is on web and Android: IN FLOW, always occupying its height. */
+  const header = (
+    <View collapsable={false}>
+      {bar}
+      {pinnedRow}
     </View>
   );
 
@@ -259,15 +355,20 @@ export function PlayerSheetFrame({
   const floatingHeader = (
     <Animated.View
       collapsable={false}
-      pointerEvents="none"
+      /* `box-none` once the pinned row is live, so the row inside it can be
+         pressed while the bar itself still lets nothing through. Fully `none`
+         at rest, as it always was: there is no control in it then. */
+      pointerEvents={pinnedShown ? 'box-none' : 'none'}
       style={[styles.headerFloat, { opacity: titleFade }]}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: c.surfaceSheet }]} />
       {tone ? (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: rgba(tone, TONE_PEAK) }]} />
       ) : null}
-      <View style={[styles.header, { borderBottomColor: c.border }]}>
-        <View style={styles.headerText}>{titleText}</View>
-      </View>
+      {/* The two fills above are `absoluteFill`, so whatever this block grows to
+          hold is washed with it: the colour runs down over the filters rather
+          than stopping at a line above them. */}
+      {bar}
+      {pinnedRow}
     </Animated.View>
   );
 
@@ -405,7 +506,21 @@ export function PlayerSheetFrame({
  * this one ends on a rule; a gradient reaching zero at the same line would just
  * be a weaker band with a soft edge nobody asked for.
  */
-export function SheetToneBand({ tone, children }: { tone?: string | null; children: ReactNode }) {
+export function SheetToneBand({
+  tone,
+  onLayout,
+  children,
+}: {
+  tone?: string | null;
+  /**
+   * Where the band sits in the scroll content. Passed through for the one
+   * caller that has to hand the frame a `pinnedAt`: an offset measured inside
+   * the band is relative to the band, and the frame is asking about the
+   * content.
+   */
+  onLayout?: ViewProps['onLayout'];
+  children: ReactNode;
+}) {
   const draggable = Platform.OS === 'ios';
   /* Clears whatever the scroll content is inset by, so the band reaches the
      top of the sheet — on iOS that includes the floating grabber's block. */
@@ -413,9 +528,13 @@ export function SheetToneBand({ tone, children }: { tone?: string | null; childr
 
   return (
     <View
+      onLayout={onLayout}
       style={[
         styles.band,
-        { marginTop: -top, paddingTop: top },
+        /* The pair nets to zero — the box grows upward by exactly what it is
+           shifted up by — so the band starts at the top of the scroll content
+           however much is added here. See `OVERSCROLL_REACH`. */
+        { marginTop: -(top + OVERSCROLL_REACH), paddingTop: top + OVERSCROLL_REACH },
         tone ? { backgroundColor: rgba(tone, TONE_PEAK) } : null,
       ]}>
       {children}
@@ -447,6 +566,25 @@ const TITLE_REVEAL_AT = 44;
  * tier accents could each have been tuned. Tiers ride the same number so the
  * two pages read as one treatment.
  */
+/**
+ * How far the band reaches ABOVE the top of the scroll content, which is what a
+ * bounce reveals.
+ *
+ * The band is a background inside the scroll view — it has to be, or its bottom
+ * edge would not stay on the row it cuts at (see the note on the component). So
+ * a fling to the top rubber-bands the whole content DOWN, the band with it, and
+ * whatever the band was covering appears in the gap: the sheet's own fill,
+ * which against a colour reads as a grey slab dragged out from behind the
+ * header.
+ *
+ * Extending the box upward costs nothing — it is a solid colour, clipped by the
+ * scroll view at rest — and it cannot drift out of register with the band
+ * proper, because it IS the band. 300 is past the reach of a hard fling on the
+ * tallest phone; a pixel of grey at the very limit of a deliberate two-handed
+ * drag is not worth more.
+ */
+const OVERSCROLL_REACH = 300;
+
 /** Clearance above the grabber, and the height of the block it occupies. */
 const HANDLE_TOP = 5;
 const HANDLE_BLOCK = HANDLE_TOP + 5 + Spacing.one;
@@ -511,6 +649,25 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerText: { flex: 1, gap: 2 },
+  /**
+   * The takeover row: the bar's gutter, its own bottom rhythm, and the rule.
+   *
+   * The gutter is `styles.header`'s, deliberately the same number, because the
+   * row has to line up with the title above it — and in the content it lines up
+   * with the same edge by way of the tone band, which insets by the identical
+   * amount. A row that scrolls horizontally still needs the inset: the strip is
+   * inset, not the page.
+   *
+   * The rule is the row's baseline, not a gap below it — see the note on the
+   * missing bottom padding.
+   */
+  pinned: {
+    paddingHorizontal: Spacing.three,
+    /* No bottom padding: the row's own last mark sits on the rule below it,
+       which is what the strip under the masthead does and what the band this
+       stands in for does at rest. */
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
   close: {
     width: 30,
     height: 30,

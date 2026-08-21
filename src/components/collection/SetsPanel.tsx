@@ -49,6 +49,7 @@
  * it at the same height as the inventory's, which is pinned above ITS list for
  * the same reason; see the note at the render.
  */
+import type { ReactNode } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -73,9 +74,19 @@ import { useSets } from './use-sets';
 export function SetsPanel({
   onOpenSet,
   onBackToInventory,
+  action,
 }: {
   onOpenSet: (code: string) => void;
   onBackToInventory: () => void;
+  /**
+   * Drawn on the right of the summary strip — the Packs button.
+   *
+   * A NODE FROM THE ROUTE, like `onBackToInventory` beside it, rather than
+   * something this panel reaches for itself. Everything in here that navigates
+   * arrives as a prop, which is what keeps the panel drawable from `/gallery`
+   * with no router under it.
+   */
+  action?: ReactNode;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -166,7 +177,7 @@ export function SetsPanel({
           explaining themselves. */}
       {all.length > 0 ? (
         <View style={styles.strip}>
-          <SetsStrip stats={summariseSets(all)} />
+          <SetsStrip stats={summariseSets(all)} action={action} />
         </View>
       ) : null}
 

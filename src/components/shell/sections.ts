@@ -5,12 +5,26 @@
  * being the fantasy game's navigation and became the APP's.
  *
  *   1. NAV_TABS      — the bottom bar (and the top of the wide rail). Fantasy,
- *                      Scores, Profile. These are products, not screens.
+ *                      Players, Scores, Profile. These are products, not
+ *                      screens.
  *   2. FANTASY_SECTIONS — the row under the header once you are inside Fantasy.
- *                      Lineup, Collection, Players, Board. These used to BE the
+ *                      Lineup, Collection, Sets, Board. These used to BE the
  *                      bottom bar.
- *   3. NavChild      — a section's sub-pages, drawn by `SectionNav` as the
- *                      page's action bar. Unchanged.
+ *   3. NavChild      — a section's OR a tab's sub-pages, drawn by `SectionNav`
+ *                      as the page's action bar.
+ *
+ * PLAYERS IS A PRODUCT, NOT A BOARD, and moving it down a level is what let
+ * Collection stop being a folder. The pool of every player in the league is not
+ * a view of your fantasy team the way your lineup and your cards are — you go
+ * there to look somebody up, which is the same kind of errand as checking the
+ * scores. So it sits in the bottom bar and takes its three views with it.
+ *
+ * COLLECTION IS ITS OWN CONTENT NOW. It was a folder holding Inventory and
+ * Sets, which meant `/fantasy/collection` was a redirect and the section strip
+ * was immediately followed by a second strip switching between two pages. Sets
+ * came up to sit beside it, and Collection simply IS the inventory — one word,
+ * one page, no tray under it. The level-2 row is still four items wide; it is
+ * the same four slots holding better-chosen things.
  *
  * Four presentations read this file: the bottom tab bar renders one tab per
  * entry in NAV_TABS, `FantasyTopNav` renders FANTASY_SECTIONS as underlined
@@ -29,14 +43,10 @@
  * like: set the lineup, look at what you own, go and get more, then see where
  * that put you.
  *
- * One child of every section deliberately shares the section's own href. The
- * nav needs an item for the landing page or there is no way back to it, and the
- * sidebar needs the parent row to stay a live target. The alternative — a bare
- * `/fantasy/lineup/index` child — would show the same word twice in the rail
- * for no gain.
- *
- * It is the FIRST child everywhere except Players, which lands on its second;
- * see the note there.
+ * One child of any parent that has several deliberately shares the parent's own
+ * href. The nav needs an item for the landing page or there is no way back to
+ * it, and the sidebar needs the parent row to stay a live target. Only Players
+ * has several now, and it lands on its second; see the note there.
  */
 import type { ActionIconName } from '@/components/shell/ActionBar';
 import type { TabIconName } from '@/components/shell/TabIcon';
@@ -138,59 +148,68 @@ export type NavTab = {
    * tab layout keys off when deciding whether to pin the tab button to an href.
    */
   sections?: NavSection[];
+  /**
+   * The tab's own sub-pages, for a tab that is one board rather than several.
+   *
+   * The same thing a section's `children` are and drawn by the same bar —
+   * Players kept its three views when it moved down to the bottom bar, and
+   * they did not become a level of their own on the way. `childrenOf` answers
+   * for both, which is what stops `SectionNav` needing to know whether it is
+   * looking at a tab or a section.
+   */
+  children?: NavChild[];
+};
+
+/**
+ * Where you go to get more cards, declared once and used by BOTH boards that
+ * make you want them.
+ *
+ * It is not a peer of anything and it is not a page: a sheet presented over the
+ * app, so pressing it pushes `/packs` over whatever you were reading and
+ * closing it puts you back on THAT page. See `app/(app)/packs.tsx`.
+ *
+ * IT APPEARS TWICE ON PURPOSE. It used to have one home because Collection was
+ * a folder and the tray under it was the only place a round button could sit.
+ * With Collection and Sets separated, "I need more cards" is the next thought
+ * on both of them — a shop reachable from your cards but not from the set you
+ * are two cards short of would be missing from exactly the screen that sells
+ * hardest. One object, two doors, and the same sheet behind both.
+ *
+ * IT IS NOT A CHILD OF EITHER SECTION, and that is the difference between where
+ * it sits and where it USED to. As a `detached` child it was drawn by
+ * `SectionNav`, which meant a full row of chrome above the page holding one
+ * circle and nothing else — the tray beside it had gone empty when Collection
+ * stopped being a folder. It is drawn by the two pages now, on the right of
+ * their summary strip (`PacksButton`, `SummaryStrip.action`), so the row is
+ * gone and the button kept its size and its place at the top right.
+ *
+ * It stays declared HERE because everything else about it is still navigation:
+ * the rail resolves `/packs` to this label and glyph, and `isOverlayPath` reads
+ * `takeover` off it to know the sheet is mounted above the tabs.
+ */
+export const PACKS: NavChild = {
+  href: '/packs',
+  label: 'Packs',
+  icon: 'shop',
+  takeover: true,
+  detached: true,
 };
 
 export const FANTASY_SECTIONS: NavSection[] = [
   // No children: the scoreboard that used to be `/lineup/scores` is the Scores
   // tab now, so the section is one page again.
   { href: '/fantasy/lineup', label: 'Lineup', icon: 'lineup' },
-  {
-    href: '/fantasy/collection',
-    label: 'Collection',
-    icon: 'collection',
-    children: [
-      { href: '/fantasy/collection/inventory', label: 'Inventory', icon: 'inventory' },
-      /* No "Soon" badge, though Sets is a designed empty state until Week 3.
-         The badge cost the whole Collection bar 11pt of height — it was a third
-         line in a cell, so it stretched its two siblings with it and the strip
-         sat lower than every other section's. And it was saying, at 7pt, a
-         weaker version of what the page itself opens with: NOT BUILT YET, over
-         "Nothing to collect here yet", over PLANNED — Week 3. */
-      { href: '/fantasy/collection/sets', label: 'Sets', icon: 'sets' },
-      /* NOT a peer of the two above, and not a page. Packs are a sheet
-         presented over the app — the same `takeover` shape Search already
-         uses, so pressing this pushes `/packs` over whatever you were reading
-         and closing it puts you back on THAT page rather than on Inventory.
-         It keeps the slot Shop had because the question is unchanged: this
-         is still where you go to get more cards. See `app/(app)/packs.tsx`. */
-      { href: '/packs', label: 'Packs', icon: 'shop', takeover: true, detached: true },
-    ],
-  },
-  {
-    href: '/fantasy/players',
-    label: 'Players',
-    icon: 'players',
-    /* THE LANDING PAGE IS THE SECOND CHILD, not the first, and it is the only
-       section where that is true.
-
-       The rule below — first child shares the section's href — exists so there
-       is always a way back to the landing page, and it is satisfied by ANY
-       child pointing at it; being first was convention, not mechanism, and
-       `SectionNav` marks the active item by comparing paths rather than by
-       position. What the order carries instead is how the three read as a set:
-       find a player, see who moved, see who is best. Opening on Trend is a
-       separate decision from where Trend sits in that row, and forcing the two
-       to agree would mean landing on a search box — a page that shows you
-       nothing until you type. */
-    children: [
-      /* Not `/fantasy/players/search`: it is a full-screen takeover living
-         above the tab navigator, so its path is a root one. See
-         `app/(app)/search.tsx`. */
-      { href: '/search', label: 'Search', icon: 'search', takeover: true },
-      { href: '/fantasy/players', label: 'Trend', icon: 'trend' },
-      { href: '/fantasy/players/leaders', label: 'Leaders', icon: 'standings' },
-    ],
-  },
+  /* ONE PAGE, NOT A FOLDER. `/fantasy/collection` used to redirect to
+     `/fantasy/collection/inventory` and draw a tray switching between that and
+     Sets — a strip of navigation under a strip of navigation, to offer two
+     pages. The word means the cards you own, so the route simply IS them.
+     It has no children at all: Packs is drawn by the page. */
+  { href: '/fantasy/collection', label: 'Collection', icon: 'collection' },
+  /* Lifted out of Collection to sit beside it. A set is not a view of your
+     inventory — it is a thing you are working towards, with its own progress,
+     its own deadline and its own rewards — and burying it one level down put
+     the feature with the most to say behind a segmented control. */
+  { href: '/fantasy/sets', label: 'Sets', icon: 'sets' },
   /* No children, like Lineup. It had two — STANDINGS and SCORING — and the
      strip they produced cost every phone screen a permanent row of navigation
      to offer one board and one reference page you read once. The board itself
@@ -205,8 +224,35 @@ export const FANTASY_SECTIONS: NavSection[] = [
   },
 ];
 
+/**
+ * The three ways into the player pool, which came down from level 2 with it.
+ *
+ * THE TAB LANDS ON THE SECOND, not the first, and it is the only nav item in
+ * the app where that is true. The rule elsewhere — first child shares the
+ * parent's href — exists so there is always a way back to the landing page, and
+ * it is satisfied by ANY child pointing at it; being first was convention, not
+ * mechanism, and `SectionNav` marks the active item by comparing paths rather
+ * than by position. What the order carries instead is how the three read as a
+ * set: find a player, see who moved, see who is best. Opening on Trend is a
+ * separate decision from where Trend sits in that row, and forcing the two to
+ * agree would mean landing on a search box — a page that shows you nothing
+ * until you type.
+ */
+const PLAYER_VIEWS: NavChild[] = [
+  /* Not `/players/search`: it is a full-screen takeover living above the tab
+     navigator, so its path is a root one. See `app/(app)/search.tsx`. */
+  { href: '/search', label: 'Search', icon: 'search', takeover: true },
+  { href: '/players', label: 'Trend', icon: 'trend' },
+  { href: '/players/leaders', label: 'Leaders', icon: 'standings' },
+];
+
 export const NAV_TABS: NavTab[] = [
   { href: '/fantasy', label: 'Fantasy', icon: 'fantasy', sections: FANTASY_SECTIONS },
+  /* Next to Fantasy because the two are the game: your team, then everyone
+     else's players. It was the third board inside Fantasy and never sat right
+     there — the other three are all about YOUR week, and this one is the
+     league's whole pool. */
+  { href: '/players', label: 'Players', icon: 'players', children: PLAYER_VIEWS },
   /* The league's own week, rather than yours. It was a band across the top of
      the lineup until it had somewhere better to be; a page can hold the week
      picker and the per-game leaders that the band had no room for. */
@@ -227,9 +273,36 @@ export function routeNameOf(tab: NavTab): string {
   return tab.href.replace(/^\//, '');
 }
 
-/** A section's sub-pages, in order. `SectionNav` turns these into bar items. */
-export function childrenOf(sectionHref: string): NavChild[] {
-  return FANTASY_SECTIONS.find((s) => s.href === sectionHref)?.children ?? [];
+/**
+ * A section's or a tab's sub-pages, in order. `SectionNav` turns these into bar
+ * items.
+ *
+ * Both are asked because the bar is drawn the same way at either level — the
+ * Collection section and the Players tab each hand it an href and get their own
+ * children back, and neither has to know which list it lives in.
+ */
+export function childrenOf(href: string): NavChild[] {
+  const section = FANTASY_SECTIONS.find((s) => s.href === href);
+  if (section) return section.children ?? [];
+
+  return NAV_TABS.find((t) => t.href === href)?.children ?? [];
+}
+
+/**
+ * Every sub-page declared anywhere in the tree, plus the ones that hang off no
+ * bar at all.
+ *
+ * `PACKS` is the whole reason for the third term: it is a destination the rail
+ * lists and a takeover `isOverlayPath` must know about, and it is drawn by two
+ * pages rather than by anybody's nav — so it appears in no `children` array and
+ * walking the tree alone would miss it.
+ */
+function allChildren(): NavChild[] {
+  return [
+    ...FANTASY_SECTIONS.flatMap((s) => s.children ?? []),
+    ...NAV_TABS.flatMap((t) => t.children ?? []),
+    PACKS,
+  ];
 }
 
 /* ------------------------------------------------------------------------- *
@@ -240,7 +313,7 @@ export function childrenOf(sectionHref: string): NavChild[] {
  * the app's own file structure printed down the side of the window: to reach
  * Leaders you read "Fantasy", then "Players", then "Leaders" — three words to
  * name one board, two of which are not places you can be. `/fantasy` is a
- * redirect and `/fantasy/players` opens on Trend, so two of the rail's ranks
+ * redirect and `/players` opens on Trend, so two of the rail's ranks
  * were labels pretending to be destinations.
  *
  * WEB_NAV is the same app with the pretending removed: one flat list of the
@@ -308,7 +381,7 @@ type WebNavSpec = {
    *
    * Only Search needs it: it is a full-screen takeover mounted above the tab
    * navigator, so its path is the root-level `/search` rather than something
-   * under `/fantasy/players` — see `NavChild.takeover`.
+   * under `/players` — see `NavChild.takeover`.
    */
   also?: string[];
   /**
@@ -349,31 +422,33 @@ export type WebNavItem = WebNavSpec & { label: string; icon: WebNavIcon };
 
 const WEB_NAV_SPEC: WebNavSpec[] = [
   { href: '/fantasy/lineup' },
-  {
-    href: '/fantasy/collection/inventory',
-    match: '/fantasy/collection',
-    section: '/fantasy/collection',
-    measure: 'table',
-  },
-  /* Directly under Collection, because that is the question it answers — you
-     have just looked at what you own and the next thought is "get more". It is
-     still the sheet it is on a phone (see `(app)/_layout`), opened over the app
-     rather than navigated to; a rail row that opens a sheet is the same
-     bargain as a toolbar button that does, and the alternative — a second,
-     desktop-only packs PAGE — would be two implementations of one shop. */
+  /* TWO ROWS WHERE THERE WAS ONE FOLDED ONE. Collection and Sets used to be a
+     single row with the two of them as page tabs, which was the rail's way of
+     undoing a split the phone had forced. They are genuinely two boards now,
+     so the fold is gone and each says its own name — and the `measure` that
+     existed only to stop the folded page jumping width between its two tabs
+     goes with it, since each page is free to ask for its own again. */
+  { href: '/fantasy/collection' },
+  { href: '/fantasy/sets' },
+  /* Directly under the two boards that make you want more cards, which is the
+     question it answers. It is still the sheet it is on a phone (see
+     `(app)/_layout`), opened over the app rather than navigated to; a rail row
+     that opens a sheet is the same bargain as a toolbar button that does, and
+     the alternative — a second, desktop-only packs PAGE — would be two
+     implementations of one shop. */
   { href: '/packs' },
   {
-    href: '/fantasy/players',
-    section: '/fantasy/players',
+    href: '/players',
+    section: '/players',
     also: ['/search'],
     /* Both views already ask for `table`; naming it here is what stops the
        next one being added at a different width. */
     measure: 'table',
   },
   { href: '/fantasy/leaderboard' },
-  /* Last, and outside the five above it, because it is the only row that is
-     not about you: the other five are your lineup, your cards, your packs,
-     your pool and your rank, and this is the league's own week. */
+  /* Last, and outside the rest, because it is the only row that is not about
+     you: the others are your lineup, your cards, your sets, your packs, your
+     pool and your rank, and this is the league's own week. */
   { href: '/scores', spacedAbove: true },
 ];
 
@@ -392,19 +467,19 @@ const WEB_NAV_SPEC: WebNavSpec[] = [
  * the lookup with no casts and nothing to declare beside the href. Packs is the
  * only row that resolves to a child, and the only row needing the verb set.
  *
- * SECTIONS BEFORE CHILDREN, and the order is load-bearing: `/fantasy/players`
- * is both the Players SECTION and the href of its Trend child, and the rail row
- * must be captioned with the board's name rather than the view's.
+ * PARENTS BEFORE CHILDREN, and the order is load-bearing: `/players` is both
+ * the Players TAB and the href of its Trend child, and the rail row must be
+ * captioned with the board's name rather than the view's.
  */
 function resolveRow(key: string): { label: string; icon: WebNavIcon } {
   const section = FANTASY_SECTIONS.find((s) => s.href === key);
   if (section) return { label: section.label, icon: { set: 'tab', name: section.icon } };
 
-  const child = FANTASY_SECTIONS.flatMap((s) => s.children ?? []).find((c) => c.href === key);
-  if (child) return { label: child.label, icon: { set: 'action', name: child.icon } };
-
   const tab = NAV_TABS.find((t) => t.href === key);
   if (tab) return { label: tab.label, icon: { set: 'tab', name: tab.icon } };
+
+  const child = allChildren().find((c) => c.href === key);
+  if (child) return { label: child.label, icon: { set: 'action', name: child.icon } };
 
   /* Thrown at module load rather than papered over with a fallback. This is
      static data declared in this same file, so a miss is a typo that is wrong
@@ -472,16 +547,15 @@ function webNavItemFor(pathname: string): WebNavItem | undefined {
 export function webSectionOf(pathname: string): WebSection | null {
   const item = webNavItemFor(pathname);
   if (!item?.section) return null;
-  const section = FANTASY_SECTIONS.find((s) => s.href === item.section);
-  if (!section) return null;
-  const tabs = (section.children ?? [])
+  const label = resolveRow(item.section).label;
+  const tabs = childrenOf(item.section)
     .filter((child) => !child.detached)
     .map<WebPageTab>((child) => ({
       href: child.href,
       label: child.label,
       takeover: child.takeover,
     }));
-  return tabs.length > 1 ? { label: section.label, tabs, measure: item.measure } : null;
+  return tabs.length > 1 ? { label, tabs, measure: item.measure } : null;
 }
 
 /**
@@ -501,15 +575,15 @@ export function webSectionOf(pathname: string): WebSection | null {
  * rather than a fix to the matcher.
  *
  * Two sources, and both are named because neither can be derived from the
- * other: the takeovers are declared in FANTASY_SECTIONS above (`/packs`,
- * `/search`), and the profile sheets are declared as `Stack.Screen`s in
- * `(app)/_layout.tsx` and appear nowhere in this file's tree. If a fourth sheet
- * is added there, add it here.
+ * other: the takeovers are declared in the tree above (`/packs` under two
+ * sections, `/search` under the Players tab), and the profile sheets are
+ * declared as `Stack.Screen`s in `(app)/_layout.tsx` and appear nowhere in this
+ * file's tree. If a fourth sheet is added there, add it here.
  */
 const SHEET_PREFIXES = ['/player/', '/card/', '/set/'] as const;
 
 export function isOverlayPath(pathname: string): boolean {
-  const takeovers = FANTASY_SECTIONS.flatMap((s) => s.children ?? []).filter((c) => c.takeover);
+  const takeovers = allChildren().filter((c) => c.takeover);
   if (takeovers.some((c) => c.href === pathname)) return true;
   return SHEET_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }

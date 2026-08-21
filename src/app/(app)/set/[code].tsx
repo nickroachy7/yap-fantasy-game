@@ -41,7 +41,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-import { SetChecklist, type SetMember } from '@/components/collection/SetChecklist';
+import {
+  SetChecklist,
+  SetFilters,
+  type SetFilter,
+  type SetMember,
+} from '@/components/collection/SetChecklist';
 import {
   autofillSelection,
   fillWarning,
@@ -74,6 +79,19 @@ export default function SetChecklistScreen() {
   );
 
   const [members, setMembers] = useState<SetMember[] | null>(null);
+  /**
+   * Which slice of the set is on screen.
+   *
+   * IT LIVES HERE BECAUSE IT IS DRAWN TWICE. The row belongs above the grid,
+   * where it reads as the grid's control — but the grid is thirty cards deep
+   * and the sheet's bar is the only thing left on screen by the time you are
+   * looking at the ones that matter, so the same row appears there once its
+   * first copy has scrolled away. One piece of state, two rows; the checklist
+   * draws the one in flow and the frame draws the one in the bar.
+   */
+  const [filter, setFilter] = useState<SetFilter>('ALL');
+  /** Where that first row ends, reported by the checklist that drew it. */
+  const [filtersEnd, setFiltersEnd] = useState<number | undefined>(undefined);
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   /** Card ids ticked for the next submission. */
@@ -209,6 +227,15 @@ export default function SetChecklistScreen() {
          checklist is about something too, and was the last sheet opening as a
          plain dark panel while its siblings carried a colour. */
       tone={set ? setTone(set) : null}
+      /* Only once there is something to filter. A row of chips over an empty
+         sheet is furniture, and while the members are loading that is exactly
+         what it would be. */
+      pinned={
+        members && members.length > 0 ? (
+          <SetFilters members={members} filter={filter} onFilter={setFilter} />
+        ) : undefined
+      }
+      pinnedAt={filtersEnd}
       onClose={close}
       closeLabel="Close set checklist">
       {loading && members === null ? (
@@ -247,6 +274,9 @@ export default function SetChecklistScreen() {
             claimError={claimError}
             selected={selected}
             submitting={submitting}
+            filter={filter}
+            onFilter={setFilter}
+            onFiltersEnd={setFiltersEnd}
             onClaim={() => void claim()}
             onToggle={toggle}
             onQuickAdd={(member) => {

@@ -12,6 +12,7 @@
  * It owns no state and does no arithmetic beyond drawing: `complete` comes off
  * the server, and the ordering comes from `groupSets`. See `sets.ts`.
  */
+import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Gem } from '@/components/shell/AppHeader';
@@ -102,7 +103,7 @@ export function SetsList({
  * total in a cell whose label is "CLAIMED", so an even split has room and the
  * default is the honest choice.
  */
-export function SetsStrip({ stats }: { stats: SetsSummary }) {
+export function SetsStrip({ stats, action }: { stats: SetsSummary; action?: ReactNode }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const gold = TierColors[scheme].gold.accent;
@@ -146,7 +147,7 @@ export function SetsStrip({ stats }: { stats: SetsSummary }) {
     },
   ];
 
-  return <SummaryStrip cells={cells} />;
+  return <SummaryStrip cells={cells} action={action} />;
 }
 
 /**

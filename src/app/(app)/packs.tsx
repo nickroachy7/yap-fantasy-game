@@ -140,7 +140,7 @@ export default function PacksScreen() {
      a back gesture the player has no reason to expect. */
   const seeInventory = useCallback(() => {
     router.back();
-    router.push('/fantasy/collection/inventory');
+    router.push('/fantasy/collection');
   }, [router]);
 
   const pulledPositions = useMemo(() => (pulled ? countPositions(pulled) : []), [pulled]);

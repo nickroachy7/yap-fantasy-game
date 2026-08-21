@@ -6,7 +6,7 @@
  * entire app at once is most of what a sidebar is for. Half of that argument
  * was right and the other half was the mistake: what a reader wants to see at
  * once is every PLACE, and two of those three ranks were not places. `/fantasy`
- * is a redirect, `/fantasy/players` opens straight onto Trend, and neither row
+ * is a redirect, `/players` opens straight onto Trend, and neither row
  * could ever be the page you were on — so the rail spent two of its levels
  * naming folders, and reaching Leaders meant reading three words to arrive at
  * one board.

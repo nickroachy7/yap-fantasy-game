@@ -79,6 +79,8 @@
  * label — that is the cell to add back.
  */
 
+import type { ReactNode } from 'react';
+
 import { Gem } from '@/components/shell/AppHeader';
 import { TierMark } from '@/components/cards/TierMark';
 import { SummaryStrip, type SummaryCell } from '@/components/ui/SummaryStrip';
@@ -95,7 +97,14 @@ const TIER_WEIGHT = 0.8;
 const CARDS_WEIGHT = 1.2;
 const VALUE_WEIGHT = 2;
 
-export function CollectionSummary({ stats }: { stats: CollectionStats }) {
+export function CollectionSummary({
+  stats,
+  action,
+}: {
+  stats: CollectionStats;
+  /** Drawn beside the strip — the Packs button. See `SummaryStrip.action`. */
+  action?: ReactNode;
+}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const gold = TierColors[scheme].gold.accent;
 
@@ -155,5 +164,5 @@ export function CollectionSummary({ stats }: { stats: CollectionStats }) {
     },
   ];
 
-  return <SummaryStrip cells={cells} />;
+  return <SummaryStrip cells={cells} action={action} />;
 }

@@ -30,6 +30,7 @@ export type TabIconName =
   | 'leaderboard'
   | 'players'
   | 'collection'
+  | 'sets'
   | 'profile';
 
 export type TabIconProps = {
@@ -202,6 +203,30 @@ export function TabIcon({ name, color, focused, size = 24 }: TabIconProps) {
             <View
               key={i}
               style={[{ width: 7.5 * u, height: 7.5 * u, borderRadius: 2 * u }, skin]}
+            />
+          ))}
+        </View>
+      );
+
+    case 'sets':
+      /* THE COLLECTION GLYPH WITH ONE CELL ALREADY FILLED. A set is a
+         collection with a hole in it, and the hole is the whole point of the
+         screen — the same sentence the action bar's own `sets` glyph says, in
+         the same shapes, because the two rows now sit next to each other in the
+         rail and should read as a pair rather than as two unrelated marks.
+
+         Filled throughout when active, as every glyph here is: only one row of
+         the rail is ever active, so the state that has to tell Sets from
+         Collection is the resting one. */
+      return (
+        <View style={[box, styles.grid, { gap: 2.5 * u }]} accessibilityElementsHidden importantForAccessibility="no">
+          {[0, 1, 2, 3].map((i) => (
+            <View
+              key={i}
+              style={[
+                { width: 7.5 * u, height: 7.5 * u, borderRadius: 2 * u },
+                focused || i === 0 ? { backgroundColor: color } : skin,
+              ]}
             />
           ))}
         </View>
