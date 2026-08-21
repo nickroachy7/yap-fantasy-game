@@ -6,6 +6,11 @@
   "outputDirectory": "dist",
   "cleanUrls": true,
   "trailingSlash": false,
+  "rewrites": [
+    { "source": "/player/:id", "destination": "/player/[id]" },
+    { "source": "/card/:id", "destination": "/card/[id]" },
+    { "source": "/set/:code", "destination": "/set/[code]" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

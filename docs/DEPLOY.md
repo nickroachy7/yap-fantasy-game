@@ -125,3 +125,23 @@ the same product.
   the deploy is a static site with no server runtime.
 - `/preview` is the dev component gallery. It is emitted but inert outside
   development — guarded by `__DEV__`.
+
+## Dynamic routes need a rewrite
+
+`expo export` writes one HTML file per route, and a dynamic route becomes a file
+with the brackets still in the name: `dist/set/[code].html`, `player/[id].html`,
+`card/[id].html`. Nothing on a static host maps `/set/team-buf-2026` onto that
+file, so every one of those URLs answered **404 from Vercel** — not from the app.
+
+That is only invisible while the app is doing its own client-side routing.
+Opening a set from the list works, because no request is made; the moment a
+reader refreshes the page, opens a link someone sent them, or restores a tab,
+they get Vercel's 404 instead of the sheet.
+
+The `rewrites` block in `vercel.json` maps each pattern onto its bracketed file.
+The app reads the parameter out of the URL as it always did — the rewrite is
+invisible to it, and the browser's address bar keeps the real path.
+
+**Add a rewrite whenever a dynamic route is added.** There is no lint for this
+and the failure only shows on a hard load, which is not the way the route gets
+tested during development.
