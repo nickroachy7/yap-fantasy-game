@@ -279,6 +279,15 @@ export const TabBarContentHeight = 54;
  *
  * Below each number the window is the measure, so all three are inert on a
  * phone. Choosing per screen is the point; do not add a fourth without one.
+ *
+ * IT IS A PROPERTY OF THE SCREEN EXCEPT WHERE SCREENS SHARE A PAGE. On wide
+ * web the Collection's two views are tabs of one board, and they were asking
+ * for `grid` and `table` — so the page jumped ~240pt wider when you pressed
+ * Inventory, which reads as the layout breaking rather than as two screens
+ * with different needs. A folded board names ONE measure for all its views;
+ * see `WebNavSpec.measure`. The inventory is therefore a `table`-width grid on
+ * a desktop, which is a real cost (a column or so) knowingly paid for a page
+ * that does not resize under the reader.
  */
 export const ContentMeasure = {
   grid: 1180,
@@ -293,6 +302,26 @@ export const MaxContentWidth = ContentMeasure.grid;
 
 /** The wide-web sidebar's width, shared so layout arithmetic can subtract it. */
 export const RailWidth = 236;
+
+/**
+ * The fill of the wide-web CHROME — the rail down the left and the score band
+ * across the top.
+ *
+ * It lived as a private `BAND` constant inside `Sidebar` while the rail was the
+ * only chrome there was. It is shared now because the two pieces have to be the
+ * SAME value or they stop reading as one frame around the page: a header a
+ * shade off the rail it meets at the corner draws a seam diagonally across the
+ * top-left of the window, which is the one place a seam has nothing to divide.
+ *
+ * Fixed rather than themed, like the rail always was. The app is dark-only
+ * today (see `use-color-scheme`); when that changes this becomes a pair.
+ *
+ * It sits between `background` (#000) and `surfaceSheet` (#0E1013) on purpose —
+ * near enough the sheet value that chrome and sheets feel related, far enough
+ * off #000 that the page it frames is plainly the darker, deeper thing.
+ */
+export const ChromeBand = '#0E0F12';
+
 
 /* ------------------------------------------------------------------------- *
  * Sheets

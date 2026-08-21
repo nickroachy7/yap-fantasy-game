@@ -4,25 +4,45 @@
  *
  * Every tab uses this so the chrome cannot drift between screens.
  */
-import type { ReactNode } from 'react';
+import { usePathname } from 'expo-router';
+import { useMemo, useState, type ReactNode } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppHeader } from '@/components/shell/AppHeader';
 import { useFrame } from '@/components/shell/frame';
+import { isOverlayPath, webSectionOf } from '@/components/shell/sections';
 import { useIsWide } from '@/components/shell/useResponsive';
+import { WebPageTabs } from '@/components/shell/WebPageTabs';
 import { Colors, ContentMeasure, Spacing, type Measure } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 type Props = {
-  /** Page name, e.g. "Leaderboard". Rendered as the page heading on wide web. */
+  /**
+   * Page name, e.g. "Leaderboard". Rendered as the page heading on wide web.
+   *
+   * OVERRIDDEN ON WIDE WEB FOR A FOLDED BOARD, and that is the one piece of
+   * magic in this component. Inventory passes "Inventory" and Sets passes
+   * "Sets" because on a phone those ARE the two pages. On web they are two
+   * views of Collection reached from one rail row, so the heading names the
+   * board and the tabs beneath it name the view — printing "Inventory" above a
+   * row whose first tab also says "Inventory" would say the same word twice
+   * and leave the board itself unnamed anywhere on the screen.
+   *
+   * `webSectionOf` decides, from the path alone, so no page had to be told it
+   * had been folded; a page moved between sections keeps working either way,
+   * exactly as with `useFrame`.
+   */
   title?: string;
   /**
    * How wide this screen's content wants to be. A grid of cards and a settings
    * form are not the same kind of page and should not share a measure — see
-   * ContentMeasure. Defaults to `grid` because the collection is the screen
-   * the width was reclaimed for.
+   * ContentMeasure. Defaults to `grid`, the widest, so a screen that says
+   * nothing gets the window rather than a reading measure.
    */
   measure?: Measure;
+  /* Also overridden on wide for a folded board — see `WebNavSpec.measure`. The
+     views of one board have to agree about how wide the page is, or switching
+     tabs looks like the layout breaking. */
   /**
    * Secondary line under the page heading, e.g. "Preseason · Week 3".
    *
@@ -34,31 +54,36 @@ type Props = {
   context?: string;
   /**
    * A full-bleed band pinned between the chrome and the page, outside the
-   * scroll.
+   * scroll. NARROW ONLY.
+   *
+   * It is a slot on the frame rather than the first child of `children`
+   * because of where it has to sit, and that is not expressible from inside
+   * the content box: FLUSH against the bottom of the masthead, with no page
+   * gutter and no content gap. Passed as content it inherited
+   * `styles.content`'s 16pt padding and 14pt gap, so it floated below the
+   * header with a stripe of page background above it and read as the first
+   * item on the page rather than as part of the chrome.
+   *
+   * Outside the ScrollView on purpose: a band here is the state of the week,
+   * so it must not scroll away from the decision it is context for.
+   *
+   * THERE WAS A WIDE PRESENTATION AND IT IS DELETED. It put the band across
+   * the top of the page above the heading, bleeding past the frame's wide
+   * gutter and the `maxWidth` measure so it read as a ticker rather than as
+   * another boxed panel. That was right while the top of a browser window was
+   * empty. It is not any more: `WebHeader` puts a permanent score band there,
+   * so anything in this slot landed directly underneath another full-bleed
+   * band — which the shell gallery demonstrated by drawing the ticker twice,
+   * one under the other, the day the header shipped.
+   *
+   * A wide band is still a reasonable thing to want. It belongs beside the
+   * header in `(tabs)/_layout`, where it can be mounted once for the session
+   * and can sit ABOVE or beside the scoreboard rather than being a second
+   * stripe under it. Do not restore this branch to get one.
    *
    * NOTHING IN THE PRODUCT PASSES ONE TODAY. `ScoreStrip` was the band this
-   * slot was built for, and the scoreboard has a tab of its own now — so the
-   * only thing exercising it is the shell gallery, which still draws the strip
-   * in this slot because the placement is the part worth being able to look at.
-   * Kept rather than deleted: the geometry below is the hard-won half, and the
-   * next band (a live-week banner, a lock warning) will want exactly it.
-   *
-   * It is a slot on the frame rather than the first child of `children` because
-   * of where it has to sit, which is different on each platform and is not
-   * expressible from inside the content box:
-   *
-   *  - narrow: FLUSH against the bottom of the header, with no page gutter
-   *    and no content gap. Passed as content it inherited `styles.content`'s
-   *    16pt padding and 14pt gap, so it floated below the header with a stripe
-   *    of page background above it and read as the first item on the page
-   *    rather than as part of the chrome.
-   *  - wide: across the top of the page, above the heading, running the full
-   *    width of the content column — past both the frame's wide gutter and the
-   *    `maxWidth` measure, which is what makes it a ticker rather than another
-   *    boxed panel.
-   *
-   * Outside the ScrollView on purpose: it is the state of the week, so it must
-   * not scroll away from the decision it is context for.
+   * slot was built for and the scoreboard has its own tab; the shell gallery
+   * is the only caller left.
    */
   banner?: ReactNode;
   children: ReactNode;
@@ -66,6 +91,17 @@ type Props = {
   scroll?: boolean;
   refreshing?: boolean;
   onRefresh?: () => void;
+  /**
+   * Dev galleries only, and the third of these in the shell — `Sidebar` and
+   * `FantasyTopNav` carry the same prop for the same reason.
+   *
+   * The wide heading now depends on the ROUTE (see `title`), and a gallery
+   * route matches no nav href, so the folded-board case — the heading naming
+   * the board with its views as tabs beneath — was the one arrangement in the
+   * shell that could not be looked at. Product code passes nothing and uses
+   * the real router.
+   */
+  pathnameOverride?: string;
 };
 
 export function Screen({
@@ -77,8 +113,8 @@ export function Screen({
   scroll = true,
   refreshing,
   onRefresh,
+  pathnameOverride,
 }: Props) {
-  const maxWidth = ContentMeasure[measure];
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   // The sidebar already shows the wordmark, balance and account on wide web;
@@ -100,6 +136,48 @@ export function Screen({
    */
   const frame = useFrame();
   const flush = frame.nav && !isWide;
+
+  /* Null on a page that is a page in its own right, and on every phone: the
+     narrow build still navigates these with the action bar and has no heading
+     for tabs to sit under. */
+  const realPathname = usePathname();
+  const routed = pathnameOverride ?? realPathname;
+
+  /**
+   * The last path that was a PAGE, so a sheet opened over this one cannot
+   * change what this one says it is.
+   *
+   * `usePathname` reports the top of the stack, and the sheets are mounted
+   * above the tab navigator with the page beneath still rendered — so opening
+   * Packs from Players re-titled the page behind the dialog from "Players" to
+   * "Trend", dropped its view tabs and re-measured it, then put all three back
+   * on close. See `isOverlayPath`, which is also where the rail's opposite and
+   * correct behaviour is argued.
+   *
+   * State set DURING RENDER, which is React's own pattern for "something from
+   * the previous render" and not the mistake it looks like: React discards the
+   * output and re-runs this component immediately, before committing or
+   * touching the DOM, so the extra pass costs one render of one component at
+   * the moment a sheet opens. A ref adjusted in place would be cheaper and is
+   * what this was first written as — `react-hooks/refs` rejects it, correctly:
+   * a ref read during render is invisible to React, so nothing guarantees the
+   * page re-renders when the value changes back.
+   */
+  const [lastPage, setLastPage] = useState(routed);
+  const overlaid = isOverlayPath(routed);
+  if (!overlaid && routed !== lastPage) setLastPage(routed);
+  const pathname = overlaid ? lastPage : routed;
+  /* Memoised on the path: this returns a fresh object with a fresh `tabs`
+     array every call, and `Screen` re-renders once a second on the lineup
+     while the lock counts down. */
+  const section = useMemo(
+    () => (isWide ? webSectionOf(pathname) : null),
+    [isWide, pathname],
+  );
+  /** The board's name where there is one, else the page's own. See `title`. */
+  const heading = section?.label ?? title;
+  /** The board's width where there is one, else the page's own. See `measure`. */
+  const maxWidth = ContentMeasure[section?.measure ?? measure];
 
   const body = scroll ? (
     <ScrollView
@@ -124,22 +202,27 @@ export function Screen({
       style={[styles.fill, isWide && styles.wideGutter, { backgroundColor: c.background }]}>
       {isWide ? (
         <>
-          {/* Across the top of the page, before the heading. The negative
-              margin cancels the frame's wide gutter so the band reaches the
-              rail on one side and the window on the other; capped at the
-              measure it would be a panel with the page's shoulders around it,
-              which is the one thing a ticker must not look like. */}
-          {banner ? <View style={styles.wideBanner}>{banner}</View> : null}
+          {/* No `banner` here — the slot is narrow-only, see the prop. */}
           {/* Dropping AppHeader on wide is right — the rail already carries the
            * wordmark, balance and account. But what replaced it was a 12pt grey
            * context line and nothing else, so web pages had no heading at all and
            * "Leaderboard" appeared only on a segmented control. The rail says
            * which section you are in; the page should still say what it is. */}
           <View style={[styles.pageHeader, { maxWidth }]}>
-            {title ? <Text style={[styles.title, { color: c.text }]}>{title}</Text> : null}
-            {context ? (
-              <Text style={[styles.context, { color: c.textSecondary }]}>{context}</Text>
-            ) : null}
+            <View style={styles.titleBlock}>
+              {heading ? (
+                <Text style={[styles.title, { color: c.text }]}>{heading}</Text>
+              ) : null}
+              {context ? (
+                <Text style={[styles.context, { color: c.textSecondary }]}>{context}</Text>
+              ) : null}
+            </View>
+            {/* Under the heading rather than beside it. Beside it was tried and
+                puts a control on the optical centre line of a 26pt title, which
+                reads as part of the title; under it the tabs sit on the page's
+                own baseline and the hairline they carry becomes the edge
+                between the chrome and the content. */}
+            {section ? <WebPageTabs tabs={section.tabs} pathname={pathname} /> : null}
           </View>
         </>
       ) : (
@@ -165,9 +248,6 @@ export function Screen({
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   wideGutter: { paddingHorizontal: Spacing.three },
-  /* Cancels `wideGutter`. Inert on narrow, where the frame has no gutter to
-     give back and the banner is already flush. */
-  wideBanner: { marginHorizontal: -Spacing.three },
   content: {
     padding: Spacing.three,
     gap: 14,
@@ -178,10 +258,17 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
     paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.four,
+    /* 20 rather than the 24 it was: there is a band of chrome directly above
+       the page now, so the heading no longer has to hold the top of the window
+       open on its own. */
+    paddingTop: 20,
     paddingBottom: Spacing.two,
-    gap: 2,
+    gap: Spacing.two + 2,
   },
+  /* The title and its context line are one block with the old 2pt between
+     them; the `gap` above is now the larger space between that block and the
+     view tabs. */
+  titleBlock: { gap: 2 },
   title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.4 },
   context: { fontSize: 12, letterSpacing: 0.3 },
   flexContent: {

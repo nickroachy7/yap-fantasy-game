@@ -6,6 +6,7 @@ import { NAV_TABS, routeNameOf } from '@/components/shell/sections';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { TabIcon } from '@/components/shell/TabIcon';
 import { useIsWide } from '@/components/shell/useResponsive';
+import { WebHeader } from '@/components/shell/WebHeader';
 import { Colors, SheetCorner, TabBarContentHeight } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -59,6 +60,17 @@ export default function TabsLayout() {
     <View style={[styles.shell, isWide && styles.shellWide, { backgroundColor: c.background }]}>
       {isWide ? <Sidebar /> : null}
       <View style={styles.content}>
+        {/* Mounted HERE, above the navigator, for the same reason `FantasyFrame`
+            draws the phone's masthead above its own: chrome rendered by a
+            screen is chrome that is torn down and rebuilt every time you change
+            screen. For a ticker that costs a refetch of the week's fixtures on
+            every click and — more visibly — resets its horizontal scroll, so
+            scrolling to Sunday night and then opening Collection would put you
+            back at Thursday. Mounted once, it simply keeps its place.
+
+            Narrow renders nothing: a phone cannot spend 62pt of a 812pt screen
+            on chrome, which is why the scoreboard is a tab there. */}
+        {isWide ? <WebHeader /> : null}
         <Tabs
           /**
            * Back returns to the tab you CAME FROM, not to the first one.

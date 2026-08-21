@@ -650,6 +650,22 @@ function GalleryBody() {
     <View style={[styles.shell, isWide && styles.shellWide, { backgroundColor: c.background }]}>
       {isWide ? <Sidebar pathnameOverride={VIEW_PATH[view]} /> : null}
       <View style={styles.content}>
+        {/* The wide chrome, in the arrangement `(tabs)/_layout` builds it: the
+            score band across the top of the content column, meeting the rail at
+            the top-left corner. Reproduced here rather than by rendering
+            `WebHeader` itself, which reads the network for the live week — the
+            joint worth looking at is where the two fills meet, and a fixture
+            week shows it without a session. */}
+        {isWide ? (
+          <ScoreStrip
+            games={GALLERY_GAMES}
+            week="Pre Wk 3"
+            startersByTeam={GALLERY_STARTERS_BY_TEAM}
+            loading={false}
+            chrome
+            alwaysShow
+          />
+        ) : null}
         {/* The narrow chrome, in the arrangement `FantasyFrame` builds it: the
             masthead, then the strip, then the page. Reproduced here rather than
             by rendering the frame itself because the frame reads the router and
@@ -671,12 +687,22 @@ function GalleryBody() {
           title={VIEW_TITLE[view]}
           measure={VIEW_MEASURE[view]}
           context="Preseason · Week 3"
+          /* What makes the FOLDED heading inspectable: on a real route the
+             collection views draw as tabs under the word "Collection", and a
+             gallery route matches no nav href. Same escape hatch the rail and
+             the top nav already take. */
+          pathnameOverride={VIEW_PATH[view]}
           /* The score band, in the slot the lineup screen puts it in. This is
              the whole reason it is a slot on the frame: it renders flush under
              the header on a phone and across the top of the page on the web,
              and neither placement is reachable from inside the content box.
              Only on the lineup view, which is the only screen that has one. */
           banner={
+            /* The slot is narrow-only now — `Screen` simply does not render it
+               on wide, since the window grew a permanent score band of its own
+               (see above). No `isWide` guard here: this gallery exists to
+               exercise the real component, and a caller working around a rule
+               the component already enforces hides whether it still does. */
             view === 'lineup' ? (
               <ScoreStrip
                 games={GALLERY_GAMES}

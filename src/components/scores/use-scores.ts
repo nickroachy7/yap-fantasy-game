@@ -49,30 +49,50 @@ export type SeasonSchedule = {
 };
 
 /**
- * The season the competition is currently in, per `current_slate()`.
+ * The slate the competition is currently in, per `current_slate()`.
  *
- * Every screen that needs it was making its own round trip for a number that
+ * Every screen that needs it was making its own round trip for a value that
  * changes a few times a year, and on the trend board that trip was load-bearing
  * in the worst way: until it landed the screen used the fallback season, so a
  * revisit asked `useSeasonSchedule` for the wrong season for one render and
  * missed the cache it was about to hit. Peeking it removes both costs.
  *
+ * IT KEEPS THE WHOLE ROW NOW, not just the season. It cached only
+ * `data[0].season` and threw the week away, so the wide-web score band — which
+ * wants exactly the week the RPC just named — would have had to make a second
+ * identical call for the two fields this one had already fetched and discarded.
+ * The season accessors below are unchanged in behaviour and read through it.
+ *
  * Null means the RPC returned nothing — the caller's own fallback applies. That
  * is a real answer and is cached; only a thrown read is retried.
  */
-const currentSeason = sessionCache<'now', number | null>(async () => {
+const currentSlate = sessionCache<'now', Slate | null>(async () => {
   const { data, error } = await supabase.rpc('current_slate');
   if (error) throw new Error(error.message);
-  return (data as { season: number }[] | null)?.[0]?.season ?? null;
+  const row = (data as { season: number; season_type: number; week: number }[] | null)?.[0];
+  return row ? { season: row.season, seasonType: row.season_type, week: row.week } : null;
 });
 
 export function loadCurrentSeason(): Promise<number | null> {
-  return currentSeason.read('now').catch(() => null);
+  return currentSlate.read('now').then((s) => s?.season ?? null).catch(() => null);
 }
 
 /** The season IF it has already landed. Never starts a read. */
 export function peekCurrentSeason(): number | null {
-  return currentSeason.peek('now') ?? null;
+  return currentSlate.peek('now')?.season ?? null;
+}
+
+/**
+ * The current slate, as a hook, for chrome that is mounted for the whole
+ * session rather than for one screen.
+ *
+ * Null while it is in flight AND when the RPC has nothing to say — the two are
+ * deliberately not distinguished, because the one caller (`WebHeader`) draws
+ * the same thing either way: a band with no fixtures in it. A screen that needs
+ * to tell "loading" from "offseason" apart should read the cache directly.
+ */
+export function useCurrentSlate(): Slate | null {
+  return useSessionRead(currentSlate, 'now').value ?? null;
 }
 
 type Schedule = { games: ScoreGame[]; slates: Slate[]; teams: Map<string, ScoreTeam> };
