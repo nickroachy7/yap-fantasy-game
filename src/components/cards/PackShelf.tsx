@@ -23,6 +23,7 @@
  * does not currently keep.
  */
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Gem } from '@/components/shell/AppHeader';
 import {
@@ -167,6 +168,10 @@ export function PackShelf({
  * cheapest possible second purchase. `Open another` is the same act made
  * deliberate: one tap further away, and it says what it does.
  */
+/** How far apart the cards land, and how long each takes. See `PullResult`. */
+const REVEAL_STAGGER_MS = 55;
+const REVEAL_MS = 240;
+
 export function PullResult({
   pulled,
   silverAt,
@@ -196,9 +201,35 @@ export function PullResult({
 
   return (
     <>
+      {/**
+        * DEALT, NOT PRINTED.
+        *
+        * All eight used to arrive in the same frame, which is the one moment in
+        * this app where that is the wrong answer: opening a pack is the reward,
+        * and a reward that appears as a finished table reads as a query result.
+        * The stagger costs nothing and buys the only thing missing — a sense
+        * that the cards are being turned over one at a time.
+        *
+        * SMALL NUMBERS ON PURPOSE. 55ms apart and 240ms each puts the last card
+        * of an eight-card pack down just under 0.7s, which is short enough that
+        * nobody waits on it and long enough to read as dealing. This is the
+        * beta's version of the moment, not the finished one — the full reveal
+        * is its own piece of work.
+        *
+        * `entering` only, no exit: the result is replaced wholesale by the
+        * shelf when you open another, and animating cards out would delay the
+        * next pack behind an animation about the last one.
+        *
+        * Reanimated's entering animations are already used in product code (see
+        * `ui/collapsible`), so this adds no dependency and nothing new to learn.
+        */}
       <View style={styles.grid}>
-        {pulled.map((p) => (
-          <PlayerCard key={p.card_instance_id} model={toModel(p)} size="grid" />
+        {pulled.map((p, i) => (
+          <Animated.View
+            key={p.card_instance_id}
+            entering={FadeInDown.delay(i * REVEAL_STAGGER_MS).duration(REVEAL_MS)}>
+            <PlayerCard model={toModel(p)} size="grid" />
+          </Animated.View>
         ))}
       </View>
 
