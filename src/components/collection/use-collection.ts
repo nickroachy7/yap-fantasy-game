@@ -36,7 +36,8 @@
  * Pull-to-refresh also invalidates, because a refresh the user ASKED for that
  * returns a cached answer is not a refresh.
  */
-import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { sessionCache } from '@/lib/session-cache';
@@ -105,10 +106,17 @@ export function useCollection(): CollectionState {
      same rows. See `lib/session-cache`. */
   const [cards, setCards] = useState<CollectionCard[] | null>(() => collection.peek('mine') ?? null);
 
+  /* The cache version these rows came from. See the focus effect below. */
+  const seen = useRef(collection.version('mine'));
+
   const load = useCallback<Load>(async (live) => {
+    /* Captured BEFORE the await: an invalidation that lands mid-read must not
+       be credited to the answer we are about to store, or it goes unnoticed. */
+    const at = collection.version('mine');
     try {
       const rows = await collection.read('mine');
       if (!live()) return;
+      seen.current = at;
       setCards(rows);
     } catch (e) {
       return e instanceof Error ? e.message : 'Could not load your collection.';
@@ -116,6 +124,33 @@ export function useCollection(): CollectionState {
   }, []);
 
   const { loading, refreshing, error, refresh } = useLoader(load);
+
+  /**
+   * CATCH UP ON THE WAY BACK IN.
+   *
+   * `invalidateCollection()` drops the cached rows, and that is enough for a
+   * screen that has to mount — but the collection lives in a tab, and a tab
+   * stays MOUNTED once visited. So opening a pack from a Collection you had
+   * already looked at invalidated a cache nobody re-read: the grid held the
+   * state it was in before the pack, and the new cards were missing until the
+   * app was restarted or the grid pulled by hand. The invalidation was never
+   * the missing piece; something had to act on it.
+   *
+   * The guard is what keeps this cheap, and it compares VERSIONS rather than
+   * asking whether the cache still holds a value. Those are not the same
+   * question: another screen calling `reload()` invalidates and immediately
+   * re-reads, which leaves a full cache that this mounted screen has still
+   * never seen. An ordinary tab switch moves no version and costs nothing.
+   *
+   * `cards !== null` keeps the first mount out of it: `useLoader` is already
+   * reading then, and while a second call would be deduped by the in-flight map
+   * it would still raise `refreshing` under a grid that has yet to draw.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      if (cards !== null && seen.current !== collection.version('mine')) void refresh();
+    }, [cards, refresh]),
+  );
 
   /* Pull-to-refresh must reach the server. It is also the user's own escape
      hatch from a stale grid if some future mutation forgets to invalidate. */

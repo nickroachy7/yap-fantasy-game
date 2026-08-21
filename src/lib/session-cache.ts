@@ -37,6 +37,21 @@ export type SessionCache<K extends string, V> = {
   peek: (key: K) => V | undefined;
   /** Forget one key, or the whole cache. The next read goes to the network. */
   invalidate: (key?: K) => void;
+  /**
+   * A number that changes whenever `key` is invalidated, and never otherwise.
+   *
+   * This exists because dropping a cached value does NOT reach a screen that is
+   * already mounted, and in a tab navigator most screens are. A mounted hook
+   * holds its rows in its own state; invalidating the cache leaves that state
+   * exactly where it was. So a screen needs a way to ask "has anything happened
+   * since I last read?" on the way back in, and comparing values cannot answer
+   * it — a cache that was invalidated and then immediately re-read (which is
+   * what a `reload()` from another screen does) looks identical to one that was
+   * never touched.
+   *
+   * Monotonic, so a comparison is always safe.
+   */
+  version: (key: K) => number;
 };
 
 export function sessionCache<K extends string, V>(
@@ -44,6 +59,9 @@ export function sessionCache<K extends string, V>(
 ): SessionCache<K, V> {
   const inFlight = new Map<string, Promise<V>>();
   const settled = new Map<string, V>();
+  /** Per-key invalidation counts, plus a whole-cache one. Both only rise. */
+  const bumps = new Map<string, number>();
+  let epoch = 0;
 
   return {
     read(key) {
@@ -67,12 +85,17 @@ export function sessionCache<K extends string, V>(
     },
     invalidate(key) {
       if (key === undefined) {
+        epoch += 1;
         inFlight.clear();
         settled.clear();
         return;
       }
+      bumps.set(key, (bumps.get(key) ?? 0) + 1);
       inFlight.delete(key);
       settled.delete(key);
+    },
+    version(key) {
+      return epoch + (bumps.get(key) ?? 0);
     },
   };
 }

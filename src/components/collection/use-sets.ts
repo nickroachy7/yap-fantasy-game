@@ -21,7 +21,8 @@
  * rows for the 2026 pool and it grows only when a family is added — never with
  * the size of a collection. PostgREST's silent 1000-row cap is nowhere near.
  */
-import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { sessionCache } from '@/lib/session-cache';
@@ -70,10 +71,16 @@ export function useSets(): SetsState {
      spinner. See `lib/session-cache`. */
   const [rows, setRows] = useState<CardSet[] | null>(() => sets.peek('mine') ?? null);
 
+  /* The cache version these rows came from. See the focus effect below. */
+  const seen = useRef(sets.version('mine'));
+
   const load = useCallback<Load>(async (live) => {
+    /* Captured before the await — see `useCollection` for why. */
+    const at = sets.version('mine');
     try {
       const next = await sets.read('mine');
       if (!live()) return;
+      seen.current = at;
       setRows(next);
     } catch (e) {
       return e instanceof Error ? e.message : 'Could not load your sets.';
@@ -81,6 +88,25 @@ export function useSets(): SetsState {
   }, []);
 
   const { loading, refreshing, error, refresh } = useLoader(load);
+
+  /**
+   * CATCH UP ON THE WAY BACK IN. Same reasoning as `useCollection`, and the
+   * same symptom the other way round: committing cards to a set from the set's
+   * own screen changes the progress on the sets LIST, and the list is a tab
+   * that stays mounted. Going "back to the sets page" therefore showed the
+   * progress from before the commit.
+   *
+   * It compares VERSIONS, not whether the cache still holds a value — the set
+   * screen's own `reload()` invalidates and immediately re-reads, so the cache
+   * is full again by the time the tab is focused while this instance's rows are
+   * still the ones from before the commit. An ordinary tab switch moves no
+   * version and costs nothing.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      if (rows !== null && seen.current !== sets.version('mine')) void refresh();
+    }, [rows, refresh]),
+  );
 
   /* Pull-to-refresh must reach the server. It is also the player's own escape
      hatch from a stale list if some future mutation forgets to invalidate. */
@@ -94,7 +120,13 @@ export function useSets(): SetsState {
      control as well would say the whole page is reloading when one row is. */
   const reload = useCallback(async () => {
     invalidateSets();
-    await sets.read('mine').then(setRows, () => undefined);
+    const at = sets.version('mine');
+    await sets.read('mine').then((next) => {
+      /* This instance is now current for that version. Without this the screen
+         that just claimed would re-read itself once more on its next focus. */
+      seen.current = at;
+      setRows(next);
+    }, () => undefined);
   }, []);
 
   return {
