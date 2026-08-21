@@ -53,17 +53,36 @@ begin
   select count(*) into v_before from public.sweep_log;
 
   ------------------------------------------------- 1. a slate that is standing down
-  -- Push the week safely into the future first, so the stand-down branch is
-  -- exercised from a known state rather than from whatever today happens to be.
+  -- MOVING THE WEEK UNDER TEST IS NOT ENOUGH, and assuming it was is what broke
+  -- this suite the minute preseason week 3 kicked off. `current_slate()` picks
+  -- the LATEST week whose first kickoff has passed — any week, not this one — so
+  -- pushing only the week under test into the future simply hands the slate to
+  -- whichever other week happens to be live, and the sweep correctly swept it.
+  -- The suite then reported that as a failure of the stand-down branch.
+  --
+  -- So every fixture is cleared out of the window first, and the week under test
+  -- is put back in the past as a FINISHED week: kicked off eight days ago, all
+  -- final. That is the one state where a slate exists (`first_kick <= now()`)
+  -- and nothing about it is live — final, and well outside `slate_is_live`'s
+  -- six-hour correction window.
+  update public.games set starts_at = now() + interval '10 days';
+
   update public.games
-     set starts_at = now() + interval '10 days'
+     set starts_at = now() - interval '8 days', status_state = 'final'
    where season = v_season and season_type = v_type and week = v_week;
 
   v_ret := public.gameday_sweep();
 
   select * into v_row from public.sweep_log order by id desc limit 1;
-  if v_row.outcome not in ('stood_down','no_slate') then
-    raise exception 'FAIL 1: a slate 10 days out should not sweep, got %', v_row.outcome;
+  -- 'stood_down' exactly, not "either of the two quiet outcomes". The state is
+  -- now built rather than inherited, so there IS a slate and 'no_slate' would
+  -- mean `current_slate()` had stopped seeing a week that has kicked off.
+  if v_row.outcome <> 'stood_down' then
+    raise exception 'FAIL 1: a finished slate should stand down, got %', v_row.outcome;
+  end if;
+  if v_row.week is distinct from v_week then
+    raise exception 'FAIL 1: stood down on week % but the slate under test is %',
+      v_row.week, v_week;
   end if;
   if v_row.duration_ms is null then
     raise exception 'FAIL 1: a stand-down must still be timed';
@@ -71,8 +90,12 @@ begin
   raise notice 'PASS 1: standing down is recorded, not silent (outcome=%)', v_row.outcome;
 
   ----------------------------------------------------------- 2. a live slate sweeps
+  -- `status_state` is set back as well as the clock. Step 1 marked this week
+  -- final, and while a kickoff 30 minutes ago would still read as live through
+  -- `slate_is_live`'s six-hour correction window, that would be testing the
+  -- correction window rather than a live slate. A game in progress says 'in'.
   update public.games
-     set starts_at = now() - interval '30 minutes'
+     set starts_at = now() - interval '30 minutes', status_state = 'in'
    where season = v_season and season_type = v_type and week = v_week;
 
   select * into v_slate from public.current_slate();
@@ -142,6 +165,67 @@ begin
   raise notice 'PASS 4: sweep still returned % with the log rejecting inserts', v_ret;
 
   alter table public.sweep_log drop constraint sweep_log_break;
+end;
+$$;
+
+-- ---- 5. the table is ops-only, and by TWO mechanisms ------------------------
+--
+-- `sweep_log` is the operator's record of what the sweep did. Nothing in `src/`
+-- reads it and nothing should, so it carries no grant to anon or authenticated
+-- AND — since 20260821110000 — RLS with no policies underneath.
+--
+-- The two are asserted SEPARATELY, the same way `view_security` does it, and
+-- for the same reason: a test that only ever checks them together cannot say
+-- which one is load-bearing. Step 5b hands the grant back inside this
+-- (rolled-back) transaction, so the only thing left standing is RLS.
+do $$
+declare
+  v_rls   boolean;
+  v_grant integer;
+  v_n     integer;
+begin
+  ------------------------------------------------------------ 5a. both layers
+  select relrowsecurity into v_rls
+    from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relname = 'sweep_log';
+
+  if not v_rls then
+    raise exception 'FAIL 5a: sweep_log has RLS disabled — the grant is the only thing holding';
+  end if;
+
+  -- No policies is the intent, not an oversight: RLS with none denies every
+  -- role subject to it, which is exactly what an ops-only table wants.
+  select count(*) into v_n from pg_policies
+   where schemaname = 'public' and tablename = 'sweep_log';
+  if v_n <> 0 then
+    raise exception 'FAIL 5a: sweep_log has % polic(ies) — it is meant to have none', v_n;
+  end if;
+
+  select count(*) into v_grant
+    from information_schema.role_table_grants
+   where table_schema = 'public' and table_name = 'sweep_log'
+     and grantee in ('anon', 'authenticated');
+  if v_grant <> 0 then
+    raise exception 'FAIL 5a: sweep_log carries % grant(s) to anon/authenticated', v_grant;
+  end if;
+  raise notice 'PASS 5a: sweep_log has RLS on, no policies, and no client grants';
+
+  ------------------------------------------- 5b. RLS holds without the grant
+  -- Hand `authenticated` SELECT back deliberately. If a future migration does
+  -- this by accident — which the posture doc warns is the recurring failure —
+  -- RLS is the only thing between the operator's log and every signed-in user.
+  grant select on public.sweep_log to authenticated;
+
+  set local role authenticated;
+  select count(*) into v_n from public.sweep_log;
+  reset role;
+
+  if v_n <> 0 then
+    raise exception
+      'FAIL 5b: authenticated read % row(s) with SELECT granted — RLS is NOT holding on its own', v_n;
+  end if;
+  raise notice 'PASS 5b: with SELECT granted back, authenticated still sees 0 rows';
+
   raise notice 'ALL SWEEP LOG ASSERTIONS PASSED';
 end;
 $$;

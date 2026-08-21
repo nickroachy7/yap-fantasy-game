@@ -47,6 +47,27 @@ where c.season = 2026 and p.position_abbreviation = 'QB'
   and c.id not in (select card_id from public.card_instances)
 order by c.id limit 1;
 
+-- ---- two weeks of this suite's own -----------------------------------------
+--
+-- THE SUITE USED TO NAME REAL PRESEASON WEEKS — locked week 1, open week 3 —
+-- with a comment recording when each kicked off. That is a test with an expiry
+-- date on it, and it expired: preseason week 3 locked at 2026-08-21 00:00Z, so
+-- from that minute "the open week" was shut and six of the seven assertions
+-- below became unreachable behind a lock error. It failed for a reason that had
+-- nothing to do with `set_lineup`.
+--
+-- `week_lock_time` is `min(starts_at)` over the week's games and nothing else,
+-- so a week IS its kickoff times. Two synthetic weeks — one kicked off, one
+-- still ahead — give this suite both states it needs and pin them relative to
+-- `now()`, which is what stops the calendar deciding whether the tests run.
+-- Weeks 92 and 93 are far outside any real slate.
+--
+-- No teams: `home_team_id` and `visitor_team_id` are nullable, and the only
+-- column that matters here is `starts_at`.
+insert into public.games (external_id, season, week, season_type, starts_at, status_state)
+values (993001, 2026, 93, 1, now() - interval '2 days', 'final'),
+       (993002, 2026, 92, 1, now() + interval '7 days', 'scheduled');
+
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}';
 
@@ -59,9 +80,10 @@ declare
   foreign_qb constant uuid := 'bbbbbbbb-1111-0000-0000-00000000000b';
   v_lineup uuid; v_slots int; v_lineups int; blocked int := 0;
 
-  -- preseason wk1 kicked off 2026-08-07 (locked); wk3 starts 2026-08-21 (open)
-  locked_week   constant int := 1;
-  open_week     constant int := 3;
+  -- This suite's own weeks, inserted above and pinned to now(): 93 kicked off
+  -- two days ago, 92 kicks off in a week. Never real weeks — see the note there.
+  locked_week   constant int := 93;
+  open_week     constant int := 92;
 begin
   select ci.id into qb  from public.card_instances ci join public.cards c on c.id=ci.card_id join public.players p on p.id=c.player_id where ci.user_id=a and p.position_abbreviation='QB' order by ci.id limit 1;
   select ci.id into rb1 from public.card_instances ci join public.cards c on c.id=ci.card_id join public.players p on p.id=c.player_id where ci.user_id=a and p.position_abbreviation='RB' order by ci.id limit 1;

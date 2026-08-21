@@ -23,7 +23,12 @@ export function Panel({
   hint?: string;
   /** Right-aligned control on the title row — a tab set, a toggle. */
   action?: ReactNode;
-  children: ReactNode;
+  /**
+   * Optional: a panel may be nothing but its heading. The leaderboard's
+   * "Standings" title sits above a list that draws its own bled rows, so there
+   * is a heading to render and no body to put in a surface.
+   */
+  children?: ReactNode;
   /** False when the child draws its own edges (a full-bleed table). */
   inset?: boolean;
 }) {

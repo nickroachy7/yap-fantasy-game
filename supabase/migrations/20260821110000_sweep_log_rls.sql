@@ -1,0 +1,77 @@
+-- Row level security on `sweep_log`, which is the ONE table in `public` that
+-- did not have it.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THE ADVISOR SAID, AND WHAT WAS ACTUALLY TRUE
+-- ---------------------------------------------------------------------------
+--
+-- Supabase's advisor flags this table `rls_disabled` at CRITICAL, with its
+-- standard wording: "fully exposed to the anon and authenticated roles — anyone
+-- with the anon key can read or modify every row."
+--
+-- That wording is generic and, for this table, it was wrong. `sweep_log` has
+-- never been readable by anybody holding the publishable key, because
+-- 20260819200000 ends with
+--
+--     revoke all on public.sweep_log from anon, authenticated;
+--
+-- and a role with no SELECT privilege gets `permission denied for table
+-- sweep_log` whether or not RLS is on. Verified rather than assumed: as `anon`,
+-- both a SELECT and an INSERT return `insufficient_privilege` today.
+--
+-- ---------------------------------------------------------------------------
+-- SO WHY CHANGE ANYTHING
+-- ---------------------------------------------------------------------------
+--
+-- Because one mechanism is not the posture this project claims to have. From
+-- `docs/security-posture.md`:
+--
+--   * "Supabase's default privileges grant anon and authenticated everything
+--     created in public. Anything that should be narrower has to be revoked
+--     explicitly. This has now produced two findings — assume it will produce
+--     a third."
+--   * "A comment claiming a surface is unreachable is not a mechanism. Assert
+--     it, or it is a hope."
+--
+-- The revoke is a single point of failure of exactly the kind that document
+-- says keeps failing: it is one statement, in one migration, that a later
+-- `grant select on all tables in schema public` — or a hand-run grant during
+-- an incident — silently undoes, with nothing underneath it. Every other table
+-- in `public` carries RLS as the layer beneath the grant. This one now does
+-- too, and `sweep_log.test.sql` asserts BOTH layers separately, including the
+-- case where the grant is handed back.
+--
+-- ---------------------------------------------------------------------------
+-- WHY THERE ARE NO POLICIES, AND WHY THAT IS THE WHOLE POINT
+-- ---------------------------------------------------------------------------
+--
+-- RLS with no policies denies everything to every role that is subject to it.
+-- That is precisely the intent here: no client has ever read this table, none
+-- should, and `src/` contains no reference to it beyond the generated types.
+-- A policy would be inventing an access path nothing has asked for.
+--
+-- Nothing that legitimately touches the table is subject to RLS:
+--
+--   * `gameday_sweep()` is SECURITY DEFINER and owned by `postgres`, which is
+--     also the table's OWNER — and an owner bypasses its own table's RLS. The
+--     sweep keeps logging.
+--   * `service_role` and `postgres` both hold BYPASSRLS, so the dashboard, psql
+--     and the runbook's queries are unaffected.
+--   * `sweep_health` is `security_invoker=on` over this table and is itself
+--     revoked from anon and authenticated, so its only callers are the two
+--     roles above.
+--
+-- NOT `force row level security`. Forcing would subject the OWNER to these
+-- (non-existent) policies, which would stop `gameday_sweep` writing its own log
+-- — turning a hardening change into an outage on the one table whose absence of
+-- rows is the alarm.
+
+alter table public.sweep_log enable row level security;
+
+-- Restated rather than assumed. This is idempotent, and it puts the grant layer
+-- and the RLS layer in the same migration so neither can be read as the whole
+-- story on its own.
+revoke all on public.sweep_log from anon, authenticated;
+
+comment on table public.sweep_log is
+  'One row per gameday_sweep tick. Outlives pg_net''s 6h TTL and pg_cron''s return_message, which records only "1 row". Ops-only: RLS is enabled with NO policies and the table is revoked from anon and authenticated, so it is reachable exclusively by the sweep itself (definer, owner) and by BYPASSRLS roles. Do not add a policy — see 20260821110000_sweep_log_rls.sql.';

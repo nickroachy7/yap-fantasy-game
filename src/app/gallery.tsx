@@ -51,7 +51,22 @@ import { UsagePanel } from '@/components/players/UsagePanel';
 import { parseProfile } from '@/components/players/profile';
 import { ScoreStrip } from '@/components/scores/ScoreStrip';
 import type { ScoreGame, ScoreTeam } from '@/components/scores/scoreboard';
+import { BoardRow } from '@/components/leaderboard/BoardRow';
+import { Podium } from '@/components/leaderboard/Podium';
+import { YourRow } from '@/components/leaderboard/YourRow';
+import { standingRows } from '@/components/leaderboard/PointsBoard';
+import type { Standing } from '@/components/leaderboard/board';
+import {
+  BOARD_META,
+  buildBoard,
+  withTopTier,
+  type BoardId,
+  type CommunityBoardId,
+  type CommunityData,
+} from '@/components/leaderboard/community';
 import { Panel } from '@/components/ui/Panel';
+import { BoardControls } from '@/components/leaderboard/BoardControls';
+import { MenuButton, MenuHeading, MenuItem } from '@/components/ui/MenuButton';
 import { Tabs } from '@/components/ui/Tabs';
 import { Screen } from '@/components/shell/Screen';
 import { SegmentedControl, type Segment } from '@/components/shell/SegmentedControl';
@@ -60,7 +75,7 @@ import { FantasyTopNav } from '@/components/shell/FantasyTopNav';
 import { FrameProvider } from '@/components/shell/frame';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { WIDE_BREAKPOINT, useIsWide } from '@/components/shell/useResponsive';
-import { Colors, Spacing, Type, type Measure } from '@/constants/theme';
+import { Colors, Spacing, Type, type CardTier, type Measure } from '@/constants/theme';
 import { PlayerContext, type PlayerState } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -266,30 +281,182 @@ function InventoryFixture() {
   );
 }
 
-const BOARD = [
-  { rank: 1, name: 'nickroachy', points: 312.4, weeks: 3 },
-  { rank: 2, name: 'dmb', points: 298.1, weeks: 3 },
-  { rank: 3, name: 'a_very_long_display_name', points: 271.8, weeks: 3 },
-  { rank: 4, name: 'kp', points: 245.0, weeks: 2 },
-  { rank: 5, name: 'sarah', points: 233.9, weeks: 3 },
+/**
+ * The five community boards, drawn by the REAL table.
+ *
+ * This fixture used to be a hand-rolled row list — a rank, a name and a number
+ * in styles that existed only here. That contradicted the gallery's whole
+ * premise: the point is to look at the components that ship, and a mock of a
+ * table tells you nothing about the table. It also could not answer the
+ * questions these boards actually raise — whether the tier column survives at
+ * 52pt, whether a two-line card row stays legible next to a one-line manager
+ * row, whether the widest display name in the fixture pushes the numbers off a
+ * phone.
+ *
+ * `MEID` is nickroachy's row on every board, so the "you" tint and the YOU word
+ * are visible here rather than only for whoever is signed in.
+ */
+const MEID = 'fixture-me';
+
+/* The mark each manager's row wears — their best held card. Real boards read it
+   from `board_top_tiers`; here it is fixed so all four tiers are on screen. */
+const SCOPE_FIXTURE = [
+  { value: 'season', label: 'Season' },
+  { value: '3', label: 'Pre 3' },
+  { value: '2', label: 'Pre 2' },
+  { value: '1', label: 'Pre 1' },
+];
+
+const FIXTURE_TIERS = new Map<string, CardTier>([
+  ['u2', 'diamond'],
+  [MEID, 'gold'],
+  ['u3', 'silver'],
+  ['u4', 'bronze'],
+  ['u5', 'bronze'],
+]);
+
+const BOARD_FIXTURES: Record<CommunityBoardId, CommunityData> = {
+  week: {
+    id: 'week',
+    rows: [
+      { rank: 1, user_id: 'u2', display_name: 'dmb', week: 2, points: 148.2, weeks_played: 3 },
+      { rank: 2, user_id: MEID, display_name: 'nickroachy', week: 3, points: 141.7, weeks_played: 3 },
+      { rank: 3, user_id: 'u3', display_name: 'a_very_long_display_name', week: 1, points: 139.0, weeks_played: 3 },
+      { rank: 4, user_id: 'u4', display_name: 'kp', week: 3, points: 122.4, weeks_played: 2 },
+      { rank: 5, user_id: 'u5', display_name: 'sarah', week: 2, points: 96.5, weeks_played: 3 },
+    ],
+  },
+  record: {
+    id: 'record',
+    rows: [
+      { rank: 1, user_id: 'u2', display_name: 'dmb', wins: 3, losses: 0, ties: 0, weeks: 3, win_pct: 1, points: 298.1 },
+      { rank: 2, user_id: MEID, display_name: 'nickroachy', wins: 2, losses: 0, ties: 1, weeks: 3, win_pct: 0.833, points: 312.4 },
+      { rank: 3, user_id: 'u5', display_name: 'sarah', wins: 1, losses: 1, ties: 1, weeks: 3, win_pct: 0.5, points: 233.9 },
+      { rank: 4, user_id: 'u3', display_name: 'a_very_long_display_name', wins: 1, losses: 2, ties: 0, weeks: 3, win_pct: 0.333, points: 271.8 },
+      { rank: 5, user_id: 'u4', display_name: 'kp', wins: 0, losses: 2, ties: 0, weeks: 2, win_pct: 0, points: 245 },
+    ],
+  },
+  collection: {
+    id: 'collection',
+    rows: [
+      { rank: 1, user_id: 'u2', display_name: 'dmb', value_gems: 1864, held: 61, players: 54, gold_plus: 9, diamond: 1, career_fp: 1240.5 },
+      { rank: 2, user_id: MEID, display_name: 'nickroachy', value_gems: 1208, held: 74, players: 66, gold_plus: 5, diamond: 0, career_fp: 980.2 },
+      { rank: 3, user_id: 'u3', display_name: 'a_very_long_display_name', value_gems: 742, held: 38, players: 35, gold_plus: 3, diamond: 0, career_fp: 610 },
+      { rank: 4, user_id: 'u5', display_name: 'sarah', value_gems: 416, held: 29, players: 27, gold_plus: 1, diamond: 0, career_fp: 305.4 },
+      // A shelf that has never been started: FP is an em dash, not a zero.
+      { rank: 5, user_id: 'u4', display_name: 'kp', value_gems: 96, held: 12, players: 12, gold_plus: 0, diamond: 0, career_fp: 0 },
+    ],
+  },
+  cards: {
+    id: 'cards',
+    rows: [
+      { rank: 1, card_instance_id: 'c1', user_id: 'u2', display_name: 'dmb', player_id: 'p1', player_name: 'Josh Allen', position_abbreviation: 'QB', team_abbreviation: 'BUF', tier: 'diamond', career_fp: 2612.4, lineup_starts: 31, fp_per_start: 84.3 },
+      { rank: 2, card_instance_id: 'c2', user_id: MEID, display_name: 'nickroachy', player_id: 'p2', player_name: 'Christian McCaffrey', position_abbreviation: 'RB', team_abbreviation: 'SF', tier: 'gold', career_fp: 1188, lineup_starts: 14, fp_per_start: 84.9 },
+      { rank: 3, card_instance_id: 'c3', user_id: 'u5', display_name: 'sarah', player_id: 'p3', player_name: "Ja'Marr Chase", position_abbreviation: 'WR', team_abbreviation: 'CIN', tier: 'gold', career_fp: 902.5, lineup_starts: 12, fp_per_start: 75.2 },
+      { rank: 4, card_instance_id: 'c4', user_id: MEID, display_name: 'nickroachy', player_id: 'p4', player_name: 'Travis Kelce', position_abbreviation: 'TE', team_abbreviation: 'KC', tier: 'silver', career_fp: 411.8, lineup_starts: 9, fp_per_start: 45.8 },
+      { rank: 5, card_instance_id: 'c5', user_id: 'u4', display_name: 'kp', player_id: 'p5', player_name: 'Harrison Butker', position_abbreviation: 'PK', team_abbreviation: 'KC', tier: 'bronze', career_fp: 96, lineup_starts: 8, fp_per_start: 12 },
+    ],
+  },
+  sets: {
+    id: 'sets',
+    rows: [
+      { rank: 1, user_id: MEID, display_name: 'nickroachy', rungs: 13, sets: 4, completed: 3, dailies: 11, burned: 42, gems: 790 },
+      { rank: 2, user_id: 'u2', display_name: 'dmb', rungs: 9, sets: 3, completed: 1, dailies: 24, burned: 31, gems: 1240 },
+      { rank: 3, user_id: 'u5', display_name: 'sarah', rungs: 4, sets: 2, completed: 0, dailies: 6, burned: 14, gems: 300 },
+      { rank: 4, user_id: 'u3', display_name: 'a_very_long_display_name', rungs: 2, sets: 1, completed: 0, dailies: 3, burned: 8, gems: 150 },
+      // Cards burnt, no rung reached yet — the row the union in board_sets exists for.
+      { rank: 5, user_id: 'u4', display_name: 'kp', rungs: 0, sets: 0, completed: 0, dailies: 1, burned: 3, gems: 40 },
+    ],
+  },
+};
+
+/**
+ * The points board's own rows, which no other fixture exercises.
+ *
+ * It is the board the screen opens on and the only one carrying a MOVEMENT
+ * mark, so a fixture set that stopped at the five community boards left the
+ * default view unchecked. All four movement states are here — up, down, held
+ * and new — because they are four different glyphs and the one that is easy to
+ * get wrong is `NEW`, which must not read as a rise of zero.
+ */
+const POINTS_FIXTURE: Standing[] = [
+  { userId: 'u2', name: 'dmb', rank: 1, points: 312.4, weeksPlayed: 3, seasonRank: 1, avg: 104.1, best: { week: 2, points: 148.2, rank: 1 }, movement: 2, weekly: [] },
+  { userId: MEID, name: 'nickroachy', rank: 2, points: 298.1, weeksPlayed: 3, seasonRank: 2, avg: 99.4, best: { week: 3, points: 141.7, rank: 2 }, movement: -1, weekly: [] },
+  { userId: 'u3', name: 'a_very_long_display_name', rank: 3, points: 271.8, weeksPlayed: 3, seasonRank: 3, avg: 90.6, best: { week: 1, points: 139, rank: 3 }, movement: 0, weekly: [] },
+  { userId: 'u4', name: 'kp', rank: 4, points: 245, weeksPlayed: 2, seasonRank: 4, avg: 122.5, best: { week: 3, points: 122.4, rank: 4 }, movement: null, weekly: [] },
+  // Nothing scored yet: the derived columns are dashes, not zeroes.
+  { userId: 'u5', name: 'sarah', rank: 5, points: 0, weeksPlayed: 0, seasonRank: 5, avg: null, best: null, movement: null, weekly: [] },
 ];
 
 function LeaderboardFixture() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  const [id, setId] = useState<BoardId>('cards');
+
+  const points = id === 'points';
+  const [scope, setScope] = useState('season');
+  // One metadata table for all six boards now — no fixture copy to drift.
+  const meta = BOARD_META[id];
+  // Preseason, so the week board reads "Pre 3" rather than "Wk 3".
+  const built = points
+    ? withTopTier(standingRows(POINTS_FIXTURE, 'season', 1, true), FIXTURE_TIERS)
+    : buildBoard(BOARD_FIXTURES[id], 1, { scheme, topTiers: FIXTURE_TIERS });
 
   return (
-    <View style={styles.rows}>
-      {BOARD.map((r) => (
-        <View key={r.rank} style={[styles.row, { borderColor: c.backgroundElement }]}>
-          <Text style={[styles.rank, { color: c.textSecondary }]}>{r.rank}</Text>
-          <Text numberOfLines={1} style={[styles.rowName, { color: c.text }]}>
-            {r.name}
-          </Text>
-          <Text style={[styles.rowMeta, { color: c.textSecondary }]}>{r.weeks} wks</Text>
-          <Text style={[styles.rowPoints, { color: c.text }]}>{r.points.toFixed(1)}</Text>
-        </View>
-      ))}
+    <View style={styles.board}>
+      {/* The product's own control row, not a harness one — the fixture is here
+          to show what the screen looks like, and the pickers are part of that.
+          Points gets a second chip, exactly as `PointsBoard` gives it one. */}
+      <View style={styles.boardControls}>
+        <BoardControls board={id} onBoardChange={setId}>
+          {points ? (
+            <MenuButton
+              text={scope === 'season' ? 'SZN' : `P${scope}`}
+              label="Week"
+              active={scope !== 'season'}>
+              {(close) => (
+                <>
+                  <MenuHeading>Week</MenuHeading>
+                  {SCOPE_FIXTURE.map((o) => (
+                    <MenuItem
+                      key={o.value}
+                      label={o.label}
+                      selected={o.value === scope}
+                      onPress={() => {
+                        setScope(o.value);
+                        close();
+                      }}
+                    />
+                  ))}
+                </>
+              )}
+            </MenuButton>
+          ) : null}
+        </BoardControls>
+      </View>
+      <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>{meta.blurb}</Text>
+      <Podium rows={built} meId={MEID} />
+
+      {/* Pinned above the list on every real board. Drawn here so the fixture
+          shows the whole board, not only its list. */}
+      <YourRow
+        row={built.find((r) => r.userId === MEID) ?? null}
+        field={built.length}
+        absent="You are not on this board yet."
+        unit={meta.unit}
+        title={id === 'cards' ? 'Your best card' : 'Where you stand'}
+      />
+
+      <Panel title="Standings" hint={`${built.length} ranked`} />
+
+      {/* Bled past the gallery Screen's own 16pt padding, because the real
+          boards bleed past the list's — otherwise this fixture would show a
+          narrower row than the product draws. */}
+      <View style={styles.boardRows}>
+        {built.map((row) => (
+          <BoardRow key={row.key} row={row} isMe={row.userId === MEID} unit={meta.unit} />
+        ))}
+      </View>
     </View>
   );
 }
@@ -547,6 +714,11 @@ const styles = StyleSheet.create({
   profile: { gap: Spacing.three },
   sheetButton: { alignSelf: 'flex-start' },
   pressed: { opacity: 0.6 },
+  board: { gap: 14 },
+  boardIntro: { gap: 2 },
+  boardRows: { marginHorizontal: -Spacing.three },
+  /* The control row draws its own gutter, as it does in the product. */
+  boardControls: { marginHorizontal: -Spacing.three },
   rows: { gap: 1 },
   row: {
     flexDirection: 'row',

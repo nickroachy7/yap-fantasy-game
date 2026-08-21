@@ -1313,6 +1313,83 @@ export type Database = {
         }
         Returns: Json
       }
+      board_best_week: {
+        Args: { p_limit?: number; p_season: number; p_season_type?: number }
+        Returns: {
+          display_name: string
+          points: number
+          rank: number
+          user_id: string
+          week: number
+          weeks_played: number
+        }[]
+      }
+      board_cards: {
+        Args: { p_limit?: number; p_position?: string; p_season?: number }
+        Returns: {
+          card_instance_id: string
+          career_fp: number
+          display_name: string
+          fp_per_start: number
+          lineup_starts: number
+          player_id: string
+          player_name: string
+          position_abbreviation: string
+          rank: number
+          team_abbreviation: string
+          tier: Database["public"]["Enums"]["card_tier"]
+          user_id: string
+        }[]
+      }
+      board_collection: {
+        Args: { p_limit?: number; p_season?: number }
+        Returns: {
+          career_fp: number
+          diamond: number
+          display_name: string
+          gold_plus: number
+          held: number
+          players: number
+          rank: number
+          user_id: string
+          value_gems: number
+        }[]
+      }
+      board_record: {
+        Args: { p_limit?: number; p_season: number; p_season_type?: number }
+        Returns: {
+          display_name: string
+          losses: number
+          points: number
+          rank: number
+          ties: number
+          user_id: string
+          weeks: number
+          win_pct: number
+          wins: number
+        }[]
+      }
+      board_sets: {
+        Args: { p_limit?: number }
+        Returns: {
+          burned: number
+          completed: number
+          dailies: number
+          display_name: string
+          gems: number
+          rank: number
+          rungs: number
+          sets: number
+          user_id: string
+        }[]
+      }
+      board_top_tiers: {
+        Args: never
+        Returns: {
+          tier: Database["public"]["Enums"]["card_tier"]
+          user_id: string
+        }[]
+      }
       card_profile: { Args: { p_card_instance_id: string }; Returns: Json }
       claim_set_reward: { Args: { p_set_code: string }; Returns: Json }
       commit_candidate: { Args: { p_card_id: string }; Returns: string }

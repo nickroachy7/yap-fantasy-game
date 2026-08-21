@@ -1,277 +1,159 @@
 /**
- * The global board. One board, no leagues and no friend lists in the beta.
+ * The global board. One community, no leagues and no friend lists in the beta.
  *
- * The screen is built on one observation: `leaderboard()` takes a week, and
- * `lineups` is RLS-scoped to its owner, so a per-week RPC call is the ONLY way
- * a client can learn anything about anyone else's week. Paying for one call per
- * scored week turns four columns of nothing into average, best week, movement,
- * per-week rank and a week-by-week breakdown — with no new SQL.
+ * SIX BOARDS, NOT ONE, and the reason is that a single points board answers one
+ * question and settles early. By week four the top is decided, the bottom half
+ * has no reason to open the screen, and everything else the game asks of a
+ * player — pulling cards, tiering one up, burning thirty into a set, beating the
+ * median with a squad that started late — produces a number nothing compares.
  *
- * Loading is therefore two-phase. The season board renders as soon as it lands;
- * the week boards enrich it a moment later. Until they do, the derived columns
- * show an em dash rather than a wrong number, and movement shows unknown rather
- * than "new".
+ * Each board ranks what a different part of the game actually produces:
+ *
+ *   Points      season and per-week fantasy points. The original board.
+ *   Best week   the single highest week anybody has posted.
+ *   Record      W-L-T against the field's median — the contest already played.
+ *   Collection  what a shelf would sell for.
+ *   Cards       the best individual COPY in the game, and who holds it.
+ *   Sets        rungs claimed, sets finished, cards burnt getting there.
+ *
+ * WHY IN-PAGE STATE RATHER THAN ROUTES. These are six views of one subject: a
+ * route per board would put six entries in the back stack for what is a glance
+ * sideways, and would make the phone's back gesture walk the reader through
+ * boards they were only flicking past.
+ *
+ * WHY A DROPDOWN AND NOT A STRIP OF TABS. It WAS a strip of tabs, and it was
+ * the exact mistake `FantasyTopNav` documents: "if they ever converge on the
+ * same treatment, the page grows two identical strips again and the reader has
+ * to work out which is which by trying them." A word with a rule under it is
+ * that file's treatment, drawn one row above this. Points had three of them
+ * stacked — section nav, boards, weeks.
+ *
+ * It was also too many for a strip. `DropdownChip`'s own note is the argument:
+ * a row of peers "become a horizontally scrolling strip where the option you
+ * want is usually off-screen". At 375pt exactly that happened — Sets sat past
+ * the right edge with nothing to say the row scrolled, so two of the six boards
+ * were undiscoverable on a phone. The grid shows all six at once.
+ *
+ * WHY THE STRIP IS PINNED while the week tabs inside the points board scroll
+ * away with the content. They are different ranks of control: this one says
+ * WHICH BOARD you are reading and has to stay reachable from row two hundred;
+ * the week tabs filter the board you are already on.
+ *
+ * THE SLATE IS READ HERE, ONCE. Every board needs the same season and season
+ * type, so six boards each calling `current_slate()` would be six round trips
+ * for one answer — and two boards could disagree about the week across a
+ * rollover. It is read once and handed down.
  */
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
-import {
-  BOARD_LIMIT,
-  buildStandings,
-  fetchWeekBoards,
-  normaliseEntries,
-  slateLabel,
-  weekTabLabel,
-  type Entry,
-  type Scope,
-  type Slate,
-  type WeekBoards,
-} from '@/components/leaderboard/board';
-import { Podium } from '@/components/leaderboard/Podium';
-import { StandingsHeader, StandingsRow, boardColumns } from '@/components/leaderboard/StandingsRow';
-import { WeekBreakdown } from '@/components/leaderboard/WeekBreakdown';
-import { YourStanding } from '@/components/leaderboard/YourStanding';
+import { CommunityBoard } from '@/components/leaderboard/CommunityBoard';
+import { PointsBoard } from '@/components/leaderboard/PointsBoard';
+import { slateLabel, type Slate } from '@/components/leaderboard/board';
+import type { BoardId } from '@/components/leaderboard/community';
 import { Screen } from '@/components/shell/Screen';
-import { useIsWide, useTabBarInset } from '@/components/shell/useResponsive';
-import { Panel } from '@/components/ui/Panel';
-import { Tabs, type Tab } from '@/components/ui/Tabs';
-import { Colors, Spacing, Type } from '@/constants/theme';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
 
 // Fallback only — the live slate comes from current_slate().
 const SEASON = 2026;
 
-/** Stable identity so the memos below do not recompute on every render. */
-const NO_WEEKS: WeekBoards = [];
-
 export default function LeaderboardScreen() {
   const { session } = useAuth();
   const meId = session?.user.id ?? null;
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  const isWide = useIsWide();
-  const tabInset = useTabBarInset();
 
   const [slate, setSlate] = useState<Slate | null>(null);
-  const [entries, setEntries] = useState<Entry[] | null>(null);
-  /** Null means "not fetched yet", which is not the same as "no scored weeks". */
-  const [weeks, setWeeks] = useState<WeekBoards | null>(null);
-  const [scope, setScope] = useState('season');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [board, setBoard] = useState<BoardId>('points');
 
-  const loadedSlate = useRef<string | null>(null);
-
-  // Loading is two-phase, so a slow pull-to-refresh can land after a fast one.
-  // `live()` is the token that keeps the older response from winning.
+  // Follow whatever slate is actually being played. Hardcoding season_type 2
+  // (regular season) made the board render empty for the whole preseason
+  // validation window, which reads as "the leaderboard is broken".
   const load = useCallback<Load>(async (live) => {
-    // Follow whatever slate is actually being played. Hardcoding season_type 2
-    // (regular season) made the board render empty for the whole preseason
-    // validation window, which reads as "the leaderboard is broken".
-    const slateRes = await supabase.rpc('current_slate');
+    const { data, error } = await supabase.rpc('current_slate');
     if (!live()) return;
-    if (slateRes.error) return slateRes.error.message;
-    const current = (slateRes.data as Slate[] | null)?.[0] ?? null;
-    const season = current?.season ?? SEASON;
-    const seasonType = current?.season_type ?? 2;
-
-    const boardRes = await supabase.rpc('leaderboard', {
-      p_season: season,
-      p_season_type: seasonType,
-      p_week: undefined, // omitted -> SQL default null -> season to date
-      p_limit: BOARD_LIMIT,
-    });
-    if (!live()) return;
-    if (boardRes.error) return boardRes.error.message;
-
-    setSlate(current);
-    setEntries(normaliseEntries(boardRes.data as Entry[] | null));
-
-    // Discard the week detail only when the SLATE itself moved. A pull to
-    // refresh should not blank every derived column for a round trip.
-    const key = `${season}:${seasonType}`;
-    if (loadedSlate.current !== key) {
-      loadedSlate.current = key;
-      setWeeks(null);
-    }
-
-    const boards = await fetchWeekBoards(season, seasonType, current?.week ?? 0);
-    if (!live()) return;
-    setWeeks(boards);
+    if (error) return error.message;
+    setSlate((data as Slate[] | null)?.[0] ?? null);
   }, []);
 
-  const { refreshing, error, refresh } = useLoader(load);
+  const { loading, error, reload, refresh } = useLoader(load);
 
+  const season = slate?.season ?? SEASON;
   const seasonType = slate?.season_type ?? 2;
-  const boards = weeks ?? NO_WEEKS;
-  /** False until the week boards land — the difference between "—" and "NEW". */
-  const detailKnown = weeks !== null;
-  const latestWeek = boards.length > 0 ? boards[boards.length - 1].week : null;
 
-  // Derived rather than corrected in state: a refresh that briefly empties the
-  // week boards must not silently throw away the tab the user chose.
-  const activeScope: Scope = useMemo(() => {
-    if (scope === 'season') return 'season';
-    const week = Number(scope);
-    return boards.some((b) => b.week === week) ? week : 'season';
-  }, [scope, boards]);
+  /** Handed to each board so a pull-to-refresh re-reads the slate as well. */
+  const refreshSlate = useCallback(async () => {
+    await refresh();
+  }, [refresh]);
 
-  const rows = useMemo(
-    () => buildStandings(activeScope, entries ?? [], boards),
-    [activeScope, entries, boards],
-  );
-  const columns = useMemo(
-    () => boardColumns(activeScope, isWide, seasonType, latestWeek),
-    [activeScope, isWide, seasonType, latestWeek],
-  );
-  const fieldByWeek = useMemo(
-    () => new Map(boards.map((b) => [b.week, b.entries.length] as const)),
-    [boards],
-  );
-  const me = useMemo(() => rows.find((r) => r.userId === meId) ?? null, [rows, meId]);
-
-  const tabs = useMemo<Tab<string>[]>(
-    () => [
-      { value: 'season', label: 'Season', hint: entries ? String(entries.length) : undefined },
-      // Newest first: the week you want is almost always the last one played.
-      ...[...boards].reverse().map((b) => ({
-        value: String(b.week),
-        label: weekTabLabel(seasonType, b.week),
-        hint: String(b.entries.length),
-      })),
-    ],
-    [entries, boards, seasonType],
+  const headerContext = useMemo(
+    () =>
+      [
+        slate ? `${slateLabel(slate.season_type)} ${slate.season}` : `${SEASON} season`,
+        slate?.week ? `Week ${slate.week}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    [slate],
   );
 
-  const scopeLabel =
-    activeScope === 'season' ? 'Season to date' : weekTabLabel(seasonType, activeScope);
-
-  const headerContext = [
-    slate ? `${slateLabel(slate.season_type)} ${slate.season}` : `${SEASON} season`,
-    slate?.week ? `Week ${slate.week}` : null,
-    entries ? `${entries.length} ranked` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-
-  // Everything that changes a row's appearance without changing `rows`.
-  const listExtra = useMemo(
-    () => ({ expandedId, columns, detailKnown, meId }),
-    [expandedId, columns, detailKnown, meId],
-  );
-
-  const listHeader = (
-    <View style={styles.head}>
-      {/* One lone "Season" tab is chrome, not a choice. */}
-      {boards.length > 0 ? (
-        <Tabs
-          tabs={tabs}
-          value={activeScope === 'season' ? 'season' : String(activeScope)}
-          onChange={setScope}
+  const body = () => {
+    // The slate is one small RPC and everything below depends on it, so the
+    // whole screen waits rather than each board rendering a season it guessed.
+    if (loading) return <ActivityIndicator style={styles.centred} />;
+    if (error) {
+      return (
+        <View style={styles.centred}>
+          <EmptyState
+            title="Could not load the leaderboard"
+            body={error}
+            actionLabel="Try again"
+            onAction={reload}
+          />
+        </View>
+      );
+    }
+    if (board === 'points') {
+      return (
+        <PointsBoard
+          slate={slate}
+          season={season}
+          seasonType={seasonType}
+          meId={meId}
+          onRefreshSlate={refreshSlate}
+          board={board}
+          onBoardChange={setBoard}
         />
-      ) : null}
-
-      <Podium rows={rows} meId={meId} detailKnown={detailKnown} />
-
-      <YourStanding
-        standing={me}
-        field={rows.length}
-        scopeLabel={scopeLabel}
+      );
+    }
+    return (
+      <CommunityBoard
+        id={board}
+        season={season}
         seasonType={seasonType}
-        slateLabelText={slate ? `${slateLabel(slate.season_type)} ${slate.season}` : 'season'}
-        weekLabelText={slate?.week ? `Week ${slate.week}` : null}
-        detailKnown={detailKnown}
+        meId={meId}
+        onRefreshSlate={refreshSlate}
+        board={board}
+        onBoardChange={setBoard}
       />
-
-      {rows.length > 0 ? (
-        <Panel
-          title="Standings"
-          hint={detailKnown ? undefined : 'Loading week detail…'}
-          inset={false}>
-          <StandingsHeader columns={columns} />
-        </Panel>
-      ) : null}
-    </View>
-  );
+    );
+  };
 
   return (
-    // scroll={false}: the FlatList below owns the scroll container, and nesting
-    // a virtualised list inside a ScrollView defeats the virtualisation.
+    // scroll={false}: each board owns a FlatList, and nesting a virtualised
+    // list inside a ScrollView defeats the virtualisation.
     <Screen title="Leaderboard" measure="table" context={headerContext} scroll={false}>
-      {entries === null && !error ? (
-        <ActivityIndicator style={styles.centred} />
-      ) : error ? (
-        <Text style={[Type.body, styles.centred, { color: c.negative }]}>{error}</Text>
-      ) : (
-        <FlatList
-          data={rows}
-          extraData={listExtra}
-          keyExtractor={(r) => r.userId}
-          contentContainerStyle={[styles.list, { paddingBottom: tabInset + Spacing.four }]}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />
-          }
-          ListHeaderComponent={listHeader}
-          ListEmptyComponent={<EmptyBoard slate={slate} />}
-          renderItem={({ item }) => (
-            <StandingsRow
-              standing={item}
-              columns={columns}
-              isMe={item.userId === meId}
-              detailKnown={detailKnown}
-              expanded={expandedId === item.userId}
-              onToggle={() =>
-                setExpandedId((current) => (current === item.userId ? null : item.userId))
-              }>
-              <WeekBreakdown
-                weekly={item.weekly}
-                seasonType={seasonType}
-                fieldByWeek={fieldByWeek}
-              />
-            </StandingsRow>
-          )}
-        />
-      )}
+      {/* The board draws the control row — see `BoardControls` for why both
+          chips have to be drawn by the same component. This screen still owns
+          which board is selected; it just no longer draws the chip itself. */}
+      <View style={styles.body}>{body()}</View>
     </Screen>
   );
 }
 
-/**
- * An empty board is the NORMAL state through preseason, and it has two quite
- * different causes. Saying which one applies is the whole job here: "No scores
- * yet" on its own is indistinguishable from a broken query, and this screen has
- * already shipped looking broken once.
- */
-function EmptyBoard({ slate }: { slate: Slate | null }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-
-  const body = slate
-    ? `No lineup has been scored for the ${slateLabel(slate.season_type).toLowerCase()} ` +
-      `${slate.season} yet. Scores land after a week's games finish, and Week ${slate.week} ` +
-      `is the slate in play — so the board fills in as soon as it is scored.`
-    : `No week has kicked off yet, so there is nothing to rank. The board opens with the first ` +
-      `game of the season.`;
-
-  return (
-    <View style={[styles.empty, { borderColor: c.border, backgroundColor: c.surface }]}>
-      <Text style={[Type.section, { color: c.text }]}>Nothing scored yet</Text>
-      <Text style={[Type.bodyRelaxed, styles.emptyBody, { color: c.textSecondary }]}>{body}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  head: { gap: 14, paddingBottom: Spacing.two },
-  list: { padding: Spacing.three },
+  body: { flex: 1 },
   centred: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four },
-  empty: {
-    gap: Spacing.one,
-    padding: Spacing.three,
-    borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  emptyBody: { maxWidth: 460 },
 });

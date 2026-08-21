@@ -490,6 +490,21 @@ export default function ProfileScreen() {
             </View>
           </Panel>
 
+          {/* The rules of the competition, not a preference — but this is where
+              a reference page you read once belongs, next to the other
+              documents you open and close. It used to be a permanent second row
+              of navigation on the Leaderboard; see `app/(app)/scoring.tsx`. */}
+          <Panel title="How the game works">
+            <View style={[styles.field, { borderColor: c.border }]}>
+              <Text style={[Type.micro, styles.fieldLabel, { color: c.textTertiary }]}>RULES</Text>
+              <View style={styles.links}>
+                <Link href="/scoring" accessibilityRole="link">
+                  <Text style={[Type.body, { color: c.textSecondary }]}>Scoring</Text>
+                </Link>
+              </View>
+            </View>
+          </Panel>
+
           <Panel title="Account">
             <View style={styles.rows}>
               <Field label="EMAIL" value={session?.user.email ?? DASH} c={c} />

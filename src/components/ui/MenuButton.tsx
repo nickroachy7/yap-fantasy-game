@@ -26,6 +26,13 @@
  * than "this is a value you can pick" — the chips beside them hold a state, and
  * these open a choice or flip a switch. A fifth and sixth rectangle on that row
  * would have read as two more positions.
+ *
+ * TWO TRIGGERS, ONE MENU. `MenuBar` is the same anchored panel hung off a
+ * full-width bar instead of a circle, for the one choice on a screen that IS
+ * the screen's subject — the leaderboard's board picker. The positioning, the
+ * dismissal and the items are shared through `useAnchor` and `AnchoredPanel`
+ * below, because two copies of "measure the trigger, drop a Modal under it" is
+ * the drift this file already argues against.
  */
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import {
@@ -39,7 +46,15 @@ import {
 } from 'react-native';
 
 import { ActionIcon, type ActionIconName } from '@/components/shell/ActionBar';
-import { Colors, ControlDiameter, Radius, Spacing, Type, selectionAccent } from '@/constants/theme';
+import {
+  Colors,
+  ControlDiameter,
+  NUMERIC,
+  Radius,
+  Spacing,
+  Type,
+  selectionAccent,
+} from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 /** Diameter, shared with the action bar's detached button. See the theme. */
@@ -50,6 +65,92 @@ const DROP = 6;
 const MARGIN = Spacing.two;
 
 type Anchor = { x: number; y: number; width: number; height: number };
+
+/**
+ * Measure the trigger on PRESS and hold the result while the menu is open.
+ *
+ * On press rather than on layout: a trigger in a row that scrolls, on a screen
+ * whose header can change height, has no position worth caching — and measuring
+ * once at mount is how a menu ends up opening where the button used to be.
+ */
+function useAnchor() {
+  const trigger = useRef<View>(null);
+  const [anchor, setAnchor] = useState<Anchor | null>(null);
+
+  const open = useCallback(() => {
+    trigger.current?.measureInWindow((x, y, width, height) =>
+      setAnchor({ x, y, width, height }),
+    );
+  }, []);
+  const close = useCallback(() => setAnchor(null), []);
+
+  return { trigger, anchor, open, close };
+}
+
+/**
+ * The panel itself: a transparent Modal used for POSITIONING, not as a dialog.
+ *
+ * An absolutely-positioned View is clipped by any scroll container above it,
+ * and every one of these sits over a list — the same constraint `DropdownChip`
+ * documents. Nothing is dimmed, and a press anywhere outside dismisses it.
+ *
+ * `align` is the only difference between the two triggers. A round button sits
+ * at the right end of its row, so its panel grows leftwards from that edge or
+ * it runs off the screen. A full-width bar's panel matches the bar, so the menu
+ * reads as the bar opening rather than as a card appearing near it.
+ */
+function AnchoredPanel({
+  anchor,
+  align,
+  close,
+  children,
+}: {
+  anchor: Anchor;
+  align: 'right' | 'stretch';
+  close: () => void;
+  children: ReactNode;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const { width: screenW, height: screenH } = useWindowDimensions();
+
+  return (
+    <>
+      {/* The dismiss target is a SIBLING of the panel, not its parent. Wrapping
+          the panel in a pressable backdrop produces a button containing
+          buttons, which react-native-web renders as real nested <button>
+          elements and React rejects at runtime — the trap `DropdownChip`,
+          `SwapSheet` and `ConfirmDialog` all document. */}
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        accessibilityRole="button"
+        accessibilityLabel="Close menu"
+        onPress={close}
+      />
+      <View
+        style={[
+          styles.panel,
+          {
+            backgroundColor: c.surface,
+            borderColor: c.borderStrong,
+            top: anchor.y + anchor.height + DROP,
+            maxHeight: screenH - (anchor.y + anchor.height + DROP) - MARGIN * 2,
+          },
+          align === 'right'
+            ? {
+                right: Math.max(MARGIN, screenW - (anchor.x + anchor.width)),
+                minWidth: 176,
+                maxWidth: 260,
+              }
+            : { left: anchor.x, width: anchor.width },
+        ]}>
+        <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+          {children}
+        </ScrollView>
+      </View>
+    </>
+  );
+}
 
 /**
  * The button alone — no menu.
@@ -92,13 +193,19 @@ export function ToggleButton({
   );
 }
 
+export type MenuTrigger =
+  /* Exactly one of the two. A round button shows a glyph OR a two-or-three
+     character value, never both — there is room for one thing in a circle. */
+  | { icon: ActionIconName; text?: never }
+  | { text: string; icon?: never };
+
 export function MenuButton({
   icon,
+  text,
   label,
   active,
   children,
-}: {
-  icon: ActionIconName;
+}: MenuTrigger & {
   /** What the menu is, spoken — e.g. "Tier". */
   label: string;
   /** True when this filter is doing something, so the button reads as on. */
@@ -109,21 +216,7 @@ export function MenuButton({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const accent = selectionAccent(scheme);
-  const { width: screenW, height: screenH } = useWindowDimensions();
-
-  const trigger = useRef<View>(null);
-  const [anchor, setAnchor] = useState<Anchor | null>(null);
-
-  /* Measured on PRESS rather than on layout. A button in a row that scrolls, on
-     a screen whose header can change height, has no position worth caching —
-     and measuring once at mount is how a menu ends up opening where the button
-     used to be. */
-  const open = useCallback(() => {
-    trigger.current?.measureInWindow((x, y, width, height) =>
-      setAnchor({ x, y, width, height }),
-    );
-  }, []);
-  const close = useCallback(() => setAnchor(null), []);
+  const { trigger, anchor, open, close } = useAnchor();
 
   return (
     <>
@@ -142,12 +235,24 @@ export function MenuButton({
           },
           pressed && styles.pressed,
         ]}>
-        <ActionIcon
-          name={icon}
-          color={active ? accent : c.textSecondary}
-          focused={active}
-          size={16}
-        />
+        {icon ? (
+          <ActionIcon
+            name={icon}
+            color={active ? accent : c.textSecondary}
+            focused={active}
+            size={16}
+          />
+        ) : (
+          /* The VALUE in the circle, not a glyph for the category. `W3` says
+             which week you are on; a calendar icon would only say that weeks
+             exist, and the button would need a label beside it to be read at
+             all. Two or three characters is the whole budget. */
+          <Text
+            numberOfLines={1}
+            style={[Type.micro, NUMERIC, { color: active ? accent : c.textSecondary }]}>
+            {text}
+          </Text>
+        )}
       </Pressable>
 
       <Modal
@@ -157,41 +262,69 @@ export function MenuButton({
         // Android's hardware back must dismiss this, or the menu is a trap on
         // the one platform where it is not obvious how to escape.
         onRequestClose={close}>
-        {/* The dismiss target is a SIBLING of the panel, not its parent.
-            Wrapping the panel in a pressable backdrop produces a button
-            containing buttons, which react-native-web renders as real nested
-            <button> elements and React rejects at runtime — the trap
-            `DropdownChip`, `SwapSheet` and `ConfirmDialog` all document.
-
-            Undimmed on purpose. A scrim says "the screen behind this is
-            suspended", which is true of a confirmation and false of a filter
-            you are watching take effect. */}
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          accessibilityRole="button"
-          accessibilityLabel="Close menu"
-          onPress={close}
-        />
         {anchor ? (
-          <View
-            style={[
-              styles.panel,
-              {
-                backgroundColor: c.surface,
-                borderColor: c.borderStrong,
-                top: anchor.y + anchor.height + DROP,
-                /* Right-aligned to the trigger, because these buttons sit at
-                   the right end of their row: a panel growing rightwards from a
-                   button 20pt from the screen edge would be off it. Clamped so
-                   it cannot leave the screen on either side. */
-                right: Math.max(MARGIN, screenW - (anchor.x + anchor.width)),
-                maxHeight: screenH - (anchor.y + anchor.height + DROP) - MARGIN * 2,
-              },
-            ]}>
-            <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-              {children(close)}
-            </ScrollView>
-          </View>
+          <AnchoredPanel anchor={anchor} align="right" close={close}>
+            {children(close)}
+          </AnchoredPanel>
+        ) : null}
+      </Modal>
+    </>
+  );
+}
+
+/**
+ * The same menu, hung off a bar that spans its container.
+ *
+ * FOR THE CHOICE THAT IS THE SCREEN'S SUBJECT, which is a different thing from
+ * a filter. The leaderboard's board picker decides what the entire page is a
+ * list OF — six views that are not variations of one board but six different
+ * boards — and a chip sized to its own word gave that the same weight as a
+ * position filter sitting beside it.
+ *
+ * It replaced a `DropdownChip`, whose panel is centred over a dimmed backdrop.
+ * That is the shape of a CONFIRMATION, as the note at the head of this file
+ * says, and it severs the panel from the control that summoned it. This drops
+ * from the bar, at the bar's own width, so the menu reads as the bar opening.
+ */
+export function MenuBar({
+  value,
+  label,
+  children,
+}: {
+  /** The current choice, drawn in the bar. */
+  value: string;
+  /** What the menu is, spoken — e.g. "Board". */
+  label: string;
+  children: (close: () => void) => ReactNode;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const { trigger, anchor, open, close } = useAnchor();
+
+  return (
+    <>
+      <Pressable
+        ref={trigger}
+        onPress={open}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: anchor !== null }}
+        accessibilityLabel={`${label}: ${value}`}
+        style={({ pressed }) => [
+          styles.bar,
+          { backgroundColor: c.backgroundElement, borderColor: c.border },
+          pressed && styles.pressed,
+        ]}>
+        <Text numberOfLines={1} style={[Type.strong, styles.barLabel, { color: c.text }]}>
+          {value}
+        </Text>
+        <Text style={[Type.fine, { color: c.textTertiary }]}>▾</Text>
+      </Pressable>
+
+      <Modal visible={anchor !== null} transparent animationType="none" onRequestClose={close}>
+        {anchor ? (
+          <AnchoredPanel anchor={anchor} align="stretch" close={close}>
+            {children(close)}
+          </AnchoredPanel>
         ) : null}
       </Modal>
     </>
@@ -287,10 +420,20 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     flexShrink: 0,
   },
+  /* Width comes from `align` — see AnchoredPanel. */
+  bar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    height: 38,
+    paddingHorizontal: Spacing.two + 2,
+    borderRadius: Radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  barLabel: { flexShrink: 1, minWidth: 0 },
   panel: {
     position: 'absolute',
-    minWidth: 176,
-    maxWidth: 260,
     borderRadius: Radius.panel,
     borderWidth: StyleSheet.hairlineWidth,
     paddingVertical: Spacing.one,

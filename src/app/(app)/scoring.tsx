@@ -8,8 +8,20 @@
  * arbitrary one, which is a bad property for the number the entire game ranks
  * people by.
  *
- * It lives under Leaderboard rather than Profile because scoring is a rule of
- * the competition, not a preference of the account.
+ * IT USED TO LIVE UNDER LEADERBOARD, on the reasoning that scoring is a rule of
+ * the competition rather than a preference of the account. That reasoning was
+ * about the page; the problem was what it did to the SECTION. It gave the
+ * Leaderboard a two-item sub-nav — STANDINGS | SCORING — which spent a
+ * permanent strip of every phone screen advertising a page you read once,
+ * directly above the board's own six-way switcher. Two rows of navigation, one
+ * of them almost never the answer.
+ *
+ * So Leaderboard is boards and nothing else, and this is a reference page
+ * reached from Profile → Settings, beside the other documents you consult and
+ * close. It sits ABOVE the tab navigator — a root route in `(app)`, like
+ * `packs` and `search` — because it is not part of any section's navigation any
+ * more. Still inside the auth gate: `scoring_rules` is readable `to
+ * authenticated`, so a signed-out reader would get an empty page.
  *
  * The page reads the ACTIVE row from `scoring_rules` and renders whatever is in
  * it. It does not restate the constants the edge function ships with — see
@@ -28,7 +40,6 @@ import {
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
 import { StatusChip } from '@/components/ui/StatusChip';
-import { useTabBarInset } from '@/components/shell/useResponsive';
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
@@ -37,7 +48,6 @@ import { supabase } from '@/lib/supabase';
 export default function ScoringScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const tabInset = useTabBarInset();
 
   const [sheet, setSheet] = useState<ScoringSheet | null>(null);
 
@@ -130,7 +140,6 @@ export default function ScoringScreen() {
       refreshing={refreshing}
       onRefresh={() => void refresh()}>
       {body()}
-      <View style={{ height: tabInset }} />
     </Screen>
   );
 }

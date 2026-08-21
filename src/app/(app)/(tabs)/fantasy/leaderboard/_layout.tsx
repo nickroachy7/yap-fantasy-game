@@ -1,17 +1,16 @@
 import { Stack } from 'expo-router';
 
-import { SectionFrame } from '@/components/shell/SectionFrame';
-
 /**
- * Standings and the scoring rules that produce them are peers.
- * `Screen` supplies each page's chrome; the frame supplies the section's header
- * and nav, drawn once above this navigator so they survive the swap between the
- * two — see `SectionFrame`.
+ * One page: the boards.
+ *
+ * No `SectionFrame` any more. That frame exists to draw a section's sub-page
+ * nav once, above the navigator that swaps the sub-pages underneath — and this
+ * section has no sub-pages left. Scoring moved to `/scoring` (Profile →
+ * Settings), so a frame here would hoist an empty strip.
+ *
+ * `Screen` supplies every page's chrome, so this navigator draws none. Same
+ * shape as `lineup/_layout.tsx`, for the same reason.
  */
 export default function LeaderboardLayout() {
-  return (
-    <SectionFrame section="/fantasy/leaderboard">
-      <Stack screenOptions={{ headerShown: false, animation: 'none' }} />
-    </SectionFrame>
-  );
+  return <Stack screenOptions={{ headerShown: false, animation: 'none' }} />;
 }

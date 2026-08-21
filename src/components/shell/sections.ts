@@ -195,15 +195,17 @@ export const FANTASY_SECTIONS: NavSection[] = [
       { href: '/fantasy/players/leaders', label: 'Leaders', icon: 'standings' },
     ],
   },
+  /* No children, like Lineup. It had two — STANDINGS and SCORING — and the
+     strip they produced cost every phone screen a permanent row of navigation
+     to offer one board and one reference page you read once. The board itself
+     now carries a six-way switcher, so that strip sat directly above another
+     strip; two rows of chrome before a single row of data.
+     Scoring moved to `/scoring`, reached from Profile → Settings. */
   {
     href: '/fantasy/leaderboard',
     label: 'Leaderboard',
     tabLabel: 'Board',
     icon: 'leaderboard',
-    children: [
-      { href: '/fantasy/leaderboard', label: 'Standings', icon: 'standings' },
-      { href: '/fantasy/leaderboard/scoring', label: 'Scoring', icon: 'scoring' },
-    ],
   },
 ];
 

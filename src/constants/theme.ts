@@ -13,6 +13,29 @@ export const Colors = {
     background: '#ffffff',
     backgroundElement: '#F0F0F3',
     backgroundSelected: '#E0E1E6',
+    /**
+     * "This row is you", wherever a list contains the reader.
+     *
+     * NOT `backgroundSelected`, which is what it used to be and what the lineup
+     * row still uses. Those two tints answer different questions.
+     * `backgroundSelected` marks a CHOICE the reader just made — the card
+     * picked in the swap sheet — so it is loud on purpose and lasts a moment.
+     * This marks an IDENTITY that is true on every row of every board forever,
+     * and at #2E3135 a permanent band of mid-grey out-shouted the seven rows
+     * around it that the reader was actually scanning.
+     *
+     * It is the tab bar's own grey, which is the quietest surface in the app
+     * that still reads as a surface — exactly the job here. `surfaceSheet`
+     * carries the same value in dark and is deliberately NOT reused: that token
+     * is for things presented OVER the app and says so, and a row in the flow of
+     * a page borrowing it would be the drift its note warns about. Same value,
+     * different reason, so it can move without dragging every sheet with it.
+     *
+     * Light mode cannot copy the bar, which is white on white there and leans on
+     * its seam instead. A row has no seam, so this is the lightest grey that
+     * still separates from the page.
+     */
+    backgroundMine: '#F0F0F3',
     textSecondary: '#60646C',
     /** Third rank of text: units, footnotes, the quiet half of a stat pair. */
     textTertiary: '#8B8D98',
@@ -41,6 +64,8 @@ export const Colors = {
     background: '#000000',
     backgroundElement: '#212225',
     backgroundSelected: '#2E3135',
+    /** See the light value. The tab bar's grey — the quietest real surface. */
+    backgroundMine: '#0E1013',
     textSecondary: '#B0B4BA',
     textTertiary: '#7E8289',
     border: '#26282C',

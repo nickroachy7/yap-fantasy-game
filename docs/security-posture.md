@@ -56,7 +56,7 @@ subtransaction does make assertion 1 fire.
 
 ---
 
-## Accepted by design: ten SECURITY DEFINER functions callable by `authenticated`
+## Accepted by design: eighteen SECURITY DEFINER functions callable by `authenticated`
 
 The linter warns that a signed-in user can call these over `/rest/v1/rpc/…`.
 That is the intent — it is the whole server-authoritative design. Every one of
@@ -75,13 +75,26 @@ one is revoked from `anon` and pinned to `search_path = public, pg_temp`.
 | `card_profile` | One card instance wide, and it reads the same rank matview `player_profile` does. |
 | `player_market` | Counts copies of one player across `card_instances`, which is RLS-scoped to its owner — so an invoker-rights version would report every count as 1. Counts and one maximum; nothing that names an owner. |
 | `player_card_market` | The same answer for the whole directory in one scan, deliberately narrower than `player_market`. Same boundary. |
+| `claim_set_reward` | Pays a set reward. Like `open_pack`, it is the only path that writes `set_completions`, `gem_balances` and `gems_ledger`, none of which has an INSERT policy. |
+| `commit_card_to_set` | Burns a card permanently and pays for it. Same reasoning: the burn and the payout must be one server-side transaction. |
+| `commit_cards_to_set` | The batch form of the same call, and the same boundary. |
+| `board_best_week` | Reads every user's `lineups` rows to find each one's highest week. RLS scopes that table to its owner, so an invoker-rights version would rank the caller alone — and would look completely normal doing it. Exposes a display name, a week and a score, which is what `leaderboard` already publishes. |
+| `board_record` | Grades every user against the field's weekly median. It computes the same medians `median_record` does, across the same RLS-scoped rows, and differs only in publishing names against results rather than the caller's own line. |
+| `board_collection` | Aggregates `card_instances`, which is RLS-scoped to its owner, so an invoker-rights version would report the caller's shelf as the whole community's. Counts and a gem valuation; nothing about which specific cards anybody holds. |
+| `board_cards` | The highest-scoring held copies across every user's `card_instances`. Exposes the owner's display name, the player, the tier and the score. It also returns `card_instances.id`, which is inert to anyone but the owner — `card_profile` filters on `auth.uid()`, so another user's id opens nothing. |
+| `board_sets` | Aggregates `set_milestone_claims` and committed `card_instances`, both RLS-scoped. Counts and gem totals only. |
 
-Eight further definer functions (`gameday_sweep`, `score_week`,
-`apply_injuries`, `grant_weekly_gems`, `award_score_gems`,
-`refresh_player_season_ranks`, `handle_new_user`, `verify_sync_secret`) are
-callable by **neither** `anon` nor `authenticated`. They run from cron, from
-triggers, or from an Edge Function holding the sync secret. The linter does not
-flag them, correctly.
+Eleven further definer functions (`apply_injuries`, `assign_card_rarity`,
+`award_score_gems`, `gameday_sweep`, `grant_weekly_gems`, `handle_new_user`,
+`rebuild_card_sets`, `rebuild_daily_set`, `refresh_player_season_ranks`,
+`score_week`, `verify_sync_secret`) are callable by **neither** `anon` nor
+`authenticated`. They run from cron, from triggers, or from an Edge Function
+holding the sync secret. The linter does not flag them, correctly.
+
+The counts in this section drifted before: it read *ten* and *eight* while the
+database held eighteen and eleven, because the sets work added three callable
+functions and two internal ones without touching this file. Run the query below
+rather than trusting the prose.
 
 Verify the whole picture in one query:
 
@@ -125,6 +138,46 @@ easy to guess, please choose a different one."*
 
 ---
 
+## Closed 2026-08-21: `sweep_log` had no RLS — and the advisor overstated it
+
+The advisor flagged `public.sweep_log` `rls_disabled` at **CRITICAL**, with its
+standard wording: *"fully exposed to the anon and authenticated roles — anyone
+with the anon key can read or modify every row."*
+
+**That part was not true here, and it is worth recording why**, because the next
+person to read this lint will need the same five minutes back. `sweep_log` has
+carried `revoke all … from anon, authenticated` since the migration that created
+it (`20260819200000`), and a role with no SELECT privilege is refused whether or
+not RLS is on. Checked rather than reasoned about — as `anon`, both a SELECT and
+an INSERT return `insufficient_privilege`. The advisor's lint tests for
+`relrowsecurity`, not for reachability, so its severity assumes the default
+grants that this table had already given up.
+
+**It was still fixed** (`20260821110000`), because one mechanism is not the
+posture claimed everywhere else on this page. The revoke was a single statement
+in a single migration with nothing beneath it, and the first standing rule below
+says that grant surface keeps re-opening by accident. Every other table in
+`public` has RLS under the grant; this one now does too.
+
+**RLS with NO policies is the terminal state, not a half-finished one.** No
+policy is coming: nothing in `src/` reads this table, and a policy would invent
+an access path nobody asked for. Everything that legitimately touches it is
+exempt — `gameday_sweep` is definer and owned by `postgres`, which owns the
+table and so bypasses its RLS; `service_role` and `postgres` both hold
+BYPASSRLS. Deliberately **not** `force row level security`, which would subject
+the owner to the (non-existent) policies and stop the sweep writing its own log.
+
+**The CRITICAL lint is now an INFO lint, and that is the finish line.** The
+advisor replaces `rls_disabled` with `rls_enabled_no_policy` for exactly this
+shape. Expect it, and do not "fix" it by adding a policy.
+
+Both layers are asserted separately in `sweep_log.test.sql` (5a and 5b), the
+same way `view_security.test.sql` does it: 5b hands `authenticated` the SELECT
+grant back inside the rolled-back transaction and proves RLS returns zero rows
+on its own.
+
+---
+
 ## Standing rules
 
 - **Supabase's default privileges grant `anon` and `authenticated` everything
@@ -137,3 +190,15 @@ easy to guess, please choose a different one."*
   control story for it.
 - Re-run the advisor after **every** migration that adds a view, matview, or
   function. It is the only thing here that has caught a regression on its own.
+- **Read an advisor finding's severity as a claim to check, not a fact.** The
+  `sweep_log` lint said CRITICAL and "anyone with the anon key can read every
+  row"; the table had been revoked from `anon` for two days. The lint was still
+  worth acting on, for a reason its own text never mentioned. Confirm the
+  exposure by impersonating the role before you believe the headline — and fix
+  it anyway if the only thing standing is a grant.
+- **A test that names a real week has an expiry date on it.** `lineup_abuse`
+  hardcoded "preseason wk3 starts Aug 21 (open)" and started failing the minute
+  that week kicked off, with six assertions unreachable behind a lock error that
+  had nothing to do with what it tests. Suites own their weeks: synthetic
+  fixtures pinned relative to `now()`, at week numbers far outside any real
+  slate.
