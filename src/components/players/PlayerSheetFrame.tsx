@@ -61,9 +61,10 @@
  * `ConfirmDialog` all hit this; the fix is the same one — the backdrop is laid
  * behind the card, not around it.
  */
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Animated,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -196,7 +197,31 @@ export function PlayerSheetFrame({
    */
   const draggable = Platform.OS === 'ios' && !isWeb;
   const showClose = !draggable;
-  const showHandle = draggable || (isWeb && !wide);
+
+  /**
+   * Whether the bar is taken OUT of the layout and drawn over the content.
+   *
+   * It used to mean "iOS", and the web bottom sheet paid for that: its handle
+   * and title bar sat in flow above the scroller, painted on `surfaceSheet`, so
+   * the tone wash — which lives inside the scroll content — began BELOW them.
+   * The sheet opened with a strip of undressed dark grey above the colour,
+   * where the phone app has the wash running to the very top edge. It read as a
+   * header bolted onto a coloured panel rather than as a coloured sheet.
+   *
+   * The narrow web sheet floats for the same reason iOS does, and gets the same
+   * result: the scroller starts at the top of the card, the band's negative
+   * margin reaches the corners, and the bar washes over it.
+   *
+   * The WIDE dialog keeps its bar in flow. It is a centred panel with a title
+   * and a close button, not a sheet dragged up from an edge, and there is no
+   * top edge for a wash to mark.
+   */
+  const floats = draggable || (isWeb && !wide);
+  /* The ✕ moves out of the bar when the bar floats: the bar is invisible at
+     rest (`titleFade` is 0) and the only way out must not be. It is drawn as
+     its own floating element instead, above everything. */
+  const closeInBar = showClose && !floats;
+  const closeFloating = showClose && floats;
 
   /* Only ever flips twice, so this is a cheap piece of state rather than a
      per-frame re-render: the comparison is done on every scroll event but
@@ -219,6 +244,98 @@ export function PlayerSheetFrame({
    * is what keeps the takeover on the right pixel across text sizes.
    */
   const [barHeight, setBarHeight] = useState(0);
+
+  /**
+   * DRAG-TO-DISMISS, FOR THE NARROW WEB SHEET ONLY.
+   *
+   * iOS has this from the platform and Android's `modal` is not a bottom sheet,
+   * so this is the one presentation that looked draggable and was not: it comes
+   * up from the bottom edge with a grabber on it, and the grabber was decoration
+   * admitted as such in a comment. A handle that does nothing is worse than no
+   * handle, because it is the mark that means "pull me".
+   *
+   * `PanResponder` rather than react-native-gesture-handler: the app has no
+   * `GestureHandlerRootView` anywhere and adding one for a single web sheet is a
+   * root-level change to satisfy a leaf. PanResponder is in React Native itself,
+   * react-native-web implements it over pointer events, and this file already
+   * animates with `Animated`.
+   *
+   * `useNativeDriver: false` throughout, because there is no native driver on
+   * web — passing true only earns a console warning on every drag.
+   *
+   * THE GESTURE IS OWNED BY THE TOP STRIP, not the whole card. A responder on
+   * the card competes with the ScrollView for every vertical touch, and the
+   * usual fix — only drag when the list is scrolled to the top — means holding
+   * scroll offset in a ref and getting it wrong at the boundary. The strip is
+   * the grabber's own area, which is the part a reader reaches for anyway.
+   */
+  const [dragY] = useState(() => new Animated.Value(0));
+  const [cardHeight, setCardHeight] = useState(0);
+  const canDrag = isWeb && !wide;
+
+  /**
+   * Where the sheet goes when the finger leaves it.
+   *
+   * Idempotent by construction: it only ever starts one of two animations to a
+   * fixed target, so being called twice — which the three hooks below make
+   * possible — costs a redundant animation to the place it is already going.
+   */
+  const settle = useMemo(
+    () => (dy: number, vy: number) => {
+      /* Distance OR speed. A short flick is as clear an instruction as a long
+         pull, and requiring the distance makes a fast one feel ignored. */
+      if (dy > DISMISS_AFTER || vy > FLICK_VELOCITY) {
+        Animated.timing(dragY, {
+          /* Off the bottom of its own height, so the card is GONE rather than
+             merely low when `onClose` unmounts it. Falls back to a generous
+             constant if the layout has not reported a height yet. */
+          toValue: cardHeight || 900,
+          duration: 160,
+          useNativeDriver: false,
+        }).start(onClose);
+        return;
+      }
+      Animated.spring(dragY, {
+        toValue: 0,
+        useNativeDriver: false,
+        bounciness: 0,
+        speed: 18,
+      }).start();
+    },
+    [dragY, cardHeight, onClose],
+  );
+
+  const drag = useMemo(
+    () =>
+      PanResponder.create({
+        /* Claimed on MOVE, not on grant, and only downward: a tap on the
+           grabber should still be a tap, and an upward drag belongs to nobody
+           here. The axis test stops a horizontal swipe stealing the sheet. */
+        onMoveShouldSetPanResponder: (_e, g) => g.dy > 4 && Math.abs(g.dy) > Math.abs(g.dx),
+        onPanResponderMove: (_e, g) => {
+          /* Downward only. Following a negative dy would lift the sheet off the
+             bottom edge it is anchored to and show the page under it. */
+          if (g.dy > 0) dragY.setValue(g.dy);
+        },
+        /**
+         * ONE SETTLE, ON EVERY WAY THE GESTURE CAN END.
+         *
+         * `onPanResponderEnd` fires for a release AND for a termination, and
+         * the other two are kept because a responder that ends without settling
+         * leaves the sheet parked halfway down the screen with the app behind
+         * it — the single worst state this can be in, and unrecoverable without
+         * a reload. Three routes to the same idempotent function is cheap
+         * insurance against exactly that.
+         */
+        onPanResponderEnd: (_e, g) => settle(g.dy, g.vy),
+        onPanResponderRelease: (_e, g) => settle(g.dy, g.vy),
+        /* An interrupted gesture — the pointer leaving the window mid-drag, or
+           another responder taking over — puts the sheet back rather than
+           leaving it stranded. No distance is passed, so it always springs. */
+        onPanResponderTerminate: () => settle(0, 0),
+      }),
+    [dragY, settle],
+  );
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = e.nativeEvent.contentOffset.y;
@@ -310,7 +427,7 @@ export function PlayerSheetFrame({
         {titleText}
       </Animated.View>
 
-      {!showClose ? null : (
+      {!closeInBar ? null : (
         <Pressable
           onPress={onClose}
           accessibilityRole="button"
@@ -400,22 +517,43 @@ export function PlayerSheetFrame({
    *
    * The grabber is the only thing telling an iOS reader this sheet can be
    * dragged away — the ✕ went when it arrived — so it is the one mark here that
-   * must not be subtle. At `borderStrong` (#34373C) it was four levels off the
+   * must not be subtle. On the narrow web sheet it now marks a real gesture
+   * too, and is drawn inside the strip that owns it rather than here. At `borderStrong` (#34373C) it was four levels off the
    * sheet's own fill and effectively disappeared once the tone wash tinted the
    * area behind it. `textTertiary` (#7E8289) is roughly where UIKit draws its
    * own grabber on a dark sheet, and the same value the player silhouette
    * already uses for a non-text mark.
    */
-  const handle = showHandle ? (
-    <View style={[styles.handleBar, styles.handleFlow, { backgroundColor: c.textTertiary }]} />
-  ) : null;
-
   /* Absolute, and drawn AFTER the floating header so it sits on top of it: the
      grabber is the dismiss affordance and must stay visible whether or not the
      title bar has appeared. */
-  const floatingHandle = showHandle ? (
+  const floatingHandle = draggable ? (
     <View pointerEvents="none" style={styles.handleFloat}>
       <View style={[styles.handleBar, { backgroundColor: c.textTertiary }]} />
+    </View>
+  ) : null;
+
+  /**
+   * The ✕, floating, for the narrow web sheet.
+   *
+   * Drawn separately from the bar because the bar fades in on scroll and this
+   * must not: on web the drag is a nicety and the button is the guarantee. It
+   * is rendered after the floating header AND after the grabber so it takes its
+   * own taps back from both.
+   */
+  const floatingClose = closeFloating ? (
+    <View pointerEvents="box-none" style={styles.closeFloat}>
+      <Pressable
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel={closeLabel}
+        hitSlop={10}
+        style={({ pressed }) => [
+          styles.close,
+          { backgroundColor: pressed ? c.backgroundSelected : c.backgroundElement },
+        ]}>
+        <Text style={[styles.closeGlyph, { color: c.textSecondary }]}>✕</Text>
+      </Pressable>
     </View>
   ) : null;
 
@@ -456,8 +594,8 @@ export function PlayerSheetFrame({
         { paddingBottom: (footer || isWeb ? 0 : bottom) + Spacing.four },
         /* With the header floating, the grabber floats too, so the content has
            to reserve the space it used to occupy in flow or the hero starts
-           underneath it. */
-        draggable && { paddingTop: HANDLE_BLOCK + Spacing.three },
+           underneath it. True of the narrow web sheet as well now. */
+        floats && { paddingTop: HANDLE_BLOCK + Spacing.three },
       ]}
       onScroll={onScroll}
       scrollEventThrottle={32}
@@ -514,21 +652,42 @@ export function PlayerSheetFrame({
         accessibilityLabel={closeLabel}
         onPress={onClose}
       />
-      <View
+      <Animated.View
+        onLayout={(e) => setCardHeight(e.nativeEvent.layout.height)}
         style={[
           styles.card,
           wide ? styles.dialog : styles.bottomSheet,
           { backgroundColor: c.surfaceSheet, borderColor: c.borderStrong },
+          canDrag && { transform: [{ translateY: dragY }] },
         ]}>
-        {/* Decoration — this sheet is not draggable on web — but it is the
-            standard mark for "this came from the bottom and goes back there",
-            and without it the panel reads as a page. Same call as SwapSheet.
-            `showHandle` already knows it is web-narrow only. */}
-        {handle}
-        {header}
-        {scroller}
-        {footerBar}
-      </View>
+        {wide ? (
+          /* The dialog keeps its bar in flow: it is a centred panel with a
+             title and a close button, not a sheet with a top edge to dress. */
+          <>
+            {header}
+            {scroller}
+            {footerBar}
+          </>
+        ) : (
+          /* The bottom sheet is built the way the iOS one is — scroller first,
+             chrome floated over it — so the tone wash inside the content
+             reaches the top corners instead of starting under a grey bar. The
+             order is the z-order: header, then grabber, then ✕, each taking its
+             own taps back from the one below. */
+          <>
+            {scroller}
+            {footerBar}
+            {floatingHeader}
+            {/* The grabber, and the strip that makes it mean something. The
+                responder lives on a transparent block around it rather than on
+                the 36pt bar itself, which is too small a target to pull. */}
+            <View style={styles.dragStrip} {...drag.panHandlers}>
+              <View style={[styles.handleBar, styles.handleInStrip, { backgroundColor: c.textTertiary }]} />
+            </View>
+            {floatingClose}
+          </>
+        )}
+      </Animated.View>
     </View>
   );
 }
@@ -572,10 +731,14 @@ export function SheetToneBand({
   onLayout?: ViewProps['onLayout'];
   children: ReactNode;
 }) {
-  const draggable = Platform.OS === 'ios';
-  /* Clears whatever the scroll content is inset by, so the band reaches the
-     top of the sheet — on iOS that includes the floating grabber's block. */
-  const top = (draggable ? HANDLE_BLOCK : 0) + Spacing.three;
+  /* Whatever the scroll content is inset by, the band has to climb back over —
+     and that inset now includes the grabber's block on the narrow web sheet as
+     well as on iOS, because both float their chrome. Reading `useIsWide` here
+     is what keeps this in step with the frame's own `floats`; get it wrong and
+     the wash either stops short of the top edge or overshoots it. */
+  const wide = useIsWide();
+  const floats = Platform.OS === 'ios' || (Platform.OS === 'web' && !wide);
+  const top = (floats ? HANDLE_BLOCK : 0) + Spacing.three;
 
   return (
     <View
@@ -652,6 +815,18 @@ const TITLE_REVEAL_AT = 44;
  */
 const OVERSCROLL_REACH = 300;
 
+/**
+ * How far the narrow web sheet has to be pulled before letting go dismisses it,
+ * and how fast a flick has to be to count instead.
+ *
+ * 110 is about a third of the way down a phone-sized sheet: far enough that a
+ * scroll misread as a drag does not throw the sheet away, short enough that the
+ * pull does not feel like work. The velocity is in points per millisecond, so
+ * 0.7 is a deliberate flick and not a hurried scroll.
+ */
+const DISMISS_AFTER = 110;
+const FLICK_VELOCITY = 0.7;
+
 /** Clearance above the grabber, and the height of the block it occupies. */
 const HANDLE_TOP = 5;
 const HANDLE_BLOCK = HANDLE_TOP + 5 + Spacing.one;
@@ -703,10 +878,53 @@ const styles = StyleSheet.create({
    */
   handleBar: { width: 36, height: 5, borderRadius: 2.5, alignSelf: 'center' },
   /** In flow, on the web sheet: the margins are the block's height. */
-  handleFlow: { marginTop: HANDLE_TOP, marginBottom: Spacing.one },
   /** Floating, on iOS: same geometry, taken out of the layout. */
   handleFloat: { position: 'absolute', top: HANDLE_TOP, left: 0, right: 0 },
   headerFloat: { position: 'absolute', top: 0, left: 0, right: 0, paddingTop: HANDLE_BLOCK },
+  /* Sits on the bar's own line, on the same gutter the bar uses, so the button
+     lands where it did when it was inside the bar. */
+  closeFloat: {
+    position: 'absolute',
+    top: HANDLE_BLOCK,
+    right: Spacing.three,
+    paddingVertical: Spacing.two,
+  },
+  /**
+   * The pull target: full width, transparent, and MUCH taller than the mark it
+   * contains.
+   *
+   * Sized to HANDLE_BLOCK first, which is 14pt — the grabber's own block. That
+   * is the size of the drawing, not the size of a thing a thumb can catch, and
+   * in practice the pull missed it and landed on the content underneath, where
+   * it selected text instead. 48 is the usual minimum for a touch target and it
+   * reaches from the top edge down to just above the sheet's title, which is
+   * the whole band a reader would call "the top of the sheet".
+   *
+   * The ✕ sits inside that band on the right. It is rendered AFTER this, so it
+   * is above it and takes its own presses back; nothing else up here is
+   * interactive.
+   *
+   * `userSelect: 'none'` because a drag over text is a SELECTION on web unless
+   * something says otherwise, and a half-highlighted ladder row left behind by
+   * a failed pull looks broken. `cursor: grab` because a pointer that can drag
+   * should say so.
+   */
+  dragStrip: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 48,
+    justifyContent: 'flex-start',
+    ...Platform.select({
+      /* `pointer`, not `grab`: React Native's `CursorValue` only admits `auto`
+         and `pointer`, and casting past the type to get a nicer cursor is not
+         worth owning a lie about the platform's API. */
+      web: { userSelect: 'none' as const, cursor: 'pointer' as const },
+      default: {},
+    }),
+  },
+  handleInStrip: { marginTop: HANDLE_TOP },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
