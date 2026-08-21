@@ -63,7 +63,7 @@ export default function PacksScreen() {
   const [packs, setPacks] = useState<Pack[] | null>(null);
   /** pack_id -> how many times this player has opened it. */
   const [openings, setOpenings] = useState<Map<string, number>>(() => new Map());
-  const [silverAt, setSilverAt] = useState<number>(200);
+  const [silverAt, setSilverAt] = useState<number>(50);
   const [openingCode, setOpeningCode] = useState<string | null>(null);
   const [pulled, setPulled] = useState<Pulled[] | null>(null);
   const [error, setError] = useState<string | null>(null);
