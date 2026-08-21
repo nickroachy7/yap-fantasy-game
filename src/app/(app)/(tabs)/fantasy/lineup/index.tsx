@@ -36,7 +36,7 @@
  * case a button genuinely handled — the write FAILING — gets a retry, because
  * an autosave that cannot save and cannot be told to try again is a dead end.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -557,6 +557,60 @@ export default function LineupScreen() {
     const t = setTimeout(() => void submit(), DEBOUNCE_MS);
     return () => clearTimeout(t);
   }, [dirty, saving, blocked, slate, submit]);
+
+  /**
+   * AND THE FLUSH, WHICH IS WHAT MAKES THE DEBOUNCE SAFE.
+   *
+   * The effect above cancels its timer on cleanup, and unmounting is a cleanup.
+   * So a swap followed inside 700ms by a tap on any other tab threw the edit
+   * away — no request sent, no error, and a board that showed the change right
+   * up until the moment you left it. The faster you moved the more you lost,
+   * which is the worst possible shape for a bug like this: it punished exactly
+   * the people who knew what they wanted.
+   *
+   * The ref carries the newest unsaved payload; the second effect has an empty
+   * dependency list so its cleanup runs on unmount and nowhere else.
+   *
+   * IT DELIBERATELY DOES NOT TOUCH STATE. There is no component left to render
+   * a spinner or an error by the time this fires, so it sends the write and
+   * lets the server be the record. Anything it cannot report is recoverable:
+   * the next mount re-reads the lineup, and whatever did not stick is simply
+   * not there.
+   *
+   * `saving` is not a guard here. If a write is already in flight then this
+   * payload is the newer one — the whole reason it is still dirty — and the
+   * server applies whichever lands last against the same slots.
+   */
+  const pendingRef = useRef<{ season: number; season_type: number; week: number; slots: { slot: string; card_instance_id: string }[] } | null>(null);
+
+  useEffect(() => {
+    pendingRef.current =
+      dirty && !blocked && slate
+        ? {
+            season: slate.season,
+            season_type: slate.season_type,
+            week: slate.week,
+            slots: Object.entries(picks).map(([slot, card_instance_id]) => ({
+              slot,
+              card_instance_id,
+            })),
+          }
+        : null;
+  }, [dirty, blocked, slate, picks]);
+
+  useEffect(
+    () => () => {
+      const p = pendingRef.current;
+      if (!p) return;
+      void supabase.rpc('set_lineup', {
+        p_season: p.season,
+        p_season_type: p.season_type,
+        p_week: p.week,
+        p_slots: p.slots,
+      });
+    },
+    [],
+  );
 
   /**
    * The one thing the reader can still ask for by hand, and only after a
