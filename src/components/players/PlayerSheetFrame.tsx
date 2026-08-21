@@ -583,7 +583,13 @@ export function PlayerSheetFrame({
 
   const scroller = (
     <ScrollView
-      style={styles.fill}
+      /* `overscrollBehavior: 'contain'` asks the browser not to rubber-band
+         this scroller past its own ends, which removes the gap the band is
+         reaching to cover rather than merely covering it. Support is uneven —
+         hence the reach above as well — and it has a second job regardless: it
+         stops a flick that runs out of checklist from scrolling the PAGE behind
+         the sheet, which is its own small wrongness. */
+      style={[styles.fill, isWeb && styles.noBounce]}
       contentContainerStyle={[
         styles.content,
         // The native sheet stops short of the home indicator on its own; the
@@ -809,11 +815,22 @@ const TITLE_REVEAL_AT = 44;
  *
  * Extending the box upward costs nothing — it is a solid colour, clipped by the
  * scroll view at rest — and it cannot drift out of register with the band
- * proper, because it IS the band. 300 is past the reach of a hard fling on the
- * tallest phone; a pixel of grey at the very limit of a deliberate two-handed
- * drag is not worth more.
+ * proper, because it IS the band.
+ *
+ * 300 WAS NOT ENOUGH, and the reasoning that picked it was about the wrong
+ * gesture. It was measured against a deliberate drag from a standstill at the
+ * top. The bounce that actually beats it is a hard flick UP from the bottom of
+ * a long checklist: the momentum is still being spent when the content reaches
+ * the top, and mobile Safari happily rubber-bands several hundred points past
+ * it. Grey appeared above the colour for a few frames, which is exactly the
+ * seam the band exists to prevent.
+ *
+ * 900 is past anything a thumb can produce. It is still one solid colour on one
+ * box, so the cost of being generous here is nothing at all — which is the
+ * argument for picking a number that cannot be beaten rather than one that is
+ * merely usually enough.
  */
-const OVERSCROLL_REACH = 300;
+const OVERSCROLL_REACH = 900;
 
 /**
  * How far the narrow web sheet has to be pulled before letting go dismisses it,
@@ -917,10 +934,34 @@ const styles = StyleSheet.create({
     height: 48,
     justifyContent: 'flex-start',
     ...Platform.select({
-      /* `pointer`, not `grab`: React Native's `CursorValue` only admits `auto`
-         and `pointer`, and casting past the type to get a nicer cursor is not
-         worth owning a lie about the platform's API. */
-      web: { userSelect: 'none' as const, cursor: 'pointer' as const },
+      /**
+       * `touchAction: 'none'` IS THE GESTURE. Without it there is no drag at
+       * all on a real phone, and the reason is invisible from the JS side: a
+       * browser decides who owns a vertical touch BEFORE any handler runs, and
+       * the default owner is the scroller. It keeps the sequence, PanResponder
+       * is never granted, and the sheet does not move. Nothing errors.
+       *
+       * It is also why this looked fine under automation. Synthetic touch
+       * events are dispatched straight at the element and never go past the
+       * browser's gesture arbitration, so they reached the responder and moved
+       * the sheet — proving the wiring while saying nothing about the one thing
+       * that was broken.
+       *
+       * Declaring `none` on the strip hands vertical touches there to us. It is
+       * scoped to the 48pt strip precisely so the rest of the sheet keeps
+       * native scrolling, which is the part a browser does better than we ever
+       * would.
+       *
+       * `userSelect: 'none'` because a drag over text is a selection unless
+       * something says otherwise. `pointer` and not `grab`: React Native's
+       * `CursorValue` admits only `auto` and `pointer`, and casting past the
+       * type for a nicer cursor is not worth owning a lie about the API.
+       */
+      web: {
+        touchAction: 'none' as const,
+        userSelect: 'none' as const,
+        cursor: 'pointer' as const,
+      },
       default: {},
     }),
   },
@@ -934,6 +975,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerText: { flex: 1, gap: 2 },
+  noBounce: Platform.select({
+    web: { overscrollBehavior: 'contain' as const },
+    default: {},
+  }),
   /* The gutter is the content's, so the buttons line up with the cards above
      them rather than sitting a few points inside or outside the grid. */
   footer: {
