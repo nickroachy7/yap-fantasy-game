@@ -968,7 +968,12 @@ export function PlayerCard({
         * card in the grid and left the cells a hair apart from their own bottom      *
         * edge for no reason a reader could see.                                       *
         * ================================================================ */}
-      {footer === undefined ? null : (
+      {/* `== null`, so an explicit `null` is treated as "no footer" rather than
+          as an empty one. It read `=== undefined`, and a caller passing null to
+          mean "nothing down there" — the set checklist did — got the reserved
+          line and the gap above it anyway, which is exactly the 4pt-of-page
+          problem this block was made conditional to avoid. */}
+      {footer == null ? null : (
         <View style={[styles.footer, { minHeight: footLine }]}>{footer}</View>
       )}
 

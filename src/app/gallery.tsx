@@ -33,9 +33,16 @@ import {
   USAGE_SAMPLE,
 } from '@/components/dev/profile-fixture';
 import { OWNED_MANY, SETS_FIXTURE, SET_MEMBERS_FIXTURE } from '@/components/dev/fixtures';
-import { SetChecklist, type SetFilter } from '@/components/collection/SetChecklist';
-import { SetsList, SetsStrip } from '@/components/collection/SetsList';
-import { autofillSelection, remainingOf, summariseSets } from '@/components/collection/sets';
+import { SetActions,
+  SetChecklist, type SetFilter } from '@/components/collection/SetChecklist';
+import { SetsFilters, SetsList, SetsStrip } from '@/components/collection/SetsList';
+import {
+  autofillSelection,
+  filterSets,
+  remainingOf,
+  summariseSets,
+  type SetListFilter,
+} from '@/components/collection/sets';
 import { PlayerHero } from '@/components/players/PlayerHero';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { CardStanding } from '@/components/players/CardStanding';
@@ -186,16 +193,20 @@ const MIN_CARD_WIDTH = 100;
  */
 function SetsFixture() {
   const [claiming, setClaiming] = useState<string | null>(null);
+  const [filter, setFilter] = useState<SetListFilter>('ALL');
+  const shown = filterSets(SETS_FIXTURE, filter);
 
   return (
     <View style={styles.profile}>
-      {/* The strip is `SetsPanel`'s rather than the list's — it is pinned above
-          the scroll on the real screen, at the same height the inventory pins
-          its own. Drawn here so the gallery still shows the whole page and not
-          just the rows under it. */}
+      {/* The strip and the chips are `SetsPanel`'s rather than the list's —
+          both are pinned above the scroll on the real screen, at the same
+          height the inventory pins its own pair. Drawn here so the gallery
+          shows the whole page and not just the rows under it, and so the
+          filters' own states are reachable without a session. */}
       <SetsStrip stats={summariseSets(SETS_FIXTURE)} />
+      <SetsFilters sets={SETS_FIXTURE} filter={filter} onFilter={setFilter} />
       <SetsList
-        sets={SETS_FIXTURE}
+        sets={shown}
         claimingCode={claiming}
         onOpenSet={() => undefined}
         onClaim={(set) => setClaiming((held) => (held === set.code ? null : set.code))}
@@ -251,6 +262,18 @@ function ChecklistFixture() {
               : [...held, m.card_id],
           )
         }
+      />
+
+      {/* THE SHEET'S PINNED BAR, drawn here in flow. On the route this is the
+          frame's `footer` — below the scroll and above the home indicator — and
+          the gallery has no sheet to pin it to, so it sits at the foot of the
+          fixture instead. What is being reviewed here is the bar's two states,
+          which is the part the frame does not decide. */}
+      <SetActions
+        set={set}
+        members={SET_MEMBERS_FIXTURE}
+        selected={selected}
+        submitting={false}
         onAutofill={() =>
           setSelected(autofillSelection(SET_MEMBERS_FIXTURE, set ? remainingOf(set) : 0))
         }

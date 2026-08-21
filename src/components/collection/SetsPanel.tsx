@@ -67,8 +67,8 @@ import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
-import { SetsList, SetsStrip } from './SetsList';
-import { summariseSets, type CardSet } from './sets';
+import { SetsFilters, SetsList, SetsStrip } from './SetsList';
+import { filterSets, summariseSets, type CardSet, type SetListFilter } from './sets';
 import { useSets } from './use-sets';
 
 export function SetsPanel({
@@ -97,6 +97,10 @@ export function SetsPanel({
   const { sets, error, loading, refreshing, refresh, reload } = useSets();
 
   /** The code being claimed, so only the pressed row shows a spinner. */
+  /* Which sets are on screen. Held here rather than in `SetsList`, because the
+     chip row is drawn in the PINNED block above the scroll and the list is
+     inside it — two children of this panel, one piece of state between them. */
+  const [filter, setFilter] = useState<SetListFilter>('ALL');
   const [claiming, setClaiming] = useState<string | null>(null);
   /** The last claim's failure. Shared with nothing — it is about one press. */
   const [claimError, setClaimError] = useState<string | null>(null);
@@ -104,6 +108,8 @@ export function SetsPanel({
   const [claimed, setClaimed] = useState<{ name: string; gems: number } | null>(null);
 
   const all = useMemo(() => sets ?? [], [sets]);
+  /** What the chips have left on screen. `SetsList` groups whatever it is given. */
+  const shown = useMemo(() => filterSets(all, filter), [all, filter]);
 
   const claim = useCallback(
     async (set: CardSet) => {
@@ -178,6 +184,13 @@ export function SetsPanel({
       {all.length > 0 ? (
         <View style={styles.strip}>
           <SetsStrip stats={summariseSets(all)} action={action} />
+          {/* WHAT YOU HAVE, ABOVE WHAT NARROWS IT — the inventory's order, for
+              the inventory's reason: here is the whole board, now here is how
+              to sieve it. Pinned with the strip rather than scrolling with the
+              list, again as the inventory does, so the control that decides
+              what you are looking at cannot leave the screen you are
+              looking at. */}
+          <SetsFilters sets={all} filter={filter} onFilter={setFilter} />
         </View>
       ) : null}
 
@@ -221,19 +234,35 @@ export function SetsPanel({
             </View>
           ) : null}
 
-          <SetsList
-            sets={all}
-            claimingCode={claiming}
-            onOpenSet={onOpenSet}
-            onClaim={(set) => void claim(set)}
-          />
+          {shown.length === 0 ? (
+            /* A FILTER THAT FOUND NOTHING IS NOT AN EMPTY SEASON, and the two
+               must not read alike: the message above is about there being no
+               card pool at all, and this is about the four chips overhead. It
+               names the chip so the way out is obvious. */
+            <Text style={[Type.body, styles.centredText, { color: c.textTertiary }]}>
+              {filter === 'READY'
+                ? 'No sets have a reward waiting. Add cards to a set to reach its next rung.'
+                : filter === 'CAN_ADD'
+                  ? 'None of your cards fit an open slot right now. Open a pack, or check back after a game.'
+                  : 'You have not finished a set yet.'}
+            </Text>
+          ) : (
+            <SetsList
+              sets={shown}
+              claimingCode={claiming}
+              onOpenSet={onOpenSet}
+              onClaim={(set) => void claim(set)}
+            />
+          )}
 
+          {shown.length === 0 ? null : (
           <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
             Open a set to add cards to it. A card you add is burnt — it leaves your collection for
             good and cannot be started again — and pays back part of what it would have sold for.
             Packs are still drawn from the whole season pool, so which sets you can fill is a matter
             of what you happen to pull.
           </Text>
+          )}
           </>
         )}
       </ScrollView>
@@ -246,7 +275,10 @@ const styles = StyleSheet.create({
   /* The inventory's `summary` wrapper, to the point: one gutter, and the 8pt
      gap to whatever comes next. Two screens with the same strip at different
      heights is what this replaced. */
-  strip: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
+  /* `gap` because this block holds two rows now — the strip and the chips —
+     and they must sit apart by the same 8 the inventory puts between its own
+     pair, or they read as one control with a bar stuck on top of it. */
+  strip: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two, gap: Spacing.two },
   content: { paddingHorizontal: Spacing.three, gap: Spacing.three },
   contentTop: { paddingTop: Spacing.three },
   centred: {

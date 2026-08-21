@@ -42,6 +42,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import {
+  countsOf,
+  SetActions,
   SetChecklist,
   SetFilters,
   type SetFilter,
@@ -92,6 +94,10 @@ export default function SetChecklistScreen() {
   const [filter, setFilter] = useState<SetFilter>('ALL');
   /** Where that first row ends, reported by the checklist that drew it. */
   const [filtersEnd, setFiltersEnd] = useState<number | undefined>(undefined);
+  /* Whether this set has an action at all. A set you hold no card for offers
+     nothing to autofill and nothing to submit, so it gets no bar — see the
+     `footer` prop, which must be absent rather than empty. */
+  const canAdd = useMemo(() => countsOf(members ?? []).CAN_ADD, [members]);
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   /** Card ids ticked for the next submission. */
@@ -237,7 +243,31 @@ export default function SetChecklistScreen() {
       }
       pinnedAt={filtersEnd}
       onClose={close}
-      closeLabel="Close set checklist">
+      closeLabel="Close set checklist"
+      /* CONDITIONAL, not a component that returns null: the frame draws a bar
+         around whatever it is handed, so a footer that rendered nothing would
+         pin an empty strip to the bottom of the sheet. A set you hold no card
+         for has no action, and therefore no bar. */
+      footer={
+        canAdd === 0 ? undefined : (
+          <SetActions
+            set={set}
+            members={members ?? []}
+            selected={selected}
+            submitting={submitting}
+            onAutofill={autofill}
+            onClear={() => setSelected([])}
+            onSubmit={() => {
+              setSubmitError(null);
+              setAdded(null);
+              // The batch path. `quick` must be cleared or a stale one from an
+              // earlier badge tap would decide what this dialog submits.
+              setQuick(null);
+              setConfirming(true);
+            }}
+          />
+        )
+      }>
       {loading && members === null ? (
         <View style={styles.centred}>
           <ActivityIndicator />
@@ -283,16 +313,6 @@ export default function SetChecklistScreen() {
               setSubmitError(null);
               setAdded(null);
               setQuick(member.card_id);
-              setConfirming(true);
-            }}
-            onAutofill={autofill}
-            onClear={() => setSelected([])}
-            onSubmit={() => {
-              setSubmitError(null);
-              setAdded(null);
-              // The batch path. `quick` must be cleared or a stale one from an
-              // earlier badge tap would decide what this dialog submits.
-              setQuick(null);
               setConfirming(true);
             }}
           />

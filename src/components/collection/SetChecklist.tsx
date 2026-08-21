@@ -135,8 +135,17 @@ const FILTERS: { key: SetFilter; label: string }[] = [
   { key: 'MISSING', label: 'Missing' },
 ];
 
-/** How many members each filter would leave on screen. */
-function countsOf(members: SetMember[]): Record<SetFilter, number> {
+/**
+ * How many members each filter would leave on screen.
+ *
+ * Exported because the ROUTE asks it too, and for a reason worth stating: the
+ * action bar is the sheet's footer now, and a footer is a slot the frame draws
+ * chrome around. A `SetActions` that rendered null inside it would leave an
+ * empty bar pinned to the bottom of the sheet — the same trap `PlayerCard`'s
+ * footer had. So the route decides whether there IS a footer, and this is the
+ * question it decides on.
+ */
+export function countsOf(members: SetMember[]): Record<SetFilter, number> {
   let inSet = 0;
   let canAdd = 0;
   for (const m of members) {
@@ -209,6 +218,127 @@ export function SetFilters({
   );
 }
 
+/**
+ * Autofill, and what it turns into once you have ticked something.
+ *
+ * PINNED TO THE BOTTOM OF THE SHEET, which is a change of place and not just of
+ * styling. It used to sit between the filters and the grid, where it pushed
+ * every card down half a row on a screen whose whole point is the cards — and,
+ * worse, it scrolled away: a 29-card set is several screens long, so by the
+ * time you had ticked the three you wanted, the button that submits them was
+ * off the top of the sheet.
+ *
+ * ONE SLOT, TWO STATES, and they are the same act at two stages. Autofill
+ * PROPOSES a batch from the rules in `autofillSelection` — bronze and
+ * duplicates first — and then gets out of the way; every card is a toggle, so
+ * taking two out and putting a third in is two taps rather than a different
+ * screen. Once anything is ticked the slot becomes the submit bar, because at
+ * that point the batch is the page's next action. Nothing here is destructive:
+ * the confirmation on the route is.
+ *
+ * IT DRAWS NOTHING OF ITS OWN AROUND ITSELF — no fill, no rule, no safe area.
+ * The frame's footer slot owns all three, so this cannot disagree with the
+ * pinned header at the other end of the same sheet.
+ */
+export function SetActions({
+  set,
+  members,
+  selected,
+  submitting,
+  onAutofill,
+  onClear,
+  onSubmit,
+}: {
+  set: CardSet | null;
+  members: SetMember[];
+  selected: string[];
+  submitting: boolean;
+  onAutofill: () => void;
+  onClear: () => void;
+  onSubmit: () => void;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const gold = TierColors[scheme].gold.accent;
+
+  const plan = useMemo(() => planFor(members, selected), [members, selected]);
+  const remaining = set ? remainingOf(set) : 0;
+  /* The ceiling on the selection. The server refuses a commit that would take a
+     set past its requirement, so this is what the note below counts down. */
+  const roomLeft = remaining - plan.cards;
+
+  return (
+    <View style={styles.actions}>
+      {plan.cards > 0 ? (
+        <Text style={[Type.fine, styles.pickNote, { color: c.textTertiary }]}>
+          {roomLeft === 0
+            ? `That fills every slot this set has left. Tap a card to swap it out.`
+            : `Tap a card to add or remove it. ${roomLeft} more ${roomLeft === 1 ? 'slot' : 'slots'} free.`}
+        </Text>
+      ) : null}
+
+      <View style={styles.pickRow}>
+        {plan.cards > 0 ? (
+          <>
+            <Pressable
+              onPress={onSubmit}
+              disabled={submitting}
+              accessibilityRole="button"
+              accessibilityLabel={`Add the ${plan.cards} selected cards to the set, paying ${plan.gems} gems`}
+              accessibilityState={{ disabled: submitting, busy: submitting }}
+              style={({ pressed }) => [
+                styles.submit,
+                { backgroundColor: gold },
+                submitting && styles.disabled,
+                pressed && !submitting && styles.pressed,
+              ]}>
+              {submitting ? (
+                <ActivityIndicator />
+              ) : (
+                <>
+                  <Text style={[Type.strong, { color: '#17130A' }]}>
+                    {plan.cards === 1 ? 'Add 1 card' : `Add ${plan.cards} cards`}
+                  </Text>
+                  <View style={styles.gemRow}>
+                    <Gem color="#17130A" size={9} />
+                    <Text style={[Type.fine, NUMERIC, { color: '#17130A' }]}>{plan.gems}</Text>
+                  </View>
+                </>
+              )}
+            </Pressable>
+            <Pressable
+              onPress={onClear}
+              disabled={submitting}
+              accessibilityRole="button"
+              accessibilityLabel="Clear the selection"
+              style={({ pressed }) => [
+                styles.secondary,
+                { borderColor: c.border },
+                pressed && styles.pressed,
+              ]}>
+              <Text style={[Type.strong, { color: c.textSecondary }]}>Clear</Text>
+            </Pressable>
+          </>
+        ) : (
+          <Pressable
+            onPress={onAutofill}
+            disabled={submitting || remaining === 0}
+            accessibilityRole="button"
+            accessibilityLabel="Select cards to add automatically"
+            style={({ pressed }) => [
+              styles.autofill,
+              { borderColor: gold, backgroundColor: c.backgroundElement },
+              (submitting || remaining === 0) && styles.disabled,
+              pressed && styles.pressed,
+            ]}>
+            <Text style={[Type.strong, { color: c.text }]}>Autofill</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+}
+
 export function SetChecklist({
   set,
   members,
@@ -219,9 +349,6 @@ export function SetChecklist({
   onClaim,
   onToggle,
   onQuickAdd,
-  onAutofill,
-  onClear,
-  onSubmit,
   filter,
   onFilter,
   onFiltersEnd,
@@ -244,9 +371,6 @@ export function SetChecklist({
    * submit bar uses, so nothing here has two destructive paths to keep in step.
    */
   onQuickAdd: (member: SetMember) => void;
-  onAutofill: () => void;
-  onClear: () => void;
-  onSubmit: () => void;
   /** Which slice is on screen. Owned by the caller — see `SetFilter`. */
   filter: SetFilter;
   onFilter: (next: SetFilter) => void;
@@ -285,7 +409,6 @@ export function SetChecklist({
   );
   const cardWidth = Math.floor((width - GAP * (columns - 1)) / columns);
 
-  const counts = useMemo(() => countsOf(members), [members]);
 
   const shown = useMemo(() => filterMembers(members, filter), [members, filter]);
 
@@ -502,80 +625,6 @@ export function SetChecklist({
       </SheetToneBand>
 
       <View style={styles.list}>
-
-        {/* AUTOFILL PROPOSES, THE TICKS DECIDE. The button seeds a selection
-            from the rules in `autofillSelection` — bronze, duplicates first —
-            and then gets out of the way: every row is a toggle, so taking two
-            out and putting a different one in is two taps rather than a
-            different screen. Nothing here is destructive; the submit bar is. */}
-        {counts.CAN_ADD > 0 ? (
-          <View style={styles.pickRow}>
-            {plan.cards > 0 ? (
-              <>
-                <Pressable
-                  onPress={onSubmit}
-                  disabled={submitting}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Add the ${plan.cards} selected cards to the set, paying ${plan.gems} gems`}
-                  accessibilityState={{ disabled: submitting, busy: submitting }}
-                  style={({ pressed }) => [
-                    styles.submit,
-                    { backgroundColor: gold },
-                    submitting && styles.disabled,
-                    pressed && !submitting && styles.pressed,
-                  ]}>
-                  {submitting ? (
-                    <ActivityIndicator />
-                  ) : (
-                    <>
-                      <Text style={[Type.strong, { color: '#17130A' }]}>
-                        {plan.cards === 1 ? 'Add 1 card' : `Add ${plan.cards} cards`}
-                      </Text>
-                      <View style={styles.gemRow}>
-                        <Gem color="#17130A" size={9} />
-                        <Text style={[Type.fine, NUMERIC, { color: '#17130A' }]}>{plan.gems}</Text>
-                      </View>
-                    </>
-                  )}
-                </Pressable>
-                <Pressable
-                  onPress={onClear}
-                  disabled={submitting}
-                  accessibilityRole="button"
-                  accessibilityLabel="Clear the selection"
-                  style={({ pressed }) => [
-                    styles.secondary,
-                    { borderColor: c.border },
-                    pressed && styles.pressed,
-                  ]}>
-                  <Text style={[Type.strong, { color: c.textSecondary }]}>Clear</Text>
-                </Pressable>
-              </>
-            ) : (
-              <Pressable
-                onPress={onAutofill}
-                disabled={submitting || remaining === 0}
-                accessibilityRole="button"
-                accessibilityLabel="Select cards to add automatically"
-                style={({ pressed }) => [
-                  styles.autofill,
-                  { borderColor: gold, backgroundColor: c.backgroundElement },
-                  (submitting || remaining === 0) && styles.disabled,
-                  pressed && styles.pressed,
-                ]}>
-                <Text style={[Type.strong, { color: c.text }]}>Autofill</Text>
-              </Pressable>
-            )}
-          </View>
-        ) : null}
-
-        {plan.cards > 0 ? (
-          <Text style={[Type.fine, styles.pickNote, { color: c.textTertiary }]}>
-            {roomLeft === 0
-              ? `That fills every slot this set has left. Tap a card to swap it out.`
-              : `Tap a card to add or remove it. ${roomLeft} more ${roomLeft === 1 ? 'slot' : 'slots'} free.`}
-          </Text>
-        ) : null}
 
         {shown.length === 0 ? (
           <Text style={[Type.body, styles.centredText, { color: c.textTertiary }]}>
@@ -958,11 +1007,17 @@ function MemberCard({
         nextTierAt: null,
       }}
       overlay={badge}
-      /* NOTHING UNDER THE FRAME. The state is the badge and the frame now, so
-         a cell is a square and nothing else — the same shape the inventory's
-         cells took when their own two lines moved onto the card. Passing null
-         rather than leaving it off is what takes the default block out. */
-      footer={null}
+      /* NOTHING UNDER THE FRAME, and the way to say that is to say nothing.
+         The state is the badge and the frame now, so a cell is a square and
+         nothing else — the same shape the inventory's cells take.
+
+         It passed `footer={null}` here, which was right when the card drew a
+         default block and null was how you suppressed it. The card draws none
+         of its own any more, so null had become a SUPPLIED footer that happened
+         to be empty: 13pt of reserved line plus the column's 4pt gap under
+         every cell, making this grid's cards 132 tall against the inventory's
+         115 at the same width. Omitting the prop is what leaves the square
+         bare. */
     />
   );
 
@@ -1061,6 +1116,7 @@ const styles = StyleSheet.create({
   /* No `paddingTop`: the band above ends on a hard edge and the scroll
      container's own gap is the separation. */
   list: { gap: Spacing.two },
+  actions: { gap: Spacing.two },
   pickRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   /* Filled once something is selected, because at that point it IS the page's
      next action. Autofill is outlined: it proposes, and proposing should not

@@ -12,10 +12,11 @@
  * It owns no state and does no arithmetic beyond drawing: `complete` comes off
  * the server, and the ordering comes from `groupSets`. See `sets.ts`.
  */
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Gem } from '@/components/shell/AppHeader';
+import { Chip, ChipRow } from '@/components/ui/Chip';
 import { SummaryStrip, type SummaryCell } from '@/components/ui/SummaryStrip';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -23,8 +24,10 @@ import {
   actionableOf,
   groupSets,
   progressOf,
+  setCountsOf,
   statusOf,
   type CardSet,
+  type SetListFilter,
   type SetsSummary,
 } from './sets';
 
@@ -103,6 +106,64 @@ export function SetsList({
  * total in a cell whose label is "CLAIMED", so an even split has room and the
  * default is the honest choice.
  */
+/**
+ * The chip row over the sets list — the collection's row, doing the collection's
+ * job on the other board.
+ *
+ * CHIPS, NOT THE UNDERLINED `Tabs` the set checklist uses, and the difference
+ * is what the row is sitting on. The checklist's filters are the last line of a
+ * coloured header, where four filled pills read as buttons stuck onto it. This
+ * row sits on the page above a list, exactly where the inventory's ALL/QB/RB
+ * row sits above its grid — so it takes that treatment, and the two boards
+ * under Collection and Sets look like two views of one app.
+ *
+ * COUNTS ON EVERY CHIP, for the same reason the inventory puts them there: a
+ * filter that might empty the list should say so before it is pressed, not
+ * after. `READY 0` is a useful thing to read at a glance and a wasted tap
+ * avoided.
+ */
+export function SetsFilters({
+  sets,
+  filter,
+  onFilter,
+}: {
+  /** Every set, unfiltered — the counts are of the whole board. */
+  sets: CardSet[];
+  filter: SetListFilter;
+  onFilter: (next: SetListFilter) => void;
+}) {
+  const counts = useMemo(() => setCountsOf(sets), [sets]);
+
+  return (
+    <ChipRow>
+      {SET_FILTERS.map((f) => (
+        <Chip
+          key={f.key}
+          selected={filter === f.key}
+          label={f.label}
+          count={counts[f.key]}
+          onPress={() => onFilter(f.key)}
+          accessibilityLabel={`${f.accessibility}, ${counts[f.key]} sets`}
+        />
+      ))}
+    </ChipRow>
+  );
+}
+
+/**
+ * The order is by how much is up to you RIGHT NOW: everything, then the two
+ * that are calls to action, then the pile you are done with.
+ *
+ * Ready before Can add because ready is free — a rung already earned, waiting
+ * to be collected — where adding costs you a card.
+ */
+const SET_FILTERS: { key: SetListFilter; label: string; accessibility: string }[] = [
+  { key: 'ALL', label: 'All', accessibility: 'All sets' },
+  { key: 'READY', label: 'Ready', accessibility: 'Sets with a reward to claim' },
+  { key: 'CAN_ADD', label: 'Can add', accessibility: 'Sets you hold a card for' },
+  { key: 'CLAIMED', label: 'Claimed', accessibility: 'Sets you have finished' },
+];
+
 export function SetsStrip({ stats, action }: { stats: SetsSummary; action?: ReactNode }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];

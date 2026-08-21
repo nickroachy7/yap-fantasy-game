@@ -203,6 +203,60 @@ export function actionableOf(set: CardSet): number {
   return Math.min(set.ready, remainingOf(set));
 }
 
+/**
+ * The four states a set can be in from where the player is standing, and the
+ * only four worth sieving a list of thirty-three by.
+ *
+ * NAMED FOR THE LIST, not for a set: `SetChecklist` already exports a
+ * `SetFilter` that sieves the CARDS inside one set, and two types called the
+ * same thing meaning different things is a mistake waiting on whoever imports
+ * both — the gallery does.
+ *
+ * THEY ARE THE STATES THE MODEL ALREADY HAS, not new ones invented for a chip
+ * row: `READY` is `statusOf`'s ready, `CLAIMED` is its claimed, and `CAN_ADD`
+ * is `actionableOf` being non-zero. A filter that needed its own rules would be
+ * a second opinion about what a set is doing, and the row and the card would
+ * eventually disagree.
+ *
+ * NOT FILTERED BY FAMILY, deliberately, though it is the obvious other axis.
+ * The list already draws dailies and teams as separate titled sections, so a
+ * Daily/Team pair of chips would hide one of two headings the reader can
+ * already see — where these four cut ACROSS both sections and answer the
+ * question a chip row is for: what can I do something about right now.
+ */
+export type SetListFilter = 'ALL' | 'READY' | 'CAN_ADD' | 'CLAIMED';
+
+/** Whether one set belongs under one filter. */
+function matchesFilter(set: CardSet, filter: SetListFilter): boolean {
+  if (filter === 'ALL') return true;
+  if (filter === 'READY') return statusOf(set) === 'ready';
+  if (filter === 'CLAIMED') return statusOf(set) === 'claimed';
+
+  /* CAN_ADD is about your COLLECTION, not the set's progress, which is why it
+     is the one that cannot be read off `statusOf`. A set can be claimable and
+     addable at once, so the two overlap on purpose — these are lenses, not a
+     partition. */
+  return actionableOf(set) > 0;
+}
+
+export function filterSets(sets: CardSet[], filter: SetListFilter): CardSet[] {
+  return filter === 'ALL' ? sets : sets.filter((set) => matchesFilter(set, filter));
+}
+
+/** How many sets each filter would leave on screen. */
+export function setCountsOf(sets: CardSet[]): Record<SetListFilter, number> {
+  let ready = 0;
+  let canAdd = 0;
+  let claimed = 0;
+  for (const set of sets) {
+    if (statusOf(set) === 'ready') ready += 1;
+    else if (statusOf(set) === 'claimed') claimed += 1;
+    if (actionableOf(set) > 0) canAdd += 1;
+  }
+
+  return { ALL: sets.length, READY: ready, CAN_ADD: canAdd, CLAIMED: claimed };
+}
+
 /** The next rung, or null once every one is behind you. */
 export function nextMilestone(set: CardSet): Milestone | null {
   return set.milestones.find((m) => !m.reached) ?? null;

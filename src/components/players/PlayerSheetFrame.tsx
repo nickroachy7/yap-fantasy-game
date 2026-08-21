@@ -96,6 +96,7 @@ export function PlayerSheetFrame({
   tone,
   pinned,
   pinnedAt,
+  footer,
   children,
 }: {
   /** The player's name once known; undefined while loading. */
@@ -149,6 +150,27 @@ export function PlayerSheetFrame({
    * than a duplicate. Omitted, it falls back to the title's threshold.
    */
   pinnedAt?: number;
+  /**
+   * A bar pinned to the bottom of the sheet, below the scroll rather than
+   * inside it.
+   *
+   * FOR AN ACTION THE PAGE IS ABOUT, and only that. A sheet several screens
+   * long puts its own primary button out of reach the moment you scroll — the
+   * set checklist's submit bar sat above a 29-card grid, so ticking the third
+   * card scrolled away the button that commits all three. Pinned, it is
+   * reachable at any offset. It is the same argument `pinned` above makes for
+   * the filters, at the other end of the sheet.
+   *
+   * THE SLOT OWNS THE CHROME: the fill, the rule above it and the home
+   * indicator's inset are drawn here, once, so the two pinned bars cannot
+   * drift apart. What is passed in is the controls alone.
+   *
+   * PASS NOTHING RATHER THAN AN EMPTY NODE. A component that renders null still
+   * arrives as a truthy element, so the bar would draw around it and pin an
+   * empty strip to the bottom of the sheet — decide at the caller whether there
+   * is an action at all.
+   */
+  footer?: ReactNode;
   children: ReactNode;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -397,6 +419,30 @@ export function PlayerSheetFrame({
     </View>
   ) : null;
 
+  /**
+   * The bar itself: the fill, the rule and the safe area that `footer` promises
+   * its callers, drawn once here.
+   *
+   * `surfaceSheet` rather than a transparent strip, because content scrolls
+   * UNDER it — the same reason the floating header paints its own background.
+   * No tone: the wash marks the top of the sheet, and a coloured bar at the
+   * bottom would read as a second header.
+   */
+  const footerBar = footer ? (
+    <View
+      collapsable={false}
+      style={[
+        styles.footer,
+        {
+          backgroundColor: c.surfaceSheet,
+          borderTopColor: c.border,
+          paddingBottom: (isWeb ? 0 : bottom) + Spacing.three,
+        },
+      ]}>
+      {footer}
+    </View>
+  ) : null;
+
   const scroller = (
     <ScrollView
       style={styles.fill}
@@ -404,7 +450,10 @@ export function PlayerSheetFrame({
         styles.content,
         // The native sheet stops short of the home indicator on its own; the
         // web dialog has no safe area to respect.
-        { paddingBottom: (isWeb ? 0 : bottom) + Spacing.four },
+        /* The home indicator's clearance belongs to whichever thing is at the
+           bottom of the sheet. With a footer that is the footer, and adding it
+           here as well would put a band of empty sheet under the last row. */
+        { paddingBottom: (footer || isWeb ? 0 : bottom) + Spacing.four },
         /* With the header floating, the grabber floats too, so the content has
            to reserve the space it used to occupy in flow or the hero starts
            underneath it. */
@@ -439,6 +488,7 @@ export function PlayerSheetFrame({
     return (
       <View collapsable={false} style={[styles.sheetRoot, { backgroundColor: c.surfaceSheet }]}>
         {scroller}
+        {footerBar}
         {floatingHeader}
         {floatingHandle}
       </View>
@@ -477,6 +527,7 @@ export function PlayerSheetFrame({
         {handle}
         {header}
         {scroller}
+        {footerBar}
       </View>
     </View>
   );
@@ -560,11 +611,27 @@ const TITLE_REVEAL_AT = 44;
  * through the first 40% of that (see `wash`), which is the ~120pt covering the
  * title bar and the name rather than the empty bar alone.
  *
- * 0.20 is set against the NORMALISED club colours rather than the tier accents,
+ * 0.26 is set against the NORMALISED club colours rather than the tier accents,
  * because that is the harder case: `teamWash` forces every club to one
  * lightness so a single peak has to work for all thirty-two, where the four
  * tier accents could each have been tuned. Tiers ride the same number so the
  * two pages read as one treatment.
+ *
+ * IT WAS 0.20 AND READ AS GREY-BLUE RATHER THAN AS THE CLUB. At that weight
+ * Jacksonville's teal composited to rgb(23,50,57) over `surfaceSheet` — a hue
+ * you could find if you were told it was there. 0.26 puts it at rgb(25,60,68),
+ * which is the same colour said out loud.
+ *
+ * THE ALPHA IS THE LEVER HERE, NOT `WASH_L` in `teams.ts`, and it is worth
+ * knowing why before reaching for the other one: at a fifth opacity, eight
+ * points of source lightness move the composite by about six. Lightening the
+ * source enough to be felt would have to go far enough to cost the white
+ * `Type.page` sitting on top of it. Raising the alpha moves the hue directly
+ * and leaves the source colours — which are the clubs' own — alone.
+ *
+ * The ceiling is that white title. At 0.26 the darkest club still clears 9:1
+ * and the brightest (Cincinnati, rgb(65,41,29)) clears 9:1 as well, so there is
+ * room above this if it is still not enough — but not unlimited room.
  */
 /**
  * How far the band reaches ABOVE the top of the scroll content, which is what a
@@ -589,7 +656,7 @@ const OVERSCROLL_REACH = 300;
 const HANDLE_TOP = 5;
 const HANDLE_BLOCK = HANDLE_TOP + 5 + Spacing.one;
 
-const TONE_PEAK = 0.2;
+const TONE_PEAK = 0.26;
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
@@ -649,6 +716,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerText: { flex: 1, gap: 2 },
+  /* The gutter is the content's, so the buttons line up with the cards above
+     them rather than sitting a few points inside or outside the grid. */
+  footer: {
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   /**
    * The takeover row: the bar's gutter, its own bottom rhythm, and the rule.
    *
