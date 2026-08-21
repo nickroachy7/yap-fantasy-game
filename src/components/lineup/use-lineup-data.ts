@@ -19,11 +19,18 @@
  * screen showed an empty week 2 board through the whole of the Sunday and
  * Monday that week 1 was being played.
  *
- * `lineup_slate()` (20260821130000) answers the third question: the week that
- * has begun and is not finished, falling back to the next open week when no
- * week is in play. Both are fetched, because when a week IS in play they are
- * different weeks and the screen legitimately offers both — the one you are
- * watching, and the one you can still set.
+ * `lineup_slate()` (20260821130000) answers the third question, and is the only
+ * one this hook asks: the week that has begun and is not finished, falling back
+ * to the next open week when no week is in play.
+ *
+ * IT BRIEFLY FETCHED BOTH, and offered a switcher between them. That existed
+ * because the week in play was entirely frozen — the old lock froze every player
+ * at the week's first kickoff — so making any change at all meant going to the
+ * next week. Per-player locking (20260821210000) removed the reason: the week in
+ * play is editable, slot by slot, right up to each player's own kickoff. What
+ * was left was a control with one real option and a second week nobody needed,
+ * and between a week's last game and the next week's first this function rolls
+ * forward on its own with days to spare.
  */
 import { useCallback, useState } from 'react';
 
@@ -41,15 +48,6 @@ import {
   type Slate,
   type SlotConfig,
 } from './model';
-
-/**
- * Which of the two weeks this hook is reading.
- *
- * `'current'` is whatever `lineup_slate()` names — the week in play, or the
- * next open one when nothing is being played. `'next'` is always
- * `upcoming_slate()`, and is only a distinct week while a week is in play.
- */
-export type LineupView = 'current' | 'next';
 
 type CollectionRow = {
   id: string | null;
@@ -237,19 +235,6 @@ export type LineupData = {
    */
   inPlay: boolean;
   /**
-   * The week `lineup_slate()` named, whichever view is showing. Needed
-   * separately from `slate` so a switcher can label the option it is offering
-   * to switch BACK to while the reader is looking at the other one.
-   */
-  currentSlate: Slate | null;
-  /**
-   * The next week still open for submission, when that is a DIFFERENT week from
-   * the one on screen — which is exactly when a week is in play. Null the rest
-   * of the time, because offering to switch to the week you are already looking
-   * at is not an offer.
-   */
-  nextSlate: Slate | null;
-  /**
    * True while at least one game in the shown week is actually being played.
    * Narrower than `inPlay`, which stays true through the days between a
    * Thursday night game and the Sunday ones, and it is the right test for
@@ -288,11 +273,9 @@ export type LineupData = {
   reload: () => Promise<void>;
 };
 
-export function useLineupData(view: LineupView = 'current'): LineupData {
+export function useLineupData(): LineupData {
   const [slate, setSlate] = useState<Slate | null>(null);
   const [inPlay, setInPlay] = useState(false);
-  const [currentSlate, setCurrentSlate] = useState<Slate | null>(null);
-  const [nextSlate, setNextSlate] = useState<Slate | null>(null);
   const [hasLiveGame, setHasLiveGame] = useState(false);
   const [lockAt, setLockAt] = useState<string | null>(null);
   const [slots, setSlots] = useState<SlotConfig[]>([]);
@@ -304,18 +287,11 @@ export function useLineupData(view: LineupView = 'current'): LineupData {
   const [finalizedAt, setFinalizedAt] = useState<string | null>(null);
 
   const load = useCallback<Load>(async (live) => {
-    // BOTH slates, in the same round trip as everything else.
-    //
-    // `lineup_slate()` is the week to show and `upcoming_slate()` the week that
-    // is still open. They name the same week whenever nothing is being played,
-    // and different ones whenever something is — see the note at the head of
-    // this file for what reading only the second one cost.
-    //
-    // The collection, slot config and team list do not depend on either, so
-    // they ride along rather than waiting a round trip for them.
-    const [slateRes, nextRes, cfg, coll, teamsRes] = await Promise.all([
+    // `lineup_slate()` names the one week this screen is about. The collection,
+    // slot config and team list do not depend on it, so they ride along rather
+    // than waiting a round trip for it.
+    const [slateRes, cfg, coll, teamsRes] = await Promise.all([
       supabase.rpc('lineup_slate'),
-      supabase.rpc('upcoming_slate'),
       supabase
         .from('lineup_slot_config')
         .select('slot, eligible_positions, display_order')
@@ -333,25 +309,9 @@ export function useLineupData(view: LineupView = 'current'): LineupData {
     if (!live()) return;
     if (slateRes.error) return slateRes.error.message;
 
-    const shown = (slateRes.data as (Slate & { in_play: boolean })[] | null)?.[0] ?? null;
-    const next = (nextRes.data as Slate[] | null)?.[0] ?? null;
-    /* Same week means there is nothing to switch to. Compared on all three
-       fields rather than on `week` alone: preseason week 3 and regular-season
-       week 3 are both "week 3" and are four weeks apart. */
-    const sameWeek =
-      shown !== null &&
-      next !== null &&
-      shown.season === next.season &&
-      shown.season_type === next.season_type &&
-      shown.week === next.week;
-
-    // `'next'` is only a real choice while a week is in play; the rest of the
-    // time both views resolve to the one week that exists.
-    const s = view === 'next' && !sameWeek && next ? next : shown;
+    const s = (slateRes.data as (Slate & { in_play: boolean })[] | null)?.[0] ?? null;
     setSlate(s);
-    setInPlay(s === shown && (shown?.in_play ?? false));
-    setCurrentSlate(shown);
-    setNextSlate(sameWeek || !next ? null : next);
+    setInPlay(s?.in_play ?? false);
     /* Same precedence as before: the collection's failure is the one reported
        if both the slot config and the collection fail, because it is the one
        that empties the screen. */
@@ -452,7 +412,7 @@ export function useLineupData(view: LineupView = 'current'): LineupData {
     setScoredAt(prior?.scored_at ?? null);
     setFinalizedAt(prior?.finalized_at ?? null);
     return failure;
-  }, [view]);
+  }, []);
 
   // Quiet, like the old `reload`: it cleared the error and re-read, but never
   // put the screen back into its first-load spinner.
@@ -461,8 +421,6 @@ export function useLineupData(view: LineupView = 'current'): LineupData {
   return {
     slate,
     inPlay,
-    currentSlate,
-    nextSlate,
     hasLiveGame,
     lockAt,
     slots,

@@ -56,9 +56,8 @@ import {
   type LineupCard,
   type SortKey,
 } from '@/components/lineup/model';
-import { useLineupData, type LineupView } from '@/components/lineup/use-lineup-data';
+import { useLineupData } from '@/components/lineup/use-lineup-data';
 import { Screen } from '@/components/shell/Screen';
-import { SegmentedControl } from '@/components/shell/SegmentedControl';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -101,20 +100,9 @@ export default function LineupScreen() {
   const router = useRouter();
   const wide = useIsWide();
 
-  /**
-   * Which week is on screen.
-   *
-   * Only ever a real choice while a week is in play — the rest of the time the
-   * week you are watching and the week you can set are the same one, and the
-   * switcher below does not render at all.
-   */
-  const [view, setView] = useState<LineupView>('current');
-
   const {
     slate,
     inPlay,
-    currentSlate,
-    nextSlate,
     hasLiveGame,
     lockAt,
     slots,
@@ -127,7 +115,7 @@ export default function LineupScreen() {
     loading,
     error: loadError,
     reload,
-  } = useLineupData(view);
+  } = useLineupData();
   const { displayName } = usePlayer();
 
   /**
@@ -548,8 +536,6 @@ export default function LineupScreen() {
         : null;
   const context = slate && phase ? `${week} · ${phase}` : week;
 
-  /** Short form for the switcher, where the season prefix is repeated noise. */
-  const weekTab = (sl: typeof slate) => (sl ? `Week ${sl.week}` : '—');
 
   return (
     <Screen
@@ -558,31 +544,6 @@ export default function LineupScreen() {
       context={context}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}>
-      {/* TWO WEEKS EXIST AT ONCE, for five days out of every seven, and this is
-          the only honest way to draw that.
- 
-          An NFL week opens on Thursday night and closes on Monday, and it locks
-          at its first kickoff — so from Thursday onwards the week you are
-          WATCHING and the week you can still SET are different weeks. The screen
-          used to show only the second, which meant that for the whole of Sunday
-          your players were on the field and the board in front of you was an
-          empty form for a game four days away.
- 
-          It renders only when those two weeks are genuinely different, which is
-          exactly when a week is in play. The rest of the time there is one week
-          and a switcher offering to show it to you would be a control with one
-          real option. */}
-      {nextSlate ? (
-        <SegmentedControl<LineupView>
-          segments={[
-            { value: 'current', label: weekTab(currentSlate), badge: hasLiveGame ? 'LIVE' : undefined },
-            { value: 'next', label: weekTab(nextSlate), badge: 'OPEN' },
-          ]}
-          value={view}
-          onChange={setView}
-        />
-      ) : null}
-
       <ContestCard
         displayName={displayName}
         weekLabel={week}
