@@ -38,9 +38,37 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const load = useCallback<Load>(
     async (live) => {
       if (!session) return;
-      // All three are RLS-scoped to the caller; no user_id filter is sent.
+      /**
+       * THE `profiles` FILTER IS NOT REDUNDANT, AND ASSUMING IT WAS BROKE THE
+       * HEADER FOR EVERY PLAYER.
+       *
+       * These three reads used to go out unfiltered, on the stated grounds that
+       * "all three are RLS-scoped to the caller". Two of them are.
+       * `gem_balances` and `card_instances` both have policies of the form
+       * `auth.uid() = user_id`, so an unfiltered select returns exactly the
+       * caller's row and `.single()` is honest.
+       *
+       * `profiles` does not. Its SELECT policy is a flat `true` — deliberately,
+       * because the leaderboards render other players' names and cannot do that
+       * if a profile is only visible to its owner. So an unfiltered select
+       * returns EVERY profile, and `.single()` on nine rows is a PostgREST 406
+       * (`PGRST116: cannot coerce the result to a single JSON object`).
+       *
+       * It worked exactly as long as the table had one row in it. The moment a
+       * second person signed up it broke for everybody at once, and it broke
+       * quietly: the failure is swallowed into `error`, the state keeps its
+       * initial values, and the rail and the header settle on "player" and a
+       * balance of 0. It reads as data that will not save rather than data that
+       * will not load — a display name change DOES land, and then the chrome
+       * goes on showing the old default, so the natural conclusion is that the
+       * save failed.
+       *
+       * The lesson is in the shape, not the query: RLS scoping is a per-table
+       * fact, so a comment claiming it for a batch is a claim about tables it
+       * has not checked.
+       */
       const [profile, balance, cards] = await Promise.all([
-        supabase.from('profiles').select('display_name').single(),
+        supabase.from('profiles').select('display_name').eq('id', session.user.id).single(),
         supabase.from('gem_balances').select('balance').single(),
         /* `is_held`, not every row this user has ever had. A sold copy is still
            their row and a committed one is too, so an unfiltered count made the
