@@ -54,34 +54,64 @@ only where the registration is renewed.
 1. **Deploy to Vercel first and check the `.vercel.app` URL.** Nothing about the
    domain moves until the new site is known-good on its own hostname.
 2. **Add both `yapfantasy.com` and `www.yapfantasy.com`** in Vercel → Settings →
-   Domains. Vercel will show the exact records to create — take them from that
-   screen rather than from memory. The apex is an `A` record; the `www` CNAME
-   target is **per-project** (`<hash>.vercel-dns-0NN.com`), not a shared
-   hostname, so a value copied from another project's docs will not verify.
-3. **Replace the Railway records in Cloudflare.** What is there now:
+   Domains. Both are already added and already show `verified: true` — Vercel
+   confirms ownership as soon as no other Vercel account holds the name, so the
+   only thing outstanding is where the records point.
+3. **Repoint the two Cloudflare records.** The zone holds exactly two, and both
+   were CNAMEs to Railway — *not* A records:
 
-   | Name | Type | Value |
-   |---|---|---|
-   | `yapfantasy.com` | A | `69.46.46.65` |
-   | `www` | CNAME | `i48kee4g.up.railway.app` |
+   | Name | Type | Was | Now |
+   |---|---|---|---|
+   | `yapfantasy.com` | CNAME | `sfwxzp6e.up.railway.app` | `79fc71ab70bfc9e0.vercel-dns-017.com` |
+   | `www` | CNAME | `i48kee4g.up.railway.app` | `79fc71ab70bfc9e0.vercel-dns-017.com` |
 
-   Point both at the values Vercel gave you. **Set them to DNS-only (grey
-   cloud), not proxied.** Vercel issues and renews the certificate itself, and
-   an orange-cloud record in front of it means two CDNs and two certificates for
-   one site — which fails as a redirect loop or an SSL handshake error, and does
-   so intermittently, which is worse.
+   Both stay **DNS-only (grey cloud)**, which is how they already were. Vercel
+   issues and renews the certificate itself, and an orange-cloud record in front
+   of it means two CDNs and two certificates for one site — which fails as a
+   redirect loop or an SSL handshake error, and does so intermittently, which is
+   worse than failing outright.
+
+   **A CNAME at the apex is deliberate.** Normally that is illegal and Vercel
+   asks for an `A` to `216.198.79.1` instead — but Cloudflare flattens apex
+   CNAMEs, so the record is legal here and is the better of the two: it follows
+   Vercel's edge IPs when they change, where a hardcoded A record silently rots.
+   `dig` reports the flattened A values, which is why the apex *looks* like an
+   A record from outside and is why the pre-cutover reading of this zone was
+   wrong.
+
+   The CNAME target is **per-project**. `cname.vercel-dns.com` also works and is
+   what most guides print, but the hashed hostname is what this project was
+   issued.
+
+   Expect a **few minutes of intermittent SSL errors** right after the switch
+   while Vercel issues the certificate — the domain answers, some requests fail
+   the handshake, and then it settles. Measured here: 10/12 requests good five
+   minutes in, 11/11 shortly after. Do not go changing records during that
+   window; it resolves itself.
 4. **Wait for Vercel to report both domains valid**, then load the site. TTLs
    here are short, so this is usually minutes.
 5. **Update Supabase URL Configuration** to the new origin — see the section
    above. Easy to forget once the site itself is up, and sign-in is broken until
    it is done.
-6. **Only then stop the old Railway service.** `yap-web` in the `sleeper-yap-bot`
-   project. Leaving it running costs nothing and is the rollback: until the
-   records are changed back it is simply unreachable.
+6. **Only then stop the old Railway service.** `railway down --service yap-web`
+   in the `sleeper-yap-bot` project removes its deployment; the service and its
+   config stay, so `railway redeploy --service yap-web` puts it back.
 
-   The `yap` service in that project is the **Discord bot, which stays**. It
-   shares the project but not the domain, and it holds the only copy of the
-   bot's Discord credentials. Do not delete the project to clean up the site.
+   The `yap` service in that project is the **Discord bot, which stays running**.
+   It shares the project but not the domain, and it holds the only copy of the
+   bot's Discord credentials. Never `railway delete` the project to tidy up the
+   site — that takes the bot with it.
+
+## Rolling back
+
+The old site is a removed deployment, not a deleted one, so the way back is:
+
+1. `railway redeploy --service yap-web`
+2. Point the two Cloudflare CNAMEs at `sfwxzp6e.up.railway.app` (apex) and
+   `i48kee4g.up.railway.app` (`www`).
+
+Railway still holds `yapfantasy.com` on that service, so nothing has to be
+re-added there.
 
 Note that the old site ran against a **different Supabase project**
 (`yxtnocecnqutcvltptya`) from this one (`ygrmsleanavyewfbhlth`). No accounts,
