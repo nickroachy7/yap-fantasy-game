@@ -51,6 +51,7 @@
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { YapMark } from '@/components/brand/YapLogo';
 import { Colors, Spacing, TierColors } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -100,7 +101,15 @@ export function AppHeader({
   return (
     <View style={[styles.base, { paddingTop: top, backgroundColor: c.background }]}>
       <View style={[styles.row, attached && styles.rowAttached]}>
-        <Text style={[styles.wordmark, { color: c.text }]}>YAP FANTASY</Text>
+        {/* Mark plus wordmark, not the stacked lockup. The lockup is two lines
+            tall and this masthead is one line by design (see the header) —
+            dropping it in would have doubled the height of the chrome on every
+            screen to say the same word. `ink` is the page, because that is what
+            the bot's face slots are showing through to. */}
+        <View style={styles.brand}>
+          <YapMark height={19} ink={c.background} />
+          <Text style={[styles.wordmark, { color: c.text }]}>YAP FANTASY</Text>
+        </View>
 
         <View style={styles.balance}>
           <Gem size={12} color={accent} />
@@ -131,6 +140,9 @@ const styles = StyleSheet.create({
      and 4 is enough to keep the wordmark off the labels below while letting the
      row underneath set the actual gap. */
   rowAttached: { paddingBottom: 4 },
+  /* `flexShrink: 1` lives on the wordmark, not here, so the text truncates
+     before the mark does — a clipped logo looks broken, clipped type does not. */
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 9, flexShrink: 1 },
   wordmark: {
     fontSize: 14,
     fontWeight: '800',

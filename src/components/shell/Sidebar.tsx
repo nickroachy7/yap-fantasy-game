@@ -36,6 +36,7 @@ import { Link, usePathname } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { YapMark } from '@/components/brand/YapLogo';
 import { ActionIcon } from '@/components/shell/ActionBar';
 import { Gem, initialsOf } from '@/components/shell/AppHeader';
 import {
@@ -67,7 +68,13 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
   return (
     <View style={[styles.rail, { backgroundColor: ChromeBand }]}>
       <View style={styles.brandBlock}>
-        <Text style={styles.wordmark}>YAP FANTASY</Text>
+        {/* Same lockup as the phone masthead, and `ink` is ChromeBand here
+            rather than the page — the rail paints its own ground, and the
+            bot's face slots have to match whatever they sit on. */}
+        <View style={styles.brand}>
+          <YapMark height={19} ink={ChromeBand} />
+          <Text style={styles.wordmark}>YAP FANTASY</Text>
+        </View>
         <View style={[styles.gems, { borderColor: accent }]}>
           <Gem color={accent} size={10} />
           <Text style={[styles.balance, NUMERIC]}>{loading ? '—' : gems.toLocaleString()}</Text>
@@ -182,6 +189,7 @@ function NavRow({
 const styles = StyleSheet.create({
   rail: { width: RailWidth, paddingVertical: 20, justifyContent: 'flex-start' },
   brandBlock: { paddingHorizontal: 18, gap: 12, marginBottom: 22 },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   wordmark: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', letterSpacing: 1.8 },
   gems: {
     flexDirection: 'row',

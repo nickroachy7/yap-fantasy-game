@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { YapMark } from '@/components/brand/YapLogo';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
@@ -65,6 +66,11 @@ export default function LoginScreen() {
           style={styles.fill}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ThemedView style={styles.content}>
+            {/* The mark, not the full lockup: the lockup's wordmark reads YAP,
+                and setting that directly above the words "Yap Fantasy" says the
+                same thing twice at two sizes. `ink` is the page — see YapLogo. */}
+            <YapMark height={54} ink={colors.background} />
+
             <ThemedText type="title">Yap Fantasy</ThemedText>
 
             <ThemedText themeColor="textSecondary" style={styles.subtitle}>

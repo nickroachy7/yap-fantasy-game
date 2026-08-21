@@ -324,6 +324,37 @@ export const ChromeBand = '#0E0F12';
 
 
 /* ------------------------------------------------------------------------- *
+ * Brand
+ * ------------------------------------------------------------------------- */
+
+/**
+ * The Yap mark's two tones, carried over from the site this app replaces.
+ *
+ * FIXED, NOT THEMED, and deliberately outside `Colors`. A logo is one artwork
+ * with one palette — the same lime on a phone, on the web rail and on a
+ * favicon fetched as its own document with no page to inherit from. Putting it
+ * in `Colors` would invite it to follow the scheme, and a mark that changes
+ * colour with the chrome is no longer a mark.
+ *
+ * `ink` is NOT a background. It is the colour of the shapes punched back
+ * through the lime — the bot's face slots, the counters in the A and the P —
+ * and it has to match whatever surface the logo is drawn on or those cutouts
+ * read as a dark rectangle sitting behind the letters. Every caller passes the
+ * ground it is actually drawing on; this value is only the fallback for
+ * surfaces that happen to be `ChromeBand`-ish, and for the standalone raster
+ * assets, which have no surface to ask.
+ *
+ * `lime` is close to but NOT `TierColors.dark.gold.accent` (#E3BE4A). They are
+ * allowed to coexist because they never mean the same thing: gold prices
+ * things in gems inside the content, lime only ever says Yap in the chrome.
+ */
+export const Brand = {
+  lime: '#C7F53D',
+  ink: '#101114',
+} as const;
+
+
+/* ------------------------------------------------------------------------- *
  * Sheets
  *
  * The player profile is presented over the app rather than instead of it: a
