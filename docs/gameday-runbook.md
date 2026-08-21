@@ -464,6 +464,59 @@ return value**, so it is also the fastest way to see what the sweep decided:
 ```
 or `{"skipped":"nothing live","season":2026,"week":3}`.
 
+**It cannot force an ingest outside a live window, and that is usually the
+window you want.** `gameday_sweep` checks `slate_is_live()` before it makes any
+HTTP call, so between the six-hour correction cut-off and the next kickoff it
+returns `{"skipped":"nothing live"}` no matter how many times you run it. Every
+reason you would reach for a manual kick — a missed scheduler window, a provider
+outage that cleared too late, a redeploy that had to land before the data could
+— falls in exactly that gap.
+
+### D7. Backfill a week that is not live
+
+```sql
+select public.backfill_week(2026, 1::smallint, 3);
+```
+
+`gameday_sweep`'s body without the liveness gate and with the week named rather
+than derived. Same endpoint, same `finalOnly:false`, same secrets, same
+`score_week` — a backfill that reached the database by a different route than
+the sweep could produce a state the sweep cannot, and then there would be two
+things to debug instead of one. It files its row under `outcome = 'backfill'`
+rather than `'swept'`, so a hole in `sweep_log` still means the scheduler
+missed.
+
+**Run it twice.** `net.http_post` is async: it queues the request and returns an
+id, so the `score_week` at the end of the first call scores what the PREVIOUS
+fetch left behind, not the one it just fired. Wait for the response, then call
+again — the second call ingests nothing new and scores what the first fetched.
+
+```sql
+select public.backfill_week(2026, 1::smallint, 3);          -- note ingest_request
+select ingest_status, ingest_body->>'stat_lines'            -- ~20s later
+  from public.sweep_log where ingest_request_id = <id>;
+select public.backfill_week(2026, 1::smallint, 3);          -- now score it
+```
+
+Worth doing before and after: the fingerprint tells you whether anything
+actually changed, which `stat_lines` counts alone will not if a correction
+replaced a value rather than adding a row.
+
+```sql
+select count(*), round(sum(fp.points),2),
+       md5(string_agg(sl.player_id::text||':'||fp.points::text, ',' order by sl.player_id))
+  from public.stat_lines sl join public.fantasy_points fp on fp.stat_line_id = sl.id
+ where sl.season=2026 and sl.season_type=1 and sl.week=3;
+```
+
+Run on 2026-08-21 against the two games from the night before — last ingested at
+07:55, ten hours cold — it moved 191 lines / 327.82 points to 192 / 336.52. The
+sweep would have picked the same correction up at the next kickoff; the point of
+having this is not needing to wait for one.
+
+**Never schedule it.** The gate it removes is the only thing standing between
+this project and polling an empty Tuesday at the provider's expense.
+
 ---
 
 ## Failure modes
