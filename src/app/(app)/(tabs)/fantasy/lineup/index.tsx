@@ -49,6 +49,7 @@ import {
   eligibleSlotsFor,
   firstOpenSlotFor,
   isEligible,
+  isLocked,
   lockCaption,
   sortByPosition,
   sortCards,
@@ -168,7 +169,30 @@ export default function LineupScreen() {
     return out;
   }, [savedPicks, edits]);
 
-  const locked = lockAt ? now >= new Date(lockAt).getTime() : false;
+  /**
+   * THE LOCK IS NO LONGER ONE MOMENT, so this is no longer one boolean.
+   *
+   * `week_lock_time` is the week's FIRST kickoff, and treating it as the
+   * lineup's deadline froze eleven players on account of the one who was
+   * playing — for the four days an NFL week runs. A player now locks at his own
+   * kickoff (20260821210000), so what the screen needs is not "are we past the
+   * lock" but two derived facts: when the next player locks, and whether
+   * anything at all is still movable.
+   *
+   * `lockAt` from the server is kept only as the pre-kickoff fallback: before
+   * ANY of the week's games have started it and the earliest card kickoff are
+   * the same instant, and it is the one the caption's absolute time is written
+   * from.
+   */
+  const nextLockAt = useMemo(() => {
+    const upcoming = cards
+      .map((card) => (isLocked(card.game) ? null : card.game?.startsAt ?? null))
+      .filter((t): t is string => Boolean(t))
+      .map((t) => new Date(t).getTime())
+      .filter((t) => Number.isFinite(t) && t > now);
+    return upcoming.length > 0 ? new Date(Math.min(...upcoming)).toISOString() : null;
+  }, [cards, now]);
+
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const usedIds = useMemo(() => new Set(Object.values(picks)), [picks]);
 
@@ -182,12 +206,28 @@ export default function LineupScreen() {
     [cards, slate],
   );
   const offSeasonCount = cards.length - seasonCards.length;
+  /**
+   * Nothing left to move: every card you hold is either playing or played.
+   *
+   * Deliberately about the CARDS and not about the slots. A board with eight
+   * locked starters still has a live decision in it if the bench has somebody
+   * whose game is at eight o'clock, and calling that "locked" would hide the
+   * only move left.
+   */
+  const allLocked =
+    seasonCards.length > 0 && seasonCards.every((card) => isLocked(card.game));
 
   const eligibleBySlot = useMemo(() => {
     const map = new Map<string, LineupCard[]>();
     for (const cfg of slots) {
       const list = seasonCards.filter(
-        (card) => isEligible(card, cfg) && (!usedIds.has(card.id) || picks[cfg.slot] === card.id),
+        (card) =>
+          isEligible(card, cfg) &&
+          (!usedIds.has(card.id) || picks[cfg.slot] === card.id) &&
+          /* A player whose game has begun cannot be brought in, so he is not a
+             candidate. He stays visible on the bench with his live figure —
+             this only removes him from the list of people you could START. */
+          !isLocked(card.game),
       );
       map.set(cfg.slot, sortCards(list, sort));
     }
@@ -311,34 +351,47 @@ export default function LineupScreen() {
    * the top of it.
    */
   const swapRequest = useMemo<SwapRequest | null>(() => {
-    /* Locked closes it, and does so here rather than in an effect: the
-       countdown re-renders this screen every second, so the lock is already
-       reflected in the derivation. An effect would have been a second source of
-       truth for the same instant. */
-    if (!swap || locked) return null;
+    /* Gated on THIS slot or THIS card, not on the board. The old check refused
+       to open the sheet at all once the week's first game had started, which is
+       why the swap modal stopped opening on a Friday: week 3 kicked off on the
+       Thursday and every remaining fixture was still days away.
+
+       Done here rather than in an effect: the countdown re-renders this screen
+       every second, so the lock is already reflected in the derivation, and an
+       effect would be a second source of truth for the same instant. */
+    if (!swap) return null;
     if (swap.kind === 'slot') {
       const cfg = slots.find((s) => s.slot === swap.slot);
       if (!cfg) return null;
       const pickedId = picks[cfg.slot];
+      const occupant = pickedId ? (byId.get(pickedId) ?? null) : null;
+      // An empty slot is always openable; a filled one only while its occupant
+      // can still be taken out.
+      if (isLocked(occupant?.game ?? null)) return null;
       return {
         kind: 'slot',
         slot: cfg.slot,
         eligiblePositions: cfg.eligible_positions.join('/'),
-        current: pickedId ? (byId.get(pickedId) ?? null) : null,
+        current: occupant,
         options: eligibleBySlot.get(cfg.slot) ?? [],
       };
     }
     const card = byId.get(swap.cardId);
-    if (!card) return null;
+    if (!card || isLocked(card.game)) return null;
     return {
       kind: 'bench',
       card,
-      destinations: eligibleSlotsFor(card, slots).map((cfg) => ({
-        slot: cfg.slot,
-        occupant: picks[cfg.slot] ? (byId.get(picks[cfg.slot]) ?? null) : null,
-      })),
+      /* A destination whose occupant is already playing is not a destination:
+         taking him out is exactly what the server refuses, so offering the slot
+         would be offering an error. */
+      destinations: eligibleSlotsFor(card, slots)
+        .map((cfg) => ({
+          slot: cfg.slot,
+          occupant: picks[cfg.slot] ? (byId.get(picks[cfg.slot]) ?? null) : null,
+        }))
+        .filter((d) => !isLocked(d.occupant?.game ?? null)),
     };
-  }, [swap, locked, slots, picks, byId, eligibleBySlot]);
+  }, [swap, slots, picks, byId, eligibleBySlot]);
 
   /**
    * Re-read both halves of the fixture, without the pull-to-refresh spinner.
@@ -443,10 +496,10 @@ export default function LineupScreen() {
    * so a save that lands makes it false and the effect goes quiet on its own.
    */
   useEffect(() => {
-    if (!dirty || locked || saving || blocked || !slate) return;
+    if (!dirty || saving || blocked || !slate) return;
     const t = setTimeout(() => void submit(), DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [dirty, locked, saving, blocked, slate, submit]);
+  }, [dirty, saving, blocked, slate, submit]);
 
   /**
    * The one thing the reader can still ask for by hand, and only after a
@@ -469,7 +522,7 @@ export default function LineupScreen() {
   /* "About to save" — the debounce window. The status line has to cover it or
      there is a visible second where an edit has been made and the screen says
      it is saved. */
-  const pending = dirty && !locked && !blocked;
+  const pending = dirty && !blocked;
   /* The week, without the lock state. The contest card carries the lock in its
      own tile and its own chip, so repeating it here put "Locked" on the card
      three times. */
@@ -490,7 +543,7 @@ export default function LineupScreen() {
     ? 'Live'
     : finalizedAt
       ? 'Final'
-      : locked
+      : allLocked
         ? 'Locked'
         : null;
   const context = slate && phase ? `${week} · ${phase}` : week;
@@ -533,8 +586,8 @@ export default function LineupScreen() {
       <ContestCard
         displayName={displayName}
         weekLabel={week}
-        lockAt={lockAt}
-        locked={locked}
+        lockAt={nextLockAt ?? lockAt}
+        locked={allLocked}
         now={now}
         /* Passed raw. Whether a nought is a SCORE or just an unswept row is a
            question about the field, not about this lineup, so the card decides
@@ -562,8 +615,10 @@ export default function LineupScreen() {
           {`Points as of ${new Date(scoredAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`}
           {hasLiveGame ? ' · updating every minute' : ''}
         </Text>
-      ) : lockCaption(lockAt, locked) ? (
-        <Text style={[Type.fine, { color: c.textTertiary }]}>{lockCaption(lockAt, locked)}</Text>
+      ) : lockCaption(nextLockAt ?? lockAt, allLocked) ? (
+        <Text style={[Type.fine, { color: c.textTertiary }]}>
+          {lockCaption(nextLockAt ?? lockAt, allLocked)}
+        </Text>
       ) : null}
 
       {cards.length === 0 ? (
@@ -586,7 +641,6 @@ export default function LineupScreen() {
               picks={picks}
               eligibleCounts={eligibleCounts}
               openSlot={swap?.kind === 'slot' ? swap.slot : null}
-              locked={locked}
               savedPoints={savedPoints}
               scored={scoredAt !== null}
               onOpenSlot={openSlot}
@@ -604,7 +658,6 @@ export default function LineupScreen() {
               cards={bench}
               targetSlotFor={targetSlotFor}
               startableFor={startableFor}
-              locked={locked}
               onOpen={openBenchCard}
               onOpenProfile={openProfile}
               offSeasonCount={offSeasonCount}
@@ -634,7 +687,7 @@ export default function LineupScreen() {
             <ActivityIndicator size="small" color={c.textTertiary} />
             <Text style={[Type.fine, { color: c.textTertiary }]}>Saving…</Text>
           </>
-        ) : locked ? (
+        ) : allLocked ? (
           <Text style={[Type.fine, { color: c.textTertiary }]}>
             Locked — this week&apos;s lineup is final.
           </Text>
@@ -643,7 +696,7 @@ export default function LineupScreen() {
         ) : null}
       </View>
 
-      {!locked && filled < slots.length ? (
+      {!allLocked && filled < slots.length ? (
         <Text style={[Type.fine, styles.centreText, { color: c.textTertiary }]}>
           {slots.length - filled} slot{slots.length - filled === 1 ? '' : 's'} still empty. A partial
           lineup is allowed — an empty slot simply scores nothing.

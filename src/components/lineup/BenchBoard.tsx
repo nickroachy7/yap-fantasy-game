@@ -25,13 +25,12 @@ import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { BenchRow } from './LineupRow';
-import { type LineupCard } from './model';
+import { isLocked, type LineupCard } from './model';
 
 function BenchBoardImpl({
   cards,
   targetSlotFor,
   startableFor,
-  locked,
   onOpen,
   onOpenProfile,
   offSeasonCount,
@@ -41,7 +40,6 @@ function BenchBoardImpl({
   targetSlotFor: (card: LineupCard) => string | null;
   /** Whether any slot at all accepts him — a taken slot still counts. */
   startableFor: (card: LineupCard) => boolean;
-  locked: boolean;
   /** The badge opens the swap sheet for this card. */
   onOpen: (card: LineupCard) => void;
   /** Everything else opens the player. */
@@ -59,20 +57,28 @@ function BenchBoardImpl({
           Every card you own is in the lineup.
         </Text>
       ) : (
-        cards.map((card) => (
+        cards.map((card) => {
+          /* PER CARD. A bench player whose own game has kicked off can no
+             longer be brought in — the server refuses it (20260821210000) and
+             the badge must not offer it. Everyone else stays available, which
+             is the point: a receiver playing on Sunday night is a live option
+             all Sunday afternoon. */
+          const cardLocked = isLocked(card.game);
+          return (
           <BenchRow
             key={card.id}
             card={card}
             destination={targetSlotFor(card)}
-            disabled={locked || !startableFor(card)}
-            onSwap={!locked && startableFor(card) ? () => onOpen(card) : undefined}
+            disabled={cardLocked || !startableFor(card)}
+            onSwap={!cardLocked && startableFor(card) ? () => onOpen(card) : undefined}
             /* Every owned card has an instance id, which is all the card
                profile needs — the old guard was on `playerId`, required only
                while this opened the PLAYER, and would now make a row dead for
                a field the destination no longer reads. */
             onOpenProfile={() => onOpenProfile(card)}
           />
-        ))
+          );
+        })
       )}
       {offSeasonCount > 0 ? (
         <Text style={[Type.fine, styles.note, { color: c.textTertiary }]}>

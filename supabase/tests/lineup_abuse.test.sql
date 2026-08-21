@@ -62,11 +62,73 @@ order by c.id limit 1;
 -- `now()`, which is what stops the calendar deciding whether the tests run.
 -- Weeks 92 and 93 are far outside any real slate.
 --
--- No teams: `home_team_id` and `visitor_team_id` are nullable, and the only
--- column that matters here is `starts_at`.
+-- TEAMS MATTER NOW. They did not when a whole week locked at its first kickoff
+-- — `starts_at` was the only column that decided anything, so these games were
+-- inserted with null teams. Under per-player locking (20260821210000) a card is
+-- locked by ITS OWN player's fixture, so a game nobody plays in locks nobody,
+-- and this suite's synthetic week would have gone from "everything is frozen"
+-- to "nothing ever locks" without a single assertion changing.
+--
+-- Week 93 therefore gets two games: one that kicked off two days ago and one
+-- that has not started, each pointed at a real team, so the same week contains
+-- both a locked player and an editable one. That is the state per-player
+-- locking exists for, and it is unreachable with one game.
 insert into public.games (external_id, season, week, season_type, starts_at, status_state)
 values (993001, 2026, 93, 1, now() - interval '2 days', 'final'),
-       (993002, 2026, 92, 1, now() + interval '7 days', 'scheduled');
+       (993002, 2026, 92, 1, now() + interval '7 days', 'scheduled'),
+       (993003, 2026, 93, 1, now() + interval '2 days', 'scheduled');
+
+-- Two of A's running backs on different clubs: one whose game has been played,
+-- one whose game is still ahead. Carried in a temp table because the assertions
+-- run in a later block, under a different role.
+create temp table lock_fixture on commit drop as
+with rbs as (
+  select ci.id as card_id, p.team_id,
+         row_number() over (order by p.team_id, ci.id) as rn
+    from public.card_instances ci
+    join public.cards   c on c.id = ci.card_id
+    join public.players p on p.id = c.player_id
+   where ci.user_id = 'aaaaaaaa-0000-0000-0000-000000000001'
+     and p.position_abbreviation = 'RB'
+     and p.team_id is not null
+)
+select
+  (select card_id from rbs where rn = 1) as locked_card,
+  (select team_id from rbs where rn = 1) as locked_team,
+  (select card_id from rbs where team_id <> (select team_id from rbs where rn = 1)
+    order by team_id, card_id limit 1) as open_card,
+  (select team_id from rbs where team_id <> (select team_id from rbs where rn = 1)
+    order by team_id, card_id limit 1) as open_team;
+
+-- The assertions below run as `authenticated`, and a temp table belongs to the
+-- role that made it. Without this they get "permission denied for table
+-- lock_fixture" — which looks like an RLS finding and is nothing of the sort.
+grant select on lock_fixture to authenticated;
+
+do $$
+declare f record;
+begin
+  select * into f from lock_fixture;
+  if f.locked_card is null or f.open_card is null then
+    raise exception 'FAIL: fixture needs two RB cards on different clubs';
+  end if;
+
+  -- Point each week-93 game at one of the two clubs.
+  update public.games set home_team_id = f.locked_team where external_id = 993001;
+  update public.games set home_team_id = f.open_team   where external_id = 993003;
+
+  -- A lineup set BEFORE that first game kicked off, holding the card that is
+  -- now locked. Written directly rather than through set_lineup, because
+  -- set_lineup would (correctly) refuse to place a player whose game has begun
+  -- — this is the state a user is legitimately already in.
+  insert into public.lineups (user_id, season, season_type, week)
+  values ('aaaaaaaa-0000-0000-0000-000000000001', 2026, 1::smallint, 93);
+  insert into public.lineup_slots (lineup_id, slot, card_instance_id)
+  select l.id, 'RB1', f.locked_card
+    from public.lineups l
+   where l.user_id = 'aaaaaaaa-0000-0000-0000-000000000001'
+     and l.season = 2026 and l.season_type = 1 and l.week = 93;
+end $$;
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"aaaaaaaa-0000-0000-0000-000000000001","role":"authenticated"}';
@@ -79,6 +141,7 @@ declare
   -- Pinned above rather than selected here; RLS would hide it from A. See there.
   foreign_qb constant uuid := 'bbbbbbbb-1111-0000-0000-00000000000b';
   v_lineup uuid; v_slots int; v_lineups int; blocked int := 0;
+  locked_rb uuid; open_rb uuid;
 
   -- This suite's own weeks, inserted above and pinned to now(): 93 kicked off
   -- two days ago, 92 kicks off in a week. Never real weeks — see the note there.
@@ -94,12 +157,50 @@ begin
   select ci.id into te  from public.card_instances ci join public.cards c on c.id=ci.card_id join public.players p on p.id=c.player_id where ci.user_id=a and p.position_abbreviation='TE' order by ci.id limit 1;
   select ci.id into pk  from public.card_instances ci join public.cards c on c.id=ci.card_id join public.players p on p.id=c.player_id where ci.user_id=a and p.position_abbreviation='PK' order by ci.id limit 1;
 
-  -- 1. a week that has already kicked off
+  -- 1. ADDING a player whose game has already kicked off.
+  --
+  --    This used to read "a week that has already kicked off", and asserted
+  --    that week 93 refused everything. It no longer does and should not: the
+  --    week has a game still to come, and the players in it are editable. What
+  --    must be refused is putting a man on the field who is already on it.
+  select locked_card into locked_rb from lock_fixture;
+  select open_card   into open_rb   from lock_fixture;
+
+  --    TAKING HIM OUT. The setup left him in RB1 from a lineup set before his
+  --    game began, and replacing him now would be picking a starter after
+  --    watching him play.
   begin
     perform public.set_lineup(2026, 1::smallint, locked_week,
-      jsonb_build_array(jsonb_build_object('slot','QB','card_instance_id',qb)));
-    raise exception 'FAIL: wrote a lineup for a locked week';
+      jsonb_build_array(jsonb_build_object('slot','RB1','card_instance_id',open_rb)));
+    raise exception 'FAIL: removed a player whose game had already started';
   exception when sqlstate '55006' then blocked := blocked + 1; end;
+
+  --    PUTTING HIM SOMEWHERE ELSE is the same offence wearing a different hat:
+  --    he leaves RB1 and arrives at RB2, and the arrival is an add.
+  begin
+    perform public.set_lineup(2026, 1::smallint, locked_week,
+      jsonb_build_array(
+        jsonb_build_object('slot','RB1','card_instance_id',open_rb),
+        jsonb_build_object('slot','RB2','card_instance_id',locked_rb)));
+    raise exception 'FAIL: moved a player whose game had already started';
+  exception when sqlstate '55006' then blocked := blocked + 1; end;
+
+  --    AND THE OTHER HALF, which is the whole reason the rule changed: a slot
+  --    beside a locked one is still editable. RB1 is untouched, RB2 takes a
+  --    player whose game has not kicked off, and this MUST be allowed — under
+  --    the old whole-week lock it was not, and that is the bug being fixed.
+  perform public.set_lineup(2026, 1::smallint, locked_week,
+    jsonb_build_array(
+      jsonb_build_object('slot','RB1','card_instance_id',locked_rb),
+      jsonb_build_object('slot','RB2','card_instance_id',open_rb)));
+
+  select count(*) into v_slots
+    from public.lineup_slots ls
+    join public.lineups l on l.id = ls.lineup_id
+   where l.user_id = a and l.season = 2026 and l.season_type = 1 and l.week = locked_week;
+  if v_slots <> 2 then
+    raise exception 'FAIL: editing beside a locked slot left % slots, expected 2', v_slots;
+  end if;
 
   -- 2. a card owned by somebody else
   begin
@@ -137,8 +238,11 @@ begin
     raise exception 'FAIL: kicker allowed in FLEX';
   exception when sqlstate '22023' then blocked := blocked + 1; end;
 
-  if blocked <> 6 then
-    raise exception 'FAIL: only %/6 attacks blocked', blocked;
+  -- Seven, not six: the old single "locked week" attack became two, because a
+  -- per-player lock has two ways to be broken — taking a playing man out, and
+  -- putting one in.
+  if blocked <> 7 then
+    raise exception 'FAIL: only %/7 attacks blocked', blocked;
   end if;
 
   -- ---- happy path -------------------------------------------------------
@@ -162,11 +266,16 @@ begin
     jsonb_build_array(jsonb_build_object('slot','QB','card_instance_id',qb)));
 
   select count(*) into v_slots   from public.lineup_slots where lineup_id = v_lineup;
-  select count(*) into v_lineups from public.lineups;
+  -- Scoped to the open week. This suite now also holds a week-93 lineup, set up
+  -- to give the per-player lock something already in place to defend, and an
+  -- unqualified count() would read it as a duplicate.
+  select count(*) into v_lineups
+    from public.lineups
+   where user_id = a and season = 2026 and season_type = 1 and week = open_week;
   if v_slots   <> 1 then raise exception 'FAIL: resubmit left % slots, expected 1', v_slots; end if;
   if v_lineups <> 1 then raise exception 'FAIL: resubmit created a second lineup'; end if;
 
-  raise notice 'PASS: 6/6 attacks blocked; 8-slot lineup written; resubmit replaced it';
+  raise notice 'PASS: %/7 attacks blocked; per-player locks hold both ways; 8-slot lineup written; resubmit replaced it', blocked;
 end $$;
 
 reset role;

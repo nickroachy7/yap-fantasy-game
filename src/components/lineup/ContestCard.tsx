@@ -245,8 +245,13 @@ export function ContestCard({
   const c = Colors[scheme];
   const accent = TierColors[scheme].gold.accent;
 
-  /* Only ever rendered on an open week — a locked or final one shows its chip
-     instead — so there is no 'LOCKED' branch here to keep in step with it. */
+  /* The countdown runs to the NEXT player's kickoff, not to the week's first —
+     players lock one at a time now, so this is a deadline that arrives several
+     times and shortens the bench each time rather than ending the week.
+ 
+     Only ever rendered while something is still movable; a fully locked or
+     final week shows its chip instead, so there is no 'LOCKED' branch here to
+     keep in step with it. */
   const clock = lockAt ? countdownLabel(new Date(lockAt).getTime() - now) : DASH;
 
   /**
@@ -367,7 +372,7 @@ export function ContestCard({
         ) : (
           <View style={styles.clock}>
             <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
-              LOCKS IN
+              NEXT LOCK
             </Text>
             <Text numberOfLines={1} style={[Type.strong, NUMERIC, { color: c.text }]}>
               {clock}

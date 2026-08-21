@@ -16,7 +16,7 @@ import { memo } from 'react';
 import { View } from 'react-native';
 
 import { StarterRow } from './LineupRow';
-import { type LineupCard, type SlotConfig } from './model';
+import { isLocked, type LineupCard, type SlotConfig } from './model';
 
 function SlotBoardImpl({
   slots,
@@ -24,7 +24,6 @@ function SlotBoardImpl({
   picks,
   eligibleCounts,
   openSlot,
-  locked,
   savedPoints,
   scored,
   onOpenSlot,
@@ -37,7 +36,6 @@ function SlotBoardImpl({
   eligibleCounts: Map<string, number>;
   /** The slot whose sheet is open, so its row stays visibly the subject. */
   openSlot: string | null;
-  locked: boolean;
   /** Per-slot scored points, and whether the week has been swept at all. */
   savedPoints: Record<string, number | null>;
   scored: boolean;
@@ -48,27 +46,33 @@ function SlotBoardImpl({
 }) {
   return (
     <View>
-      {slots.map((cfg) => (
+      {slots.map((cfg) => {
+        const card = picks[cfg.slot] ? (byId.get(picks[cfg.slot]) ?? null) : null;
+        /* PER SLOT, not per board. A locked slot is one whose occupant is
+           already playing; an EMPTY slot is never locked, because there is no
+           player in it to have kicked off — which is exactly the case that lets
+           you fill a hole on Sunday morning with somebody playing that
+           afternoon. */
+        const slotLocked = isLocked(card?.game ?? null);
+        return (
         <StarterRow
           key={cfg.slot}
           slot={cfg.slot}
-          card={picks[cfg.slot] ? (byId.get(picks[cfg.slot]) ?? null) : null}
+          card={card}
           points={savedPoints[cfg.slot] ?? null}
           scored={scored}
           selected={openSlot === cfg.slot}
-          disabled={locked}
+          disabled={slotLocked}
           eligibleCount={eligibleCounts.get(cfg.slot) ?? 0}
           eligiblePositions={cfg.eligible_positions.join('/')}
-          onSwap={locked ? undefined : () => onOpenSlot(cfg.slot)}
+          onSwap={slotLocked ? undefined : () => onOpenSlot(cfg.slot)}
           /* An EMPTY slot has no card to open and stays undefined; a filled
              one always can. The guard used to be on `playerId`, needed only
              while this opened the PLAYER rather than the copy. */
-          onOpenProfile={(() => {
-            const card = picks[cfg.slot] ? byId.get(picks[cfg.slot]) : undefined;
-            return card ? () => onOpenProfile(card) : undefined;
-          })()}
+          onOpenProfile={card ? () => onOpenProfile(card) : undefined}
         />
-      ))}
+        );
+      })}
     </View>
   );
 }

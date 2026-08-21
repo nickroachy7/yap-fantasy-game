@@ -215,6 +215,30 @@ export function liveLabel(game: GameContext | null): string | null {
 }
 
 /**
+ * Is this card fixed in place?
+ *
+ * A player locks at HIS OWN kickoff, not at the week's. The week-level lock this
+ * replaces was `min(starts_at)` over every fixture, so a Thursday night game
+ * froze the other eleven of your players for four days over games that had not
+ * started — see 20260821210000, which is the enforcing half. This is the
+ * client's copy of the same question, and it must give the same answer: a badge
+ * offering a swap the server will refuse is worse than no badge at all.
+ *
+ * A BYE IS NOT A LOCK. A player with no fixture never kicks off, so nothing ever
+ * fixes him in place, and he stays swappable. That is not a loophole: whoever
+ * you swap him FOR has to be unlocked too, so by the time every game has started
+ * there is nobody left to bring in and the rule closes itself.
+ *
+ * An empty slot is not locked either — it has no player to have started — which
+ * is what lets you fill a hole on Sunday morning with somebody playing that
+ * afternoon.
+ */
+export function isLocked(game: GameContext | null): boolean {
+  if (!game || !game.opponent) return false;
+  return game.status !== 'scheduled';
+}
+
+/**
  * The number a row should show for this week, or null for a dash.
  *
  * ---------------------------------------------------------------------------
@@ -283,12 +307,25 @@ export function countdownLabel(msRemaining: number): string {
   return `${m}m ${s % 60}s`;
 }
 
-/** Long form for the absolute lock time, shown once as a caption. */
+/**
+ * Long form for the absolute lock time, shown once as a caption.
+ *
+ * "first kickoff" is gone from the wording, because the week's first kickoff
+ * stopped being anybody's deadline: players lock one at a time, at their own.
+ * What this names is the NEXT one — the moment the roster of people you can
+ * still move shrinks again.
+ *
+ * `locked` no longer needs a time beside it. Once everything has started there
+ * is no instant left to count toward, and printing the week's opening kickoff
+ * there — which is what the fallback would supply — would date the sentence to
+ * something that happened days ago.
+ */
 export function lockCaption(lockAt: string | null, locked: boolean): string | undefined {
+  if (locked) return 'Every player you hold has started. Nothing can be changed.';
   if (!lockAt) return undefined;
   const d = new Date(lockAt);
   if (Number.isNaN(d.getTime())) return undefined;
-  return `${locked ? 'Locked at' : 'Locks at first kickoff,'} ${d.toLocaleString()}`;
+  return `Next player locks at ${d.toLocaleString()}`;
 }
 
 export function isEligible(card: LineupCard, cfg: SlotConfig): boolean {
