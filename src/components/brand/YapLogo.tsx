@@ -31,9 +31,27 @@ import Svg, { Path } from 'react-native-svg';
 
 import { Brand } from '@/constants/theme';
 
-/** Aspect ratios, baked from the viewBoxes below so callers only pass height. */
+/**
+ * Aspect ratios, baked from the viewBoxes below so callers only pass height.
+ */
 const LOCKUP_RATIO = 1.597923;
 const MARK_RATIO = 1.535826;
+
+/**
+ * NEVER LET THE MARK SHRINK.
+ *
+ * On web this component renders a bare <svg>, which does NOT pick up React
+ * Native Web's reset — so it lands in a flex column as a plain CSS flex item,
+ * where `flex-shrink` defaults to 1. The moment that column overflows (a short
+ * browser window on the login screen, which is exactly where the mark is
+ * biggest) the browser resolves the overflow by shrinking its children, and the
+ * SVG is the one child with no intrinsic minimum: it collapses to height 0 and
+ * the logo silently disappears. It measured 82.9x0 in production before this.
+ *
+ * Native never had the problem — RN's own default is `flexShrink: 0` — which is
+ * precisely why it has to be stated here rather than left to the platform.
+ */
+const NO_SHRINK = { flexShrink: 0 } as const;
 
 type LogoProps = {
   /** Height in points. Width follows from the lockup's own ratio. */
@@ -50,6 +68,7 @@ export function YapLogo({ height = 28, color = Brand.lime, ink = Brand.ink }: Lo
     <Svg
       width={height * LOCKUP_RATIO}
       height={height}
+      style={NO_SHRINK}
       viewBox="494 687 1077 674"
       accessibilityRole="image"
       accessibilityLabel="Yap">
@@ -70,6 +89,7 @@ export function YapMark({ height = 20, color = Brand.lime, ink = Brand.ink }: Lo
     <Svg
       width={height * MARK_RATIO}
       height={height}
+      style={NO_SHRINK}
       viewBox="776 687 493 321"
       accessibilityRole="image"
       accessibilityLabel="Yap">

@@ -1,0 +1,33 @@
+# What NOT to upload to Vercel.
+#
+# The CLI does not read .gitignore, so without this file `vercel deploy` uploads
+# the working directory as it stands — which here meant 413MB and a hard failure
+# on `ios/Pods/ExpoImage/SDWebImage.xcframework is not a valid symlink`. The
+# native iOS build tree is generated, gitignored, irrelevant to a web export,
+# and full of symlinks the archive cannot represent.
+#
+# Everything below is either regenerated on the build machine (node_modules via
+# `npm ci`, dist via `expo export`) or has nothing to do with the web bundle.
+# The web build needs src/, assets/, public/, app.json, package.json and the
+# lockfile — do not add those here.
+
+node_modules
+dist
+.expo
+web-build
+
+# Generated native projects. `expo export --platform web` never reads them.
+ios
+android
+
+# Backend and tooling that ship nowhere near the browser.
+supabase
+docs
+scripts/brand-fonts
+
+.git
+.github
+.vscode
+.claude
+*.log
+.DS_Store

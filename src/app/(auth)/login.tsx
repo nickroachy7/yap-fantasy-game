@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   useColorScheme,
@@ -76,125 +77,138 @@ export default function LoginScreen() {
         <KeyboardAvoidingView
           style={styles.fill}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ThemedView style={styles.content}>
-            {/* The mark, not the full lockup: the lockup's wordmark reads YAP,
-                and setting that directly above the words "Yap Fantasy" says the
-                same thing twice at two sizes. `ink` is the page — see YapLogo. */}
-            <YapMark height={54} ink={colors.background} />
+          {/* Scrolls rather than centres-and-clips. `content` used to be a
+              `flex: 1` column with `justifyContent: 'center'`, which centres
+              beautifully until the form is taller than the window — and then
+              overflows EQUALLY in both directions, putting the heading and the
+              email field above the top edge where nothing can scroll to them.
+              A short laptop window is enough to do it, and that is most of the
+              people this is being handed to. `flexGrow` keeps the centring for
+              every viewport that does have the room. */}
+          <ScrollView
+            style={styles.fill}
+            contentContainerStyle={styles.scroll}
+            keyboardShouldPersistTaps="handled">
+            <ThemedView style={styles.content}>
+              {/* The mark, not the full lockup: the lockup's wordmark reads YAP,
+                  and setting that directly above the words "Yap Fantasy" says the
+                  same thing twice at two sizes. `ink` is the page — see YapLogo. */}
+              <YapMark height={54} ink={colors.background} />
 
-            <ThemedText type="title">Yap Fantasy</ThemedText>
+              <ThemedText type="title">Yap Fantasy</ThemedText>
 
-            <ThemedText themeColor="textSecondary" style={styles.subtitle}>
-              {mode === 'sent'
-                ? `We sent a sign-in link to ${email.trim()}.`
-                : mode === 'password'
-                  ? 'Sign in, or make an account with an email and password.'
-                  : 'We will email you a link. No password to remember.'}
-            </ThemedText>
+              <ThemedText themeColor="textSecondary" style={styles.subtitle}>
+                {mode === 'sent'
+                  ? `We sent a sign-in link to ${email.trim()}.`
+                  : mode === 'password'
+                    ? 'Sign in, or make an account with an email and password.'
+                    : 'We will email you a link. No password to remember.'}
+              </ThemedText>
 
-            {mode !== 'sent' ? (
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                placeholder="you@example.com"
-                placeholderTextColor={colors.textSecondary}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="email"
-                keyboardType="email-address"
-                inputMode="email"
-                editable={!busy}
-                style={inputStyle}
-              />
-            ) : null}
-
-            {mode === 'link' ? (
-              <>
-                <PrimaryButton
-                  label="Email me a link"
-                  busy={busy}
-                  disabled={!emailLooksValid || busy}
-                  onPress={() => run(() => sendMagicLink(email), () => setMode('sent'))}
-                />
-                <SecondaryButton
-                  label="Use a password instead"
-                  disabled={busy}
-                  onPress={() => { setMode('password'); setError(null); }}
-                />
-              </>
-            ) : null}
-
-            {mode === 'sent' ? (
-              <>
-                <ThemedText themeColor="textSecondary" style={styles.subtitle}>
-                  Open it on this device, or enter the code from the email.
-                </ThemedText>
+              {mode !== 'sent' ? (
                 <TextInput
-                  value={code}
-                  onChangeText={setCode}
-                  placeholder="123456"
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="you@example.com"
                   placeholderTextColor={colors.textSecondary}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  keyboardType="number-pad"
-                  inputMode="numeric"
-                  maxLength={10}
-                  editable={!busy}
-                  style={[...inputStyle, styles.codeInput]}
-                />
-                <PrimaryButton
-                  label="Verify code"
-                  busy={busy}
-                  disabled={code.trim().length < 6 || busy}
-                  onPress={() => run(() => verifyCode(email, code))}
-                />
-                <SecondaryButton
-                  label="Use a different email"
-                  disabled={busy}
-                  onPress={() => { setMode('link'); setCode(''); setError(null); }}
-                />
-              </>
-            ) : null}
-
-            {mode === 'password' ? (
-              <>
-                <TextInput
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder={`Password (${MIN_PASSWORD}+ characters)`}
-                  placeholderTextColor={colors.textSecondary}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  autoComplete="current-password"
-                  secureTextEntry
+                  autoComplete="email"
+                  keyboardType="email-address"
+                  inputMode="email"
                   editable={!busy}
                   style={inputStyle}
                 />
-                <PrimaryButton
-                  label="Sign in"
-                  busy={busy}
-                  disabled={!emailLooksValid || !passwordLongEnough || busy}
-                  onPress={() => run(() => signInWithPassword(email, password))}
-                />
-                <SecondaryButton
-                  label="Create an account with this password"
-                  disabled={!emailLooksValid || !passwordLongEnough || busy}
-                  onPress={() => run(() => signUpWithPassword(email, password))}
-                />
-                <SecondaryButton
-                  label="Email me a link instead"
-                  disabled={busy}
-                  onPress={() => { setMode('link'); setPassword(''); setError(null); }}
-                />
-              </>
-            ) : null}
+              ) : null}
 
-            {error ? (
-              <ThemedText type="small" style={[styles.error, { color: colors.text }]}>
-                {error}
-              </ThemedText>
-            ) : null}
-          </ThemedView>
+              {mode === 'link' ? (
+                <>
+                  <PrimaryButton
+                    label="Email me a link"
+                    busy={busy}
+                    disabled={!emailLooksValid || busy}
+                    onPress={() => run(() => sendMagicLink(email), () => setMode('sent'))}
+                  />
+                  <SecondaryButton
+                    label="Use a password instead"
+                    disabled={busy}
+                    onPress={() => { setMode('password'); setError(null); }}
+                  />
+                </>
+              ) : null}
+
+              {mode === 'sent' ? (
+                <>
+                  <ThemedText themeColor="textSecondary" style={styles.subtitle}>
+                    Open it on this device, or enter the code from the email.
+                  </ThemedText>
+                  <TextInput
+                    value={code}
+                    onChangeText={setCode}
+                    placeholder="123456"
+                    placeholderTextColor={colors.textSecondary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="number-pad"
+                    inputMode="numeric"
+                    maxLength={10}
+                    editable={!busy}
+                    style={[...inputStyle, styles.codeInput]}
+                  />
+                  <PrimaryButton
+                    label="Verify code"
+                    busy={busy}
+                    disabled={code.trim().length < 6 || busy}
+                    onPress={() => run(() => verifyCode(email, code))}
+                  />
+                  <SecondaryButton
+                    label="Use a different email"
+                    disabled={busy}
+                    onPress={() => { setMode('link'); setCode(''); setError(null); }}
+                  />
+                </>
+              ) : null}
+
+              {mode === 'password' ? (
+                <>
+                  <TextInput
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder={`Password (${MIN_PASSWORD}+ characters)`}
+                    placeholderTextColor={colors.textSecondary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="current-password"
+                    secureTextEntry
+                    editable={!busy}
+                    style={inputStyle}
+                  />
+                  <PrimaryButton
+                    label="Sign in"
+                    busy={busy}
+                    disabled={!emailLooksValid || !passwordLongEnough || busy}
+                    onPress={() => run(() => signInWithPassword(email, password))}
+                  />
+                  <SecondaryButton
+                    label="Create an account with this password"
+                    disabled={!emailLooksValid || !passwordLongEnough || busy}
+                    onPress={() => run(() => signUpWithPassword(email, password))}
+                  />
+                  <SecondaryButton
+                    label="Email me a link instead"
+                    disabled={busy}
+                    onPress={() => { setMode('link'); setPassword(''); setError(null); }}
+                  />
+                </>
+              ) : null}
+
+              {error ? (
+                <ThemedText type="small" style={[styles.error, { color: colors.text }]}>
+                  {error}
+                </ThemedText>
+              ) : null}
+            </ThemedView>
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </ThemedView>
@@ -263,9 +277,10 @@ function PrimaryButton({
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  /* The centring lives here now, on the scroll content, so it degrades to
+     "start at the top and scroll" instead of overflowing off both edges. */
+  scroll: { flexGrow: 1, justifyContent: 'center' },
   content: {
-    flex: 1,
-    justifyContent: 'center',
     gap: 14,
     padding: 24,
     maxWidth: 420,

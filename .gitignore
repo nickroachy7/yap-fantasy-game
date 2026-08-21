@@ -44,3 +44,4 @@ example
 
 # expo web export
 dist/
+.vercel
