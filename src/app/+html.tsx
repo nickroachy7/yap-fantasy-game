@@ -37,7 +37,30 @@ export default function Root({ children }: PropsWithChildren) {
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        {/**
+         * `viewport-fit=cover` IS WHAT MAKES THE SAFE AREA EXIST ON WEB.
+         *
+         * Without it iOS Safari lays the page out inside the safe area and
+         * reports every `env(safe-area-inset-*)` as 0. `useSafeAreaInsets()`
+         * reads those variables on web, so it returned 0 at the bottom, and the
+         * tab bar — which sizes itself `TabBarContentHeight + insets.bottom`
+         * and pads by the same amount, exactly so it can reach the edge —
+         * had nothing to reach into. The bar stopped short and the strip under
+         * it, where the home indicator sits, was left showing the page.
+         *
+         * The bar was never wrong. It was told the inset was zero.
+         *
+         * This opts the page into the full window, which means content CAN now
+         * pass under the notch and the indicator. That is safe here because the
+         * chrome already asks for the insets rather than assuming them: the
+         * masthead pads by `insets.top`, the tab bar by `insets.bottom`, and
+         * the sheets by their own. Turning this on without those would put the
+         * wordmark under the clock.
+         */}
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
+        />
 
         <title>{TITLE}</title>
         <meta name="description" content={DESCRIPTION} />
