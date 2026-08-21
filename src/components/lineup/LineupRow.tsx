@@ -672,21 +672,22 @@ export function BandFigure({ label, value }: { label: string; value: string | nu
 export function PlayerBand({
   card,
   badge,
-  lead,
   right,
   emptyPrimary,
   emptySecondary,
   selected,
+  dimmed,
   onPress,
   accessibilityLabel,
 }: {
   card: LineupCard | null;
   badge: React.ReactNode;
-  lead?: React.ReactNode;
   right: React.ReactNode;
   emptyPrimary?: string;
   emptySecondary?: string;
   selected?: boolean;
+  /** Present but not choosable — a player whose game has already kicked off. */
+  dimmed?: boolean;
   onPress?: () => void;
   accessibilityLabel: string;
 }) {
@@ -698,15 +699,30 @@ export function PlayerBand({
       onPress={onPress}
       disabled={!onPress}
       accessibilityRole="button"
-      accessibilityState={{ selected: Boolean(selected) }}
+      accessibilityState={{ selected: Boolean(selected), disabled: Boolean(dimmed) }}
       accessibilityLabel={accessibilityLabel}
       style={({ pressed }) => [
         styles.row,
         styles.band,
-        { backgroundColor: selected ? c.backgroundSelected : c.background },
+        /* NO FILL OF ITS OWN. It used to paint `background`, and the current
+           pick `backgroundSelected` — two colours, neither of which is the
+           colour of the sheet they sit in (`surfaceSheet`), so the rows read as
+           tiles dropped onto a panel rather than as the same rows the board is
+           made of. Transparent, they inherit the sheet, and the only fill left
+           is the one that means something: the press.
+
+           WHICH ROW IS THE CURRENT ONE IS SAID BY POSITION AND BY ITS MARK, not
+           by a tint. It sits at the top under its own heading with `IN` beside
+           it; a highlight as well was the third way of saying it, and the one
+           that cost the row its resemblance to the board. */
         pressed && { backgroundColor: c.backgroundElement },
+        dimmed && styles.dimmed,
       ]}>
-      {lead ? <View style={styles.lead}>{lead}</View> : null}
+      {/* NO LEAD COLUMN. There was one, 30pt wide, holding an `IN` or an `OUT`
+          — and it pushed the name in far enough that "Christian McCaffrey"
+          rendered as "Christian McCaf…" in a sheet whose entire job is telling
+          two players apart. The heading above each group already says which
+          group it is, so the column was spending the name's width to repeat it. */}
       <View style={styles.badgeCol}>{badge}</View>
       <Identity
         card={card}
@@ -839,5 +855,8 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
   },
   /* Fixed, so IN / OUT / a slot code all start at the same x down the list. */
-  lead: { width: 30, alignSelf: 'center', alignItems: 'flex-start' },
+  /* Still legible, plainly not choosable. Greying each element separately would
+     mean teaching every one of them a disabled colour; the row is one object
+     and it recedes as one. */
+  dimmed: { opacity: 0.45 },
 });

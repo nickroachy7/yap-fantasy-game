@@ -250,24 +250,35 @@ export default function LineupScreen() {
   const eligibleBySlot = useMemo(() => {
     const map = new Map<string, LineupCard[]>();
     for (const cfg of slots) {
+      /* LOCKED CARDS STAY IN THIS LIST. They cannot be picked, and the sheet
+         draws them dimmed and unpressable — but withholding them made the sheet
+         announce "0 eligible RB" to somebody holding four, with no way to tell
+         a rule from a fault. The sheet gets `lockedIds` and says which is
+         which. */
       const list = seasonCards.filter(
-        (card) =>
-          isEligible(card, cfg) &&
-          (!usedIds.has(card.id) || picks[cfg.slot] === card.id) &&
-          /* A player whose game has begun cannot be brought in, so he is not a
-             candidate. He stays visible on the bench with his live figure —
-             this only removes him from the list of people you could START. */
-          !lockedIds.has(card.id),
+        (card) => isEligible(card, cfg) && (!usedIds.has(card.id) || picks[cfg.slot] === card.id),
       );
       map.set(cfg.slot, sortCards(list, sort));
     }
     return map;
-  }, [slots, seasonCards, usedIds, picks, sort, lockedIds]);
+  }, [slots, seasonCards, usedIds, picks, sort]);
 
-  /** What the empty rows advertise. The lists themselves live in the sheet. */
+  /**
+   * What the empty rows advertise. The lists themselves live in the sheet.
+   *
+   * Counts only what can actually be STARTED. The list behind it keeps its
+   * locked cards so the sheet can show them, but a row promising "4 eligible"
+   * that opens onto four players you cannot pick is worse than one that says 0.
+   */
   const eligibleCounts = useMemo(
-    () => new Map([...eligibleBySlot].map(([slot, list]) => [slot, list.length])),
-    [eligibleBySlot],
+    () =>
+      new Map(
+        [...eligibleBySlot].map(([slot, list]) => [
+          slot,
+          list.filter((card) => !lockedIds.has(card.id)).length,
+        ]),
+      ),
+    [eligibleBySlot, lockedIds],
   );
 
   /* Grouped by position, not sorted by the reader — see `sortByPosition`. The
@@ -404,6 +415,7 @@ export default function LineupScreen() {
         eligiblePositions: cfg.eligible_positions.join('/'),
         current: occupant,
         options: eligibleBySlot.get(cfg.slot) ?? [],
+        lockedIds,
       };
     }
     const card = byId.get(swap.cardId);
@@ -421,7 +433,7 @@ export default function LineupScreen() {
         }))
         .filter((d) => !isCardLocked(d.occupant)),
     };
-  }, [swap, slots, picks, byId, eligibleBySlot, isCardLocked]);
+  }, [swap, slots, picks, byId, eligibleBySlot, isCardLocked, lockedIds]);
 
   /**
    * Re-read both halves of the fixture, without the pull-to-refresh spinner.

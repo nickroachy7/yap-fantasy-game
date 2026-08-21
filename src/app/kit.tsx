@@ -244,6 +244,11 @@ const SWAP_OPTIONS: LineupCard[] = [
 
 const SWAP_SLOT: SwapRequest = {
   kind: 'slot',
+  // Both halves, honestly: o1's game is live and o3's is final, so both are
+  // locked; only o2 has yet to kick off. Locking just one of them would have
+  // shown a FINAL fixture sitting in the choosable list, which is the exact
+  // contradiction this sheet exists to stop drawing.
+  lockedIds: new Set(['o1', 'o3']),
   slot: 'RB1',
   eligiblePositions: 'RB',
   current: STARTERS[1].card,
@@ -252,6 +257,8 @@ const SWAP_SLOT: SwapRequest = {
 
 const SWAP_EMPTY_SLOT: SwapRequest = {
   kind: 'slot',
+  // Nothing locked here, so the empty-slot case reads as the simple one it is.
+  lockedIds: new Set<string>(),
   slot: 'FLEX',
   eligiblePositions: 'RB/WR/TE',
   current: null,

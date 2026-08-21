@@ -83,6 +83,16 @@ export type SwapRequest =
       current: LineupCard | null;
       /** Eligible cards, already sorted. May include `current`; it is filtered. */
       options: LineupCard[];
+      /**
+       * Which of those have kicked off and so cannot be brought in.
+       *
+       * They are listed rather than withheld. Filtering them out left the sheet
+       * saying "0 eligible RB" and "no other RB card in your collection can
+       * start here" to somebody holding four of them, which reads as a broken
+       * screen rather than as a rule — and the rule is one the reader needs to
+       * learn, because it governs the whole afternoon.
+       */
+      lockedIds: Set<string>;
     }
   | { kind: 'bench'; card: LineupCard; destinations: SwapDestination[] };
 
@@ -173,7 +183,7 @@ export function SwapSheet({
                 </Text>
                 <Text numberOfLines={1} style={[Type.fine, styles.title, { color: c.textTertiary }]}>
                   {request.kind === 'slot'
-                    ? `${request.options.filter((o) => o.id !== request.current?.id).length} eligible ${request.eligiblePositions}`
+                    ? countLabel(request)
                     : `${request.card.team ?? DASH} · ${matchupLabel(request.card.game)}`}
                 </Text>
                 {/* A dialog has no drag and no bottom Close, so it keeps one. */}
@@ -255,23 +265,34 @@ function SlotBody({
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const { slot, current, eligiblePositions } = request;
+  const { slot, current, eligiblePositions, lockedIds } = request;
 
   /* The incumbent is pinned above, so he is not also in the list — one player
      appearing twice in a list you are choosing from is a bug report waiting to
      be filed, however it is marked. */
-  const options = request.options.filter((o) => o.id !== current?.id);
+  const rest = request.options.filter((o) => o.id !== current?.id);
+  /* Choosable first, kicked-off after. Not two separate lists with two
+     headings: they are the same set of players answering the same question, and
+     the only difference is whether the answer is still available — which the
+     dimming and the mark already say, in place. */
+  const open = rest.filter((o) => !lockedIds.has(o.id));
+  const shut = rest.filter((o) => lockedIds.has(o.id));
 
   return (
     <>
       {current ? (
-        <>
+        <View style={styles.section}>
+          {/* THE CURRENT PICK GETS ITS OWN HEADING. It used to be pinned above
+              the divider with no label and a tinted background, which made it
+              read as a banner rather than as the first of two groups. Naming it
+              is what turns the sheet into the shape it describes: who is in,
+              then who could be. */}
+          <Divider>Currently starting</Divider>
           <PlayerBand
-              card={current}
-              badge={<PositionBadge label={current.position} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />}
-              lead={<Text style={[Type.micro, { color: c.positive }]}>IN</Text>}
-              right={<BandFigure {...figureFor(current, sort)} />}
-              selected
+            card={current}
+            badge={<PositionBadge label={current.position} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />}
+            right={<BandFigure {...figureFor(current, sort)} />}
+            selected
             accessibilityLabel={`${current.name} is starting at ${slot}`}
           />
           <Pressable
@@ -283,7 +304,7 @@ function SlotBody({
               Bench {current.name} — leave {slot} empty
             </Text>
           </Pressable>
-        </>
+        </View>
       ) : null}
 
       <View style={styles.section}>
@@ -294,34 +315,61 @@ function SlotBody({
             list of one is the sheet describing its own machinery — and with a
             single eligible card it was the widest, loudest thing on screen.
             No hint either: the divider above already says what this list is. */}
-        {options.length > 2 ? <SortBar value={sort} onChange={onSort} /> : null}
-        {options.length === 0 ? (
+        {open.length > 2 ? <SortBar value={sort} onChange={onSort} /> : null}
+        {open.length === 0 ? (
           <Text style={[Type.body, styles.empty, { color: c.textSecondary }]}>
-            {current
-              ? `No other ${eligiblePositions} card in your collection can start here.`
-              : `Nothing in your collection can start at ${slot}.`}
+            {shut.length > 0
+              ? `Every other ${eligiblePositions} card you hold has already kicked off.`
+              : current
+                ? `No other ${eligiblePositions} card in your collection can start here.`
+                : `Nothing in your collection can start at ${slot}.`}
           </Text>
-        ) : (
-          <>
-            {options.map((card) => (
-              <PlayerBand
-                key={card.id}
-                card={card}
-                badge={<PositionBadge label={card.position} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />}
-                right={<BandFigure {...figureFor(card, sort)} />}
-                onPress={() => onPick(slot, card.id)}
-                accessibilityLabel={
-                  current
-                    ? `Start ${card.name} at ${slot} in place of ${current.name}`
-                    : `Start ${card.name} at ${slot}`
-                }
-              />
-            ))}
-          </>
-        )}
+        ) : null}
+
+        {open.map((card) => (
+          <PlayerBand
+            key={card.id}
+            card={card}
+            badge={<PositionBadge label={card.position} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />}
+            right={<BandFigure {...figureFor(card, sort)} />}
+            onPress={() => onPick(slot, card.id)}
+            accessibilityLabel={
+              current
+                ? `Start ${card.name} at ${slot} in place of ${current.name}`
+                : `Start ${card.name} at ${slot}`
+            }
+          />
+        ))}
+
+        {/* Shown, dimmed, and not pressable. See `lockedIds` on the request for
+            why they are here at all rather than filtered away. */}
+        {shut.map((card) => (
+          <PlayerBand
+            key={card.id}
+            card={card}
+            dimmed
+            badge={<PositionBadge label={card.position} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />}
+            /* LOCKED replaces the figure's unit, which is where the eye already
+               is and which costs no width — the alternative was a lead column,
+               and that column is exactly what was truncating names. The number
+               above it keeps its meaning; what changes is the one word that was
+               only ever restating the sort. */
+            right={<BandFigure {...figureFor(card, sort)} label="LOCKED" />}
+            accessibilityLabel={`${card.name} has already started and cannot be brought in`}
+          />
+        ))}
       </View>
     </>
   );
+}
+
+/** "3 eligible RB", and what it does when some of them have kicked off. */
+function countLabel(request: Extract<SwapRequest, { kind: 'slot' }>): string {
+  const rest = request.options.filter((o) => o.id !== request.current?.id);
+  const open = rest.filter((o) => !request.lockedIds.has(o.id)).length;
+  const shut = rest.length - open;
+  const head = `${open} eligible ${request.eligiblePositions}`;
+  return shut > 0 ? `${head} · ${shut} locked` : head;
 }
 
 /**
@@ -357,16 +405,18 @@ function BenchBody({
 
   return (
     <>
-      {/* The mirror of the slot mode's pinned incumbent: the player the sheet
-          is about, in the same box, under the same kind of label. */}
-      <PlayerBand
-            card={card}
-            badge={<PositionBadge label={card.position} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />}
-            lead={<Text style={[Type.micro, { color: c.textSecondary }]}>OUT</Text>}
-            right={<BandFigure {...figureFor(card, 'fp')} />}
-            selected
-        accessibilityLabel={`${card.name} is on the bench`}
-      />
+      {/* The mirror of the slot mode's incumbent: the player the sheet is about,
+          in the same row, under his own heading. */}
+      <View style={styles.section}>
+        <Divider>Moving</Divider>
+        <PlayerBand
+          card={card}
+          badge={<PositionBadge label={card.position} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />}
+          right={<BandFigure {...figureFor(card, 'fp')} />}
+          selected
+          accessibilityLabel={`${card.name} is on the bench`}
+        />
+      </View>
 
       <View style={styles.section}>
         <Divider>Send him to</Divider>
