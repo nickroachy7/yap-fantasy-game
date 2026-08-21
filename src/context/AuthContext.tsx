@@ -17,10 +17,8 @@ type AuthState = {
   session: Session | null;
   /** True until the persisted session has been read — gate routing on this. */
   initialising: boolean;
-  sendMagicLink: (email: string) => Promise<void>;
-  verifyCode: (email: string, code: string) => Promise<void>;
   signInWithPassword: (email: string, password: string) => Promise<void>;
-  signUpWithPassword: (email: string, password: string) => Promise<void>;
+  signUpWithPassword: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -44,8 +42,6 @@ function tokensFromUrl(url: string): { access_token: string; refresh_token: stri
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [initialising, setInitialising] = useState(true);
-  const redirectTo = useMemo(() => Linking.createURL('/auth/callback'), []);
-
   useEffect(() => {
     let active = true;
 
@@ -74,26 +70,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void supabase.auth.setSession(tokens);
   }, [incomingUrl]);
 
-  const sendMagicLink = useCallback(
-    async (email: string) => {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
-        options: { emailRedirectTo: redirectTo, shouldCreateUser: true },
-      });
-      if (error) throw error;
-    },
-    [redirectTo],
-  );
-
-  const verifyCode = useCallback(async (email: string, code: string) => {
-    const { error } = await supabase.auth.verifyOtp({
-      email: email.trim().toLowerCase(),
-      token: code.trim(),
-      type: 'email',
-    });
-    if (error) throw error;
-  }, []);
-
   const signInWithPassword = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
@@ -102,10 +78,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
   }, []);
 
-  const signUpWithPassword = useCallback(async (email: string, password: string) => {
+  /**
+   * The chosen name rides along IN the signup call rather than being written
+   * after it.
+   *
+   * `options.data` lands on the new row's `raw_user_meta_data`, which the
+   * `handle_new_user` trigger reads while creating the profile — inside the
+   * same transaction that creates the account. A follow-up UPDATE from here
+   * would be a second round trip that a closed tab or a dropped connection can
+   * lose, and what it loses is not just the name: the profile is left called
+   * after the email address, on a board every other player can read.
+   *
+   * The trigger validates the same 2..24 rule and falls back rather than
+   * raising, so a name it rejects costs the name and not the account. The
+   * screen enforces it too, which is what makes that outcome unreachable.
+   */
+  const signUpWithPassword = useCallback(async (email: string, password: string, name: string) => {
     const { data, error } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
       password,
+      options: { data: { display_name: name.trim() } },
     });
     if (error) throw error;
     // With email confirmation disabled, signUp returns a session directly. If
@@ -125,8 +117,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       session,
       initialising,
-      sendMagicLink,
-      verifyCode,
       signInWithPassword,
       signUpWithPassword,
       signOut,
@@ -134,8 +124,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [
       session,
       initialising,
-      sendMagicLink,
-      verifyCode,
       signInWithPassword,
       signUpWithPassword,
       signOut,

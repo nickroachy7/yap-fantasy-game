@@ -18,43 +18,74 @@ import { Colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 
 /**
- * PASSWORD IS THE PRIMARY PATH, AND THAT IS TEMPORARY.
+ * EMAIL AND PASSWORD, AND NOTHING ELSE.
  *
- * Magic link is the better door and is still meant to be the default: no
- * password to remember, no reset flow to build. It leads while the project has
- * a working sender of its own — and it does not have one yet. Until custom SMTP
- * lands, Supabase sends from its shared address, which is rate limited to a
- * handful of messages an hour across the WHOLE project. That limit is invisible
- * until it is not: the third person to sign up in the same hour gets a link
- * that never arrives, with nothing on screen to say why, and the app looks
- * broken to exactly the people being asked to try it.
+ * Magic link used to lead here and has been removed outright rather than
+ * demoted. It was the better door on paper — nothing to remember, no reset flow
+ * to write — and it kept failing on the one thing it depends on: a sender.
+ * Until custom SMTP lands, Supabase sends from its shared address, rate limited
+ * to a handful of messages an hour across the WHOLE project rather than per
+ * user. The failure that produces is the bad kind. The client's request
+ * succeeds, the screen says "we sent you a link", and the link never arrives —
+ * so the third person to sign up in the same hour concludes the app is broken.
+ * A group of friends all signing up at once is precisely that case.
  *
- * A password has no such ceiling. So for the friends beta the order is flipped
- * and magic link stays one tap away. FLIP IT BACK the moment SMTP is live —
- * this is a two-line change: the initial `mode` below, and the two button
- * labels that name the other path.
+ * Keeping it as a secondary path was the first attempt and it was worse than
+ * either extreme: a door that works for the first two people through it is a
+ * trap for everyone behind them, and offering two ways in doubles what can go
+ * wrong for a beta that needs neither.
+ *
+ * THERE IS NO PASSWORD RESET YET. That is the cost of this, and it is worth
+ * being honest about in the place someone will read it: a player who forgets
+ * their password currently cannot get back in without a hand-issued recovery
+ * link from the Supabase dashboard. Reset is the same email dependency wearing
+ * a different hat, so it lands with SMTP, not before.
  *
  * Note: email+password does NOT trigger Apple's Sign in with Apple requirement.
  * That applies only to third-party social login.
+ *
+ * ── TWO MODES, AND WHY SIGNING UP IS ITS OWN ONE ────────────────────────────
+ *
+ * `password` signs in; `signup` creates an account.
+ *
+ * `signup` is separate because of a third field. Creating an account used to be
+ * a second button under Sign in, submitting whatever was in the same two
+ * inputs — so there was nowhere to ask what the player wanted to be CALLED, and
+ * the trigger fell back to deriving a name from the email local part. Everyone
+ * ended up on the leaderboard as the first half of their email address, which
+ * is both a name nobody chose and more of an email address than they meant to
+ * publish: `profiles` is readable by every authenticated user.
+ *
+ * Two verbs on one form is also how people create a second account when they
+ * meant to sign in — the fields are identical, so nothing catches it.
  */
-type Mode = 'link' | 'sent' | 'password';
+type Mode = 'password' | 'signup';
 
 const MIN_PASSWORD = 8;
+
+/* The same 2..24 the `profiles_display_name_check` constraint enforces and the
+   `handle_new_user` trigger re-checks. Stated here so the reader gets a real
+   message instead of the trigger quietly falling back to their email prefix. */
+const MIN_NAME = 2;
+const MAX_NAME = 24;
 
 export default function LoginScreen() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
-  const { sendMagicLink, verifyCode, signInWithPassword, signUpWithPassword } = useAuth();
+  const { signInWithPassword, signUpWithPassword } = useAuth();
 
   const [mode, setMode] = useState<Mode>('password');
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const emailLooksValid = /^\S+@\S+\.\S+$/.test(email.trim());
   const passwordLongEnough = password.length >= MIN_PASSWORD;
+  const trimmedName = name.trim();
+  const nameValid = trimmedName.length >= MIN_NAME && trimmedName.length <= MAX_NAME;
+  const canCreate = emailLooksValid && passwordLongEnough && nameValid && !busy;
 
   async function run(action: () => Promise<void>, after?: () => void) {
     setBusy(true);
@@ -98,76 +129,44 @@ export default function LoginScreen() {
               <ThemedText type="title">Yap Fantasy</ThemedText>
 
               <ThemedText themeColor="textSecondary" style={styles.subtitle}>
-                {mode === 'sent'
-                  ? `We sent a sign-in link to ${email.trim()}.`
-                  : mode === 'password'
-                    ? 'Sign in, or make an account with an email and password.'
-                    : 'We will email you a link. No password to remember.'}
+                {mode === 'signup'
+                  ? 'Pick a name, and you are in. It is what the leaderboard calls you.'
+                  : 'Welcome back.'}
               </ThemedText>
 
-              {mode !== 'sent' ? (
+              {/* FIRST FIELD, and deliberately so. It is the only one that is
+                  about them rather than about the account, and asking for it
+                  after a password reads as an afterthought — which is how you
+                  get people skipping it and living with a name derived from
+                  their email address. */}
+              {mode === 'signup' ? (
                 <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="you@example.com"
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Display name"
                   placeholderTextColor={colors.textSecondary}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  autoComplete="email"
-                  keyboardType="email-address"
-                  inputMode="email"
+                  autoComplete="username"
+                  maxLength={MAX_NAME}
                   editable={!busy}
                   style={inputStyle}
                 />
               ) : null}
 
-              {mode === 'link' ? (
-                <>
-                  <PrimaryButton
-                    label="Email me a link"
-                    busy={busy}
-                    disabled={!emailLooksValid || busy}
-                    onPress={() => run(() => sendMagicLink(email), () => setMode('sent'))}
-                  />
-                  <SecondaryButton
-                    label="Use a password instead"
-                    disabled={busy}
-                    onPress={() => { setMode('password'); setError(null); }}
-                  />
-                </>
-              ) : null}
-
-              {mode === 'sent' ? (
-                <>
-                  <ThemedText themeColor="textSecondary" style={styles.subtitle}>
-                    Open it on this device, or enter the code from the email.
-                  </ThemedText>
-                  <TextInput
-                    value={code}
-                    onChangeText={setCode}
-                    placeholder="123456"
-                    placeholderTextColor={colors.textSecondary}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="number-pad"
-                    inputMode="numeric"
-                    maxLength={10}
-                    editable={!busy}
-                    style={[...inputStyle, styles.codeInput]}
-                  />
-                  <PrimaryButton
-                    label="Verify code"
-                    busy={busy}
-                    disabled={code.trim().length < 6 || busy}
-                    onPress={() => run(() => verifyCode(email, code))}
-                  />
-                  <SecondaryButton
-                    label="Use a different email"
-                    disabled={busy}
-                    onPress={() => { setMode('link'); setCode(''); setError(null); }}
-                  />
-                </>
-              ) : null}
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                placeholderTextColor={colors.textSecondary}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                keyboardType="email-address"
+                inputMode="email"
+                editable={!busy}
+                style={inputStyle}
+              />
 
               {mode === 'password' ? (
                 <>
@@ -189,15 +188,52 @@ export default function LoginScreen() {
                     disabled={!emailLooksValid || !passwordLongEnough || busy}
                     onPress={() => run(() => signInWithPassword(email, password))}
                   />
+                  {/* A DOOR TO THE SIGNUP SCREEN, NOT A SECOND SUBMIT.
+                      This used to create the account from right here, using
+                      whatever was in the two fields above — which is why nobody
+                      ever chose a name: there was no third field and no screen
+                      to put one on. Two verbs on one form is also how people
+                      sign up by accident when they meant to sign in. */}
                   <SecondaryButton
-                    label="Create an account with this password"
-                    disabled={!emailLooksValid || !passwordLongEnough || busy}
-                    onPress={() => run(() => signUpWithPassword(email, password))}
+                    label="Create an account"
+                    disabled={busy}
+                    onPress={() => { setMode('signup'); setError(null); }}
+                  />
+                </>
+              ) : null}
+
+              {mode === 'signup' ? (
+                <>
+                  <TextInput
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder={`Password (${MIN_PASSWORD}+ characters)`}
+                    placeholderTextColor={colors.textSecondary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="new-password"
+                    secureTextEntry
+                    editable={!busy}
+                    style={inputStyle}
+                  />
+                  {/* Say which rule is unmet rather than dimming the button and
+                      leaving them to guess. The name rule is the one worth
+                      naming: 24 characters is not a limit anyone assumes. */}
+                  {!nameValid && trimmedName.length > 0 ? (
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {`Name must be ${MIN_NAME}-${MAX_NAME} characters.`}
+                    </ThemedText>
+                  ) : null}
+                  <PrimaryButton
+                    label="Create account"
+                    busy={busy}
+                    disabled={!canCreate}
+                    onPress={() => run(() => signUpWithPassword(email, password, trimmedName))}
                   />
                   <SecondaryButton
-                    label="Email me a link instead"
+                    label="I already have an account"
                     disabled={busy}
-                    onPress={() => { setMode('link'); setPassword(''); setError(null); }}
+                    onPress={() => { setMode('password'); setError(null); }}
                   />
                 </>
               ) : null}
@@ -289,7 +325,6 @@ const styles = StyleSheet.create({
   },
   subtitle: { marginBottom: 2 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16 },
-  codeInput: { letterSpacing: 4, textAlign: 'center', fontSize: 22 },
   button: { borderRadius: 12, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', minHeight: 52 },
   buttonDisabled: { opacity: 0.4 },
   buttonPressed: { opacity: 0.8 },

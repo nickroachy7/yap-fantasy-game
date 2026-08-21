@@ -1,9 +1,17 @@
 /**
- * Magic-link landing route.
+ * Where an emailed sign-in link lands.
  *
- * `sendMagicLink` points emailRedirectTo here, so this path MUST exist — without
- * it Supabase signs the user in and then bounces them to a 404, stranding the
- * session that was already issued.
+ * NOTHING IN THE APP SENDS ONE ANY MORE. Magic link was removed from the login
+ * screen — see the header there — so no code path here produces a link that
+ * arrives at this route. It is kept, and kept working, for two reasons that are
+ * not speculative:
+ *
+ *  - A RECOVERY LINK ISSUED BY HAND from the Supabase dashboard lands here, and
+ *    with no password-reset flow in the app that is currently the ONLY way to
+ *    get a player who has forgotten their password back into their account.
+ *    Deleting this route would remove the last door.
+ *  - Password reset, when SMTP lands, is the same mechanism — `type=recovery`
+ *    is already handled below.
  *
  * Handles every shape the link can arrive in:
  *   - web implicit flow: tokens in the URL fragment, consumed by
