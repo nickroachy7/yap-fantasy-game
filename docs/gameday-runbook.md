@@ -517,6 +517,34 @@ having this is not needing to wait for one.
 **Never schedule it.** The gate it removes is the only thing standing between
 this project and polling an empty Tuesday at the provider's expense.
 
+### D8. Change the scoring rules
+
+Rules are versioned data, and `fantasy_points` is keyed by version, so a change
+is a **recompute against stored `stat_lines.raw`** and never a re-ingest. The
+order matters, because `score_week` joins on the ACTIVE version and activating
+one that has not been computed resolves every lineup to zero:
+
+1. Insert the new version with `is_active = false` (a migration).
+2. Recompute against it — `POST /rescore {"version":N}`, no provider call.
+   32,812 lines took 7.9s.
+3. Activate it (a second migration, which refuses to run if step 2 has not
+   finished).
+4. `score_week` each week that has lineups, so `career_fp` and `settled_fp`
+   catch up.
+5. `select public.refresh_player_season_ranks();` — the matview stores
+   `season_base_points`, which reads the active ruleset.
+
+Diff the two versions before activating. Everything should be explainable:
+
+```sql
+select pl.position_abbreviation, count(*), round(sum(v2.points - v1.points),1)
+  from public.stat_lines sl
+  join public.players pl on pl.id = sl.player_id
+  join public.fantasy_points v1 on v1.stat_line_id = sl.id and v1.rules_version = 1
+  join public.fantasy_points v2 on v2.stat_line_id = sl.id and v2.rules_version = 2
+ where v2.points <> v1.points group by 1 order by 2 desc;
+```
+
 ---
 
 ## Failure modes
