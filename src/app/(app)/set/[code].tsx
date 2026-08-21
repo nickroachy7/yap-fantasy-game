@@ -58,7 +58,7 @@ import {
   type CardSet,
 } from '@/components/collection/sets';
 import { invalidateCollection } from '@/components/collection/use-collection';
-import { useSets } from '@/components/collection/use-sets';
+import { invalidateSets, useSets } from '@/components/collection/use-sets';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
@@ -208,6 +208,12 @@ export default function SetChecklistScreen() {
        too, which is the header's. Missing any one of them shows a card that no
        longer exists. */
     invalidateCollection();
+    /* The set LIST too, and its absence here is what made a freshly-committed
+       set show its old progress when you went back. The comment above has named
+       the set list as one of the three things that moved since this was
+       written; `reload()` below re-reads the list this screen holds, but the
+       sets tab keeps its own session-cached copy and nothing was dropping it. */
+    invalidateSets();
     await Promise.all([reloadMembers(), reload(), refreshPlayer()]);
     /* Cleared only on success. A failed submission must leave the batch intact
        so the player can retry it rather than rebuild it.
