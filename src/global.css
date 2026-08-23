@@ -26,3 +26,34 @@
 body {
   background-color: #000000;
 }
+
+/**
+ * THE APP IS AS TALL AS THE WINDOW YOU CAN SEE.
+ *
+ * Expo's web build leaves the document at `height: 100%`, and on iOS Safari
+ * that percentage resolves against the LARGE viewport — the height the window
+ * would be if the browser's own chrome went away. The chrome has not gone away.
+ * So the app is laid out taller than the visible area, and the thing at the
+ * bottom of it — the tab bar — is pushed down behind Safari's toolbar, leaving
+ * the page showing in the strip above it.
+ *
+ * `dvh` is the dynamic viewport height: the window as it actually is right now,
+ * chrome included, re-measured when that chrome comes and goes. `100%` stays as
+ * the fallback for anything that does not know the unit.
+ *
+ * `dvh` rather than `svh` deliberately. `svh` is the small viewport — always the
+ * toolbar-visible height — which is stable but leaves a gap on any browser that
+ * hides its chrome on scroll. This app scrolls inside its own views rather than
+ * scrolling the document, so Safari's toolbar never retracts and the two units
+ * agree today; `dvh` is the one that stays correct if that ever stops being
+ * true.
+ */
+html,
+body {
+  height: 100%;
+  height: 100dvh;
+}
+
+#root {
+  height: 100%;
+}

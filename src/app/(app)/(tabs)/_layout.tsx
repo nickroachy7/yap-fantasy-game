@@ -168,5 +168,22 @@ const styles = StyleSheet.create({
   /* Three labels now rather than five, so there is room — but the size stays
      at 10 because the bar's height is fixed (see TabBarContentHeight) and a
      bigger label would only crowd the glyph above it. */
-  tabLabel: { fontSize: 10, fontWeight: '600' },
+  /**
+   * `overflow: 'visible'` is the fix for "Fantasy" reading as "Fantasv".
+   *
+   * Only the ACTIVE label was cut, which is what made it look like a font
+   * problem rather than a layout one. Measured on the deployed build: the
+   * active label's box is 10pt tall — the font size — while its content is 14,
+   * and react-native-web ships `overflow: hidden` on it for `numberOfLines`.
+   * The inactive labels box at the full 14 and are fine. So the tail of the y
+   * overflowed by 2.5pt and was clipped, on that one tab, whichever tab it was.
+   *
+   * Letting it paint outside its box is the smallest correct answer. The label
+   * is a single short word in a fixed-width column, so the ellipsis that
+   * `hidden` exists to produce has nothing to do here anyway.
+   *
+   * `lineHeight` stays: it is what makes the inactive labels 14 rather than the
+   * font's own `normal`, and the two should agree.
+   */
+  tabLabel: { fontSize: 10, fontWeight: '600', lineHeight: 14, overflow: 'visible' },
 });
