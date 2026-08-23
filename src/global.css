@@ -50,10 +50,76 @@ body {
  */
 html,
 body {
+  /**
+   * `100vh`, and the distinction from `100%` is the whole fix.
+   *
+   * In iOS Safari these are NOT the same measurement. `height: 100%` on the
+   * root resolves against the SMALL viewport — the area above the browser's
+   * bottom toolbar — and so does `100dvh` while that toolbar is on screen.
+   * `100vh` is the LARGE viewport: the full height of the screen, with the
+   * toolbar treated as something drawn OVER the page rather than something the
+   * page has to stop short of.
+   *
+   * Expo's own reset ships `html, body { height: 100% }`, so the app has always
+   * been sized to the small viewport, ending in a hard edge above Safari's
+   * toolbar with the page showing through underneath. The tab bar is the last
+   * thing in that box, so its fill stopped there too and left a black strip
+   * between the bar and the browser chrome. Sizing to `100dvh` was the same
+   * measurement by another name and changed nothing, which is what pointed at
+   * this.
+   *
+   * At `100vh` the app reaches the bottom of the screen and the bar's fill
+   * carries on behind the toolbar, which is what makes it read as continuing
+   * rather than stopping. Safari's toolbar overlaps the last stretch of it —
+   * that is fine and is why the bar pads its CONTENT by
+   * `env(safe-area-inset-bottom)` (see the tabs layout): the icons and labels
+   * stay clear of the chrome while the fill behind them does not.
+   *
+   * `100%` stays first as the fallback for anything without viewport units.
+   */
   height: 100%;
-  height: 100dvh;
+  height: 100vh;
 }
 
 #root {
   height: 100%;
+}
+
+/**
+ * A FLOOR UNDER THE APP, IN THE TAB BAR'S OWN COLOUR.
+ *
+ * On mobile Safari the bottom chrome is a floating pill with the page showing
+ * around and below it. That region sits outside the visible viewport, so the
+ * app — correctly sized to `100dvh` — stops above it, and the tab bar's grey
+ * stopped with it. What showed underneath was the page: a black strip between
+ * the bar and the browser's toolbar.
+ *
+ * The app cannot shrink to avoid that strip; it has to paint through it. This
+ * is a fixed band pinned to the bottom of the LAYOUT viewport, which with
+ * `viewport-fit=cover` reaches the physical bottom of the screen — past where
+ * `dvh` stops.
+ *
+ * `z-index: -1` is what keeps it honest. It sits BEHIND everything the app
+ * draws, so anywhere the app actually reaches — which is every platform with
+ * no floating browser chrome — it is completely covered and changes nothing.
+ * It is visible only in the gap it exists to fill.
+ *
+ * The colour is `Colors.dark.surfaceSheet`, the tab bar's own fill, so the band
+ * reads as the bar continuing rather than as a second thing below it. If that
+ * token ever moves, this moves with it — it is duplicated here because CSS
+ * cannot see the theme, which is the one reason to hardcode it.
+ *
+ * 240 is well past the tallest chrome any phone browser puts at the bottom; the
+ * band is a flat colour behind an opaque app, so being generous costs nothing.
+ */
+body::after {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 240px;
+  background-color: #0e1013;
+  z-index: -1;
+  pointer-events: none;
 }
