@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NAV_TABS, routeNameOf } from '@/components/shell/sections';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { TabIcon } from '@/components/shell/TabIcon';
-import { useIsWide } from '@/components/shell/useResponsive';
+import { useBrowserChromeInset, useIsWide } from '@/components/shell/useResponsive';
 import { WebHeader } from '@/components/shell/WebHeader';
 import { Colors, SheetCorner, TabBarContentHeight } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -52,6 +52,10 @@ export default function TabsLayout() {
   const c = Colors[scheme];
   const isWide = useIsWide();
   const insets = useSafeAreaInsets();
+  /* What a mobile browser's own toolbar is covering. Zero on native and on a
+     desktop window — see the hook for why neither obvious viewport height
+     works on its own. */
+  const chrome = useBrowserChromeInset();
 
   /* One navigator either way. Swapping between a Tabs and a Drawer navigator
      on resize would remount every screen and lose scroll position, so the tab
@@ -130,8 +134,16 @@ export default function TabsLayout() {
                      in TabBarContentHeight; the safe area is padding beneath
                      it, so the bar's background still runs to the bottom of
                      the screen instead of floating above the home indicator. */
-                  height: TabBarContentHeight + insets.bottom,
-                  paddingBottom: insets.bottom,
+                  /* The fill runs to the bottom of the SCREEN — the document
+                     is sized to the large viewport for exactly that reason —
+                     while the content is lifted clear of both the home
+                     indicator and whatever the browser is drawing over the
+                     bottom of the window. Without `chrome` the icons and
+                     labels end up behind Safari's toolbar; without the large
+                     viewport the fill stops above it and the page shows
+                     through. Both were shipped and seen before this line. */
+                  height: TabBarContentHeight + insets.bottom + chrome,
+                  paddingBottom: insets.bottom + chrome,
                   paddingTop: 6,
                 },
           }}>
