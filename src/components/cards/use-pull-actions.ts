@@ -17,12 +17,10 @@
  * components rather than in the route because the pull is a component's worth
  * of state, and the route is already the longest file in the feature.
  *
- * EVERY FIGURE COMES FROM THE SERVER. `card_actions` reports what selling pays,
- * which sets each card can still fill, and what committing to each pays — all
- * read out of the tables `sell_card` and `commit_card_to_set` decide against.
- * Nothing here recomputes one. See the migration's note for why that matters:
- * a client that derived the payout would eventually print a number that is not
- * the number that lands.
+ * EVERY FIGURE COMES FROM THE SERVER, read through `card-actions` — which is
+ * its own module rather than part of this one because the card profile now
+ * offers the same two exits and must not import them out of the pack reveal.
+ * Nothing here recomputes a figure; see that file's note.
  *
  * ONE CARD AT A TIME, DELIBERATELY. `busy` is a single id rather than a set, so
  * a second tap while a sale is in flight does nothing. Both RPCs move the
@@ -58,51 +56,8 @@ import { invalidateSets } from '@/components/collection/use-sets';
 import { sellErrorMessage } from '@/components/players/sell';
 import { usePlayer } from '@/context/PlayerContext';
 import { supabase } from '@/lib/supabase';
+import { readCardActions, type CardActions } from './card-actions';
 import type { Pulled } from './PackShelf';
-
-/** One set a pulled card could still be committed to. */
-export type PullSet = {
-  code: string;
-  name: string;
-  family: string;
-  subtitle: string | null;
-  /** Gems this commit pays, priced by the server off the copy that would burn. */
-  pays: number;
-  committed: number;
-  required: number;
-  /** This player is already in this set — his slot cannot take a second copy. */
-  slotFilled: boolean;
-  /** The set has met its requirement, so a further commit buys nothing. */
-  setComplete: boolean;
-  /** The one field a button binds to. Never re-derived here from the three above. */
-  canCommit: boolean;
-};
-
-/** What a single copy can be turned into right now. */
-export type PullAction = {
-  cardInstanceId: string;
-  cardId: string;
-  sellValue: number;
-  /**
-   * Still in the collection — not sold, not burnt into a set.
-   *
-   * NOT the same question as `sellable`, and the reveal needs both: a card
-   * standing in an unscored lineup cannot be sold and is very much still yours,
-   * while a card that filled a set slot is gone and must stop being offered
-   * anything at all.
-   */
-  held: boolean;
-  sellable: boolean;
-  /**
-   * Whether committing would burn THIS copy or an older, cheaper one.
-   *
-   * `commit_card_to_set` always takes the least valuable copy you hold, so on a
-   * player you already own the card that goes is not the card you just pulled.
-   * The reveal says so rather than implying otherwise.
-   */
-  burnsThisCopy: boolean;
-  sets: PullSet[];
-};
 
 /**
  * What the player did with a card on the reveal.
@@ -117,87 +72,13 @@ export type Disposition =
   | { kind: 'sold'; gems: number }
   | { kind: 'committed'; setName: string; gems: number; burnedThisCopy: boolean };
 
-/** The jsonb `card_actions` returns, before it is given names this app uses. */
-type ActionRow = {
-  card_instance_id?: string;
-  card_id?: string;
-  sell_value?: number;
-  held?: boolean;
-  sellable?: boolean;
-  burns_this_copy?: boolean;
-  sets?: {
-    code?: string;
-    name?: string;
-    family?: string;
-    subtitle?: string | null;
-    pays?: number;
-    committed?: number;
-    required?: number;
-    slot_filled?: boolean;
-    set_complete?: boolean;
-    can_commit?: boolean;
-  }[];
-};
-
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
-
-function normalise(raw: ActionRow): PullAction | null {
-  if (!raw.card_instance_id || !raw.card_id) return null;
-
-  return {
-    cardInstanceId: raw.card_instance_id,
-    cardId: raw.card_id,
-    sellValue: num(raw.sell_value),
-    held: raw.held === true,
-    sellable: raw.sellable === true,
-    burnsThisCopy: raw.burns_this_copy === true,
-    sets: (raw.sets ?? [])
-      .filter((s) => !!s.code)
-      .map((s) => ({
-        code: s.code as string,
-        name: s.name ?? 'Unnamed set',
-        family: s.family ?? 'team',
-        subtitle: s.subtitle ?? null,
-        pays: num(s.pays),
-        committed: num(s.committed),
-        required: Math.max(1, num(s.required)),
-        slotFilled: s.slot_filled === true,
-        setComplete: s.set_complete === true,
-        canCommit: s.can_commit === true,
-      })),
-  };
-}
-
-/**
- * Asks the server what these cards can become.
- *
- * A FAILURE RETURNS AN EMPTY MAP RATHER THAN AN ERROR. The cards are already
- * minted and already yours — the reveal is correct without this, it just has no
- * buttons on it. Surfacing a failed read would tell the player something went
- * wrong with their pack, which is not what happened.
- */
-async function readActions(ids: string[]): Promise<Map<string, PullAction>> {
-  const next = new Map<string, PullAction>();
-  try {
-    const { data, error } = await supabase.rpc('card_actions', { p_card_instance_ids: ids });
-    if (error) return next;
-
-    for (const row of (Array.isArray(data) ? data : []) as ActionRow[]) {
-      const action = normalise(row);
-      if (action) next.set(action.cardInstanceId, action);
-    }
-  } catch {
-    // A dropped connection reaches here as a thrown TypeError rather than as
-    // supabase's `error`, and it is the same non-event: no offers, no alarm.
-  }
-  return next;
-}
 
 /** Everything scoped to one pack opening, tagged with which opening it is. */
 type PullState = {
   /** The pull's identity: its card_instance_ids, joined. '' when there is no pull. */
   key: string;
-  actions: Map<string, PullAction>;
+  actions: Map<string, CardActions>;
   disposed: Map<string, Disposition>;
   loading: boolean;
   busy: string | null;
@@ -215,7 +96,7 @@ const fresh = (key: string): PullState => ({
 
 export type PullActionsState = {
   /** Keyed by card_instance_id. Empty until the first read lands. */
-  actions: Map<string, PullAction>;
+  actions: Map<string, CardActions>;
   /** True only while the FIRST read for this pull is in flight. */
   loading: boolean;
   /** What each card became. Only ever grows within one pull. */
@@ -253,7 +134,7 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
   useEffect(() => {
     if (!key) return;
     let live = true;
-    void readActions(key.split(',')).then((actions) => {
+    void readCardActions(key.split(',')).then((actions) => {
       if (!live) return;
       setState((held) => (held.key === key ? { ...held, actions, loading: false } : held));
     });
@@ -277,7 +158,7 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
       invalidateCollection();
       invalidateSets();
       try {
-        const [, actions] = await Promise.all([refreshWallet(), readActions(at.split(','))]);
+        const [, actions] = await Promise.all([refreshWallet(), readCardActions(at.split(','))]);
         foldInto(at, (held) => ({ ...held, actions, busy: null }));
       } catch {
         /* THE BUTTONS COME BACK EVEN WHEN THE TIDY-UP FAILS. This runs after

@@ -102,8 +102,10 @@ import {
 } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { PlayerCard, type PlayerCardModel } from './PlayerCard';
+import { SetPickRow } from './SetPickRow';
 import type { Pulled } from './PackShelf';
-import type { Disposition, PullAction, PullSet } from './use-pull-actions';
+import type { CardActions } from './card-actions';
+import type { Disposition } from './use-pull-actions';
 
 /** Every card is minted at the floor tier; only lineup starts move it. */
 const MINT_TIER: CardTier = 'bronze';
@@ -191,7 +193,7 @@ export function PackReveal({
   /** Career FP the next tier starts at, read from `tier_thresholds`. */
   silverAt: number;
   /** What each card can be turned into, keyed by card_instance_id. */
-  actions: Map<string, PullAction>;
+  actions: Map<string, CardActions>;
   loadingActions: boolean;
   disposed: Map<string, Disposition>;
   /** The card a write is in flight for. Blocks every button on every card. */
@@ -455,7 +457,7 @@ export function PackReveal({
                 if (i !== focus) goTo(i);
               }}
               actions={(turned) => (
-                <CardActions
+                <CardActionPanel
                   player={p.player_name ?? 'This card'}
                   revealed={turned}
                   action={actions.get(p.card_instance_id)}
@@ -713,6 +715,10 @@ type Stage = 'idle' | 'picking' | 'selling';
 /**
  * Sell it, or put it in a set — for the one card this panel sits under.
  *
+ * Named for the panel rather than for the data: `CardActions` is now the type
+ * of what `card_actions` returns, and the two living in one file under one name
+ * is a rename waiting to go wrong.
+ *
  * ONE PANEL PER CARD, DRAWN UNDER IT, INSIDE ITS SLIDE. It is as wide as the
  * card and no wider, which is what makes the buttons a column rather than a
  * row — see `buttonRow`.
@@ -731,7 +737,7 @@ type Stage = 'idle' | 'picking' | 'selling';
  * first press, which is the property that actually matters on a surface you
  * scroll with your thumb.
  */
-function CardActions({
+function CardActionPanel({
   player,
   revealed,
   action,
@@ -746,7 +752,7 @@ function CardActions({
 }: {
   player: string;
   revealed: boolean;
-  action: PullAction | undefined;
+  action: CardActions | undefined;
   loading: boolean;
   became: Disposition | undefined;
   busy: boolean;
@@ -873,7 +879,7 @@ function CardActions({
       ) : stage === 'picking' ? (
         <View style={styles.stageBlock}>
           {commitable.map((s) => (
-            <SetRow
+            <SetPickRow
               key={s.code}
               set={s}
               busy={busy}
@@ -1037,53 +1043,6 @@ function CardActions({
   );
 }
 
-/** One set on offer: what it is, how far along it is, and what it pays. */
-function SetRow({
-  set,
-  busy,
-  spare,
-  onPress,
-}: {
-  set: PullSet;
-  busy: boolean;
-  /** The commit would burn an older copy rather than this one. */
-  spare: boolean;
-  onPress: () => void;
-}) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  const gold = TierColors[scheme].gold.accent;
-
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={busy}
-      accessibilityRole="button"
-      accessibilityLabel={`Add to ${set.name}, ${set.committed} of ${set.required} filled, pays ${set.pays} gems`}
-      style={({ pressed }) => [
-        styles.setRow,
-        { backgroundColor: c.surface, borderColor: c.border },
-        pressed && styles.pressed,
-        busy && styles.dim,
-      ]}>
-      <View style={styles.setText}>
-        <Text numberOfLines={1} style={[Type.strong, { color: c.text }]}>
-          {set.name}
-        </Text>
-        <Text style={[Type.fine, NUMERIC, { color: c.textTertiary }]}>
-          {`${set.committed} of ${set.required} filled`}
-          {set.family === 'daily' ? ' · expires at midnight' : ''}
-          {spare ? ' · uses a spare copy' : ''}
-        </Text>
-      </View>
-      <View style={styles.setPay}>
-        <Gem size={10} color={gold} />
-        <Text style={[Type.strong, NUMERIC, { color: c.text }]}>{set.pays}</Text>
-      </View>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   deckHead: {
     flexDirection: 'row',
@@ -1174,18 +1133,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
 
-  setRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.chip,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    minHeight: 48,
-  },
-  setText: { flex: 1, minWidth: 0, gap: 1 },
-  setPay: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
 
   afterRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.two },
   after: {

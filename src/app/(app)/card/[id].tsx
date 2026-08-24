@@ -28,6 +28,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { readCardActions, type CardActionSet, type CardActions } from '@/components/cards/card-actions';
+import { CardExits } from '@/components/cards/CardExits';
 import { PlayerAvatar } from '@/components/cards/PlayerAvatar';
 import { invalidateCollection } from '@/components/collection/use-collection';
 import { invalidateSets } from '@/components/collection/use-sets';
@@ -42,10 +44,9 @@ import { startKey } from '@/components/players/GameLog';
 import { parseCardProfile, type CardProfile } from '@/components/players/card-profile';
 import { sellErrorMessage } from '@/components/players/sell';
 import { usePlayerPage } from '@/components/players/use-player-page';
-import { Gem } from '@/components/shell/AppHeader';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
-import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
+import { Colors, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
@@ -85,21 +86,38 @@ export default function CardDetailScreen() {
   const [busy, setBusy] = useState(false);
   const [sellError, setSellError] = useState<string | null>(null);
 
+  /* WHAT THIS COPY CAN BECOME, decided by the server. `card_profile` says what
+     the card IS; this says what may be done with it — what selling pays, and
+     which sets still have a slot open for it and at what price. Two reads
+     rather than one because they answer different questions and only this one
+     changes when somebody else's commit fills a set. */
+  const [can, setCan] = useState<CardActions | null>(null);
+  /** The set the confirm dialog is about, null when it is closed. */
+  const [pendingSet, setPendingSet] = useState<CardActionSet | null>(null);
+  const [commitError, setCommitError] = useState<string | null>(null);
+
   const loadCard = useCallback<Load>(
     async (live) => {
       if (!id) return;
-      const { data, error: err } = await supabase.rpc('card_profile', { p_card_instance_id: id });
+      const [{ data, error: err }, offers] = await Promise.all([
+        supabase.rpc('card_profile', { p_card_instance_id: id }),
+        /* Never the reason this screen fails. A card whose profile loaded is a
+           card worth showing; losing the offers costs it two buttons, and
+           `readCardActions` already answers an outage with an empty map. */
+        readCardActions([id]),
+      ]);
       if (!live()) return;
       if (err) return err.message;
       // Null for a card that is not the caller's, which is the same answer as
       // "does not exist" — deliberately, so this cannot be used to probe
       // whether an id is real.
       setCard(data ? parseCardProfile(data) : null);
+      setCan(offers.get(id) ?? null);
     },
     [id],
   );
 
-  const { loading, error } = useLoader(loadCard);
+  const { loading, error, refresh: reload } = useLoader(loadCard);
 
   /* The football, keyed by the PLAYER this copy is of. Null until the card
      resolves, which is what makes this a two-phase load rather than one. */
@@ -153,6 +171,54 @@ export default function CardDetailScreen() {
       setBusy(false);
     }
   }, [card, refreshWallet, dismiss]);
+
+  /**
+   * Put this card into a set.
+   *
+   * IT DOES NOT DISMISS, and that is the difference from selling. A sold copy
+   * is gone and its profile is a page about a thing that no longer exists, so
+   * that flow closes the sheet. A committed copy still HAS a profile — this
+   * screen already draws a block for it, naming the set and linking to it — and
+   * closing would take the player away from the one place that says what just
+   * happened. So it reloads in place and the page becomes the after picture.
+   *
+   * `p_card_id` is the PRINTED card, not this instance, because that is what
+   * the function takes: it picks the copy itself, and it picks the least
+   * valuable one you hold. Which may not be this one — see `burnsThisCopy` and
+   * the warning on the dialog.
+   */
+  const confirmCommit = useCallback(async () => {
+    if (!card || !pendingSet) return;
+    setBusy(true);
+    setCommitError(null);
+    try {
+      const { error: err } = await supabase.rpc('commit_card_to_set', {
+        p_set_code: pendingSet.code,
+        p_card_id: card.card.cardId,
+      });
+      /* Verbatim. Every refusal `commit_card_to_set` raises is written to be
+         read by a player — unlike `sell_card`'s, which is what `sellErrorMessage`
+         exists to translate. */
+      if (err) throw new Error(err.message);
+
+      // A copy left the collection and a set moved, and both are held for the
+      // session. Missing either shows a card that is no longer there.
+      invalidateCollection();
+      invalidateSets();
+      await refreshWallet();
+      setPendingSet(null);
+      // Back to the server for both halves: the profile now reads as committed
+      // (or not, if a spare went instead), and the set that took it can no
+      // longer take another.
+      await reload();
+    } catch (e) {
+      // Held open, same as the sale. Closing would leave the card unchanged
+      // with no explanation, which reads as the button having done nothing.
+      setCommitError(e instanceof Error ? e.message : 'The card could not be added.');
+    } finally {
+      setBusy(false);
+    }
+  }, [card, pendingSet, refreshWallet, reload]);
 
   const body = () => {
     if (loading || !id) {
@@ -263,30 +329,47 @@ export default function CardDetailScreen() {
               {`${k.season ?? '—'} card · ${k.rarity ?? 'unknown'} · acquired ${dateLabel(k.acquiredAt)}${k.source ? ` from a ${k.source}` : ''}`}
             </Text>
 
-            <CardStanding card={k} rank={card.rank} />
-            <StartLog starts={card.starts} playerName={k.playerName} />
-
-            {/* Neither exit leaves anything to sell. Both are checked, not
-                just the sale: a committed copy with a live SELL button is a
-                button whose only outcome is a Postgres error. */}
+            {/**
+              * WHAT YOU CAN DO WITH IT, above what it has done.
+              *
+              * The sale used to sit at the BOTTOM of this tab, under the start
+              * log and above the community panel — a defensible reading order
+              * (look, then decide) that was reported as the button not
+              * existing. On a card with fourteen starts the log is most of a
+              * screen, so "what can I do with this" was below the fold on the
+              * one screen that exists to answer it. Adding to a set was not
+              * offered here at all.
+              *
+              * Neither exit is offered on a copy that has already taken one,
+              * and BOTH are checked rather than just the sale: a committed copy
+              * with a live SELL button is a button whose only outcome is a
+              * Postgres error.
+              */}
             {k.soldAt || k.committedAt ? null : (
-              <Pressable
-                onPress={() => {
+              <CardExits
+                playerName={k.playerName}
+                tier={k.tier}
+                sellValue={k.sellValue}
+                sets={can?.sets ?? []}
+                /* Defaults to "this one burns" while the offers are still in
+                   flight, which is the safe way round: it is the reading that
+                   makes the act sound MORE consequential, and no button is
+                   drawn from it until `sets` arrives anyway. */
+                burnsThisCopy={can?.burnsThisCopy !== false}
+                busy={busy}
+                onCommit={(set) => {
+                  setCommitError(null);
+                  setPendingSet(set);
+                }}
+                onSell={() => {
                   setSellError(null);
                   setSelling(true);
                 }}
-                accessibilityRole="button"
-                accessibilityLabel={`Sell this ${k.tier} card for ${k.sellValue} gems`}
-                style={({ pressed }) => [
-                  styles.sell,
-                  { borderColor: c.border, backgroundColor: c.backgroundElement },
-                  pressed && styles.pressed,
-                ]}>
-                <Text style={[Type.strong, { color: c.textSecondary }]}>SELL THIS COPY</Text>
-                <Gem color={TierColors[scheme].gold.accent} size={10} />
-                <Text style={[Type.strong, NUMERIC, { color: c.text }]}>{k.sellValue}</Text>
-              </Pressable>
+              />
             )}
+
+            <CardStanding card={k} rank={card.rank} />
+            <StartLog starts={card.starts} playerName={k.playerName} />
 
             {/* The same community view the directory page shows, underneath the
                 copy it gives context to. Rank means nothing without the pool. */}
@@ -325,6 +408,45 @@ export default function CardDetailScreen() {
             startedWeeks={startedWeeks}
           />
         ) : null}
+
+        {/**
+          * COMMITTING IS DESTRUCTIVE AND GETS A DIALOG, exactly as the set
+          * checklist gives it. This is NOT the pack reveal, where the same act
+          * resolves with a second tap: there every card is seconds old, bronze
+          * and worth single-figure gems, and there are eight of them. Here
+          * there is one card, you came to this screen to look at it, and it may
+          * carry a season of scoring — which is the case the checklist's dialog
+          * was written for.
+          */}
+        <ConfirmDialog
+          visible={pendingSet !== null}
+          title={pendingSet ? `Add ${k.playerName} to ${pendingSet.name}?` : ''}
+          body={
+            pendingSet
+              ? `A committed card is burnt: it leaves your collection for good, cannot be started or sold again, and pays back ${pendingSet.pays} gems. That fills ${pendingSet.committed + 1} of ${pendingSet.required} slots.`
+              : undefined
+          }
+          /* THE ONE THING THE TITLE DOES NOT PREDICT, and on this screen it is
+             the sharpest version of it: the player is looking at one specific
+             copy, and the server burns the least valuable one they hold. Set
+             apart rather than folded into the paragraph, which is what
+             `warning` is for. */
+          warning={
+            can?.burnsThisCopy === false
+              ? `You hold a spare of ${k.playerName}, and the least valuable copy is the one that burns — so this card stays and an older one goes.`
+              : null
+          }
+          confirmLabel={pendingSet ? `Add for ${pendingSet.pays}` : ''}
+          destructive
+          busy={busy}
+          error={commitError}
+          onConfirm={() => void confirmCommit()}
+          onCancel={() => {
+            if (busy) return;
+            setPendingSet(null);
+            setCommitError(null);
+          }}
+        />
 
         <ConfirmDialog
           visible={selling}
@@ -387,14 +509,5 @@ const styles = StyleSheet.create({
   /* `gap` for the committed banner's link, which sits under its sentence. The
      sold banner has no second child and is unaffected. */
   note: { borderRadius: Radius.panel, padding: Spacing.two + 4, gap: Spacing.two },
-  sell: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.one + 2,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.control,
-    paddingVertical: Spacing.two + 2,
-  },
   pressed: { opacity: 0.65 },
 });

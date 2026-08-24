@@ -14,7 +14,7 @@ import type { CardTier } from '@/constants/theme';
 import type { SetMember } from '@/components/collection/SetChecklist';
 import type { CardSet } from '@/components/collection/sets';
 import type { CollectionCard } from '@/components/collection/types';
-import type { PullAction, PullSet } from '@/components/cards/use-pull-actions';
+import type { CardActions, CardActionSet } from '@/components/cards/card-actions';
 
 /**
  * The four sample cards, one per tier.
@@ -395,7 +395,7 @@ type PulledFixture = {
   rarity: string | null;
 };
 
-const teamSet = (code: string, name: string, committed: number, required: number): PullSet => ({
+const teamSet = (code: string, name: string, committed: number, required: number): CardActionSet => ({
   code,
   name,
   family: 'team',
@@ -408,7 +408,7 @@ const teamSet = (code: string, name: string, committed: number, required: number
   canCommit: true,
 });
 
-export const PULL_ACTIONS_FIXTURE = new Map<string, PullAction>([
+export const PULL_ACTIONS_FIXTURE = new Map<string, CardActions>([
   [
     'ci-1',
     {
@@ -467,3 +467,50 @@ export const PULL_ACTIONS_FIXTURE = new Map<string, PullAction>([
     },
   ],
 ]);
+
+/**
+ * Three sets for the card-exits gallery, one per state the row can be in.
+ *
+ * Separate from `PULL_ACTIONS_FIXTURE` because that one is a whole pack and
+ * these are single rows — a gallery that had to open a pack to see a button
+ * would be testing the pack.
+ */
+export const KIT_SET_OPEN: CardActionSet = {
+  code: 'team-ten-2026',
+  name: 'Tennessee Titans',
+  family: 'team',
+  subtitle: 'AFC South',
+  pays: 4,
+  committed: 6,
+  required: 31,
+  slotFilled: false,
+  setComplete: false,
+  canCommit: true,
+};
+
+export const KIT_SET_DAILY: CardActionSet = {
+  code: 'daily-wr-2026-08-24',
+  name: 'Receiver of the day',
+  family: 'daily',
+  subtitle: 'Monday 24 August',
+  pays: 75,
+  committed: 1,
+  required: 3,
+  slotFilled: false,
+  setComplete: false,
+  canCommit: true,
+};
+
+/** His slot is taken, so the whole row collapses to a sentence saying so. */
+export const KIT_SET_FILLED: CardActionSet = {
+  code: 'team-jax-2026',
+  name: 'Jacksonville Jaguars',
+  family: 'team',
+  subtitle: 'AFC South',
+  pays: 4,
+  committed: 9,
+  required: 28,
+  slotFilled: true,
+  setComplete: false,
+  canCommit: false,
+};

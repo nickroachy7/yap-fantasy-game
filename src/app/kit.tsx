@@ -33,7 +33,15 @@ import type { DirectoryPlayer } from '@/components/cards/player-directory';
 import { CollectionSummary } from '@/components/collection/CollectionSummary';
 import { SearchField, SortChips } from '@/components/ui/Controls';
 import { summarise } from '@/components/collection/types';
-import { OWNED_MANY, PULLED_FIXTURE, PULL_ACTIONS_FIXTURE } from '@/components/dev/fixtures';
+import {
+  KIT_SET_DAILY,
+  KIT_SET_FILLED,
+  KIT_SET_OPEN,
+  OWNED_MANY,
+  PULLED_FIXTURE,
+  PULL_ACTIONS_FIXTURE,
+} from '@/components/dev/fixtures';
+import { CardExits } from '@/components/cards/CardExits';
 import { PackReveal } from '@/components/cards/PackReveal';
 import type { Disposition } from '@/components/cards/use-pull-actions';
 import { GameRow } from '@/components/scores/GameRow';
@@ -537,6 +545,9 @@ function Kit() {
   const [pullDisposed, setPullDisposed] = useState<Map<string, Disposition>>(() => new Map());
   const [pullActions, setPullActions] = useState(PULL_ACTIONS_FIXTURE);
   const [pullOpen, setPullOpen] = useState(false);
+  /* The card profile's two exits, which cannot be reached in this gallery any
+     other way — that screen is behind a sign-in. */
+  const [exitPicked, setExitPicked] = useState<string | null>(null);
   const spendPullCard = (id: string) =>
     setPullActions((held) => {
       const was = held.get(id);
@@ -1075,6 +1086,56 @@ function Kit() {
                 />
               </PlayerSheetFrame>
             </Modal>
+          </Section>
+
+          <Section
+            title="Card exits"
+            note="The two ways a card leaves your collection, as the card profile offers them. Four states: one set open, several (the button opens a picker), a spare copy held so the burn takes a different card, and every set closed — which says WHICH of the two reasons applies rather than going quiet. Pressing either hands the decision to a ConfirmDialog on the real screen; here it just reports what was pressed.">
+            <View style={styles.section}>
+              <CardExits
+                playerName="Drew Allar"
+                tier="bronze"
+                sellValue={8}
+                sets={[KIT_SET_OPEN]}
+                burnsThisCopy
+                busy={false}
+                onCommit={(x) => setExitPicked(`add to ${x.name} for ${x.pays}`)}
+                onSell={() => setExitPicked('sell for 8')}
+              />
+              <CardExits
+                playerName="Ja'Marr Chase-Williams"
+                tier="gold"
+                sellValue={150}
+                sets={[KIT_SET_DAILY, KIT_SET_OPEN]}
+                burnsThisCopy
+                busy={false}
+                onCommit={(x) => setExitPicked(`add to ${x.name} for ${x.pays}`)}
+                onSell={() => setExitPicked('sell for 150')}
+              />
+              <CardExits
+                playerName="Amar Johnson"
+                tier="silver"
+                sellValue={40}
+                sets={[KIT_SET_OPEN]}
+                burnsThisCopy={false}
+                busy={false}
+                onCommit={(x) => setExitPicked(`add to ${x.name} for ${x.pays}`)}
+                onSell={() => setExitPicked('sell for 40')}
+              />
+              <CardExits
+                playerName="Evan Engram"
+                tier="bronze"
+                sellValue={8}
+                sets={[KIT_SET_FILLED]}
+                burnsThisCopy
+                busy={false}
+                onCommit={(x) => setExitPicked(`add to ${x.name}`)}
+                onSell={() => setExitPicked('sell for 8')}
+              />
+              <Text style={[Type.fine, { color: c.textTertiary }]}>
+                {exitPicked ? `Pressed: ${exitPicked}` : 'Nothing pressed yet.'}
+              </Text>
+            </View>
           </Section>
 
           <Section title="Empty state" note="Bold line, quiet line, at most one action.">
