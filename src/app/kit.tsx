@@ -26,14 +26,16 @@ import { ContestCard } from '@/components/lineup/ContestCard';
 import type { FieldWeek } from '@/components/lineup/field';
 import { BADGE_SIZE, BADGE_WIDTH, BenchRow, StarterRow } from '@/components/lineup/LineupRow';
 import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
-import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
+import { PlayerSheetFrame, SheetToneBand } from '@/components/players/PlayerSheetFrame';
 import type { LineupCard } from '@/components/lineup/model';
 import { PlayerRow } from '@/components/cards/PlayerRow';
 import type { DirectoryPlayer } from '@/components/cards/player-directory';
 import { CollectionSummary } from '@/components/collection/CollectionSummary';
 import { SearchField, SortChips } from '@/components/ui/Controls';
 import { summarise } from '@/components/collection/types';
-import { OWNED_MANY } from '@/components/dev/fixtures';
+import { OWNED_MANY, PULLED_FIXTURE, PULL_ACTIONS_FIXTURE } from '@/components/dev/fixtures';
+import { PackReveal } from '@/components/cards/PackReveal';
+import type { Disposition } from '@/components/cards/use-pull-actions';
 import { GameRow } from '@/components/scores/GameRow';
 import { ScoreStrip } from '@/components/scores/ScoreStrip';
 import { LeadersPanel } from '@/components/scores/LeadersPanel';
@@ -48,7 +50,7 @@ import { SegmentedControl } from '@/components/shell/SegmentedControl';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { POSITION_ORDER, POSITIONS } from '@/constants/positions';
-import { Colors, Spacing, Type } from '@/constants/theme';
+import { Colors, Spacing, TierColors, Type } from '@/constants/theme';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -527,6 +529,20 @@ function Kit() {
   const [action, setAction] = useState('search');
   const [kitPos, setKitPos] = useState<PosFilter>('ALL');
   const [kitDirection, setKitDirection] = useState<KitDirection>('up');
+  /* The reveal's two writes, faked — including the part of them that is easy to
+     forget in a gallery: a card that has been sold, or burnt into a set, is NOT
+     held any more, and the panel draws a different thing for a card that has
+     left the collection. Committing a player you hold a spare of leaves the
+     card exactly where it was, which is the case card 2 exists to show. */
+  const [pullDisposed, setPullDisposed] = useState<Map<string, Disposition>>(() => new Map());
+  const [pullActions, setPullActions] = useState(PULL_ACTIONS_FIXTURE);
+  const [pullOpen, setPullOpen] = useState(false);
+  const spendPullCard = (id: string) =>
+    setPullActions((held) => {
+      const was = held.get(id);
+      if (!was) return held;
+      return new Map(held).set(id, { ...was, held: false, sellable: false });
+    });
   // The sheet changes shape at the same breakpoint the product uses, so this
   // gallery shows whichever one the current window would get.
   const wide = useIsWide();
@@ -982,6 +998,85 @@ function Kit() {
             />
           </Section>
 
+          <Section
+            title="Pack reveal"
+            note="Cards face down, turned over as they reach the middle. Shown INSIDE the sheet, because that is the only place it appears and the deck runs to the sheet's edges by climbing back over its gutter — laid out inline it would prove nothing about that. The panel under the deck follows whichever card is in front of you: card 2 commits a spare copy, card 3 is in two sets so it opens the picker, card 4's slot is already filled, card 5 is in no set at all.">
+            <View style={styles.row}>
+              <Pressable
+                onPress={() => setPullOpen(true)}
+                style={({ pressed }) => [
+                  styles.demoButton,
+                  { backgroundColor: c.backgroundElement },
+                  pressed && { opacity: 0.6 },
+                ]}>
+                <Text style={[Type.strong, { color: c.text }]}>Open a pack</Text>
+              </Pressable>
+            </View>
+            {/* Same scaffold, and the same two caveats, as the player sheet
+                above: a plain Modal stands in for the route's own full-screen
+                container, and its animation is off because react-native-web
+                drives pointer-events from it. */}
+            <Modal
+              visible={pullOpen}
+              transparent
+              animationType="none"
+              onRequestClose={() => setPullOpen(false)}>
+              <PlayerSheetFrame
+                title="You pulled 5 cards"
+                tone={TierColors[scheme].gold.accent}
+                onClose={() => setPullOpen(false)}
+                closeLabel="Close packs">
+                {/* The hero the real screen puts above the deck, in miniature.
+                    Not decoration in a gallery: on a phone and on narrow web the
+                    frame FLOATS its chrome over the content, so whatever is
+                    first in the sheet sits under the ✕. Drop this and the
+                    deck's own counter row lands beneath the close button, which
+                    is a bug the gallery would be inventing rather than
+                    reporting. */}
+                <SheetToneBand tone={TierColors[scheme].gold.accent}>
+                  <View style={styles.pullHero}>
+                    <Text style={[Type.micro, { color: TierColors[scheme].gold.accent }]}>
+                      PULLED
+                    </Text>
+                    <Text style={[Type.page, { color: c.text }]}>You pulled 5 cards</Text>
+                  </View>
+                </SheetToneBand>
+                <PackReveal
+                  pulled={PULLED_FIXTURE}
+                  silverAt={200}
+                  actions={pullActions}
+                  loadingActions={false}
+                  disposed={pullDisposed}
+                  busy={null}
+                  error={null}
+                  onDismissError={() => {}}
+                  onSell={(id) => {
+                    setPullDisposed((held) => new Map(held).set(id, { kind: 'sold', gems: 8 }));
+                    spendPullCard(id);
+                  }}
+                  onCommit={(id, code) => {
+                    const was = pullActions.get(id);
+                    const burnedThisCopy = was?.burnsThisCopy ?? true;
+                    setPullDisposed((held) =>
+                      new Map(held).set(id, {
+                        kind: 'committed',
+                        setName: was?.sets.find((x) => x.code === code)?.name ?? code,
+                        gems: 4,
+                        burnedThisCopy,
+                      }),
+                    );
+                    if (burnedThisCopy) spendPullCard(id);
+                  }}
+                  onAgain={() => {
+                    setPullDisposed(new Map());
+                    setPullActions(PULL_ACTIONS_FIXTURE);
+                  }}
+                  onSeeInventory={() => setPullOpen(false)}
+                />
+              </PlayerSheetFrame>
+            </Modal>
+          </Section>
+
           <Section title="Empty state" note="Bold line, quiet line, at most one action.">
             <Panel>
               <EmptyState
@@ -1028,6 +1123,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, alignItems: 'center' },
   iconCell: { alignItems: 'center', gap: Spacing.two },
   summaryPad: { padding: Spacing.two + 2 },
+  pullHero: { gap: Spacing.two, paddingBottom: Spacing.three },
   demoButton: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,

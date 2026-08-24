@@ -1319,6 +1319,10 @@ export type Database = {
         }
         Returns: Json
       }
+      backfill_week: {
+        Args: { p_season: number; p_season_type: number; p_week: number }
+        Returns: Json
+      }
       board_best_week: {
         Args: { p_limit?: number; p_season: number; p_season_type?: number }
         Returns: {
@@ -1396,6 +1400,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      card_actions: { Args: { p_card_instance_ids: string[] }; Returns: Json }
       card_profile: { Args: { p_card_instance_id: string }; Returns: Json }
       claim_set_reward: { Args: { p_set_code: string }; Returns: Json }
       commit_candidate: { Args: { p_card_id: string }; Returns: string }
@@ -1416,6 +1421,10 @@ export type Database = {
         }[]
       }
       daily_set_position: { Args: { p_day: string }; Returns: string }
+      game_has_started: {
+        Args: { p_starts_at: string; p_status_state: string }
+        Returns: boolean
+      }
       gameday_sweep: { Args: never; Returns: Json }
       grant_weekly_gems: {
         Args: {
@@ -1448,6 +1457,14 @@ export type Database = {
           season: number
           season_type: number
           week: number
+        }[]
+      }
+      locked_cards: {
+        Args: { p_season: number; p_season_type: number; p_week: number }
+        Returns: {
+          card_instance_id: string
+          locked: boolean
+          starts_at: string
         }[]
       }
       median_record: {

@@ -14,6 +14,7 @@ import type { CardTier } from '@/constants/theme';
 import type { SetMember } from '@/components/collection/SetChecklist';
 import type { CardSet } from '@/components/collection/sets';
 import type { CollectionCard } from '@/components/collection/types';
+import type { PullAction, PullSet } from '@/components/cards/use-pull-actions';
 
 /**
  * The four sample cards, one per tier.
@@ -360,3 +361,106 @@ export const SET_MEMBERS_FIXTURE: SetMember[] = [
   // No production yet: no FP suffix, rather than a printed zero.
   { card_id: 'm8', player_id: 'p8', player_name: 'Seth Williams',           position_abbreviation: 'WR', team_abbreviation: 'JAX', season_fp: null,  committed: false, held: 0, commit_value: 0,  commit_tier: null },
 ];
+
+/**
+ * One pack opening, for the reveal gallery.
+ *
+ * FIVE CARDS COVERING THE FIVE STATES the panel under the deck can be in, in
+ * the order you meet them scrolling right:
+ *
+ *   1  the ordinary case — one set open, sellable, this copy is the one that
+ *      would burn;
+ *   2  a player you already own a spare of, so committing burns the OTHER copy
+ *      and the row has to say so;
+ *   3  in two sets at once — a team set and today's daily — which is the only
+ *      case that opens the picker rather than committing on the first tap;
+ *   4  a card whose slot is already filled, so there is nothing to add it to
+ *      and only the sell button is left;
+ *   5  a card in no active set at all, which is a different piece of news from
+ *      the one above and must not read the same.
+ */
+export const PULLED_FIXTURE: PulledFixture[] = [
+  { card_instance_id: 'ci-1', player_name: 'Drew Allar',              position_abbreviation: 'QB', team_abbreviation: 'TEN', rarity: 'common' },
+  { card_instance_id: 'ci-2', player_name: 'Amar Johnson',            position_abbreviation: 'RB', team_abbreviation: 'KC',  rarity: 'common' },
+  { card_instance_id: 'ci-3', player_name: "Ja'Marr Chase-Williams",  position_abbreviation: 'WR', team_abbreviation: 'CIN', rarity: 'rare'   },
+  { card_instance_id: 'ci-4', player_name: 'Evan Engram',             position_abbreviation: 'TE', team_abbreviation: 'JAX', rarity: 'common' },
+  { card_instance_id: 'ci-5', player_name: 'Cam Little',              position_abbreviation: 'PK', team_abbreviation: 'JAX', rarity: 'common' },
+];
+
+type PulledFixture = {
+  card_instance_id: string;
+  player_name: string | null;
+  position_abbreviation: string | null;
+  team_abbreviation: string | null;
+  rarity: string | null;
+};
+
+const teamSet = (code: string, name: string, committed: number, required: number): PullSet => ({
+  code,
+  name,
+  family: 'team',
+  subtitle: 'AFC North',
+  pays: 4,
+  committed,
+  required,
+  slotFilled: false,
+  setComplete: false,
+  canCommit: true,
+});
+
+export const PULL_ACTIONS_FIXTURE = new Map<string, PullAction>([
+  [
+    'ci-1',
+    {
+      cardInstanceId: 'ci-1', cardId: 'c-1', sellValue: 8, held: true, sellable: true,
+      burnsThisCopy: true,
+      sets: [teamSet('team-ten-2026', 'Tennessee Titans', 6, 31)],
+    },
+  ],
+  [
+    'ci-2',
+    {
+      cardInstanceId: 'ci-2', cardId: 'c-2', sellValue: 8, held: true, sellable: true,
+      // The spare-copy case: the commit burns an older copy, not this one.
+      burnsThisCopy: false,
+      sets: [teamSet('team-kc-2026', 'Kansas City Chiefs', 12, 29)],
+    },
+  ],
+  [
+    'ci-3',
+    {
+      cardInstanceId: 'ci-3', cardId: 'c-3', sellValue: 8, held: true, sellable: true,
+      burnsThisCopy: true,
+      sets: [
+        {
+          code: 'daily-wr-2026-08-23', name: 'Receiver of the day', family: 'daily',
+          subtitle: 'Sunday 23 August', pays: 4, committed: 1, required: 3,
+          slotFilled: false, setComplete: false, canCommit: true,
+        },
+        teamSet('team-cin-2026', 'Cincinnati Bengals', 3, 30),
+      ],
+    },
+  ],
+  [
+    'ci-4',
+    {
+      cardInstanceId: 'ci-4', cardId: 'c-4', sellValue: 8, held: true, sellable: true,
+      burnsThisCopy: true,
+      sets: [
+        {
+          code: 'team-jax-2026', name: 'Jacksonville Jaguars', family: 'team',
+          subtitle: 'AFC South', pays: 4, committed: 9, required: 28,
+          slotFilled: true, setComplete: false, canCommit: false,
+        },
+      ],
+    },
+  ],
+  [
+    'ci-5',
+    {
+      cardInstanceId: 'ci-5', cardId: 'c-5', sellValue: 8, held: true, sellable: true,
+      burnsThisCopy: true,
+      sets: [],
+    },
+  ],
+]);

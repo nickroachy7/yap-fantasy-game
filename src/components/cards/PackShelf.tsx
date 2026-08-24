@@ -1,5 +1,13 @@
 /**
- * The pack shelf and the pull that follows it — the two halves of `/packs`.
+ * The pack shelf — the first half of `/packs`, and the only half still here.
+ *
+ * WHAT THE PULL BECAME. `PullResult` used to live below, drawing every pulled
+ * card in one wrapping grid. It is `PackReveal` now, in its own file, because
+ * it stopped being a way of DISPLAYING a result and became a thing you move
+ * through and act on: cards face down in a deck, turned over one at a time, each
+ * with the two exits — sell it, or put it in a set — on the card itself. The
+ * shelf and the reveal share nothing but the `Pulled` row type, which stays
+ * here beside the RPC's other shapes.
  *
  * WHAT THIS USED TO BE. `ShopPanel`, a `ScrollView` filling
  * `collection/shop` — a whole sub-page, one third of the Collection strip, for
@@ -23,21 +31,11 @@
  * does not currently keep.
  */
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Gem } from '@/components/shell/AppHeader';
-import {
-  Colors,
-  NUMERIC,
-  Radius,
-  Spacing,
-  TierColors,
-  Type,
-  type CardTier,
-} from '@/constants/theme';
+import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import type { Json } from '@/lib/database.types';
-import { PlayerCard, type PlayerCardModel } from './PlayerCard';
 
 export type Pack = {
   id: string;
@@ -56,10 +54,6 @@ export type Pulled = {
   team_abbreviation: string | null;
   rarity: string | null;
 };
-
-/** Every card is minted at the floor tier; only lineup starts move it. */
-const MINT_TIER: CardTier = 'bronze';
-const NEXT_TIER_LABEL = 'SILVER';
 
 /**
  * Lineup order, so coverage reads QB → PK. It cannot come off the jsonb: it
@@ -149,117 +143,6 @@ export function PackShelf({
         Pull rates are not published yet. Which cards a pack can contain is decided server-side —
         the position guarantees above are the only promise a pack makes about its contents today.
       </Text>
-    </>
-  );
-}
-
-/* ---- the pull ---------------------------------------------------------- */
-
-/**
- * What just arrived, and it REPLACES the shelf rather than sitting under it.
- *
- * Two reasons, and the first is the one that was actually broken. On the old
- * page the pulled cards rendered below the shelf inside a scroll view, so on a
- * phone you spent 100 gems and the payoff was off screen — the thing you paid
- * for was the one thing you had to go looking for.
- *
- * The second is the faucet. A shelf still on screen under five new cards puts
- * "Open" a thumb's width from the moment the last one landed, which is the
- * cheapest possible second purchase. `Open another` is the same act made
- * deliberate: one tap further away, and it says what it does.
- */
-/** How far apart the cards land, and how long each takes. See `PullResult`. */
-const REVEAL_STAGGER_MS = 55;
-const REVEAL_MS = 240;
-
-export function PullResult({
-  pulled,
-  silverAt,
-  onAgain,
-  onSeeInventory,
-}: {
-  pulled: Pulled[];
-  /** Career FP the next tier starts at, read from `tier_thresholds`. */
-  silverAt: number;
-  onAgain: () => void;
-  onSeeInventory: () => void;
-}) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-
-  const toModel = (p: Pulled): PlayerCardModel => ({
-    playerName: p.player_name ?? 'Unknown player',
-    positionAbbreviation: p.position_abbreviation,
-    teamAbbreviation: p.team_abbreviation,
-    // A freshly pulled card has never been started, so it starts at the floor.
-    tier: MINT_TIER,
-    careerFp: 0,
-    tierFloorFp: 0,
-    nextTierAt: silverAt,
-    nextTierLabel: NEXT_TIER_LABEL,
-  });
-
-  return (
-    <>
-      {/**
-        * DEALT, NOT PRINTED.
-        *
-        * All eight used to arrive in the same frame, which is the one moment in
-        * this app where that is the wrong answer: opening a pack is the reward,
-        * and a reward that appears as a finished table reads as a query result.
-        * The stagger costs nothing and buys the only thing missing — a sense
-        * that the cards are being turned over one at a time.
-        *
-        * SMALL NUMBERS ON PURPOSE. 55ms apart and 240ms each puts the last card
-        * of an eight-card pack down just under 0.7s, which is short enough that
-        * nobody waits on it and long enough to read as dealing. This is the
-        * beta's version of the moment, not the finished one — the full reveal
-        * is its own piece of work.
-        *
-        * `entering` only, no exit: the result is replaced wholesale by the
-        * shelf when you open another, and animating cards out would delay the
-        * next pack behind an animation about the last one.
-        *
-        * Reanimated's entering animations are already used in product code (see
-        * `ui/collapsible`), so this adds no dependency and nothing new to learn.
-        */}
-      <View style={styles.grid}>
-        {pulled.map((p, i) => (
-          <Animated.View
-            key={p.card_instance_id}
-            entering={FadeInDown.delay(i * REVEAL_STAGGER_MS).duration(REVEAL_MS)}>
-            <PlayerCard model={toModel(p)} size="grid" />
-          </Animated.View>
-        ))}
-      </View>
-
-      <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
-        New cards start at bronze. Start them in a lineup to earn their way up.
-      </Text>
-
-      <View style={styles.afterRow}>
-        <Pressable
-          onPress={onSeeInventory}
-          accessibilityRole="button"
-          accessibilityLabel="See these cards in your inventory"
-          style={({ pressed }) => [
-            styles.after,
-            { backgroundColor: c.text },
-            pressed && styles.pressed,
-          ]}>
-          <Text style={[Type.strong, { color: c.background }]}>See in Inventory</Text>
-        </Pressable>
-        <Pressable
-          onPress={onAgain}
-          accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.after,
-            { backgroundColor: c.backgroundElement },
-            pressed && styles.pressed,
-          ]}>
-          <Text style={[Type.strong, { color: c.text }]}>Open another</Text>
-        </Pressable>
-      </View>
     </>
   );
 }
@@ -477,14 +360,4 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.8 },
   // Sentences, not a grid: hold them to a readable line even in the wide dialog.
   measure: { maxWidth: 560 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three },
-  afterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  after: {
-    borderRadius: Radius.chip,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 2,
-    minHeight: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 });

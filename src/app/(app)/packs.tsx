@@ -21,7 +21,7 @@
  * machinery: `takeover` already existed for exactly this shape.
  *
  * TWO STATES, ONE SHEET. The shelf, and then what you pulled — and the second
- * REPLACES the first rather than appending to it. See `PullResult`.
+ * REPLACES the first rather than appending to it. See `PackReveal`.
  *
  * THE TONE IS GOLD, which is the app's own: the gem, the rail's active marker,
  * the Open button. The frame's note asks that every sheet carry a colour rather
@@ -32,14 +32,15 @@ import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { PackReveal } from '@/components/cards/PackReveal';
 import {
   CoverageChip,
   PackShelf,
-  PullResult,
   countPositions,
   type Pack,
   type Pulled,
 } from '@/components/cards/PackShelf';
+import { usePullActions } from '@/components/cards/use-pull-actions';
 import { invalidateCollection } from '@/components/collection/use-collection';
 import { invalidateSets } from '@/components/collection/use-sets';
 import { Gem } from '@/components/shell/AppHeader';
@@ -104,6 +105,11 @@ export default function PacksScreen() {
   // Quiet by design: the shelf that is already drawn stays drawn while it is
   // re-read after a pack is opened.
   const { refresh: reloadShelf } = useLoader(load);
+
+  /* WHAT YOU CAN DO WITH WHAT YOU PULLED, and every figure in it decided by the
+     server. It keys off the pull itself, so opening another pack drops the last
+     one's offers with it — see `usePullActions`. */
+  const pull = usePullActions(pulled);
 
   const open = useCallback(
     async (code: string) => {
@@ -246,9 +252,22 @@ export default function PacksScreen() {
       ) : null}
 
       {pulled ? (
-        <PullResult
+        <PackReveal
+          /* A NEW PACK IS A NEW COMPONENT. The reveal holds the scroll
+             position, which cards have been turned over and which one is in
+             front of you — all of it belongs to one opening, and remounting
+             drops the lot in one go. See the note at the top of that file. */
+          key={pulled.map((p) => p.card_instance_id).join(',')}
           pulled={pulled}
           silverAt={silverAt}
+          actions={pull.actions}
+          loadingActions={pull.loading}
+          disposed={pull.disposed}
+          busy={pull.busy}
+          error={pull.error}
+          onDismissError={pull.clearError}
+          onSell={pull.sell}
+          onCommit={pull.commit}
           onAgain={() => setPulled(null)}
           onSeeInventory={seeInventory}
         />
