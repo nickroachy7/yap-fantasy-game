@@ -31,6 +31,8 @@ import {
 import { BulkBar } from '@/components/collection/BulkBar';
 import { SELECTION_MAX, sellTotal } from '@/components/collection/bulk';
 import { CollectionSummary } from '@/components/collection/CollectionSummary';
+import { RosterBar } from '@/components/collection/RosterBar';
+import { useRoster } from '@/components/collection/use-roster';
 import { useBulk } from '@/components/collection/use-bulk';
 import { PacksButton } from '@/components/shell/PacksButton';
 import { EmptyCollection, EmptyFilterResult } from '@/components/collection/EmptyInventory';
@@ -190,6 +192,10 @@ export default function InventoryScreen() {
 
   const all = useMemo(() => cards ?? [], [cards]);
   const stats = useMemo(() => summarise(all), [all]);
+  // Re-read on focus rather than derived from `all`: the cap counts held cards
+  // server-side, and this screen's list is the same set of rows only until a
+  // commit or a sale on another screen moves one of them.
+  const roster = useRoster();
 
   // Hiding the field must also drop whatever was typed into it, or a collection
   // that shrinks past the threshold filters itself by an invisible control.
@@ -392,6 +398,15 @@ export default function InventoryScreen() {
             <View style={styles.summary}>
               <CollectionSummary stats={stats} action={<PacksButton />} />
             </View>
+
+            {/* Only once it is actionable — see the note above on why this
+                pinned block is kept to a fixed height, and RosterBar's own
+                header for where the always-visible count lives instead. */}
+            {roster && (roster.isNear || roster.isOver) ? (
+              <View style={styles.summary}>
+                <RosterBar roster={roster} />
+              </View>
+            ) : null}
 
             <View style={styles.toolbar}>
               <View style={styles.chips}>

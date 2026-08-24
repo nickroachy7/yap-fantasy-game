@@ -79,6 +79,8 @@ import { SegmentedControl, type Segment } from '@/components/shell/SegmentedCont
 import { AppHeader } from '@/components/shell/AppHeader';
 import { FantasyTopNav } from '@/components/shell/FantasyTopNav';
 import { FrameProvider } from '@/components/shell/frame';
+import { RecapBody } from '@/components/recap/RecapBody';
+import type { Recap } from '@/components/recap/recap';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { WIDE_BREAKPOINT, useIsWide } from '@/components/shell/useResponsive';
 import { Colors, Spacing, Type, type CardTier, type Measure } from '@/constants/theme';
@@ -133,13 +135,14 @@ const GALLERY_STARTERS_BY_TEAM = new Map([
   ['SF', 1],
 ]);
 
-type View_ = 'inventory' | 'sets' | 'checklist' | 'leaderboard' | 'lineup' | 'profile';
+type View_ = 'inventory' | 'sets' | 'checklist' | 'leaderboard' | 'lineup' | 'recap' | 'profile';
 const VIEWS: Segment<View_>[] = [
   { value: 'inventory', label: 'Inventory' },
   { value: 'sets', label: 'Sets' },
   { value: 'checklist', label: 'Set' },
   { value: 'leaderboard', label: 'Board' },
   { value: 'lineup', label: 'Lineup' },
+  { value: 'recap', label: 'Recap' },
   { value: 'profile', label: 'Profile' },
 ];
 
@@ -150,6 +153,7 @@ const VIEW_MEASURE: Record<View_, Measure> = {
   checklist: 'form',
   leaderboard: 'table',
   lineup: 'form',
+  recap: 'form',
   profile: 'table',
 };
 const VIEW_TITLE: Record<View_, string> = {
@@ -158,6 +162,7 @@ const VIEW_TITLE: Record<View_, string> = {
   checklist: 'Jacksonville Jaguars',
   leaderboard: 'Leaderboard',
   lineup: 'Lineup',
+  recap: 'Week 3 recap',
   profile: 'Christian McCaffrey',
 };
 
@@ -168,10 +173,94 @@ const VIEW_PATH: Record<View_, string> = {
   checklist: '/fantasy/sets',
   leaderboard: '/fantasy/leaderboard',
   lineup: '/fantasy/lineup',
+  recap: '/fantasy/lineup',
   profile: '/players',
 };
 
+/**
+ * A week that exercises every branch of the recap row at once, because each one
+ * is rare in real data and a fixture that only shows the common case checks the
+ * layout that never needed checking:
+ *
+ *   - the week's MVP, carrying both a #1-at-position bonus and the MVP extra
+ *   - a card PROMOTED by the very points on its own row
+ *   - a paid multiplier above bronze, and one at bronze (which prints nothing)
+ *   - a top-10 finish, which is the smallest rung that still draws a line
+ *   - a start that scored zero, which must read as 0 and not as unpaid
+ */
+const RECAP_FIXTURE: Recap = {
+  season: 2026,
+  seasonType: 2,
+  week: 3,
+  hasLineup: true,
+  scored: true,
+  finalized: true,
+  totalPoints: 118.4,
+  rank: 2,
+  of: 14,
+  gemsPoints: 178,
+  gemsBonus: 305,
+  cards: [
+    {
+      slot: 'QB', cardInstanceId: 'r1', playerId: 'p1', playerName: 'Patrick Mahomes',
+      position: 'QB', team: 'KC', points: 31.2, awarded: true, tierAtAward: 'gold',
+      gemMultiplier: 1.25, gems: 58, positionRank: 1, bonusGems: 250, wasWeekMvp: true,
+      tierNow: 'gold', promoted: false, careerFp: 412.6,
+    },
+    {
+      slot: 'RB1', cardInstanceId: 'r2', playerId: 'p2', playerName: 'Bijan Robinson',
+      position: 'RB', team: 'ATL', points: 22.8, awarded: true, tierAtAward: 'silver',
+      gemMultiplier: 1.1, gems: 37, positionRank: 3, bonusGems: 40, wasWeekMvp: false,
+      tierNow: 'silver', promoted: false, careerFp: 188.1,
+    },
+    {
+      slot: 'RB2', cardInstanceId: 'r3', playerId: 'p3', playerName: 'Bhayshul Tuten',
+      position: 'RB', team: 'JAX', points: 14.1, awarded: true, tierAtAward: 'bronze',
+      gemMultiplier: 1, gems: 21, positionRank: 14, bonusGems: 0, wasWeekMvp: false,
+      tierNow: 'silver', promoted: true, careerFp: 52.4,
+    },
+    {
+      slot: 'WR1', cardInstanceId: 'r4', playerId: 'p4', playerName: "Ja'Marr Chase",
+      position: 'WR', team: 'CIN', points: 19.6, awarded: true, tierAtAward: 'diamond',
+      gemMultiplier: 1.4, gems: 41, positionRank: 8, bonusGems: 15, wasWeekMvp: false,
+      tierNow: 'diamond', promoted: false, careerFp: 921.3,
+    },
+    {
+      slot: 'WR2', cardInstanceId: 'r5', playerId: 'p5', playerName: 'Matthew Golden',
+      position: 'WR', team: 'GB', points: 8.4, awarded: true, tierAtAward: 'bronze',
+      gemMultiplier: 1, gems: 12, positionRank: 31, bonusGems: 0, wasWeekMvp: false,
+      tierNow: 'bronze', promoted: false, careerFp: 31.2,
+    },
+    {
+      slot: 'TE', cardInstanceId: 'r6', playerId: 'p6', playerName: 'Travis Kelce',
+      position: 'TE', team: 'KC', points: 0, awarded: true, tierAtAward: 'gold',
+      gemMultiplier: 1.25, gems: 0, positionRank: null, bonusGems: 0, wasWeekMvp: false,
+      tierNow: 'gold', promoted: false, careerFp: 259.8,
+    },
+    {
+      slot: 'FLEX', cardInstanceId: 'r7', playerId: 'p7', playerName: 'Rome Odunze',
+      position: 'WR', team: 'CHI', points: 13.9, awarded: true, tierAtAward: 'bronze',
+      gemMultiplier: 1, gems: 20, positionRank: 19, bonusGems: 0, wasWeekMvp: false,
+      tierNow: 'bronze', promoted: false, careerFp: 44.7,
+    },
+    {
+      slot: 'K', cardInstanceId: 'r8', playerId: 'p8', playerName: 'Harrison Butker',
+      position: 'PK', team: 'KC', points: 8.4, awarded: true, tierAtAward: 'silver',
+      gemMultiplier: 1.1, gems: 13, positionRank: 6, bonusGems: 15, wasWeekMvp: false,
+      tierNow: 'silver', promoted: false, careerFp: 96.5,
+    },
+  ],
+  closestSets: [
+    { code: 'team-kc-2026', name: 'Kansas City Chiefs', family: 'team', committed: 6, nextAt: 8, nextReward: 400, stillNeeded: 2, readyNow: 2 },
+    { code: 'team-cin-2026', name: 'Cincinnati Bengals', family: 'team', committed: 5, nextAt: 8, nextReward: 400, stillNeeded: 3, readyNow: 1 },
+    { code: 'team-chi-2026', name: 'Chicago Bears', family: 'team', committed: 2, nextAt: 8, nextReward: 400, stillNeeded: 6, readyNow: 4 },
+  ],
+  // Over the cap, which is the state the footer exists for.
+  roster: { held: 34, cap: 30, warnAt: 24, overBy: 4, isOver: true, isNear: false, remaining: 0 },
+};
+
 /* ---- fixture content ---------------------------------------------------- */
+
 
 const GAP = Spacing.two + 4;
 const MIN_CARD_WIDTH = 100;
@@ -372,12 +461,12 @@ const BOARD_FIXTURES: Record<CommunityBoardId, CommunityData> = {
   collection: {
     id: 'collection',
     rows: [
-      { rank: 1, user_id: 'u2', display_name: 'dmb', value_gems: 1864, held: 61, players: 54, gold_plus: 9, diamond: 1, career_fp: 1240.5 },
-      { rank: 2, user_id: MEID, display_name: 'nickroachy', value_gems: 1208, held: 74, players: 66, gold_plus: 5, diamond: 0, career_fp: 980.2 },
-      { rank: 3, user_id: 'u3', display_name: 'a_very_long_display_name', value_gems: 742, held: 38, players: 35, gold_plus: 3, diamond: 0, career_fp: 610 },
-      { rank: 4, user_id: 'u5', display_name: 'sarah', value_gems: 416, held: 29, players: 27, gold_plus: 1, diamond: 0, career_fp: 305.4 },
+      { rank: 1, user_id: 'u2', display_name: 'dmb', value_gems: 1864, held: 61, in_sets: 22, players: 54, gold_plus: 9, diamond: 1, career_fp: 1240.5 },
+      { rank: 2, user_id: MEID, display_name: 'nickroachy', value_gems: 1208, held: 74, in_sets: 0, players: 66, gold_plus: 5, diamond: 0, career_fp: 980.2 },
+      { rank: 3, user_id: 'u3', display_name: 'a_very_long_display_name', value_gems: 742, held: 38, in_sets: 9, players: 35, gold_plus: 3, diamond: 0, career_fp: 610 },
+      { rank: 4, user_id: 'u5', display_name: 'sarah', value_gems: 416, held: 29, in_sets: 0, players: 27, gold_plus: 1, diamond: 0, career_fp: 305.4 },
       // A shelf that has never been started: FP is an em dash, not a zero.
-      { rank: 5, user_id: 'u4', display_name: 'kp', value_gems: 96, held: 12, players: 12, gold_plus: 0, diamond: 0, career_fp: 0 },
+      { rank: 5, user_id: 'u4', display_name: 'kp', value_gems: 96, held: 12, in_sets: 3, players: 12, gold_plus: 0, diamond: 0, career_fp: 0 },
     ],
   },
   cards: {
@@ -758,6 +847,7 @@ function GalleryBody() {
           {view === 'checklist' ? <ChecklistFixture /> : null}
           {view === 'leaderboard' ? <LeaderboardFixture /> : null}
           {view === 'lineup' ? <LineupFixture /> : null}
+          {view === 'recap' ? <RecapBody recap={RECAP_FIXTURE} /> : null}
           {view === 'profile' ? <ProfileFixture /> : null}
         </Screen>
         </FrameProvider>

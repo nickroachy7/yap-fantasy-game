@@ -1,0 +1,16 @@
+-- Two new ledger reasons for rewarding a correct start.
+--
+-- Alone in their own migration, for the fourth time and the same reason:
+-- Postgres allows ALTER TYPE ... ADD VALUE inside a transaction but forbids
+-- USING the new label until that transaction commits, so a migration that both
+-- adds a label and writes a row with it fails with "unsafe use of new value of
+-- enum type".
+--
+-- THEY ARE NOT 'weekly_score_reward', and the split is the whole point. The
+-- per-point award pays for POINTS — it fires for every started card that did
+-- anything at all, and it is the base rate of the play economy. These two pay
+-- for BEING RIGHT: they fire only when a card you chose finished near the top
+-- of its position that week. A ledger that folded them together could not
+-- answer "how much of the play economy is skill and how much is attendance",
+-- which is the number that says whether the rates are right.
+alter type public.gem_reason add value if not exists 'position_bonus';

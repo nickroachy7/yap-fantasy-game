@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.15"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       card_instances: {
@@ -131,6 +106,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      card_set_ladder_defaults: {
+        Row: {
+          family: string
+          reward_gems: number
+          threshold_pct: number
+        }
+        Insert: {
+          family: string
+          reward_gems: number
+          threshold_pct: number
+        }
+        Update: {
+          family?: string
+          reward_gems?: number
+          threshold_pct?: number
+        }
+        Relationships: []
       }
       card_set_members: {
         Row: {
@@ -392,6 +385,27 @@ export type Database = {
           },
         ]
       }
+      game_config: {
+        Row: {
+          description: string
+          key: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          description: string
+          key: string
+          updated_at?: string
+          value: number
+        }
+        Update: {
+          description?: string
+          key?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: []
+      }
       games: {
         Row: {
           external_id: number
@@ -523,25 +537,43 @@ export type Database = {
       }
       lineup_slots: {
         Row: {
+          bonus_gems: number | null
           card_instance_id: string
+          gem_multiplier: number | null
+          gems_awarded: number | null
           id: string
           lineup_id: string
           points: number
+          position_rank: number | null
           slot: string
+          tier_at_award: Database["public"]["Enums"]["card_tier"] | null
+          was_week_mvp: boolean | null
         }
         Insert: {
+          bonus_gems?: number | null
           card_instance_id: string
+          gem_multiplier?: number | null
+          gems_awarded?: number | null
           id?: string
           lineup_id: string
           points?: number
+          position_rank?: number | null
           slot: string
+          tier_at_award?: Database["public"]["Enums"]["card_tier"] | null
+          was_week_mvp?: boolean | null
         }
         Update: {
+          bonus_gems?: number | null
           card_instance_id?: string
+          gem_multiplier?: number | null
+          gems_awarded?: number | null
           id?: string
           lineup_id?: string
           points?: number
+          position_rank?: number | null
           slot?: string
+          tier_at_award?: Database["public"]["Enums"]["card_tier"] | null
+          was_week_mvp?: boolean | null
         }
         Relationships: [
           {
@@ -796,6 +828,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      position_bonus_tiers: {
+        Row: {
+          label: string
+          max_rank: number
+          reward_gems: number
+        }
+        Insert: {
+          label: string
+          max_rank: number
+          reward_gems: number
+        }
+        Update: {
+          label?: string
+          max_rank?: number
+          reward_gems?: number
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -1103,18 +1153,21 @@ export type Database = {
       }
       tier_thresholds: {
         Row: {
+          gem_multiplier: number
           min_career_fp: number
           sell_value: number
           sort_order: number
           tier: Database["public"]["Enums"]["card_tier"]
         }
         Insert: {
+          gem_multiplier?: number
           min_career_fp: number
           sell_value?: number
           sort_order: number
           tier: Database["public"]["Enums"]["card_tier"]
         }
         Update: {
+          gem_multiplier?: number
           min_career_fp?: number
           sell_value?: number
           sort_order?: number
@@ -1311,6 +1364,10 @@ export type Database = {
         Args: { p_production_season?: number; p_season: number }
         Returns: Json
       }
+      award_position_bonuses: {
+        Args: { p_season: number; p_season_type: number; p_week: number }
+        Returns: Json
+      }
       award_score_gems: {
         Args: {
           p_per_point?: number
@@ -1360,6 +1417,8 @@ export type Database = {
           display_name: string
           gold_plus: number
           held: number
+          in_sets: number
+          in_sets_gems: number
           players: number
           rank: number
           user_id: string
@@ -1422,6 +1481,10 @@ export type Database = {
         }[]
       }
       daily_set_position: { Args: { p_day: string }; Returns: string }
+      game_config_value: {
+        Args: { p_default?: number; p_key: string }
+        Returns: number
+      }
       game_has_started: {
         Args: { p_starts_at: string; p_status_state: string }
         Returns: boolean
@@ -1515,6 +1578,7 @@ export type Database = {
         Returns: Json
       }
       refresh_player_season_ranks: { Args: never; Returns: undefined }
+      roster_status: { Args: never; Returns: Json }
       score_week: {
         Args: { p_season: number; p_season_type: number; p_week: number }
         Returns: Json
@@ -1576,6 +1640,10 @@ export type Database = {
         Args: { p_season: number; p_season_type: number; p_week: number }
         Returns: string
       }
+      week_recap: {
+        Args: { p_season: number; p_season_type: number; p_week: number }
+        Returns: Json
+      }
     }
     Enums: {
       acquisition_source: "pack" | "grant" | "admin"
@@ -1589,6 +1657,8 @@ export type Database = {
         | "card_sale"
         | "set_reward"
         | "set_commit"
+        | "position_bonus"
+        | "mvp_bonus"
       rarity: "common" | "uncommon" | "rare" | "epic" | "legendary"
     }
     CompositeTypes: {
@@ -1715,9 +1785,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       acquisition_source: ["pack", "grant", "admin"],
@@ -1731,6 +1798,8 @@ export const Constants = {
         "card_sale",
         "set_reward",
         "set_commit",
+        "position_bonus",
+        "mvp_bonus",
       ],
       rarity: ["common", "uncommon", "rare", "epic", "legendary"],
     },

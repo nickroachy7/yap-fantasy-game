@@ -98,6 +98,8 @@ export type CollectionEntry = {
   display_name: string;
   value_gems: number;
   held: number;
+  /** Copies committed to sets: still counted, frozen at the tier they went in at. */
+  in_sets: number;
   players: number;
   gold_plus: number;
   diamond: number;
@@ -462,6 +464,7 @@ export async function fetchCommunityBoard(
           display_name: r.display_name,
           value_gems: num(r.value_gems),
           held: num(r.held),
+          in_sets: num(r.in_sets),
           players: num(r.players),
           gold_plus: num(r.gold_plus),
           diamond: num(r.diamond),
@@ -614,6 +617,10 @@ function collectionRows(
       part('held', whole(r.held), 'cards'),
       // DISTINCT cards. The gap between this and CARDS is the duplicates.
       part('players', whole(r.players), 'unique'),
+      // Committed copies count on this board and can never grow again, so a
+      // large figure here says a shelf is banked rather than still climbing.
+      // Dropped entirely at zero: an empty cell on most rows would be noise.
+      ...(r.in_sets > 0 ? [part('sets', whole(r.in_sets), 'in sets')] : []),
       part(
         'fp',
         r.career_fp > 0 ? oneDp(r.career_fp) : DASH,
