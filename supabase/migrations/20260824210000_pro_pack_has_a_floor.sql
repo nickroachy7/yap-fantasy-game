@@ -1,0 +1,87 @@
+-- The Pro pack did not feel like one, and the reason was a borrowed constraint.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THE FIRST NUMBERS WERE PROTECTING, AND WHY IT DOES NOT EXIST HERE
+-- ---------------------------------------------------------------------------
+--
+-- Pro shipped at common 30 / uncommon 30 / rare 26.5 / epic 10 / legendary 3.5,
+-- and the header that chose those numbers reasoned like this: at four times the
+-- price it must not be much more than four times as good, or Standard is
+-- strictly dominated and the shop has one item.
+--
+-- That is the correct rule in a game where RARITY CONVERTS TO CURRENCY — where
+-- a legendary can be melted, dusted or sold for more than a common, so a pack
+-- with better odds is a better gem printer and the two must be priced against
+-- each other. This game is not one of those.
+--
+-- `sell_card` pays out of `tier_thresholds.sell_value`, and tier is EARNED by
+-- starting a card. Rarity is nowhere in it. A freshly pulled legendary sells for
+-- 8 gems, exactly like a freshly pulled common; the two differ only in how many
+-- fantasy points the player behind them is likely to score, which converts to
+-- gems slowly, through being played, and only if you spend a roster slot on it.
+--
+-- So there is no farm loop, and there never was one to defend. The constraint
+-- was imported from a different economy and all it bought was a 400-gem pack
+-- that felt like a 100-gem pack.
+--
+-- ---------------------------------------------------------------------------
+-- THE TWO DEFECTS, MEASURED
+-- ---------------------------------------------------------------------------
+--
+-- 1. THE FLOOR. At 30% common a five-card Pro pack contained at least one
+--    common 1 - 0.70^5 = 83% of the time. A premium pack is identified by its
+--    FLOOR, not its ceiling: what a player asks after opening one is "did I get
+--    junk", and 83% of the time the answer was yes.
+--
+-- 2. THE MASS. Its modal card was a coin flip between common and uncommon —
+--    bands 1 and 2 of 5. The whole promise is "players who produced last year",
+--    and the middle of the pack was landing below the middle of the pool.
+--
+-- Observed, on the day it shipped. A Pro pack dealt rare / uncommon / common /
+-- common / common, while a STANDARD pack opened forty minutes earlier dealt
+-- rare / rare / rare / uncommon / uncommon. That is not a tail event anybody
+-- should have to wait out; it is the distribution working as specified.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT IT BECOMES
+-- ---------------------------------------------------------------------------
+--
+--   uncommon 32    rare 43    epic 19    legendary 6
+--
+-- NO COMMONS AT ALL, which is the single change that does the most work: the
+-- floor becomes a promise a player can state — "the Pro pack does not deal
+-- junk" — rather than a probability they have to take on trust.
+--
+-- MODAL CARD IS RARE, so the middle of the pack now sits above the middle of
+-- the pool, which is what the pack's name has been claiming all along.
+--
+--   epic or better per pack   Standard 0.15   Pro 1.25
+--   at least one epic+        Standard 14%    Pro 76%
+--   at least one legendary    Standard  2.5%  Pro 27%
+--
+-- Per gem that is about 2.1x Standard rather than 1.12x. Standard is NOT thereby
+-- dead: it is the pack you can open the week you have 150 gems, and at 100 gems
+-- it stays the entry product and the one a new account actually meets. What it
+-- stops being is the pack a player with 400 gems would rather buy four of.
+--
+-- STANDARD IS DELIBERATELY UNTOUCHED. Its distribution was measured against new
+-- players being able to field a legal lineup (see the guaranteed-positions
+-- work), it is validated by 20260819101000_validate_standard_pack_odds.sql, and
+-- the report from the field is that it feels right. This is a Pro problem.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THIS STILL DOES NOT DO
+-- ---------------------------------------------------------------------------
+--
+-- There is no GUARANTEE, only odds: roughly one Pro pack in four still contains
+-- no epic or better. Turning "76%" into "always at least one epic" needs
+-- `open_pack` to grow a rarity floor beside its position floor — the machinery
+-- is already there in step 1 and the change is small — but that function is the
+-- only thing in this schema that mints a card, and sixteen days before kickoff
+-- an odds row is the version of this fix that cannot break minting. If one pack
+-- in four with no epic is still the thing people talk about, that is the next
+-- change, not this one.
+
+update public.packs
+   set odds = '{"uncommon": 32, "rare": 43, "epic": 19, "legendary": 6}'::jsonb
+ where code = 'pro';
