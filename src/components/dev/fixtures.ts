@@ -285,15 +285,21 @@ export const SETS_FIXTURE: CardSet[] = [
     minTier: null,
     complete: false,
     milestones: [
-      { pct: 10, cards: 4, gems: 100, reached: true, claimed: true, paid: 100 },
-      { pct: 25, cards: 8, gems: 300, reached: true, claimed: true, paid: 300 },
+      { pct: 10, cards: 4, gems: 60, reached: true, claimed: true, paid: 100 },
+      { pct: 25, cards: 8, gems: 100, reached: true, claimed: true, paid: 300 },
       { pct: 40, cards: 13, gems: 500, reached: false, claimed: false, paid: null },
       { pct: 50, cards: 16, gems: 700, reached: false, claimed: false, paid: null },
       { pct: 75, cards: 24, gems: 2500, reached: false, claimed: false, paid: null },
       { pct: 100, cards: 32, gems: 5000, reached: false, claimed: false, paid: null },
     ],
-    totalReward: 9100,
+    totalReward: 8860,
     claimableGems: 0,
+    /* 400, NOT 160, AND THE GAP IS THE POINT. `my_sets.claimed_gems` sums the
+       FROZEN `paid` on each rung — what actually landed — while `gems` is what
+       the rung costs today. These two were collected before
+       20260825000000_close_reachable_band.sql took the band from 400 to 160, so
+       this row reads 400 collected against a ladder that would now pay 160.
+       That is the honest answer and the only fixture that exercises it. */
     claimedGems: 400,
     nextAt: 13,
     nextReward: 500,
@@ -317,15 +323,17 @@ export const SETS_FIXTURE: CardSet[] = [
     minTier: null,
     complete: false,
     milestones: [
-      { pct: 10, cards: 3, gems: 100, reached: true, claimed: true, paid: 100 },
-      { pct: 25, cards: 8, gems: 300, reached: true, claimed: false, paid: null },
+      { pct: 10, cards: 3, gems: 60, reached: true, claimed: true, paid: 100 },
+      { pct: 25, cards: 8, gems: 100, reached: true, claimed: false, paid: null },
       { pct: 40, cards: 12, gems: 500, reached: false, claimed: false, paid: null },
       { pct: 50, cards: 15, gems: 700, reached: false, claimed: false, paid: null },
       { pct: 75, cards: 22, gems: 2500, reached: false, claimed: false, paid: null },
       { pct: 100, cards: 29, gems: 5000, reached: false, claimed: false, paid: null },
     ],
-    totalReward: 9100,
-    claimableGems: 300,
+    totalReward: 8860,
+    /* Today's price for the 25% rung, which is what an unclaimed rung is worth:
+       100, where the same rung paid this player's rivals 300 last week. */
+    claimableGems: 100,
     claimedGems: 100,
     nextAt: 12,
     nextReward: 500,
@@ -356,14 +364,14 @@ export const SETS_FIXTURE: CardSet[] = [
     minTier: null,
     complete: false,
     milestones: [
-      { pct: 10, cards: 4, gems: 100, reached: false, claimed: false, paid: null },
-      { pct: 25, cards: 8, gems: 300, reached: false, claimed: false, paid: null },
+      { pct: 10, cards: 4, gems: 60, reached: false, claimed: false, paid: null },
+      { pct: 25, cards: 8, gems: 100, reached: false, claimed: false, paid: null },
       { pct: 40, cards: 13, gems: 500, reached: false, claimed: false, paid: null },
       { pct: 50, cards: 16, gems: 700, reached: false, claimed: false, paid: null },
       { pct: 75, cards: 24, gems: 2500, reached: false, claimed: false, paid: null },
       { pct: 100, cards: 31, gems: 5000, reached: false, claimed: false, paid: null },
     ],
-    totalReward: 9100,
+    totalReward: 8860,
     claimableGems: 0,
     claimedGems: 0,
     nextAt: 4,
@@ -386,14 +394,14 @@ export const SETS_FIXTURE: CardSet[] = [
     minTier: null,
     complete: false,
     milestones: [
-      { pct: 10, cards: 3, gems: 100, reached: false, claimed: false, paid: null },
-      { pct: 25, cards: 7, gems: 300, reached: false, claimed: false, paid: null },
+      { pct: 10, cards: 3, gems: 60, reached: false, claimed: false, paid: null },
+      { pct: 25, cards: 7, gems: 100, reached: false, claimed: false, paid: null },
       { pct: 40, cards: 11, gems: 500, reached: false, claimed: false, paid: null },
       { pct: 50, cards: 14, gems: 700, reached: false, claimed: false, paid: null },
       { pct: 75, cards: 21, gems: 2500, reached: false, claimed: false, paid: null },
       { pct: 100, cards: 27, gems: 5000, reached: false, claimed: false, paid: null },
     ],
-    totalReward: 9100,
+    totalReward: 8860,
     claimableGems: 0,
     claimedGems: 0,
     nextAt: 3,
