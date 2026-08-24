@@ -332,6 +332,45 @@ export const SETS_FIXTURE: CardSet[] = [
     sortOrder: 9,
   },
   {
+    // BARELY STARTED, BUT YOU ARE HOLDING FOUR THAT FIT — and it is here to
+    // prove the band, because nothing else in this list does.
+    //
+    // Sections order by what you can DO: claimable first, then sets you hold a
+    // card for, then everything else. This one sits at 1 of 31 and must
+    // therefore appear ABOVE the Giants at 9 of 32, who are much further along
+    // and have nothing to add. Sorted by progress — which is what the list did
+    // before — it would sink to the bottom, which is exactly the case the
+    // banding exists to fix: a set you can act on today should never sit under
+    // one you can only look at.
+    id: 'set-9',
+    code: 'team-ari-2026',
+    name: 'Arizona Cardinals',
+    family: 'team',
+    subtitle: 'NFC West',
+    season: 2026,
+    required: 31,
+    totalCards: 31,
+    committed: 1,
+    ready: 4,
+    commitPayoutPct: 50,
+    minTier: null,
+    complete: false,
+    milestones: [
+      { pct: 10, cards: 4, gems: 100, reached: false, claimed: false, paid: null },
+      { pct: 25, cards: 8, gems: 300, reached: false, claimed: false, paid: null },
+      { pct: 40, cards: 13, gems: 500, reached: false, claimed: false, paid: null },
+      { pct: 50, cards: 16, gems: 700, reached: false, claimed: false, paid: null },
+      { pct: 75, cards: 24, gems: 2500, reached: false, claimed: false, paid: null },
+      { pct: 100, cards: 31, gems: 5000, reached: false, claimed: false, paid: null },
+    ],
+    totalReward: 9100,
+    claimableGems: 0,
+    claimedGems: 0,
+    nextAt: 4,
+    nextReward: 100,
+    sortOrder: 2,
+  },
+  {
     // Zero with nothing to add: the state 31 of 32 team sets sit in early on.
     id: 'set-7',
     code: 'team-lac-2026',

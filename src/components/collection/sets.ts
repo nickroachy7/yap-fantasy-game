@@ -352,6 +352,20 @@ export function summariseSets(sets: CardSet[]): SetsSummary {
   return { sets: sets.length, claimed, ready, gemsWaiting, toCommit };
 }
 
+/**
+ * Every set with gems waiting, biggest first.
+ *
+ * The claim-all button's list, and it is derived here rather than in the panel
+ * for the reason everything else in this file is: `statusOf` is the definition
+ * of ready, and a second filter written next to a button is how a screen starts
+ * disagreeing with its own summary strip. `summariseSets` counts exactly these.
+ */
+export function claimableSets(sets: CardSet[]): CardSet[] {
+  return sets
+    .filter((s) => statusOf(s) === 'ready')
+    .sort((a, b) => b.claimableGems - a.claimableGems || a.sortOrder - b.sortOrder);
+}
+
 export type SetSection = {
   key: string;
   title: string;
@@ -391,10 +405,19 @@ const FAMILY_NOTE: Record<SetFamily, string> = {
 /**
  * The ordering, which is the whole readability of a 37-row page.
  *
- * READY FIRST, AND OUT OF ITS FAMILY. A set with a rung to collect is money on
- * the table; leaving it in alphabetical position among 31 others is how it goes
- * unnoticed for a month. It is lifted into its own section at the top and
- * removed from the family section below, so no set is ever drawn twice.
+ * READY FIRST, INSIDE ITS OWN SECTION. A set with gems waiting is money on the
+ * table and cannot be left in alphabetical position among thirty-one others —
+ * but it used to be LIFTED OUT into a section of its own at the top, and that
+ * bought the visibility at the cost of the thing the page is for.
+ *
+ * Three sections named for a clock only work if a set is in the section its
+ * clock belongs to. A weekly hoisted into "ready to claim" is a weekly the
+ * reader cannot find under Weekly, and the count under each heading stops
+ * describing the family. So a ready set now rises to the top of its OWN
+ * section, which gets the same visibility without moving anything out of the
+ * structure — and the claim-all button in the panel above covers the case the
+ * lifted section was really for, which is collecting several at once without
+ * hunting for them.
  *
  * WITHIN A FAMILY: closest to done first, so the page answers "what am I near"
  * without reading every row. Claimed sets sink to the bottom — they are
@@ -408,18 +431,7 @@ const FAMILY_NOTE: Record<SetFamily, string> = {
  * word, which is what stops rows shuffling for any other reason.
  */
 export function groupSets(sets: CardSet[]): SetSection[] {
-  const ready = sets.filter((s) => statusOf(s) === 'ready');
   const sections: SetSection[] = [];
-
-  if (ready.length > 0) {
-    sections.push({
-      key: 'ready',
-      title: ready.length === 1 ? '1 set ready to claim' : `${ready.length} sets ready to claim`,
-      sets: [...ready].sort(
-        (a, b) => b.claimableGems - a.claimableGems || a.sortOrder - b.sortOrder,
-      ),
-    });
-  }
 
   /* DAILY, WEEKLY, SEASON LONG — shortest clock first, which is both the order
      of urgency and the order the sections are named for. Burying the two that
@@ -427,7 +439,7 @@ export function groupSets(sets: CardSet[]): SetSection[] {
      Position sits at the end only for rows that predate its retirement; the
      server sends none, so in practice this is three sections. */
   for (const family of ['daily', 'weekly', 'team', 'position'] as const) {
-    const rest = sets.filter((s) => s.family === family && statusOf(s) !== 'ready');
+    const rest = sets.filter((s) => s.family === family);
     if (rest.length === 0) continue;
 
     sections.push({
@@ -441,14 +453,51 @@ export function groupSets(sets: CardSet[]): SetSection[] {
   return sections;
 }
 
+/**
+ * Inside a section: THREE BANDS, IN THE ORDER OF WHAT THE PLAYER CAN DO.
+ *
+ *   1. READY      gems already earned, sitting uncollected. Biggest sum first.
+ *   2. CAN ADD    you are holding a card that fits an open slot. Something to
+ *                 do right now, and doing it is what produces band 1.
+ *   3. the rest   nothing to act on, so ordered by how close it is.
+ *
+ * Claimed sets sink under all three — finished business, and leaving them in
+ * progress order would put a set completed in September permanently above one
+ * you are two cards from now.
+ *
+ * WHY "CAN ADD" IS A BAND AND NOT A TIEBREAK. It used to be the third
+ * consideration inside band 3, below nearness to the next reward — so a set you
+ * were holding four cards for could sit below one you can do nothing about,
+ * because the second happened to be nearer its next rung. Nearness is
+ * information; holding a card that fits is an ACTION, and the page is sorted by
+ * what you can do about it. Nearness still orders within each band.
+ *
+ * The chip row's CAN_ADD filter reads the same `actionableOf`, so the band and
+ * the chip cannot disagree about what "can add" means.
+ */
 function byProgressThenOrder(a: CardSet, b: CardSet): number {
+  /* Band 1. This is what replaced the lifted "ready to claim" section; see
+     `groupSets`. */
+  const aReady = statusOf(a) === 'ready';
+  const bReady = statusOf(b) === 'ready';
+  if (aReady !== bReady) return aReady ? -1 : 1;
+  if (aReady && bReady) return b.claimableGems - a.claimableGems || a.sortOrder - b.sortOrder;
+
   const aDone = statusOf(a) === 'claimed';
   const bDone = statusOf(b) === 'claimed';
   if (aDone !== bDone) return aDone ? 1 : -1;
 
-  /* Nearness to the NEXT RUNG, not to completion. Thirty-two team sets all sit
-     within a few per cent of each other on completion for a whole season; what
-     separates them is which one is one card from paying. */
+  /* Band 2. `actionableOf` is already capped at what the set still needs, so a
+     set that cannot take another card never lands here however many spares are
+     held for it. */
+  const aCan = actionableOf(a) > 0;
+  const bCan = actionableOf(b) > 0;
+  if (aCan !== bCan) return aCan ? -1 : 1;
+
+  /* Within a band: nearness to the NEXT REWARD, not to completion. Thirty-two
+     team sets all sit within a few per cent of each other on completion for a
+     whole season; what separates them is which one is one card from paying.
+     Then how many cards you are holding for it, then the server's order. */
   return (
     rungProgressOf(b) - rungProgressOf(a) ||
     actionableOf(b) - actionableOf(a) ||

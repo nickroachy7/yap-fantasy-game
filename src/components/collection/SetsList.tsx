@@ -212,6 +212,71 @@ export function SetsStrip({ stats, action }: { stats: SetsSummary; action?: Reac
 }
 
 /**
+ * Collect everything that has gems waiting, in one press.
+ *
+ * WHY IT IS A BAR AND NOT A CELL ON THE STRIP. The strip reports; this acts.
+ * Its READY cell already says how much is waiting, and making that figure
+ * pressable would have turned one read-out on a row of four read-outs into a
+ * control, which is not a thing a player can be expected to discover. A bar
+ * under the chips is unmistakably a button and sits directly above the rows it
+ * is about.
+ *
+ * IT NAMES THE MONEY, NOT THE COUNT, in the loud position. "Claim 1,240 gems"
+ * is the reason to press it; "across 3 sets" is the detail. A button labelled
+ * "Claim 3 sets" would be asking the player to remember what those three were
+ * worth from the cell above.
+ *
+ * DISABLED WHILE IT RUNS rather than hidden — a sweep of eight sets is eight
+ * round trips, and a control that vanished mid-press would read as a crash.
+ */
+export function ClaimAllBar({
+  count,
+  gems,
+  busy,
+  onPress,
+}: {
+  count: number;
+  gems: number;
+  busy: boolean;
+  onPress: () => void;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const gold = TierColors[scheme].gold.accent;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={busy}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: busy }}
+      accessibilityLabel={
+        count === 1
+          ? `Claim ${gems} gems from 1 set`
+          : `Claim ${gems} gems from ${count} sets`
+      }
+      style={({ pressed }) => [
+        styles.claimAll,
+        { borderColor: c.positive, backgroundColor: c.surface },
+        pressed && styles.pressed,
+        busy && styles.disabled,
+      ]}>
+      {busy ? (
+        <ActivityIndicator size="small" color={c.positive} />
+      ) : (
+        <Gem color={gold} size={11} />
+      )}
+      <Text style={[Type.strong, NUMERIC, { color: c.text }]}>
+        {busy ? 'Claiming…' : `Claim ${gems.toLocaleString()} gems`}
+      </Text>
+      <Text style={[Type.fine, { color: c.textTertiary }]}>
+        {count === 1 ? 'from 1 set' : `across ${count} sets`}
+      </Text>
+    </Pressable>
+  );
+}
+
+/**
  * One set.
  *
  * The row is a TARGET, not a container of controls — pressing anywhere opens
@@ -454,6 +519,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two + 2,
     minWidth: 76,
     minHeight: 34,
+  },
+  claimAll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one + 2,
+    borderWidth: 1,
+    borderRadius: Radius.chip,
+    paddingHorizontal: Spacing.two + 2,
+    minHeight: 38,
+    marginTop: Spacing.two,
   },
   claimedTag: { alignItems: 'flex-end', gap: 1 },
   reward: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },

@@ -35,7 +35,12 @@ import {
 import { OWNED_MANY, SETS_FIXTURE, SET_MEMBERS_FIXTURE } from '@/components/dev/fixtures';
 import { SetActions,
   SetChecklist, type SetFilter } from '@/components/collection/SetChecklist';
-import { SetsFilters, SetsList, SetsStrip } from '@/components/collection/SetsList';
+import {
+  ClaimAllBar,
+  SetsFilters,
+  SetsList,
+  SetsStrip,
+} from '@/components/collection/SetsList';
 import {
   autofillSelection,
   filterSets,
@@ -293,6 +298,15 @@ function SetsFixture() {
           filters' own states are reachable without a session. */}
       <SetsStrip stats={summariseSets(SETS_FIXTURE)} />
       <SetsFilters sets={SETS_FIXTURE} filter={filter} onFilter={setFilter} />
+      {/* The sweep, which replaced the lifted "ready to claim" section. Its
+          numbers come off the same summary the strip's READY cell does, so the
+          gallery is also the place the two can be checked against each other. */}
+      <ClaimAllBar
+        count={summariseSets(SETS_FIXTURE).ready}
+        gems={summariseSets(SETS_FIXTURE).gemsWaiting}
+        busy={false}
+        onPress={() => undefined}
+      />
       <SetsList
         sets={shown}
         claimingCode={claiming}

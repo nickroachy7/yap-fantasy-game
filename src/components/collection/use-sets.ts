@@ -30,7 +30,7 @@ import { supabase } from '@/lib/supabase';
 import { normaliseSet, type CardSet, type SetViewRow } from './sets';
 
 const COLUMNS =
-  'set_id, code, name, family, subtitle, season, required_count, commit_payout_pct, sort_order, total_cards, committed, ready, complete, milestones, total_reward, claimable_gems, claimed_gems, next_at, next_reward';
+  'set_id, code, name, family, subtitle, season, required_count, commit_payout_pct, sort_order, total_cards, committed, ready, complete, milestones, total_reward, claimable_gems, claimed_gems, next_at, next_reward, min_tier';
 
 async function fetchSets(): Promise<CardSet[]> {
   // my_sets is security_invoker, so RLS scopes both the ownership counts and

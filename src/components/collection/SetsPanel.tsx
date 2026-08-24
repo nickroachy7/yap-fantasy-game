@@ -67,8 +67,14 @@ import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
-import { SetsFilters, SetsList, SetsStrip } from './SetsList';
-import { filterSets, summariseSets, type CardSet, type SetListFilter } from './sets';
+import { ClaimAllBar, SetsFilters, SetsList, SetsStrip } from './SetsList';
+import {
+  claimableSets,
+  filterSets,
+  summariseSets,
+  type CardSet,
+  type SetListFilter,
+} from './sets';
 import { useSets } from './use-sets';
 
 export function SetsPanel({
@@ -106,8 +112,17 @@ export function SetsPanel({
   const [claimError, setClaimError] = useState<string | null>(null);
   /** The last claim that worked, kept until the next press. */
   const [claimed, setClaimed] = useState<{ name: string; gems: number } | null>(null);
+  /** Set while the sweep is running, so the bar can say so and refuse a second. */
+  const [claimingAll, setClaimingAll] = useState(false);
 
   const all = useMemo(() => sets ?? [], [sets]);
+  /* The sweep's list, and the same definition the strip's READY cell counts.
+     Derived in `sets.ts` so a button and a summary cannot disagree. */
+  const ready = useMemo(() => claimableSets(all), [all]);
+  /* One summary for both the strip and the claim bar. Computed twice it was two
+     passes over every set on every render, and — worse — two chances for the
+     figure on the button to disagree with the figure above it. */
+  const summary = useMemo(() => summariseSets(all), [all]);
   /** What the chips have left on screen. `SetsList` groups whatever it is given. */
   const shown = useMemo(() => filterSets(all, filter), [all, filter]);
 
@@ -131,6 +146,74 @@ export function SetsPanel({
     },
     [reload, refreshPlayer],
   );
+
+  /**
+   * Collect every set with gems waiting, in one press.
+   *
+   * WHY THIS EXISTS. The list used to lift claimable sets out into a section of
+   * their own at the top, which made them findable at the cost of taking a
+   * weekly out from under "Weekly". Ready sets now rise inside their own
+   * section instead, and this is what covers the case that lifted section was
+   * really for: collecting several without hunting for them.
+   *
+   * ONE CALL PER SET, SEQUENTIALLY, because `claim_set_reward` takes one code
+   * and there is no batch form of it. Sequential rather than parallel because
+   * every one of them takes the SAME wallet row lock — fired together they
+   * would queue on that lock anyway, and a failure in the middle of a pile of
+   * concurrent writes is far harder to report honestly than one in a loop.
+   *
+   * PARTIAL SUCCESS IS REPORTED, NOT SWALLOWED — the same posture as
+   * `sell_cards` and `commit_cards_to_set`, which both hand back what worked
+   * and what did not. A sweep that claimed four of five and said "claimed"
+   * would be lying about the fifth, and the gems would be the evidence.
+   *
+   * ONE RELOAD AT THE END rather than one per set: the list is redrawn from the
+   * server once the whole sweep is done, so the rows do not shuffle under a
+   * player watching them.
+   */
+  const claimAll = useCallback(async () => {
+    if (ready.length === 0) return;
+
+    setClaimingAll(true);
+    setClaimError(null);
+    setClaimed(null);
+
+    let gems = 0;
+    let done = 0;
+    let firstFailure: string | null = null;
+
+    for (const set of ready) {
+      const { error: err } = await supabase.rpc('claim_set_reward', { p_set_code: set.code });
+      if (err) {
+        /* The FIRST failure is the one reported. Later ones are usually the
+           same cause repeated, and a notice listing five variations of one
+           problem is a notice nobody reads. */
+        firstFailure ??= err.message;
+      } else {
+        gems += set.claimableGems;
+        done += 1;
+      }
+    }
+
+    if (done > 0) {
+      setClaimed({
+        name: done === 1 ? ready[0].name : `${done} sets`,
+        gems,
+      });
+    }
+    if (firstFailure) {
+      setClaimError(
+        done > 0
+          ? `${ready.length - done} of ${ready.length} could not be claimed: ${firstFailure}`
+          : firstFailure,
+      );
+    }
+
+    // Both matter: the list has to redraw the rows as claimed, and the header
+    // has to show the gems that just landed.
+    await Promise.all([reload(), refreshPlayer()]);
+    setClaimingAll(false);
+  }, [ready, reload, refreshPlayer]);
 
   const onRefresh = useCallback(async () => {
     await Promise.all([refresh(), refreshPlayer()]);
@@ -183,7 +266,7 @@ export function SetsPanel({
           explaining themselves. */}
       {all.length > 0 ? (
         <View style={styles.strip}>
-          <SetsStrip stats={summariseSets(all)} action={action} />
+          <SetsStrip stats={summary} action={action} />
           {/* WHAT YOU HAVE, ABOVE WHAT NARROWS IT — the inventory's order, for
               the inventory's reason: here is the whole board, now here is how
               to sieve it. Pinned with the strip rather than scrolling with the
@@ -191,6 +274,19 @@ export function SetsPanel({
               what you are looking at cannot leave the screen you are
               looking at. */}
           <SetsFilters sets={all} filter={filter} onFilter={setFilter} />
+          {/* PINNED WITH THE STRIP, not scrolled with the list, and only when
+              there is something in it. It is the one control on this page that
+              acts on sets you may not be looking at, so it must not be possible
+              to scroll past it — and an empty version of it would be a button
+              offering nothing. */}
+          {ready.length > 0 ? (
+            <ClaimAllBar
+              count={ready.length}
+              gems={summary.gemsWaiting}
+              busy={claimingAll}
+              onPress={() => void claimAll()}
+            />
+          ) : null}
         </View>
       ) : null}
 
