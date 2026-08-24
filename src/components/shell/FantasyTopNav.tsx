@@ -1,10 +1,17 @@
 /**
- * The four boards of the fantasy game, as a strip under the masthead.
+ * The four boards of the card game, as a strip under the masthead.
  *
  * These were the bottom tab bar until the bar was given to the whole app. What
- * replaced them there is Fantasy / Scores / Profile, so this row is what you
- * see the moment you open Fantasy — the same relationship a league app draws
+ * replaced them there is Yap / Leagues / Scores / Profile, so this row is what
+ * you see the moment you open Yap — the same relationship a league app draws
  * between "which league am I in" and "draft / team / players / league".
+ *
+ * FOUR AGAIN, AND IT WAS THREE. All Cards came back from being a bottom tab on
+ * 2026-08-24 when the bar became a list of products; the strip was built for
+ * four and had been carrying three since. Nothing here changed to take it —
+ * the widths below were measured against four words and still hold, because
+ * COMPETE / ALL CARDS / COLLECT / BOARD is 28 characters, exactly what LINEUP /
+ * COLLECTION / PLAYERS / BOARD was when they were measured.
  *
  * IT IS ON EVERY SCREEN OF THE TAB, with nothing in front of it. A hub page
  * listing these same four was built and cut first; see `fantasy/index.tsx`.
@@ -53,8 +60,8 @@
  * business in a way a paragraph's is not.
  *
  * SO THE MASTHEAD ABOVE IS DELIBERATELY OUT OF LINE WITH THIS ROW, and it is to
- * stay that way. "YAP FANTASY" sits at 16 and "LINEUP" at 28-41 depending on the
- * handset, which looks like a bug and is not one — it was measured, discussed
+ * stay that way. "YAP FANTASY" sits at 16 and "COMPETE" at 28-41 depending on
+ * the handset, which looks like a bug and is not one — it was measured, discussed
  * and chosen.
  *
  * The two alignments are mathematically incompatible. Even spacing means every
@@ -118,10 +125,12 @@ export function FantasyTopNav({
     <View style={[styles.bar, { borderBottomColor: c.border }]}>
       <View style={styles.inner}>
         {FANTASY_SECTIONS.map((section) => {
-          // A section is active anywhere INSIDE it, not just on its own path.
-          // None of the four has a sub-page today — Collection and Sets stopped
-          // being folders when Sets came up to sit beside Collection — but a
-          // section that grows one must not go dark the moment you open it.
+          // A section is active anywhere INSIDE it, not just on its own path,
+          // and three of the four have sub-pages: Compete, All Cards and
+          // Collect each hold two or three views that `SectionNav` draws one
+          // row below. Without the prefix test the strip would go dark the
+          // moment you moved off a board's landing view — press Leaders and
+          // ALL CARDS would stop being underlined.
           const active =
             pathname === section.href || pathname.startsWith(`${section.href}/`);
           return (

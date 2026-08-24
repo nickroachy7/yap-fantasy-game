@@ -179,7 +179,7 @@ const VIEW_PATH: Record<View_, string> = {
   leaderboard: '/fantasy/leaderboard',
   lineup: '/fantasy/compete',
   recap: '/fantasy/compete',
-  profile: '/players',
+  profile: '/fantasy/players',
 };
 
 /**

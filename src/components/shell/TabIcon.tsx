@@ -29,6 +29,7 @@ export type TabIconName =
   | 'lineup'
   | 'leaderboard'
   | 'players'
+  | 'leagues'
   | 'collection'
   | 'sets'
   | 'profile';
@@ -195,6 +196,31 @@ export function TabIcon({ name, color, focused, size = 24 }: TabIconProps) {
         </View>
       );
 
+    case 'leagues':
+      /* A HUDDLE: three discs, two under one. The tab is other people, and the
+         only other glyph on the bar made of people is `profile` — one head and
+         one pair of shoulders. Three of anything says group; three CIRCLES says
+         group without borrowing the card shape that Yap's own boards are built
+         from, which matters because these two tabs sit next to each other and
+         are the app's whole claim about what it is.
+
+         Deliberately not a trophy, a shield or a table. All three name what a
+         league produces; the tab is the people you are in one with, and the
+         standings already have a podium two levels down.
+
+         The top disc is centred over the gap between the lower two rather than
+         over either of them, so the three read as one arrangement instead of a
+         column beside a pair. */
+      return (
+        <View style={[box, styles.huddle, { gap: 2 * u }]} accessibilityElementsHidden importantForAccessibility="no">
+          <View style={[{ width: 7.5 * u, height: 7.5 * u, borderRadius: 4 * u }, skin]} />
+          <View style={[styles.huddleRow, { gap: 2 * u }]}>
+            <View style={[{ width: 7.5 * u, height: 7.5 * u, borderRadius: 4 * u }, skin]} />
+            <View style={[{ width: 7.5 * u, height: 7.5 * u, borderRadius: 4 * u }, skin]} />
+          </View>
+        </View>
+      );
+
     case 'collection':
       /* Four cards in a grid — the inventory, which is what this tab opens. */
       return (
@@ -255,5 +281,9 @@ const styles = StyleSheet.create({
   fixture: { flexDirection: 'row', alignItems: 'center' },
   podium: { flexDirection: 'row', alignItems: 'flex-end' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', alignContent: 'center', justifyContent: 'center' },
+  /* A column, so the single disc centres over the PAIR below it rather than
+     over one of them — see the glyph. */
+  huddle: { alignItems: 'center', justifyContent: 'center' },
+  huddleRow: { flexDirection: 'row' },
   profile: { justifyContent: 'center' },
 });

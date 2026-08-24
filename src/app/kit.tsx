@@ -68,15 +68,20 @@ import { Colors, Spacing, TierColors, Type } from '@/constants/theme';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-/* Bar order, then rail order: the two the bottom bar draws, then the four the
-   top nav and the rail draw under Fantasy. Every name in `TabIconName` appears
-   — an icon missing from here is an icon nobody looks at until it ships. */
+/* Bar order, then rail order: the four the bottom bar draws, then the ones the
+   top nav and the rail draw under Yap. Every name in `TabIconName` appears —
+   an icon missing from here is an icon nobody looks at until it ships, which is
+   exactly what happened to `sets`: it was added for the rail and never listed
+   here, so it went unreviewed at both states until `leagues` was added beside
+   it and the gap showed. */
 const TAB_ICONS: TabIconName[] = [
   'fantasy',
+  'leagues',
   'scores',
   'profile',
   'lineup',
   'collection',
+  'sets',
   'players',
   'leaderboard',
 ];

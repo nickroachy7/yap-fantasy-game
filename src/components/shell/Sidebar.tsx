@@ -6,12 +6,12 @@
  * entire app at once is most of what a sidebar is for. Half of that argument
  * was right and the other half was the mistake: what a reader wants to see at
  * once is every PLACE, and two of those three ranks were not places. `/fantasy`
- * is a redirect, `/players` opens straight onto Trend, and neither row
+ * is a redirect, `/fantasy/players` opens straight onto Trend, and neither row
  * could ever be the page you were on — so the rail spent two of its levels
  * naming folders, and reaching Leaders meant reading three words to arrive at
  * one board.
  *
- * Flattened it is six rows, every one a destination, every one one click away,
+ * Flattened it is seven rows, every one a destination, every one one click away,
  * and the indent that carried the hierarchy is gone because there is no longer
  * a hierarchy for it to carry. What the fold cost — the ability to see from the
  * rail that Collection has a Sets view — is paid back in the page's own
@@ -27,9 +27,10 @@
  * the more useful of the two (the one showing who you are signed in as) placed
  * further from the eye.
  *
- * THE GROUP RULE: the five rows above Scores are yours — your lineup, your
- * cards, your packs, your pool, your rank — and Scores is the league's. The gap
- * between them is the only structure left in the rail, and it is doing work the
+ * THE GROUP RULE: the five rows at the top are the card game — your lineup,
+ * every card there is, your collection, the shop, the board — and the two below
+ * the gap are not: Leagues is the other product and Scores is the league's own
+ * week. The gap is the only structure left in the rail, and it is doing work the
  * indent used to do badly.
  */
 import { Link, usePathname } from 'expo-router';

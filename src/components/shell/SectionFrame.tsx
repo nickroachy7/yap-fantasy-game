@@ -63,12 +63,16 @@ export function SectionFrame({
   /**
    * Draw the masthead above the nav, for a frame with nothing above it.
    *
-   * A SECTION INSIDE FANTASY LEAVES THIS ALONE: `FantasyFrame` is already
-   * drawing the masthead once for the whole tab, and a second one here would be
-   * two. Players is the case that needs it — it is a bottom TAB now, so there
-   * is no frame above it, and without this the page's own `Screen` drew the
-   * masthead from inside the navigator: below the section nav rather than above
-   * it, with the nav left sitting under the status bar.
+   * A SECTION INSIDE YAP LEAVES THIS ALONE: `FantasyFrame` is already drawing
+   * the masthead once for the whole tab, and a second one here would be two.
+   * Every section is inside Yap today, so NOTHING PASSES THIS — All Cards was
+   * the one that did, while it was a bottom tab with no frame above it, and it
+   * stopped when it came back down to level 2 on 2026-08-24.
+   *
+   * It stays because the failure it fixes is not hypothetical and would come
+   * back with the next root-level section: without it the page's own `Screen`
+   * drew the masthead from inside the navigator, which put it BELOW the section
+   * nav rather than above it and left the nav sitting under the status bar.
    *
    * It has to be the frame's rather than the page's for the same reason the nav
    * is: chrome rendered by a screen is torn down and rebuilt on every

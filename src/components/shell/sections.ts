@@ -4,24 +4,34 @@
  * THREE LEVELS, and the reason there are three is that the bottom bar stopped
  * being the fantasy game's navigation and became the APP's.
  *
- *   1. NAV_TABS      — the bottom bar (and the top of the wide rail). Fantasy,
- *                      Players, Scores, Profile. These are products, not
+ *   1. NAV_TABS      — the bottom bar (and the top of the wide rail). Yap,
+ *                      Leagues, Scores, Profile. These are products, not
  *                      screens.
- *   2. FANTASY_SECTIONS — the row under the header once you are inside Fantasy.
- *                      Compete, Collect, Board. These used to BE the bottom
- *                      bar.
+ *   2. FANTASY_SECTIONS — the row under the header once you are inside Yap.
+ *                      Compete, All Cards, Collect, Board. These used to BE the
+ *                      bottom bar.
  *   3. NavChild      — a section's OR a tab's sub-pages, drawn by `SectionNav`
  *                      as the page's action bar.
  *
- * PLAYERS IS A PRODUCT, NOT A BOARD, and moving it down a level is what let
- * Collection stop being a folder. The pool of every player in the league is not
- * a view of your fantasy team the way your lineup and your cards are — you go
- * there to look somebody up, which is the same kind of errand as checking the
- * scores. So it sits in the bottom bar and takes its three views with it.
+ * LEVEL 1 IS PRODUCTS, AND THERE ARE TWO OF THEM as of 2026-08-24. Yap is the
+ * card game, and the whole tree below level 1 belongs to it; Leagues is private
+ * leagues, a different game with a different shape, and today a placeholder.
+ * Scores and Profile are not products — they are a reference page and an
+ * account, and they are at level 1 because there is nowhere else for a thing
+ * that belongs to the app rather than to either game.
  *
- * LEVEL 2 IS VERBS NOW, NOT OBJECTS, as of 2026-08-25. It was Lineup,
- * Collection, Sets, Board — four things you own or read. It is Compete,
- * Collect, Board: what you are there to DO, with the objects as views beneath.
+ * THAT IS WHY PLAYERS CAME BACK DOWN A LEVEL. It was promoted to the bar on the
+ * argument that the league's whole pool is not a view of your own team — which
+ * is true, and which stopped mattering once level 1 meant "a product". A bar
+ * reading Yap, Leagues, Players, Scores, Profile offers one of the card game's
+ * own boards at the same rank as the card game, and nothing about the bar tells
+ * a reader that pressing Players keeps them inside Yap while pressing Leagues
+ * does not. It is a board again, named All Cards, second in the level-2 strip.
+ *
+ * LEVEL 2 IS MOSTLY VERBS NOW, NOT OBJECTS. It was Lineup, Collection, Sets,
+ * Board — four things you own or read. It is Compete, All Cards, Collect,
+ * Board: what you are there to DO, with the objects as views beneath, and one
+ * noun in the middle that is a pool rather than a job.
  *
  * Grouping by intent is only right when the things inside share a job, and
  * these two do. Compete had no choice: contests mean there is no longer *a*
@@ -40,7 +50,9 @@
  * text tabs, `SectionNav` renders one section's children as the first items of
  * the page's action bar, and the wide-web rail renders WEB_NAV — a FLATTENING
  * of the three levels below, declared at the foot of this file. Values are
- * route paths.
+ * route paths, and two of them no longer match their labels: `/fantasy` is the
+ * tab captioned Yap, and `/fantasy/players` is the board captioned All Cards.
+ * Both declarations say why the routes were left alone.
  *
  * This file previously declared only the Collection segments while
  * `Sidebar.tsx` kept its own parallel copy of the whole nav — so the comment
@@ -48,14 +60,14 @@
  * code, and adding a sub-page meant remembering to edit two files. Every
  * presentation now derives from here, which is what makes that claim true.
  *
- * Order inside Fantasy is deliberate, and it follows what a week actually looks
- * like: play your cards, then sort out the ones you did not play, then see
- * where that put you.
+ * Order inside Yap is deliberate, and it follows what a week actually looks
+ * like: play your team, see what exists to be had, sort out what you own, then
+ * see where that put you.
  *
  * One child of any parent that has several deliberately shares the parent's own
  * href. The nav needs an item for the landing page or there is no way back to
  * it, and the sidebar needs the parent row to stay a live target. Compete and
- * Collect both land on their first; Players lands on its second, and the note
+ * Collect both land on their first; All Cards lands on its second, and the note
  * there explains why being first was convention rather than mechanism.
  */
 import type { ActionIconName } from '@/components/shell/ActionBar';
@@ -116,7 +128,7 @@ export type NavChild = {
   detached?: boolean;
 };
 
-/** One of the three boards inside Fantasy. Level 2. */
+/** One of the four boards inside Yap. Level 2. */
 export type NavSection = {
   href: string;
   label: string;
@@ -144,15 +156,15 @@ export type NavSection = {
   children?: NavChild[];
 };
 
-/** One of the three products in the bottom bar. Level 1. */
+/** One of the four tabs in the bottom bar. Level 1. */
 export type NavTab = {
   href: string;
   label: string;
   /** Drawn by the bottom tab bar and the wide-web rail. See TabIcon. */
   icon: TabIconName;
   /**
-   * The boards under this tab, if it has any. Only Fantasy does; Scores and
-   * Profile are single pages.
+   * The boards under this tab, if it has any. Only Yap does; Leagues, Scores
+   * and Profile are single pages.
    *
    * A tab WITH sections is a nested navigator, and that is the difference the
    * tab layout keys off when deciding whether to pin the tab button to an href.
@@ -161,11 +173,12 @@ export type NavTab = {
   /**
    * The tab's own sub-pages, for a tab that is one board rather than several.
    *
-   * The same thing a section's `children` are and drawn by the same bar —
-   * Players kept its three views when it moved down to the bottom bar, and
-   * they did not become a level of their own on the way. `childrenOf` answers
-   * for both, which is what stops `SectionNav` needing to know whether it is
-   * looking at a tab or a section.
+   * The same thing a section's `children` are and drawn by the same bar. NO TAB
+   * HAS ANY TODAY — All Cards was the one that did, and it took its three views
+   * back up to level 2 when it became a board again. The field stays because
+   * `childrenOf` answering at both levels is what stops `SectionNav` needing to
+   * know whether it is looking at a tab or a section, and a single-board
+   * product added to the bar tomorrow wants exactly this.
    */
   children?: NavChild[];
 };
@@ -220,6 +233,28 @@ const COMPETE_VIEWS: NavChild[] = [
 ];
 
 /**
+ * The three ways into the card pool, which came back up to level 2 with it.
+ *
+ * THE SECTION LANDS ON THE SECOND, not the first, and it is the only nav item
+ * in the app where that is true. The rule elsewhere — first child shares the
+ * parent's href — exists so there is always a way back to the landing page, and
+ * it is satisfied by ANY child pointing at it; being first was convention, not
+ * mechanism, and `SectionNav` marks the active item by comparing paths rather
+ * than by position. What the order carries instead is how the three read as a
+ * set: find a card, see who moved, see who is best. Opening on Trend is a
+ * separate decision from where Trend sits in that row, and forcing the two to
+ * agree would mean landing on a search box — a page that shows you nothing
+ * until you type.
+ */
+const ALL_CARD_VIEWS: NavChild[] = [
+  /* Not `/fantasy/players/search`: it is a full-screen takeover living above
+     the tab navigator, so its path is a root one. See `app/(app)/search.tsx`. */
+  { href: '/search', label: 'Search', icon: 'search', takeover: true },
+  { href: '/fantasy/players', label: 'Trend', icon: 'trend' },
+  { href: '/fantasy/players/leaders', label: 'Leaders', icon: 'standings' },
+];
+
+/**
  * The two views under Collect.
  *
  * The same pair Collection held before 2026-08-21, back under one board for a
@@ -241,6 +276,39 @@ export const FANTASY_SECTIONS: NavSection[] = [
     icon: 'lineup',
     children: COMPETE_VIEWS,
   },
+  /* ALL CARDS, which was the Players TAB and is a board again.
+   *
+   * IT CAME BACK, and the argument that sent it down to the bottom bar was not
+   * wrong so much as overtaken. That argument was: the pool of every player in
+   * the league is not a view of your own team, so it is an errand of the same
+   * kind as checking the scores. True — but the bottom bar is the APP's
+   * navigation now, and the app has a second product in it. A bar holding Yap,
+   * Leagues, Players, Scores and Profile puts one of the game's own boards at
+   * the same rank as the game, which is the level confusion the bar was
+   * reorganised to remove.
+   *
+   * SO THE ASYMMETRY IN THIS ARRAY IS GONE, and the note under Leaderboard
+   * about verb/verb/noun no longer describes it. Two of the four boards are now
+   * about everybody else — this one and the Leaderboard — and they sit at
+   * opposite ends of the strip rather than together, because the order follows
+   * the week rather than the grammar: see what you can play, see what exists to
+   * be had, see what you own, see where it put you.
+   *
+   * "ALL CARDS" RATHER THAN "PLAYERS", and it is the honest name. Every row on
+   * these three views is a card template — what it costs to pull, what it has
+   * scored, what tier your copy of it is — and calling the board Players named
+   * the person on the front of the card rather than the thing you can own. It
+   * is also the only word here that tells a new reader this board and their
+   * Collection hold the same kind of object. The ROUTE stays `/fantasy/players`
+   * on purpose: every deep link, every `dismissTo` and the whole
+   * `components/players` tree still say player, and renaming a URL to match a
+   * label is a migration with no reader-facing gain. */
+  {
+    href: '/fantasy/players',
+    label: 'All Cards',
+    icon: 'players',
+    children: ALL_CARD_VIEWS,
+  },
   /* COLLECT, which was Collection and Sets as peers. Two boards for one loop —
      look at your cards, decide what to do with them — and the exit was on the
      board you had to go out of your way to open. */
@@ -257,10 +325,12 @@ export const FANTASY_SECTIONS: NavSection[] = [
      sat directly above another strip; two rows of chrome before a single row of
      data. Scoring moved to `/scoring`, reached from Profile -> Settings.
 
-     IT STAYS OUTSIDE THE OTHER TWO, and the verb/verb/noun asymmetry is the
-     point rather than an oversight: Compete and Collect are things you DO to
-     your own team, and the boards are where you read about everybody else. It
-     is the same distinction that moved Players down to the bottom bar. */
+     IT IS LAST, and it is the end of the sentence the strip tells: play your
+     team, look at what exists, look at what you own, see where that put you.
+     It used to be the odd one out — two verbs and a noun — and the note here
+     said the asymmetry was the point. All Cards coming back up from the bottom
+     bar ended that: there are two boards about everybody else now, and they
+     bracket the two that are about you. */
   {
     href: '/fantasy/leaderboard',
     label: 'Leaderboard',
@@ -269,35 +339,33 @@ export const FANTASY_SECTIONS: NavSection[] = [
   },
 ];
 
-/**
- * The three ways into the player pool, which came down from level 2 with it.
- *
- * THE TAB LANDS ON THE SECOND, not the first, and it is the only nav item in
- * the app where that is true. The rule elsewhere — first child shares the
- * parent's href — exists so there is always a way back to the landing page, and
- * it is satisfied by ANY child pointing at it; being first was convention, not
- * mechanism, and `SectionNav` marks the active item by comparing paths rather
- * than by position. What the order carries instead is how the three read as a
- * set: find a player, see who moved, see who is best. Opening on Trend is a
- * separate decision from where Trend sits in that row, and forcing the two to
- * agree would mean landing on a search box — a page that shows you nothing
- * until you type.
- */
-const PLAYER_VIEWS: NavChild[] = [
-  /* Not `/players/search`: it is a full-screen takeover living above the tab
-     navigator, so its path is a root one. See `app/(app)/search.tsx`. */
-  { href: '/search', label: 'Search', icon: 'search', takeover: true },
-  { href: '/players', label: 'Trend', icon: 'trend' },
-  { href: '/players/leaders', label: 'Leaders', icon: 'standings' },
-];
-
 export const NAV_TABS: NavTab[] = [
-  { href: '/fantasy', label: 'Fantasy', icon: 'fantasy', sections: FANTASY_SECTIONS },
-  /* Next to Fantasy because the two are the game: your team, then everyone
-     else's players. It was the third board inside Fantasy and never sat right
-     there — the other three are all about YOUR week, and this one is the
-     league's whole pool. */
-  { href: '/players', label: 'Players', icon: 'players', children: PLAYER_VIEWS },
+  /* YAP. The house game takes the house name, and the label is one word because
+     the bar has room for one — "Yap Fantasy" is eleven characters against a
+     10pt label in a bar of fixed height, and "Fantasy" alone was already the
+     one that clipped (see `tabLabel` in the tabs layout). The product is Yap
+     Fantasy everywhere it has room to be; down here it is Yap.
+   *
+   * IT ONLY WORKS BECAUSE LEAGUES IS NEXT TO IT. On its own "Yap" names no
+   * contents — it says ours and nothing else, which is not what a tab is for.
+   * The pair is what carries the meaning: our game, your league. If Leagues is
+   * ever removed, this label has to be reconsidered rather than left standing.
+   *
+   * THE ROUTE IS STILL `/fantasy`. A label is a word and a route is an address
+   * with deep links, `dismissTo` targets and a directory on disk behind it;
+   * renaming the second to agree with the first buys the reader nothing. */
+  { href: '/fantasy', label: 'Yap', icon: 'fantasy', sections: FANTASY_SECTIONS },
+  /* LEAGUES: private leagues, and a placeholder until they exist.
+   *
+   * It ships empty on purpose rather than waiting to ship full. The bar is the
+   * one place the app states what it is, and a bar that says only Yap is a bar
+   * that says this is a card game — the second product has to be visible from
+   * the first day for the first to read as one half of something.
+   *
+   * Second, not last: it is the only other PRODUCT here. Scores and Profile are
+   * a reference page and an account, so the two games sit together at the front
+   * and the furniture follows them. */
+  { href: '/leagues', label: 'Leagues', icon: 'leagues' },
   /* The league's own week, rather than yours. It was a band across the top of
      the lineup until it had somewhere better to be; a page can hold the week
      picker and the per-game leaders that the band had no room for. */
@@ -322,9 +390,10 @@ export function routeNameOf(tab: NavTab): string {
  * A section's or a tab's sub-pages, in order. `SectionNav` turns these into bar
  * items.
  *
- * Both are asked because the bar is drawn the same way at either level — the
- * Collection section and the Players tab each hand it an href and get their own
- * children back, and neither has to know which list it lives in.
+ * Both are asked because the bar is drawn the same way at either level — a
+ * section and a tab each hand it an href and get their own children back, and
+ * neither has to know which list it lives in. Only sections have children
+ * today; see `NavTab.children` for why the tab branch stays.
  */
 export function childrenOf(href: string): NavChild[] {
   const section = FANTASY_SECTIONS.find((s) => s.href === href);
@@ -358,7 +427,7 @@ function allChildren(): NavChild[] {
  * the app's own file structure printed down the side of the window: to reach
  * Leaders you read "Fantasy", then "Players", then "Leaders" — three words to
  * name one board, two of which are not places you can be. `/fantasy` is a
- * redirect and `/players` opens on Trend, so two of the rail's ranks
+ * redirect and `/fantasy/players` opens on Trend, so two of the rail's ranks
  * were labels pretending to be destinations.
  *
  * WEB_NAV is the same app with the pretending removed: one flat list of the
@@ -375,7 +444,7 @@ function allChildren(): NavChild[] {
  *   to put the shop on the street, and burying the one screen that spends gems
  *   two levels down was costing it every impression.
  *
- * AND TWO SECTIONS FOLD RATHER THAN SPLIT. Inventory/Sets and Search/Trend/
+ * AND SECTIONS FOLD RATHER THAN SPLIT. Inventory/Sets and Search/Trend/
  * Leaders are not four and three destinations — they are two boards each with
  * a couple of views, and the phone only made them routes because a phone has
  * nowhere to put a view switcher. On web the row is the board and the views
@@ -426,7 +495,7 @@ type WebNavSpec = {
    *
    * Only Search needs it: it is a full-screen takeover mounted above the tab
    * navigator, so its path is the root-level `/search` rather than something
-   * under `/players` — see `NavChild.takeover`.
+   * under `/fantasy/players` — see `NavChild.takeover`.
    */
   also?: string[];
   /**
@@ -466,11 +535,23 @@ type WebNavSpec = {
 export type WebNavItem = WebNavSpec & { label: string; icon: WebNavIcon };
 
 const WEB_NAV_SPEC: WebNavSpec[] = [
-  /* TWO FOLDED BOARDS. Each is one row on the rail with its views as page tabs
+  /* FOLDED BOARDS. Each is one row on the rail with its views as page tabs
      — the same fold Collection/Sets had before they were split apart, restored
      because they are genuinely one board again, and now matched by Compete.
      The rail was never the thing that wanted them separate; a phone was. */
   { href: '/fantasy/compete', section: '/fantasy/compete', measure: 'form' },
+  /* THREE FOLDED BOARDS now, and this one is here rather than further down
+     because the rail follows the same order the phone's strip does. It came
+     back from being a bottom TAB; nothing about the fold changed with the move,
+     because the rail never cared which level a board lived at. */
+  {
+    href: '/fantasy/players',
+    section: '/fantasy/players',
+    also: ['/search'],
+    /* Both views already ask for `table`; naming it here is what stops the
+       next one being added at a different width. */
+    measure: 'table',
+  },
   { href: '/fantasy/collect', section: '/fantasy/collect', measure: 'table' },
   /* Directly under the board that makes you want more cards, which is the
      question it answers. It is still the sheet it is on a phone (see
@@ -479,19 +560,15 @@ const WEB_NAV_SPEC: WebNavSpec[] = [
      the alternative — a second, desktop-only packs PAGE — would be two
      implementations of one shop. */
   { href: '/packs' },
-  {
-    href: '/players',
-    section: '/players',
-    also: ['/search'],
-    /* Both views already ask for `table`; naming it here is what stops the
-       next one being added at a different width. */
-    measure: 'table',
-  },
   { href: '/fantasy/leaderboard' },
-  /* Last, and outside the rest, because it is the only row that is not about
-     you: the others are your lineup, your cards, your packs, your pool and your
-     rank, and this is the league's own week. */
-  { href: '/scores', spacedAbove: true },
+  /* THE OTHER PRODUCT, and the break above it is the one place the flat rail
+     still says "different kind of thing". Everything above is a board of the
+     card game; these two are not. */
+  { href: '/leagues', spacedAbove: true },
+  /* Last, because it is the only row that is not about you: the others are your
+     lineup, your cards, your packs, your rank and your leagues, and this is the
+     league's own week. */
+  { href: '/scores' },
 ];
 
 /**
@@ -509,9 +586,9 @@ const WEB_NAV_SPEC: WebNavSpec[] = [
  * the lookup with no casts and nothing to declare beside the href. Packs is the
  * only row that resolves to a child, and the only row needing the verb set.
  *
- * PARENTS BEFORE CHILDREN, and the order is load-bearing: `/players` is both
- * the Players TAB and the href of its Trend child, and the rail row must be
- * captioned with the board's name rather than the view's.
+ * PARENTS BEFORE CHILDREN, and the order is load-bearing: `/fantasy/players`
+ * is both the All Cards SECTION and the href of its Trend child, and the rail
+ * row must be captioned with the board's name rather than the view's.
  */
 function resolveRow(key: string): { label: string; icon: WebNavIcon } {
   const section = FANTASY_SECTIONS.find((s) => s.href === key);
@@ -610,7 +687,7 @@ export function webSectionOf(pathname: string): WebSection | null {
  *
  * That was a visible defect the moment the wide heading started deriving from
  * the route: opening Packs from the Players board re-titled the page behind the
- * dialog from "Players" to "Trend" and dropped its tab row, then put both back
+ * dialog from "All Cards" to "Trend" and dropped its tab row, then put both back
  * when you closed it. The rail is the opposite case and is correct as it is —
  * Packs IS a rail row, and it should light while its sheet is open. The two
  * genuinely want different answers, which is why this is a separate question
@@ -618,7 +695,7 @@ export function webSectionOf(pathname: string): WebSection | null {
  *
  * Two sources, and both are named because neither can be derived from the
  * other: the takeovers are declared in the tree above (`/packs` under two
- * sections, `/search` under the Players tab), and the profile sheets are
+ * sections, `/search` under All Cards), and the profile sheets are
  * declared as `Stack.Screen`s in `(app)/_layout.tsx` and appear nowhere in this
  * file's tree. If a fourth sheet is added there, add it here.
  */

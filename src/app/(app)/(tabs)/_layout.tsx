@@ -16,9 +16,13 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  *
  * It used to be the five boards — Lineup, Collection, Players, Board, Profile —
  * which meant the bar could only ever name things inside one product. Those
- * four moved to a strip under the header inside Fantasy (see `FantasyTopNav`),
- * and what is left down here is Fantasy, Scores and Profile: three places the
- * app can be, with room for the ones that do not exist yet.
+ * moved to a strip under the header inside the game (see `FantasyTopNav`), and
+ * what is left down here is Yap, Leagues, Scores and Profile: two products and
+ * the two pieces of furniture that belong to neither.
+ *
+ * THE TAB LABELLED YAP IS THE ROUTE `/fantasy`, and Leagues is a placeholder.
+ * Both are deliberate and both are argued in `sections.ts`; nothing in this
+ * file needs to know, because it renders whatever NAV_TABS declares.
  *
  * ONLY LEAF TABS ARE PINNED TO AN href, and that distinction is load-bearing.
  *
@@ -29,17 +33,17 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  * button a link to that exact path rather than a "switch to this navigator"
  * action, which reset the section.
  *
- * Fantasy is the same mechanism and the OPPOSITE call, because the tab's name
- * is now true of everything under it. Coming back from Scores should find the
+ * Yap is the same mechanism and the OPPOSITE call, because the tab's name is
+ * now true of everything under it. Coming back from Scores should find the
  * collection you were part-way through sorting, not throw you back to the
- * lineup — so Fantasy gets no href and keeps its state. What that also buys,
- * free, is the platform gesture: pressing the tab you are already on resets its
+ * lineup — so Yap gets no href and keeps its state. What that also buys, free,
+ * is the platform gesture: pressing the tab you are already on resets its
  * navigator to the route it opens on, which here means "take me back to my
  * lineup".
  *
- * Scores and Profile are single pages with no navigator and nothing to restore,
- * so an href on them would be identity. They keep one anyway — see `href`
- * below — so the bar is one rule rather than two.
+ * Leagues, Scores and Profile are single pages with no navigator and nothing to
+ * restore, so an href on them would be identity. They keep one anyway — see
+ * `href` below — so the bar is one rule rather than two.
  *
  * The tabs come from NAV_TABS rather than a list kept here. That file is the
  * single declaration of the navigation — its own header warns about exactly
@@ -165,9 +169,11 @@ const styles = StyleSheet.create({
   shell: { flex: 1 },
   shellWide: { flexDirection: 'row' },
   content: { flex: 1 },
-  /* Three labels now rather than five, so there is room — but the size stays
-     at 10 because the bar's height is fixed (see TabBarContentHeight) and a
-     bigger label would only crowd the glyph above it. */
+  /* Four labels rather than the old five, so there is still room — but the size
+     stays at 10 because the bar's height is fixed (see TabBarContentHeight) and
+     a bigger label would only crowd the glyph above it. "Leagues" is the
+     longest of the four at seven characters, which is what "Fantasy" was before
+     it became "Yap"; the note below is the measurement that word produced. */
   /**
    * `overflow: 'visible'` is the fix for "Fantasy" reading as "Fantasv".
    *
