@@ -19,6 +19,7 @@
     "packageJson": {
       "dependencies": [
         "npm:@expo/ui@~57.0.11",
+        "npm:@napi-rs/canvas@^1.0.7",
         "npm:@react-native-async-storage/async-storage@2.2.0",
         "npm:@supabase/supabase-js@^2.112.3",
         "npm:@types/react@~19.2.2",
@@ -42,6 +43,7 @@
         "npm:react-native-reanimated@4.5.1",
         "npm:react-native-safe-area-context@5.7",
         "npm:react-native-screens@4.26",
+        "npm:react-native-svg@15.15.4",
         "npm:react-native-web@0.21",
         "npm:react-native-worklets@0.10.1",
         "npm:react-native@0.86.2",

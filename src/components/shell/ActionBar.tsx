@@ -45,6 +45,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { horizontalStrip } from '@/components/ui/scroll-strip';
 
 export type ActionIconName =
+  | 'lineup'
+  | 'contests'
   | 'search'
   | 'select'
   | 'trend'
@@ -505,6 +507,63 @@ export function ActionIcon({
                 <View style={bar(w, 2)} />
               </View>
             ))}
+          </View>
+        </View>
+      );
+
+    case 'lineup':
+      /* A roster: three slots, each a marker and the name beside it. The same
+         idea as the 24pt tab glyph of the same name, redrawn at 18 rather than
+         scaled — `TabIcon`'s version sizes its column at 20 units, which at
+         this box leaves the bars a point and a half wide and reads as fuzz.
+         Two slots instead of three for the same reason. */
+      return (
+        <View style={box} accessibilityElementsHidden importantForAccessibility="no">
+          <View style={{ gap: 3 * u }}>
+            {[9, 6].map((barWidth, i) => (
+              <View
+                key={i}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 2.5 * u }}>
+                <View style={[{ width: 5 * u, height: 5 * u, borderRadius: 1.75 * u }, skin]} />
+                <View
+                  style={{
+                    width: barWidth * u,
+                    height: 2 * u,
+                    borderRadius: u,
+                    backgroundColor: color,
+                    opacity: focused ? 1 : 0.75,
+                  }}
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+      );
+
+    case 'contests':
+      /* Two fields facing each other across a halfway line. NOT a trophy and
+         NOT a podium: `standings` is already the podium and means "where
+         everyone finished", where this means "the fixtures you are in" — two
+         glyphs that both said prize would be the bar telling you the same
+         thing twice.
+
+         The divider stays solid on both states. It is the one part that
+         carries the meaning — two boxes with nothing between them is a grid,
+         and a grid is what `sets` draws. */
+      return (
+        <View style={box} accessibilityElementsHidden importantForAccessibility="no">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 * u }}>
+            <View style={[{ width: 6 * u, height: 13 * u, borderRadius: 2 * u }, skin]} />
+            <View
+              style={{
+                width: 1.5 * u,
+                height: 15 * u,
+                borderRadius: u,
+                backgroundColor: color,
+                opacity: 0.55,
+              }}
+            />
+            <View style={[{ width: 6 * u, height: 13 * u, borderRadius: 2 * u }, skin]} />
           </View>
         </View>
       );

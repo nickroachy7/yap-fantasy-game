@@ -174,7 +174,7 @@ export default function PacksScreen() {
    */
   const close = useCallback(() => {
     if (router.canGoBack()) router.back();
-    else router.dismissTo('/fantasy/collection');
+    else router.dismissTo('/fantasy/collect');
   }, [router]);
 
   /* Dismiss FIRST, then navigate. A push out of a modal that is still up leaves
@@ -186,11 +186,11 @@ export default function PacksScreen() {
      which replaces the sheet outright rather than sliding a page under it. */
   const seeInventory = useCallback(() => {
     if (!router.canGoBack()) {
-      router.dismissTo('/fantasy/collection');
+      router.dismissTo('/fantasy/collect');
       return;
     }
     router.back();
-    router.push('/fantasy/collection');
+    router.push('/fantasy/collect');
   }, [router]);
 
   const pulledPositions = useMemo(() => (pulled ? countPositions(pulled) : []), [pulled]);

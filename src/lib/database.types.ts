@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.15"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       card_instances: {
@@ -298,6 +323,106 @@ export type Database = {
           },
         ]
       }
+      contest_format_slots: {
+        Row: {
+          display_order: number
+          eligible_positions: string[]
+          format_code: string
+          slot: string
+        }
+        Insert: {
+          display_order: number
+          eligible_positions: string[]
+          format_code: string
+          slot: string
+        }
+        Update: {
+          display_order?: number
+          eligible_positions?: string[]
+          format_code?: string
+          slot?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contest_format_slots_format_code_fkey"
+            columns: ["format_code"]
+            isOneToOne: false
+            referencedRelation: "contest_formats"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      contest_formats: {
+        Row: {
+          code: string
+          description: string | null
+          name: string
+          slot_count: number
+        }
+        Insert: {
+          code: string
+          description?: string | null
+          name: string
+          slot_count: number
+        }
+        Update: {
+          code?: string
+          description?: string | null
+          name?: string
+          slot_count?: number
+        }
+        Relationships: []
+      }
+      contests: {
+        Row: {
+          code: string
+          created_at: string
+          entry_fee_gems: number
+          format_code: string
+          id: string
+          kind: Database["public"]["Enums"]["contest_kind"]
+          max_entrants: number | null
+          name: string
+          season: number
+          season_type: number
+          week: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          entry_fee_gems?: number
+          format_code: string
+          id?: string
+          kind: Database["public"]["Enums"]["contest_kind"]
+          max_entrants?: number | null
+          name: string
+          season: number
+          season_type: number
+          week: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          entry_fee_gems?: number
+          format_code?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["contest_kind"]
+          max_entrants?: number | null
+          name?: string
+          season?: number
+          season_type?: number
+          week?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contests_format_code_fkey"
+            columns: ["format_code"]
+            isOneToOne: false
+            referencedRelation: "contest_formats"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       dfs_salary_snapshots: {
         Row: {
           captured_at: string
@@ -520,24 +645,6 @@ export type Database = {
         }
         Relationships: []
       }
-      lineup_slot_config: {
-        Row: {
-          display_order: number
-          eligible_positions: string[]
-          slot: string
-        }
-        Insert: {
-          display_order: number
-          eligible_positions: string[]
-          slot: string
-        }
-        Update: {
-          display_order?: number
-          eligible_positions?: string[]
-          slot?: string
-        }
-        Relationships: []
-      }
       lineup_slots: {
         Row: {
           bonus_gems: number | null
@@ -600,17 +707,11 @@ export type Database = {
             referencedRelation: "lineups"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "lineup_slots_slot_fkey"
-            columns: ["slot"]
-            isOneToOne: false
-            referencedRelation: "lineup_slot_config"
-            referencedColumns: ["slot"]
-          },
         ]
       }
       lineups: {
         Row: {
+          contest_id: string
           finalized_at: string | null
           id: string
           scored_at: string | null
@@ -622,6 +723,7 @@ export type Database = {
           week: number
         }
         Insert: {
+          contest_id: string
           finalized_at?: string | null
           id?: string
           scored_at?: string | null
@@ -633,6 +735,7 @@ export type Database = {
           week: number
         }
         Update: {
+          contest_id?: string
           finalized_at?: string | null
           id?: string
           scored_at?: string | null
@@ -643,7 +746,15 @@ export type Database = {
           user_id?: string
           week?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lineups_contest_id_fkey"
+            columns: ["contest_id"]
+            isOneToOne: false
+            referencedRelation: "contests"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pack_openings: {
         Row: {
@@ -1183,6 +1294,24 @@ export type Database = {
       }
     }
     Views: {
+      lineup_slot_config: {
+        Row: {
+          display_order: number | null
+          eligible_positions: string[] | null
+          slot: string | null
+        }
+        Insert: {
+          display_order?: number | null
+          eligible_positions?: string[] | null
+          slot?: string | null
+        }
+        Update: {
+          display_order?: number | null
+          eligible_positions?: string[] | null
+          slot?: string | null
+        }
+        Relationships: []
+      }
       my_collection: {
         Row: {
           acquired_at: string | null
@@ -1485,6 +1614,28 @@ export type Database = {
         Args: { p_card_ids: string[]; p_set_code: string }
         Returns: Json
       }
+      contest_entrants: { Args: { p_contest: string }; Returns: number }
+      contest_lobby: {
+        Args: never
+        Returns: {
+          affordable: boolean
+          code: string
+          entrants: number
+          entry_fee_gems: number
+          format_code: string
+          format_name: string
+          id: string
+          kind: Database["public"]["Enums"]["contest_kind"]
+          max_entrants: number
+          my_filled: number
+          my_lineup_id: string
+          name: string
+          season: number
+          season_type: number
+          slot_count: number
+          week: number
+        }[]
+      }
       current_slate: {
         Args: never
         Returns: {
@@ -1496,6 +1647,10 @@ export type Database = {
       daily_pack_status: { Args: never; Returns: Json }
       daily_set_day: { Args: never; Returns: string }
       daily_set_position: { Args: { p_day: string }; Returns: string }
+      ensure_free_contest: {
+        Args: { p_season: number; p_season_type: number; p_week: number }
+        Returns: string
+      }
       game_config_value: {
         Args: { p_default?: number; p_key: string }
         Returns: number
@@ -1628,6 +1783,7 @@ export type Database = {
       }
       set_lineup: {
         Args: {
+          p_contest_code?: string
           p_season: number
           p_season_type: number
           p_slots: Json
@@ -1671,6 +1827,7 @@ export type Database = {
     Enums: {
       acquisition_source: "pack" | "grant" | "admin"
       card_tier: "bronze" | "silver" | "gold" | "diamond"
+      contest_kind: "free" | "lobby"
       gem_reason:
         | "signup_bonus"
         | "weekly_grant"
@@ -1682,6 +1839,7 @@ export type Database = {
         | "set_commit"
         | "position_bonus"
         | "mvp_bonus"
+        | "contest_entry"
       rarity: "common" | "uncommon" | "rare" | "epic" | "legendary"
     }
     CompositeTypes: {
@@ -1808,10 +1966,14 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       acquisition_source: ["pack", "grant", "admin"],
       card_tier: ["bronze", "silver", "gold", "diamond"],
+      contest_kind: ["free", "lobby"],
       gem_reason: [
         "signup_bonus",
         "weekly_grant",
@@ -1823,6 +1985,7 @@ export const Constants = {
         "set_commit",
         "position_bonus",
         "mvp_bonus",
+        "contest_entry",
       ],
       rarity: ["common", "uncommon", "rare", "epic", "legendary"],
     },

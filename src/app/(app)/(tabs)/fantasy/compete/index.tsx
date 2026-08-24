@@ -37,7 +37,7 @@
  * an autosave that cannot save and cannot be told to try again is a dead end.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BenchBoard } from '@/components/lineup/BenchBoard';
@@ -101,6 +101,18 @@ export default function LineupScreen() {
   const router = useRouter();
   const wide = useIsWide();
 
+  /**
+   * WHICH CONTEST THIS BOARD IS EDITING. Absent means the free one, which is
+   * what every link into this screen meant before the lobby existed and what
+   * the tab itself still means.
+   *
+   * A route param rather than screen state: the board is a different board per
+   * contest — different slots, different entry, different saved picks — so it
+   * has to survive a reload and be linkable from the lobby.
+   */
+  const { contest: contestParam } = useLocalSearchParams<{ contest?: string }>();
+  const contestCode = typeof contestParam === 'string' ? contestParam : undefined;
+
   const {
     slate,
     inPlay,
@@ -117,7 +129,7 @@ export default function LineupScreen() {
     error: loadError,
     reload,
     reloadLineup,
-  } = useLineupData();
+  } = useLineupData(contestCode);
   const { displayName } = usePlayer();
 
   /**
@@ -501,6 +513,7 @@ export default function LineupScreen() {
       p_season_type: slate.season_type,
       p_week: slate.week,
       p_slots: payload,
+      p_contest_code: contestCode,
     });
     if (err) {
       /**
@@ -562,7 +575,7 @@ export default function LineupScreen() {
     await reloadLineup();
     setEdits({});
     setSaving(false);
-  }, [slate, picks, reloadLineup, reload]);
+  }, [slate, picks, contestCode, reloadLineup, reload]);
 
   /**
    * The autosave.
@@ -612,7 +625,17 @@ export default function LineupScreen() {
    * payload is the newer one — the whole reason it is still dirty — and the
    * server applies whichever lands last against the same slots.
    */
-  const pendingRef = useRef<{ season: number; season_type: number; week: number; slots: { slot: string; card_instance_id: string }[] } | null>(null);
+  const pendingRef = useRef<{
+    season: number;
+    season_type: number;
+    week: number;
+    slots: { slot: string; card_instance_id: string }[];
+    /* Carried WITH the payload rather than read at flush time: the effect below
+       runs on unmount, by which point the route param is gone — and flushing a
+       lobby board's pending edit into the free contest would put the cards in
+       the wrong lineup and charge nothing for it. */
+    contestCode: string | undefined;
+  } | null>(null);
 
   useEffect(() => {
     pendingRef.current =
@@ -625,9 +648,10 @@ export default function LineupScreen() {
               slot,
               card_instance_id,
             })),
+            contestCode,
           }
         : null;
-  }, [dirty, blocked, slate, picks]);
+  }, [dirty, blocked, slate, picks, contestCode]);
 
   useEffect(
     () => () => {
@@ -638,6 +662,7 @@ export default function LineupScreen() {
         p_season_type: p.season_type,
         p_week: p.week,
         p_slots: p.slots,
+        p_contest_code: p.contestCode,
       });
     },
     [],

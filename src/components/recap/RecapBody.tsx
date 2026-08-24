@@ -197,7 +197,7 @@ function RosterLine({ recap }: { recap: Recap }) {
 
   return (
     <Pressable
-      onPress={() => router.push('/(app)/(tabs)/fantasy/collection')}
+      onPress={() => router.push('/(app)/(tabs)/fantasy/collect')}
       style={({ pressed }) => [
         styles.roster,
         { backgroundColor: c.surface, borderColor: r.isOver ? c.negative : c.borderStrong },

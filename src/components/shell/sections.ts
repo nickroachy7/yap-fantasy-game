@@ -8,8 +8,8 @@
  *                      Players, Scores, Profile. These are products, not
  *                      screens.
  *   2. FANTASY_SECTIONS — the row under the header once you are inside Fantasy.
- *                      Lineup, Collection, Sets, Board. These used to BE the
- *                      bottom bar.
+ *                      Compete, Collect, Board. These used to BE the bottom
+ *                      bar.
  *   3. NavChild      — a section's OR a tab's sub-pages, drawn by `SectionNav`
  *                      as the page's action bar.
  *
@@ -19,12 +19,21 @@
  * there to look somebody up, which is the same kind of errand as checking the
  * scores. So it sits in the bottom bar and takes its three views with it.
  *
- * COLLECTION IS ITS OWN CONTENT NOW. It was a folder holding Inventory and
- * Sets, which meant `/fantasy/collection` was a redirect and the section strip
- * was immediately followed by a second strip switching between two pages. Sets
- * came up to sit beside it, and Collection simply IS the inventory — one word,
- * one page, no tray under it. The level-2 row is still four items wide; it is
- * the same four slots holding better-chosen things.
+ * LEVEL 2 IS VERBS NOW, NOT OBJECTS, as of 2026-08-25. It was Lineup,
+ * Collection, Sets, Board — four things you own or read. It is Compete,
+ * Collect, Board: what you are there to DO, with the objects as views beneath.
+ *
+ * Grouping by intent is only right when the things inside share a job, and
+ * these two do. Compete had no choice: contests mean there is no longer *a*
+ * lineup for the board to be named after. Collect is the judgement call — a
+ * set is where a card GOES, so the inventory and the exits from it are one
+ * loop, and it had been split across two tabs where the exit lived on the one
+ * you had to go out of your way to open.
+ *
+ * This DOES put a second strip under the section strip again, which is the
+ * thing the note below used to celebrate removing. The difference is that the
+ * pair that failed were two takes on the SAME rank competing for one job; these
+ * are two ranks, and `SectionNav` sets out at length why that is allowed.
  *
  * Four presentations read this file: the bottom tab bar renders one tab per
  * entry in NAV_TABS, `FantasyTopNav` renders FANTASY_SECTIONS as underlined
@@ -40,13 +49,14 @@
  * presentation now derives from here, which is what makes that claim true.
  *
  * Order inside Fantasy is deliberate, and it follows what a week actually looks
- * like: set the lineup, look at what you own, go and get more, then see where
- * that put you.
+ * like: play your cards, then sort out the ones you did not play, then see
+ * where that put you.
  *
  * One child of any parent that has several deliberately shares the parent's own
  * href. The nav needs an item for the landing page or there is no way back to
- * it, and the sidebar needs the parent row to stay a live target. Only Players
- * has several now, and it lands on its second; see the note there.
+ * it, and the sidebar needs the parent row to stay a live target. Compete and
+ * Collect both land on their first; Players lands on its second, and the note
+ * there explains why being first was convention rather than mechanism.
  */
 import type { ActionIconName } from '@/components/shell/ActionBar';
 import type { TabIconName } from '@/components/shell/TabIcon';
@@ -106,7 +116,7 @@ export type NavChild = {
   detached?: boolean;
 };
 
-/** One of the four boards inside Fantasy. Level 2. */
+/** One of the three boards inside Fantasy. Level 2. */
 export type NavSection = {
   href: string;
   label: string;
@@ -195,27 +205,62 @@ export const PACKS: NavChild = {
   detached: true,
 };
 
+/**
+ * The two views under Compete.
+ *
+ * LINEUP SHARES THE SECTION'S OWN HREF, which is this file's convention for a
+ * parent that has several children: the bar needs an item for the landing page
+ * or there is no way back to it. It is not an arbitrary pick of which child
+ * goes first — the free contest is auto-entered, so it is the one view of this
+ * board nobody chose to be on, and it is the one with a deadline.
+ */
+const COMPETE_VIEWS: NavChild[] = [
+  { href: '/fantasy/compete', label: 'Lineup', icon: 'lineup' },
+  { href: '/fantasy/compete/contests', label: 'Contests', icon: 'contests' },
+];
+
+/**
+ * The two views under Collect.
+ *
+ * The same pair Collection held before 2026-08-21, back under one board for a
+ * reason the split did not weigh: a set is where a card GOES. See
+ * `collect/_layout.tsx`.
+ */
+const COLLECT_VIEWS: NavChild[] = [
+  { href: '/fantasy/collect', label: 'Collection', icon: 'inventory' },
+  { href: '/fantasy/collect/sets', label: 'Sets', icon: 'sets' },
+];
+
 export const FANTASY_SECTIONS: NavSection[] = [
-  // No children: the scoreboard that used to be `/lineup/scores` is the Scores
-  // tab now, so the section is one page again.
-  { href: '/fantasy/lineup', label: 'Lineup', icon: 'lineup' },
-  /* ONE PAGE, NOT A FOLDER. `/fantasy/collection` used to redirect to
-     `/fantasy/collection/inventory` and draw a tray switching between that and
-     Sets — a strip of navigation under a strip of navigation, to offer two
-     pages. The word means the cards you own, so the route simply IS them.
-     It has no children at all: Packs is drawn by the page. */
-  { href: '/fantasy/collection', label: 'Collection', icon: 'collection' },
-  /* Lifted out of Collection to sit beside it. A set is not a view of your
-     inventory — it is a thing you are working towards, with its own progress,
-     its own deadline and its own rewards — and burying it one level down put
-     the feature with the most to say behind a segmented control. */
-  { href: '/fantasy/sets', label: 'Sets', icon: 'sets' },
-  /* No children, like Lineup. It had two — STANDINGS and SCORING — and the
-     strip they produced cost every phone screen a permanent row of navigation
-     to offer one board and one reference page you read once. The board itself
-     now carries a six-way switcher, so that strip sat directly above another
-     strip; two rows of chrome before a single row of data.
-     Scoring moved to `/scoring`, reached from Profile → Settings. */
+  /* COMPETE, which was Lineup. Renaming it is not a tidy-up — a lobby means
+     there is no longer *a* lineup to name the board after. The section is
+     where your entries live, and the free contest's lineup is its index. */
+  {
+    href: '/fantasy/compete',
+    label: 'Compete',
+    icon: 'lineup',
+    children: COMPETE_VIEWS,
+  },
+  /* COLLECT, which was Collection and Sets as peers. Two boards for one loop —
+     look at your cards, decide what to do with them — and the exit was on the
+     board you had to go out of your way to open. */
+  {
+    href: '/fantasy/collect',
+    label: 'Collect',
+    icon: 'collection',
+    children: COLLECT_VIEWS,
+  },
+  /* No children, and the only section still without any. It had two —
+     STANDINGS and SCORING — and the strip they produced cost every phone screen
+     a permanent row of navigation to offer one board and one reference page you
+     read once. The board itself now carries a six-way switcher, so that strip
+     sat directly above another strip; two rows of chrome before a single row of
+     data. Scoring moved to `/scoring`, reached from Profile -> Settings.
+
+     IT STAYS OUTSIDE THE OTHER TWO, and the verb/verb/noun asymmetry is the
+     point rather than an oversight: Compete and Collect are things you DO to
+     your own team, and the boards are where you read about everybody else. It
+     is the same distinction that moved Players down to the bottom bar. */
   {
     href: '/fantasy/leaderboard',
     label: 'Leaderboard',
@@ -370,7 +415,7 @@ type WebNavSpec = {
    * href, AND the key its label and icon are looked up under. Defaults to
    * `href`.
    *
-   * Collection opens on Inventory but owns `/fantasy/collection/*`, so without
+   * Collection opens on Inventory but owns `/fantasy/collect/*`, so without
    * this the row would go dark the moment you switched to Sets — and it would
    * be captioned "Inventory", the view, rather than "Collection", the board.
    */
@@ -421,16 +466,13 @@ type WebNavSpec = {
 export type WebNavItem = WebNavSpec & { label: string; icon: WebNavIcon };
 
 const WEB_NAV_SPEC: WebNavSpec[] = [
-  { href: '/fantasy/lineup' },
-  /* TWO ROWS WHERE THERE WAS ONE FOLDED ONE. Collection and Sets used to be a
-     single row with the two of them as page tabs, which was the rail's way of
-     undoing a split the phone had forced. They are genuinely two boards now,
-     so the fold is gone and each says its own name — and the `measure` that
-     existed only to stop the folded page jumping width between its two tabs
-     goes with it, since each page is free to ask for its own again. */
-  { href: '/fantasy/collection' },
-  { href: '/fantasy/sets' },
-  /* Directly under the two boards that make you want more cards, which is the
+  /* TWO FOLDED BOARDS. Each is one row on the rail with its views as page tabs
+     — the same fold Collection/Sets had before they were split apart, restored
+     because they are genuinely one board again, and now matched by Compete.
+     The rail was never the thing that wanted them separate; a phone was. */
+  { href: '/fantasy/compete', section: '/fantasy/compete', measure: 'form' },
+  { href: '/fantasy/collect', section: '/fantasy/collect', measure: 'table' },
+  /* Directly under the board that makes you want more cards, which is the
      question it answers. It is still the sheet it is on a phone (see
      `(app)/_layout`), opened over the app rather than navigated to; a rail row
      that opens a sheet is the same bargain as a toolbar button that does, and
@@ -447,8 +489,8 @@ const WEB_NAV_SPEC: WebNavSpec[] = [
   },
   { href: '/fantasy/leaderboard' },
   /* Last, and outside the rest, because it is the only row that is not about
-     you: the others are your lineup, your cards, your sets, your packs, your
-     pool and your rank, and this is the league's own week. */
+     you: the others are your lineup, your cards, your packs, your pool and your
+     rank, and this is the league's own week. */
   { href: '/scores', spacedAbove: true },
 ];
 
@@ -519,7 +561,7 @@ export type WebSection = {
  * heading come to disagree about it.
  *
  * The boundary check is not decoration: a bare `startsWith` would light
- * `/fantasy/lineup` for a future `/fantasy/lineups`, and a rail that marks the
+ * `/fantasy/compete` for a future `/fantasy/competes`, and a rail that marks the
  * wrong row is worse than one that marks none. `also` covers the destinations
  * that live outside their board's subtree — see `WebNavSpec`.
  */

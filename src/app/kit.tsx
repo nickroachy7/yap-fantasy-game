@@ -737,6 +737,16 @@ function Kit() {
                 { key: 'scoring', label: 'Scoring', icon: 'scoring', active: action === 'scoring', onPress: () => setAction('scoring') },
               ]}
             />
+            {/* The Compete section. Both glyphs are new as of 2026-08-25 and
+                belong here for the reason the note above gives — every glyph,
+                hollow then solid, in the one place they can be compared. */}
+            <ActionBar
+              wide={false}
+              actions={[
+                { key: 'lineup', label: 'Lineup', icon: 'lineup', active: action === 'lineup', onPress: () => setAction('lineup') },
+                { key: 'contests', label: 'Contests', icon: 'contests', active: action === 'contests', onPress: () => setAction('contests') },
+              ]}
+            />
             {/* Two items — the Players section. The cap on item width is what
                 stops this reading as the segmented control it replaced. */}
             <ActionBar

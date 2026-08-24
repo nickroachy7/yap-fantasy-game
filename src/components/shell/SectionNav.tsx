@@ -67,7 +67,7 @@ import { childrenOf } from '@/components/shell/sections';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Spacing } from '@/constants/theme';
 
-export function SectionNav({ section }: { /** e.g. `/fantasy/collection`. */ section: string }) {
+export function SectionNav({ section }: { /** e.g. `/fantasy/collect`. */ section: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const wide = useIsWide();

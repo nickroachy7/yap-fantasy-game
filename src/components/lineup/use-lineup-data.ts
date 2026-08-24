@@ -239,18 +239,42 @@ type PriorLineup = {
 const LINEUP_SELECT =
   'id, total_points, scored_at, finalized_at, lineup_slots(slot, card_instance_id, points)';
 
-function readLineup(slate: Slate) {
+/**
+ * KEYED ON THE CONTEST, not on the slate.
+ *
+ * It filtered by season/type/week and took `maybeSingle()`, which was exactly
+ * right while a week held one lineup and became a live bug the moment it could
+ * hold two: the moment a player enters anything in the lobby, the free
+ * contest's own screen starts erroring on multiple rows returned. A week is no
+ * longer a key — `lineups_user_id_contest_key` is.
+ */
+function readLineup(contestId: string) {
   return supabase
     .from('lineups')
     .select(LINEUP_SELECT)
-    .eq('season', slate.season)
-    .eq('season_type', slate.season_type)
-    .eq('week', slate.week)
+    .eq('contest_id', contestId)
     .maybeSingle();
 }
 
+/** The contest a lineup screen is editing, and the format it must be filled to. */
+export type LineupContest = {
+  id: string;
+  code: string;
+  name: string;
+  kind: 'free' | 'lobby';
+  formatCode: string;
+  entryFeeGems: number;
+  /** True until the entry exists — the fee has not been taken yet. */
+  unentered: boolean;
+};
+
 export type LineupData = {
   slate: Slate | null;
+  /**
+   * Which contest this board is editing. Null only before the first load, or
+   * when the slate has no fixtures at all.
+   */
+  contest: LineupContest | null;
   /**
    * True when the week being shown has kicked off and is not yet done with.
    * The board is a scoreboard in that state and a form otherwise, and this is
@@ -299,8 +323,9 @@ export type LineupData = {
   reloadLineup: () => Promise<void>;
 };
 
-export function useLineupData(): LineupData {
+export function useLineupData(contestCode?: string): LineupData {
   const [slate, setSlate] = useState<Slate | null>(null);
+  const [contest, setContest] = useState<LineupContest | null>(null);
   const [inPlay, setInPlay] = useState(false);
   const [hasLiveGame, setHasLiveGame] = useState(false);
   const [lockAt, setLockAt] = useState<string | null>(null);
@@ -344,12 +369,8 @@ export function useLineupData(): LineupData {
     // `lineup_slate()` names the one week this screen is about. The collection,
     // slot config and team list do not depend on it, so they ride along rather
     // than waiting a round trip for it.
-    const [slateRes, cfg, coll, teamsRes] = await Promise.all([
+    const [slateRes, coll, teamsRes] = await Promise.all([
       supabase.rpc('lineup_slate'),
-      supabase
-        .from('lineup_slot_config')
-        .select('slot, eligible_positions, display_order')
-        .order('display_order'),
       loadCollection().then(
         (data) => ({ data, error: null as string | null }),
         (err: unknown) => ({
@@ -370,14 +391,56 @@ export function useLineupData(): LineupData {
        if both the slot config and the collection fail, because it is the one
        that empties the screen. */
     let failure: string | null = null;
-    if (cfg.error) failure = cfg.error.message;
-    else setSlots((cfg.data ?? []) as SlotConfig[]);
     if (coll.error) failure = coll.error;
+
+    /* WHICH CONTEST, and it has to be resolved before the slots can be: the
+       slot list belongs to the contest's FORMAT now, so a three-card lobby
+       board and the eight-card free one ask for different rows. This is the
+       one round trip that had to become sequential — everything after it still
+       goes out together. */
+    let ct: LineupContest | null = null;
+    if (s) {
+      const q = supabase
+        .from('contests')
+        .select('id, code, name, kind, format_code, entry_fee_gems')
+        .eq('season', s.season)
+        .eq('season_type', s.season_type)
+        .eq('week', s.week);
+
+      const { data: cRow, error: cErr } = contestCode
+        ? await q.eq('code', contestCode).maybeSingle()
+        : await q.eq('kind', 'free').maybeSingle();
+
+      if (!live()) return;
+      if (cErr) failure = cErr.message;
+      else if (!cRow) failure = contestCode ? 'That contest is no longer open.' : failure;
+      else
+        ct = {
+          id: cRow.id,
+          code: cRow.code,
+          name: cRow.name,
+          kind: cRow.kind as 'free' | 'lobby',
+          formatCode: cRow.format_code,
+          entryFeeGems: cRow.entry_fee_gems,
+          /* Filled in below, once the lineup read comes back: an entry exists
+             exactly when a lineup row does, which is what makes the fee
+             idempotent server-side too. See `20260825050000`. */
+          unentered: true,
+        };
+    }
+    setContest(ct);
 
     const owned = coll.data.filter((r): r is CollectionRow & { id: string } => Boolean(r.id));
     const playerIds = [...new Set(owned.map((r) => r.player_id).filter((id): id is string => Boolean(id)))];
 
-    const [lock, existing, gamesRes, stats] = await Promise.all([
+    const [cfg, lock, existing, gamesRes, stats] = await Promise.all([
+      ct
+        ? supabase
+            .from('contest_format_slots')
+            .select('slot, eligible_positions, display_order')
+            .eq('format_code', ct.formatCode)
+            .order('display_order')
+        : Promise.resolve({ data: null, error: null }),
       s
         ? supabase.rpc('week_lock_time', {
             p_season: s.season,
@@ -385,7 +448,7 @@ export function useLineupData(): LineupData {
             p_week: s.week,
           })
         : Promise.resolve({ data: null, error: null }),
-      s ? readLineup(s) : Promise.resolve({ data: null, error: null }),
+      ct ? readLineup(ct.id) : Promise.resolve({ data: null, error: null }),
       s
         ? supabase
             .from('games')
@@ -400,6 +463,11 @@ export function useLineupData(): LineupData {
     ]);
 
     if (!live()) return;
+    /* Same precedence as before: the collection's failure is the one reported
+       if both the slot config and the collection fail, because it is the one
+       that empties the screen. */
+    if (cfg.error) failure = failure ?? cfg.error.message;
+    else setSlots((cfg.data ?? []) as SlotConfig[]);
     if (!lock.error && lock.data) setLockAt(String(lock.data));
 
     const weekGames = (gamesRes.data ?? []) as GameRow[];
@@ -435,10 +503,13 @@ export function useLineupData(): LineupData {
       })),
     );
 
-    // Re-hydrate a lineup already submitted for this week.
-    applyLineup(existing.data as PriorLineup);
+    // Re-hydrate a lineup already submitted for this week. Its existence is
+    // also the answer to "have I entered", which the paid board's button reads.
+    const prior = existing.data as PriorLineup;
+    if (ct) setContest({ ...ct, unentered: !prior });
+    applyLineup(prior);
     return failure;
-  }, [applyLineup]);
+  }, [applyLineup, contestCode]);
 
   /**
    * Re-read ONLY the lineup row.
@@ -456,11 +527,13 @@ export function useLineupData(): LineupData {
    * fetch; the 60s poll brings them in when they exist.
    */
   const reloadLineup = useCallback(async () => {
-    if (!slate) return;
-    const { data, error: err } = await readLineup(slate);
+    if (!contest) return;
+    const { data, error: err } = await readLineup(contest.id);
     if (err) return;
-    applyLineup(data as PriorLineup);
-  }, [slate, applyLineup]);
+    const prior = data as PriorLineup;
+    setContest((c) => (c ? { ...c, unentered: !prior } : c));
+    applyLineup(prior);
+  }, [contest, applyLineup]);
 
   // Quiet, like the old `reload`: it cleared the error and re-read, but never
   // put the screen back into its first-load spinner.
@@ -500,6 +573,7 @@ export function useLineupData(): LineupData {
 
   return {
     slate,
+    contest,
     inPlay,
     hasLiveGame,
     lockAt,

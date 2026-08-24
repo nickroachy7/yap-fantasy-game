@@ -58,7 +58,7 @@ export function SectionFrame({
   masthead = false,
   children,
 }: {
-  /** e.g. `/fantasy/collection`. The section whose sub-pages the nav lists. */
+  /** e.g. `/fantasy/collect`. The section whose sub-pages the nav lists. */
   section: string;
   /**
    * Draw the masthead above the nav, for a frame with nothing above it.

@@ -308,7 +308,7 @@ export default function SetChecklistScreen() {
      had a close button that did not close. Sets is this sheet's landing page. */
   const close = useCallback(() => {
     if (router.canGoBack()) router.back();
-    else router.dismissTo('/fantasy/sets');
+    else router.dismissTo('/fantasy/collect/sets');
   }, [router]);
 
   return (
