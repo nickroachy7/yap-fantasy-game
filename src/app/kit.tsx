@@ -36,6 +36,7 @@ import { summarise } from '@/components/collection/types';
 import {
   KIT_COMMIT_PLAN,
   KIT_SET_DAILY,
+  KIT_SET_COMPLETE,
   KIT_SET_FILLED,
   KIT_SET_OPEN,
   OWNED_CARDS,
@@ -1098,7 +1099,7 @@ function Kit() {
 
           <Section
             title="Card exits"
-            note="The two ways a card leaves your collection, as the card profile offers them. Four states: one set open, several (the button opens a picker), a spare copy held so the burn takes a different card, and every set closed — which says WHICH of the two reasons applies rather than going quiet. Pressing either hands the decision to a ConfirmDialog on the real screen; here it just reports what was pressed.">
+            note="The two ways a card leaves your collection, as the card profile offers them. Five states: one set open, several (the button opens a picker), a spare copy held so the burn takes a different card, a player already IN his set, and a set that is full. The last two keep the button in place and grey it rather than dropping it — a card with one exit reads as a card sets never applied to, when the truth is usually that you already placed him. Pressing either hands the decision to a ConfirmDialog on the real screen; here it just reports what was pressed.">
             <View style={styles.section}>
               <CardExits
                 playerName="Drew Allar"
@@ -1135,6 +1136,18 @@ function Kit() {
                 tier="bronze"
                 sellValue={8}
                 sets={[KIT_SET_FILLED]}
+                burnsThisCopy
+                busy={false}
+                onCommit={(x) => setExitPicked(`add to ${x.name}`)}
+                onSell={() => setExitPicked('sell for 8')}
+              />
+              {/* The other closed reason, which must not read the same: the
+                  player is NOT in this set, it simply cannot take another. */}
+              <CardExits
+                playerName="Cam Little"
+                tier="bronze"
+                sellValue={8}
+                sets={[KIT_SET_COMPLETE]}
                 burnsThisCopy
                 busy={false}
                 onCommit={(x) => setExitPicked(`add to ${x.name}`)}

@@ -506,6 +506,27 @@ export const KIT_SET_DAILY: CardActionSet = {
 };
 
 /** His slot is taken, so the whole row collapses to a sentence saying so. */
+/**
+ * A set that has met its requirement.
+ *
+ * The OTHER reason a card cannot go in, and it must not read like the one
+ * below: the player is not in this set at all, it simply cannot take another
+ * card. The exits say "SET IS FULL" here and "ALREADY IN SET" there, and only
+ * the second gets a tick.
+ */
+export const KIT_SET_COMPLETE: CardActionSet = {
+  code: 'daily-pk-2026-08-24',
+  name: 'Kicker of the day',
+  family: 'daily',
+  subtitle: 'Sunday 24 August',
+  pays: 4,
+  committed: 3,
+  required: 3,
+  slotFilled: false,
+  setComplete: true,
+  canCommit: false,
+};
+
 export const KIT_SET_FILLED: CardActionSet = {
   code: 'team-jax-2026',
   name: 'Jacksonville Jaguars',

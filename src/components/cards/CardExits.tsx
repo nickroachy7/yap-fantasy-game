@@ -113,6 +113,48 @@ export function CardExits({
               </Text>
             )}
           </Pressable>
+        ) : blocked.length > 0 ? (
+          /**
+           * THE SLOT STAYS, GREYED, WHEN NOTHING CAN GO IN IT.
+           *
+           * Dropping the button and printing a sentence instead was the first
+           * version, and it read as the feature being missing rather than
+           * unavailable: the pair of exits collapsed to one, so the card looked
+           * like a card sets had never applied to. Worse for the common case
+           * this exists for — a spare of a player you have ALREADY placed —
+           * where the honest answer is not "you cannot" but "you already did".
+           *
+           * So the button holds its place and says which. It is a `Pressable`
+           * rather than a `View` on purpose: `disabled` is what makes a screen
+           * reader and the browser announce it as a control that is off, where
+           * a styled View is just decoration that happens to look like one.
+           */
+          <Pressable
+            disabled
+            accessibilityRole="button"
+            accessibilityState={{ disabled: true }}
+            accessibilityLabel={
+              blocked[0].slotFilled
+                ? `${playerName} is already in ${blocked[0].name}. This copy cannot be added.`
+                : `${blocked[0].name} is complete and cannot take another card.`
+            }
+            style={[
+              styles.exit,
+              styles.dim,
+              { borderColor: c.border, backgroundColor: c.backgroundElement },
+            ]}>
+            <Text
+              numberOfLines={1}
+              style={[Type.strong, styles.label, { color: c.textSecondary }]}>
+              {blocked[0].slotFilled ? 'ALREADY IN SET' : 'SET IS FULL'}
+            </Text>
+            {/* A tick in the positive tone, because a filled slot is something
+                the player DID rather than a refusal. Nothing for a full set —
+                that one is not their doing. */}
+            {blocked[0].slotFilled ? (
+              <Text style={[Type.strong, styles.tick, { color: c.positive }]}>✓</Text>
+            ) : null}
+          </Pressable>
         ) : null}
 
         <Pressable
@@ -149,13 +191,15 @@ export function CardExits({
         </View>
       ) : null}
 
-      {/* WHY THERE IS NO ADD BUTTON, when a set wanted this card and cannot
-          take it. Silence would read as the card belonging to no set at all. */}
+      {/* WHICH set, and what is still true of the card. The button above says
+          the state in two words; this says which set it is about and — the part
+          that stops the greyed button reading as "this card is finished" — that
+          the copy is still yours to sell or to start. */}
       {commitable.length === 0 && blocked.length > 0 ? (
         <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
           {blocked[0].slotFilled
-            ? `${playerName}'s slot in ${blocked[0].name} is already filled, so no set can take this copy.`
-            : `${blocked[0].name} has met its requirement, so it cannot take another card.`}
+            ? `${blocked[0].name} already has ${playerName}. This copy is still yours — you can sell it or start it.`
+            : `${blocked[0].name} has met its requirement, so it cannot take another card. This copy is still yours to sell or start.`}
         </Text>
       ) : null}
 
@@ -195,6 +239,8 @@ const styles = StyleSheet.create({
   /* Only the label gives way, so the price on the right can never be
      ellipsised out of the button. Same rule as the pack reveal's. */
   label: { flexShrink: 1, minWidth: 0 },
+  /* Nudged to sit on the label's baseline rather than the box's centre. */
+  tick: { lineHeight: 17 },
   picker: { gap: Spacing.two },
   measure: { maxWidth: 560 },
   dim: { opacity: 0.55 },
