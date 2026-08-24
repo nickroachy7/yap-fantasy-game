@@ -39,7 +39,17 @@ import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import type { CommitPlan } from './bulk';
 
-export type BulkStage = 'idle' | 'selling' | 'adding';
+/**
+ * `leftovers` is the one stage the player does not open themselves.
+ *
+ * It follows the add — either instead of it, when no set would take anything,
+ * or straight after it — and offers to sell exactly the copies a set could not
+ * use. That is the moment those cards are known to be spare, and the moment the
+ * player is least likely to want to keep them; making them re-tick the same
+ * cards on the grid to act on what they have just been told would be the
+ * feature refusing to finish its own sentence.
+ */
+export type BulkStage = 'idle' | 'selling' | 'adding' | 'leftovers';
 
 /** What a finished run did, in the words the bar reports it with. */
 export type BulkResult = {
@@ -65,6 +75,7 @@ export function BulkBar({
   onAdd,
   onConfirmSell,
   onConfirmAdd,
+  onConfirmSellLeftovers,
   onCancelStage,
   onClear,
   onDismissResult,
@@ -84,6 +95,7 @@ export function BulkBar({
   onAdd: () => void;
   onConfirmSell: () => void;
   onConfirmAdd: () => void;
+  onConfirmSellLeftovers: () => void;
   onCancelStage: () => void;
   onClear: () => void;
   onDismissResult: () => void;
@@ -238,8 +250,76 @@ export function BulkBar({
         onConfirm={onConfirmAdd}
         onCancel={onCancelStage}
       />
+
+      {/* THE OFFER, and it is a question rather than a report. */}
+      <ConfirmDialog
+        visible={stage === 'leftovers'}
+        title={plan ? leftoverTitle(plan) : ''}
+        body={plan ? leftoverBody(plan) : undefined}
+        confirmLabel={plan ? `Sell for ${leftoverGems(plan)}` : ''}
+        /* NOT "Cancel". There is nothing here to cancel — the add has already
+           happened, or there was never anything to add — so the quiet button is
+           the other real choice, which is to keep them. */
+        cancelLabel="Keep them"
+        destructive
+        busy={busy}
+        error={error}
+        onConfirm={onConfirmSellLeftovers}
+        onCancel={onCancelStage}
+      />
     </>
   );
+}
+
+const leftoverGems = (plan: CommitPlan): number =>
+  plan.leftovers.reduce((n, x) => n + x.sellValue, 0);
+
+/**
+ * The title names the DOMINANT reason rather than the total.
+ *
+ * "4 cards could not be added" is true and says nothing; "3 are already in
+ * their sets" is the thing the player did not know and the thing that makes the
+ * offer make sense. The body carries the rest.
+ */
+function leftoverTitle(plan: CommitPlan): string {
+  const n = plan.leftovers.length;
+  const cards = n === 1 ? '1 card' : `${n} cards`;
+  if (plan.alreadyIn >= plan.noSet && plan.alreadyIn >= plan.duplicate) {
+    return plan.alreadyIn === n
+      ? n === 1
+        ? 'That player is already in a set'
+        : `Those ${n} players are already in sets`
+      : `${cards} could not go into a set`;
+  }
+  return `${cards} could not go into a set`;
+}
+
+function leftoverBody(plan: CommitPlan): string {
+  const parts: string[] = [];
+  if (plan.alreadyIn > 0) {
+    parts.push(
+      plan.alreadyIn === 1
+        ? '1 is a player already in his set'
+        : `${plan.alreadyIn} are players already in their sets`,
+    );
+  }
+  if (plan.duplicate > 0) {
+    parts.push(
+      plan.duplicate === 1
+        ? '1 is a second copy of a player going in on this run'
+        : `${plan.duplicate} are further copies of players going in on this run`,
+    );
+  }
+  if (plan.noSet > 0) {
+    parts.push(
+      plan.noSet === 1
+        ? '1 belongs to no set with a slot open for it'
+        : `${plan.noSet} belong to no set with a slot open for them`,
+    );
+  }
+
+  const why = parts.length > 0 ? `${parts.join('; ')}. ` : '';
+  return `${why}They are still yours — selling them pays ${leftoverGems(plan)} gems, and everything they have earned goes with them.`;
 }
 
 /**

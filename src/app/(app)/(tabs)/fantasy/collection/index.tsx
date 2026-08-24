@@ -519,6 +519,7 @@ export default function InventoryScreen() {
                 onAdd={() => bulk.askAdd(selectedCards)}
                 onConfirmSell={() => bulk.runSell(selectedCards)}
                 onConfirmAdd={bulk.runAdd}
+                onConfirmSellLeftovers={bulk.runSellLeftovers}
                 onCancelStage={bulk.cancel}
                 onClear={clearSelection}
                 onDismissResult={bulk.dismissResult}

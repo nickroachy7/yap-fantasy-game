@@ -118,6 +118,15 @@ export type CommitPlan = {
   alreadyIn: number;
   noSet: number;
   duplicate: number;
+  /**
+   * The ticked copies no leg is taking — the three counts above, as cards.
+   *
+   * Kept rather than merely counted so the run can OFFER them: a selection that
+   * a set will not take is very often a selection worth selling, and the player
+   * has already said these are spare by ticking them. Without the ids that
+   * offer would mean asking them to pick the same cards again.
+   */
+  leftovers: PlannableCard[];
   /** True when any leg burns a copy other than the one that was ticked. */
   anySpare: boolean;
 };
@@ -135,6 +144,7 @@ export function planCommits(
 
   const byCode = new Map<string, CommitLeg>();
   const takenCards = new Set<string>();
+  const leftovers: PlannableCard[] = [];
   let alreadyIn = 0;
   let noSet = 0;
   let duplicate = 0;
@@ -149,10 +159,12 @@ export function planCommits(
       // player has forgotten; anything else is the shrug.
       if (can?.sets.some((s) => s.slotFilled)) alreadyIn += 1;
       else noSet += 1;
+      leftovers.push(card);
       continue;
     }
     if (takenCards.has(card.cardId)) {
       duplicate += 1;
+      leftovers.push(card);
       continue;
     }
     takenCards.add(card.cardId);
@@ -178,6 +190,7 @@ export function planCommits(
     alreadyIn,
     noSet,
     duplicate,
+    leftovers,
     anySpare,
   };
 }

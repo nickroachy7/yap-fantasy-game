@@ -543,5 +543,13 @@ export const KIT_COMMIT_PLAN: CommitPlan = {
   alreadyIn: 1,
   noSet: 1,
   duplicate: 2,
+  // The four copies the counts above describe, so the leftovers dialog has
+  // something to offer selling.
+  leftovers: [
+    { id: 'left-1', cardId: 'lc1', sellValue: 8, careerFp: 0 },
+    { id: 'left-2', cardId: 'lc2', sellValue: 8, careerFp: 0 },
+    { id: 'left-3', cardId: 'lc3', sellValue: 40, careerFp: 90 },
+    { id: 'left-4', cardId: 'lc4', sellValue: 8, careerFp: 0 },
+  ],
   anySpare: true,
 };

@@ -203,6 +203,35 @@ Deno.test('flags a plan that burns a copy other than the one ticked', () => {
   assertEquals(planCommits([card('i1', 'c1', 8)], noSpare).anySpare, false);
 });
 
+Deno.test('hands back the copies no leg took, not just a count of them', () => {
+  // The leftovers ARE the offer that follows the add — "3 were already in sets,
+  // sell them instead?" — so the plan has to name them. A count alone would
+  // mean asking the player to tick the same cards again.
+  const cards = [card('i1', 'c1', 8), card('i2', 'c1', 8), card('i3', 'c3', 40)];
+  const actions = new Map([
+    offers('i1', 'c1', [set('team-buf-2026', 'Buffalo Bills', 4)]),
+    // Second copy of the same player: a duplicate, so a leftover.
+    offers('i2', 'c1', [set('team-buf-2026', 'Buffalo Bills', 4)]),
+    // Already in his set: also a leftover, for a different reason.
+    offers('i3', 'c3', [set('team-kc-2026', 'Kansas City Chiefs', 4, false, true)]),
+  ]);
+
+  const plan = planCommits(cards, actions);
+
+  assertEquals(plan.cards, 1);
+  assertEquals(
+    plan.leftovers.map((x) => x.id).sort(),
+    ['i2', 'i3'],
+  );
+  // And every reason is represented among them.
+  assertEquals(plan.duplicate + plan.alreadyIn + plan.noSet, plan.leftovers.length);
+});
+
+Deno.test('a plan that uses everything leaves nothing over', () => {
+  const actions = new Map([offers('i1', 'c1', [set('team-buf-2026', 'Buffalo Bills', 4)])]);
+  assertEquals(planCommits([card('i1', 'c1', 8)], actions).leftovers, []);
+});
+
 Deno.test('sums what the ticked copies sell for', () => {
   assertEquals(sellTotal([card('i1', 'c1', 8), card('i2', 'c2', 150)]), 158);
   assertEquals(sellTotal([]), 0);

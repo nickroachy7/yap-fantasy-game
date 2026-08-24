@@ -48,6 +48,8 @@ export type BulkState = {
   askAdd: (selected: CollectionCard[]) => void;
   runSell: (selected: CollectionCard[]) => void;
   runAdd: () => void;
+  /** Sells exactly the copies the add could not use. See `stage: 'leftovers'`. */
+  runSellLeftovers: () => void;
   cancel: () => void;
   dismissResult: () => void;
 };
@@ -84,21 +86,12 @@ export function useBulk(onDone: () => void): BulkState {
            already in its set, or belongs to none, would otherwise open a
            dialog whose only honest confirm label is "Add 0". Say so on the bar
            instead — it is the same surface the refusals are reported on. */
-        if (next.legs.length === 0) {
-          setResult({
-            kind: 'added',
-            done: 0,
-            skipped: selected.length,
-            gems: 0,
-            firstReason:
-              next.duplicate > 0 && next.noSet === 0
-                ? 'every copy is of a player already going in'
-                : 'no set has a slot open for these',
-          });
-          return;
-        }
         setPlan(next);
-        setStage('adding');
+        /* NOTHING TO ADD IS NOT A DEAD END. A selection no set will take used to
+           report itself on the bar and stop there — which is the moment the
+           player learns these cards are spare, and the moment they are least
+           likely to want to keep them. So it goes straight to the offer. */
+        setStage(next.legs.length === 0 ? 'leftovers' : 'adding');
       })();
     },
     [busy],
@@ -191,12 +184,68 @@ export function useBulk(onDone: () => void): BulkState {
           reason = reason ?? firstRefusal(r.refusals);
         }
 
-        setStage('idle');
-        setPlan(null);
         setResult({ kind: 'added', done: added, skipped, gems: paid, firstReason: reason });
         await settle();
+        /* AND THEN THE REST. The add has taken everything a set would have; what
+           is left is what the player ticked and nothing can use. The plan is
+           kept rather than cleared because it is the only record of which
+           copies those were — the selection itself has just been dropped by
+           `settle`. */
+        if (plan.leftovers.length > 0) {
+          setStage('leftovers');
+        } else {
+          setStage('idle');
+          setPlan(null);
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'The cards could not be added.');
+      } finally {
+        setBusy(false);
+      }
+    })();
+  }, [busy, plan, settle]);
+
+  /**
+   * Sell the copies the add could not use.
+   *
+   * ONE CALL, ON IDS CAPTURED BEFORE THE COMMIT RAN, and that is safe for the
+   * one reason every bulk action here is safe: `sell_cards` skips what its rules
+   * refuse and says why. A leftover CAN have gone in the meantime — a player
+   * ticked twice sends one copy to a set and the server burns the cheapest,
+   * which may be the very copy left over — so the run reports "3 sold, 1
+   * skipped" rather than pretending otherwise.
+   */
+  const runSellLeftovers = useCallback(() => {
+    if (busy || !plan || plan.leftovers.length === 0) return;
+    const ids = plan.leftovers.map((x) => x.id);
+    setBusy(true);
+    setError(null);
+
+    void (async () => {
+      try {
+        const { data, error: err } = await supabase.rpc('sell_cards', {
+          p_card_instance_ids: ids,
+        });
+        if (err) throw new Error(sellErrorMessage(err.message));
+
+        const r = (data ?? {}) as {
+          sold?: number;
+          skipped?: number;
+          paid?: number;
+          refusals?: { reason?: string }[];
+        };
+        setStage('idle');
+        setPlan(null);
+        setResult({
+          kind: 'sold',
+          done: r.sold ?? 0,
+          skipped: r.skipped ?? 0,
+          gems: r.paid ?? 0,
+          firstReason: firstRefusal(r.refusals),
+        });
+        await settle();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'The sale could not be completed.');
       } finally {
         setBusy(false);
       }
@@ -223,6 +272,7 @@ export function useBulk(onDone: () => void): BulkState {
     askAdd,
     runSell,
     runAdd,
+    runSellLeftovers,
     cancel,
     dismissResult,
   };

@@ -1213,7 +1213,8 @@ function Kit() {
               onSell={() => setBulkStage('selling')}
               onAdd={() => setBulkStage('adding')}
               onConfirmSell={() => setBulkStage('idle')}
-              onConfirmAdd={() => setBulkStage('idle')}
+              onConfirmAdd={() => setBulkStage('leftovers')}
+              onConfirmSellLeftovers={() => setBulkStage('idle')}
               onCancelStage={() => setBulkStage('idle')}
               onClear={() => setBulkCount(0)}
               onDismissResult={() => setBulkCount(12)}
