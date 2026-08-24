@@ -188,6 +188,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
     savedPoints,
     scoredAt,
     finalizedAt,
+    contest,
     elsewhere,
     loading,
     error: loadError,
@@ -310,6 +311,23 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
    * announce a locked week to somebody whose cards are simply committed
    * elsewhere.
    */
+  /**
+   * A PAID ENTRY YOU HAVE NOT BOUGHT YET, which is the one state where the
+   * autosave must not run.
+   *
+   * Everywhere else in this game a swap is saved on a timer and that is right:
+   * editing is free, the server is the record, and a button to confirm each
+   * change would be furniture. But the FIRST submission into a paid contest is
+   * not an edit, it is a purchase — `set_lineup` takes the fee on the create
+   * path — and spending somebody's gems because they stopped typing for 700ms
+   * is not a thing to do on a timer.
+   *
+   * It is only ever true before the entry exists. Once the fee is paid the
+   * board goes back to autosaving like any other, because from then on it IS
+   * only editing.
+   */
+  const needsEntry = Boolean(contest?.unentered && contest.entryFeeGems > 0);
+
   const unavailableIds = useMemo(() => {
     const out = new Set(lockedIds);
     for (const id of elsewhere.keys()) out.add(id);
@@ -721,10 +739,10 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
    * so a save that lands makes it false and the effect goes quiet on its own.
    */
   useEffect(() => {
-    if (!dirty || saving || blocked || !slate) return;
+    if (!dirty || saving || blocked || !slate || needsEntry) return;
     const t = setTimeout(() => void submit(), DEBOUNCE_MS);
     return () => clearTimeout(t);
-  }, [dirty, saving, blocked, slate, submit]);
+  }, [dirty, saving, blocked, slate, submit, needsEntry]);
 
   /**
    * AND THE FLUSH, WHICH IS WHAT MAKES THE DEBOUNCE SAFE.
@@ -763,7 +781,11 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
 
   useEffect(() => {
     pendingRef.current =
-      dirty && !blocked && slate
+      /* `needsEntry` guards this as hard as it guards the debounce, and this is
+         the more dangerous of the two: the flush fires on UNMOUNT with no
+         component left to report anything, so closing the sheet would have
+         bought the entry on the way out and told nobody. */
+      dirty && !blocked && slate && !needsEntry
         ? {
             season: slate.season,
             season_type: slate.season_type,
@@ -775,7 +797,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
             contestCode,
           }
         : null;
-  }, [dirty, blocked, slate, picks, contestCode]);
+  }, [dirty, blocked, slate, picks, contestCode, needsEntry]);
 
   useEffect(
     () => () => {
@@ -984,12 +1006,45 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
           <Text style={[Type.fine, { color: c.textTertiary }]}>
             Locked — this week&apos;s lineup is final.
           </Text>
-        ) : filled > 0 ? (
+        ) : needsEntry ? null : filled > 0 ? (
           <Text style={[Type.fine, { color: c.textTertiary }]}>Saved automatically.</Text>
         ) : null}
       </View>
 
-      {!allLocked && filled < slots.length ? (
+      {/* THE ENTRY BUTTON. Only for a paid contest you are not in yet — see
+          `needsEntry`. It says the price because pressing it is when the price
+          is paid, which is the whole reason it exists instead of a timer.
+
+          IT WANTS A FULL LINEUP. A partial one is legal and the caption below
+          says so, but that is the rule for a free contest you are already in;
+          paying forty gems for two of three slots is a mistake somebody makes
+          once and cannot undo, and the server will not stop them. */}
+      {needsEntry && !allLocked ? (
+        <Pressable
+          onPress={filled === slots.length ? () => void submit() : undefined}
+          disabled={filled !== slots.length || saving}
+          accessibilityRole="button"
+          style={({ pressed }) => [
+            styles.enter,
+            {
+              backgroundColor: filled === slots.length ? c.text : c.surface,
+              opacity: pressed ? 0.7 : 1,
+            },
+          ]}>
+          <Text
+            style={[
+              Type.body,
+              styles.enterLabel,
+              { color: filled === slots.length ? c.background : c.textTertiary },
+            ]}>
+            {filled === slots.length
+              ? `Enter for ${contest?.entryFeeGems} gems`
+              : `Fill all ${slots.length} slots to enter`}
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {!allLocked && !needsEntry && filled < slots.length ? (
         <Text style={[Type.fine, styles.centreText, { color: c.textTertiary }]}>
           {slots.length - filled} slot{slots.length - filled === 1 ? '' : 's'} still empty. A partial
           lineup is allowed — an empty slot simply scores nothing.
@@ -1037,6 +1092,8 @@ function SectionHead({ label, hint, tone }: { label: string; hint: string; tone:
 }
 
 const styles = StyleSheet.create({
+  enter: { paddingVertical: Spacing.two, borderRadius: 12, alignItems: 'center' },
+  enterLabel: { fontWeight: '700' },
   pad: { paddingVertical: Spacing.four },
   /* The boards run to the page edges, like the directory and the collection
      do, rather than sitting in a 16pt trough inside it. `Screen` pads its
