@@ -112,15 +112,24 @@ const NEXT_TIER_LABEL = 'SILVER';
 /**
  * How wide the card in front of you is.
  *
- * `detail`'s own 320 wherever it fits, and never wider — the card is drawn for
- * that size and stretching it past it makes a poster. The 88 is the peek: the
- * strip either side that shows the edge of the next card, which is what says
- * there IS a next card without a caption saying so. On a 375pt phone that
- * leaves 287, and the floor stops a 320pt-wide device squeezing it to nothing.
+ * SMALLER THAN `detail`'s OWN 320, which is what this started at. At 320 on a
+ * phone the card plus its two buttons filled the sheet and the pack read as one
+ * card you happened to be able to scroll away from — the neighbours were a
+ * sliver each, so nothing on screen said there were four more. 264 keeps the
+ * card the biggest thing in the sheet without it being the only thing.
+ *
+ * THE PEEK IS THE OTHER HALF OF THAT SAME DECISION. It is the strip either side
+ * showing the edges of the cards next to this one, and it is what says there IS
+ * a deck without a caption saying so. Widening it from 88 to 116 buys back more
+ * than the card gives up: you now see enough of the neighbour to read its frame
+ * and the top of its own buttons.
+ *
+ * The floor stops a 320pt-wide device squeezing the card to nothing. On a 375pt
+ * phone this resolves to 259, on a 412 to the full 264.
  */
-const CARD_MAX = 320;
-const CARD_MIN = 232;
-const PEEK = 88;
+const CARD_MAX = 264;
+const CARD_MIN = 220;
+const PEEK = 116;
 
 /** The turn. Long enough to read as a card being turned, short enough to sit through eight. */
 const FLIP_MS = 420;
@@ -376,12 +385,21 @@ export function PackReveal({
             {`${focus + 1} of ${pulled.length}`}
           </Text>
         ) : (
+          /* A CHIP RATHER THAN A BARE LABEL. This is the whole of the "I do
+             not want the ceremony today" escape hatch, and as 10pt gold type
+             with nothing around it it read as a heading for the pip row beside
+             it. Bordered in the same gold, it reads as the one thing up here
+             you can press. */
           <Pressable
             onPress={revealAll}
             accessibilityRole="button"
             accessibilityLabel="Turn over every card in this pack"
             hitSlop={8}
-            style={({ pressed }) => [pressed && styles.pressed]}>
+            style={({ pressed }) => [
+              styles.revealAll,
+              { borderColor: gold },
+              pressed && styles.pressed,
+            ]}>
             <Text style={[Type.label, { color: gold }]}>REVEAL ALL</Text>
           </Pressable>
         )}
@@ -401,7 +419,14 @@ export function PackReveal({
           snapToInterval={step}
           decelerationRate="fast"
           style={WEB_SNAP}
-          disableIntervalMomentum
+          /* NO `disableIntervalMomentum`, and its absence is the point.
+             That prop clamps every gesture to the NEXT card however hard it was
+             thrown, which made an eight-card pack eight deliberate swipes with
+             no way to go faster — the flick you use to skim is the flick you use
+             to step, and the deck ignored the difference. Without it a gentle
+             swipe still lands on the neighbour (that is what `snapToInterval`
+             and `decelerationRate="fast"` are for) and a hard one carries
+             through several, revealing each as it passes the middle. */
           onScroll={onScroll}
           onScrollBeginDrag={() => {
             heading.current = null;
@@ -899,11 +924,44 @@ function CardActions({
               {busy ? (
                 <ActivityIndicator />
               ) : (
-                <Text numberOfLines={1} style={[Type.strong, { color: '#17130A' }]}>
-                  {commitable.length === 1
-                    ? `Add to ${commitable[0].name} · ${commitable[0].pays}`
-                    : `Add to a set · ${commitable.length}`}
-                </Text>
+                /**
+                 * THE PRICE IS ITS OWN ELEMENT, not the tail of the sentence,
+                 * and the reason is what an ellipsis eats first. As one string,
+                 * `Add to Washington Commanders · 4` overruns a 257pt card and
+                 * `numberOfLines={1}` takes the END of it — so the longest club
+                 * names in the league lost the gem figure and the button read
+                 * `Add to Washington Comm…`. The one number on it, gone, on
+                 * exactly the sets where the label is least readable.
+                 *
+                 * Split, the name shrinks and the figure cannot: same shape as
+                 * the sell button beside it.
+                 */
+                <>
+                  <Text numberOfLines={1} style={[Type.strong, styles.grow, { color: '#17130A' }]}>
+                    {commitable.length === 1
+                      ? `Add to ${commitable[0].name}`
+                      : /* THE COUNT IS IN THE SENTENCE, not floated to the
+                           right like the price is. Two reasons. Every set here
+                           is priced separately — `pays` follows each set's own
+                           `commit_payout_pct` — so there is no single figure
+                           this button could print, and a bare `2` in the slot
+                           where the other state prints gems reads as two gems.
+                           And it has a second job the price does not: this
+                           button opens a LIST where the other one commits on
+                           the tap, and "one of" is what warns you. */
+                        `Add to one of ${commitable.length} sets`}
+                  </Text>
+                  {commitable.length === 1 ? (
+                    <>
+                      {/* The gem in the button's own ink rather than the tone it
+                          is printed ON — gold on gold is a hole in the button. */}
+                      <Gem size={10} color="#17130A" />
+                      <Text style={[Type.strong, NUMERIC, { color: '#17130A' }]}>
+                        {commitable[0].pays}
+                      </Text>
+                    </>
+                  ) : null}
+                </>
               )}
             </Pressable>
           ) : null}
@@ -1037,6 +1095,12 @@ const styles = StyleSheet.create({
   pips: { flexDirection: 'row', alignItems: 'center' },
   pipTap: { paddingVertical: Spacing.one, paddingHorizontal: 3 },
   pip: { width: 18, height: 3, borderRadius: 2 },
+  revealAll: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.chip,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one + 1,
+  },
 
   /* The frame insets its scroll content `Spacing.three` each side; the deck
      climbs back out over both so the neighbouring card reaches the screen edge.
@@ -1096,7 +1160,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonGrow: { alignSelf: 'stretch' },
+  buttonGrow: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    gap: Spacing.one + 2,
+  },
+  /* The label takes what is left after the price, and only the label shrinks. */
+  grow: { flexShrink: 1, minWidth: 0 },
   buttonPairHalf: { flex: 1, minWidth: 0 },
   sell: {
     flexDirection: 'row',

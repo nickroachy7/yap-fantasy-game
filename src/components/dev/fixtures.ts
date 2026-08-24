@@ -423,7 +423,10 @@ export const PULL_ACTIONS_FIXTURE = new Map<string, PullAction>([
       cardInstanceId: 'ci-2', cardId: 'c-2', sellValue: 8, held: true, sellable: true,
       // The spare-copy case: the commit burns an older copy, not this one.
       burnsThisCopy: false,
-      sets: [teamSet('team-kc-2026', 'Kansas City Chiefs', 12, 29)],
+      // THE LONGEST NAME IN THE LEAGUE, on purpose. 'Add to Washington
+      // Commanders' plus a price overruns a 257pt card, so this is the fixture
+      // that proves the label shrinks and the gem figure does not.
+      sets: [teamSet('team-wsh-2026', 'Washington Commanders', 12, 32)],
     },
   ],
   [
