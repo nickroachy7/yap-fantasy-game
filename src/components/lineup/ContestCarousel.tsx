@@ -32,6 +32,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 
+import { Pressable } from 'react-native';
 import { ContestCard } from '@/components/lineup/ContestCard';
 import type { MyContest } from '@/components/contests/use-my-contests';
 import type { Record_ } from '@/components/lineup/field';
@@ -42,6 +43,7 @@ export function ContestCarousel({
   contests,
   index,
   onIndexChange,
+  onOpen,
   displayName,
   weekLabel,
   lockAt,
@@ -53,6 +55,16 @@ export function ContestCarousel({
   contests: MyContest[];
   index: number;
   onIndexChange: (i: number) => void;
+  /**
+   * Opening a card's contest — its format, its price, how full it is, and the
+   * way out of it.
+   *
+   * THE CARD IS THE HANDLE FOR THE CONTEST, which it was not before: it drew a
+   * standing and could not be pressed, so the only route to a contest's terms
+   * was the lobby — and the lobby deliberately lists only what you are NOT in.
+   * A contest you had entered had no page at all once you were in it.
+   */
+  onOpen?: (contest: MyContest) => void;
   displayName: string;
   weekLabel: string;
   lockAt: string | null;
@@ -92,7 +104,13 @@ export function ContestCarousel({
 
   // See the header: one contest must look exactly like no carousel.
   if (contests.length === 1) {
-    return <Card contest={contests[0]} {...{ displayName, weekLabel, lockAt, locked, now, record }} />;
+    return (
+      <Card
+        contest={contests[0]}
+        onOpen={onOpen}
+        {...{ displayName, weekLabel, lockAt, locked, now, record }}
+      />
+    );
   }
 
   return (
@@ -115,7 +133,11 @@ export function ContestCarousel({
         initialScrollIndex={index}
         renderItem={({ item }) => (
           <View style={{ width: page }}>
-            <Card contest={item} {...{ displayName, weekLabel, lockAt, locked, now, record }} />
+            <Card
+              contest={item}
+              onOpen={onOpen}
+              {...{ displayName, weekLabel, lockAt, locked, now, record }}
+            />
           </View>
         )}
       />
@@ -148,6 +170,7 @@ function Card({
   locked,
   now,
   record,
+  onOpen,
 }: {
   contest: MyContest;
   displayName: string;
@@ -156,8 +179,13 @@ function Card({
   locked: boolean;
   now: number;
   record: Record_;
+  onOpen?: (contest: MyContest) => void;
 }) {
-  return (
+  /* `Pressable` around the card rather than a control ON it. The card is a
+     dense thing — a name, a standing, a distribution with three labels — and
+     any button placed inside it would be competing with the axis for the one
+     corner that is not already saying something. */
+  const inner = (
     <ContestCard
       displayName={contest.kind === 'free' ? displayName : contest.name}
       weekLabel={weekLabel}
@@ -173,6 +201,17 @@ function Card({
           : `${contest.formatName} · ${contest.slotCount} cards`
       }
     />
+  );
+
+  if (!onOpen) return inner;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${contest.name}`}
+      onPress={() => onOpen(contest)}
+      style={({ pressed }) => (pressed ? { opacity: 0.75 } : null)}>
+      {inner}
+    </Pressable>
   );
 }
 

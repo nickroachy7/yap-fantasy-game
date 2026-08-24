@@ -148,8 +148,32 @@ export default function ContestSheet() {
                 ? 'This contest is full.'
                 : `You need ${contest.entryFeeGems} gems to enter.`}
             </Text>
+          ) : entered ? (
+            /* ALREADY IN, so no board here. The lineup for this contest is the
+               one on the Compete carousel, immediately behind this sheet — a
+               second copy of it would be two editors for one entry and the
+               reader would have no way to know which one they were changing.
+               Entered, this surface is the contest's TERMS and the way out. */
+            <Text style={[Type.fine, { color: c.textTertiary }]}>
+              Your lineup for this contest is on the Compete board — swipe to its
+              card to change it.
+            </Text>
           ) : (
-            <LineupEditor pinnedContest={contest.code} frame="plain" />
+            <LineupEditor
+              pinnedContest={contest.code}
+              frame="plain"
+              /* Straight to the board with this contest in front. `dismissTo`
+                 rather than push: the sheet was the way IN, not a step to come
+                 back through, and leaving it on the stack would put a contest
+                 you have already entered behind the lineup you entered it
+                 with. */
+              onEntered={(code) =>
+                router.dismissTo({
+                  pathname: '/fantasy/compete',
+                  params: { contest: code },
+                })
+              }
+            />
           )}
 
           {/* Only once you are in, and never on the free contest — that one is

@@ -86,6 +86,16 @@ export type LineupEditorProps = {
    * extraction exists to stop.
    */
   frame?: 'screen' | 'plain';
+  /**
+   * Fired once, when a submission has just BOUGHT the entry — not on the edits
+   * that follow it.
+   *
+   * The sheet uses it to hand the reader over to the board: entering is the
+   * end of what a sheet is for, and leaving them sitting in it afterwards
+   * would mean the lineup they just paid for is behind a panel they have to
+   * know to close.
+   */
+  onEntered?: (contestCode: string) => void;
 };
 
 /**
@@ -118,7 +128,7 @@ const DEBOUNCE_MS = 700;
  */
 const LIVE_POLL_MS = 60_000;
 
-export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorProps = {}) {
+export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: LineupEditorProps = {}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const router = useRouter();
@@ -159,6 +169,22 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
      showing the wrong card before the right one. `swiped` is null until a
      swipe actually happens, and from then on it owns the selection. */
   const [swiped, setSwiped] = useState<number | null>(null);
+
+  /* ARRIVING WITH A CONTEST NAMED BEATS WHATEVER WAS SWIPED TO EARLIER.
+     This board is a tab: it stays mounted while the lobby and the contest
+     sheet open over it, so a swipe made ten minutes ago is still in state when
+     somebody enters a contest and is handed back here. Without this the
+     carousel would ignore the contest they just paid for and sit on the old
+     card.
+
+     Adjusted during render rather than in an effect — the documented way to
+     reset state when a prop changes, and it avoids the extra commit that
+     `set-state-in-effect` exists to complain about. */
+  const [lastLinked, setLastLinked] = useState(linkedCode);
+  if (linkedCode !== lastLinked) {
+    setLastLinked(linkedCode);
+    setSwiped(null);
+  }
   const linkedIndex = linkedCode
     ? (myContests?.findIndex((ct) => ct.code === linkedCode) ?? -1)
     : -1;
@@ -708,6 +734,12 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
      * Still a re-read rather than trusting the payload — the server is the only
      * thing that knows what actually stuck — but only of the row that changed.
      */
+    /* Captured BEFORE the reload below flips it: `needsEntry` is derived from
+       `contest.unentered`, and re-reading the lineups is exactly what makes it
+       false. Read after, this would never be true and the handover would never
+       fire. */
+    const boughtEntry = needsEntry;
+
     await reloadLineup();
     /* The CARD is stale too, not just the board: `filled` and this contest's
        distribution both move with a submission, and on a carousel that is the
@@ -717,7 +749,9 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
     void reloadMyContests();
     setEdits({});
     setSaving(false);
-  }, [slate, picks, contestCode, reloadLineup, reload, reloadMyContests]);
+
+    if (boughtEntry && contestCode) onEntered?.(contestCode);
+  }, [slate, picks, contestCode, reloadLineup, reload, reloadMyContests, needsEntry, onEntered]);
 
   /**
    * The autosave.
@@ -906,6 +940,9 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
             now={now}
             record={record}
             width={cardWidth}
+            onOpen={(ct) =>
+              router.push({ pathname: '/contest/[code]', params: { code: ct.code } })
+            }
           />
         </View>
       )}
