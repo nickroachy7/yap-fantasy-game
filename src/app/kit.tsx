@@ -34,6 +34,7 @@ import { CollectionSummary } from '@/components/collection/CollectionSummary';
 import { SearchField, SortChips } from '@/components/ui/Controls';
 import { summarise } from '@/components/collection/types';
 import {
+  KIT_COMMIT_PLAN,
   KIT_SET_DAILY,
   KIT_SET_FILLED,
   KIT_SET_OPEN,
@@ -41,6 +42,7 @@ import {
   PULLED_FIXTURE,
   PULL_ACTIONS_FIXTURE,
 } from '@/components/dev/fixtures';
+import { BulkBar, type BulkStage } from '@/components/collection/BulkBar';
 import { CardExits } from '@/components/cards/CardExits';
 import { PackReveal } from '@/components/cards/PackReveal';
 import type { Disposition } from '@/components/cards/use-pull-actions';
@@ -548,6 +550,10 @@ function Kit() {
   /* The card profile's two exits, which cannot be reached in this gallery any
      other way — that screen is behind a sign-in. */
   const [exitPicked, setExitPicked] = useState<string | null>(null);
+  /* The inventory's multi-select bar, which cannot be reached in this gallery
+     any other way — that screen is behind a sign-in too. */
+  const [bulkStage, setBulkStage] = useState<BulkStage>('idle');
+  const [bulkCount, setBulkCount] = useState(12);
   const spendPullCard = (id: string) =>
     setPullActions((held) => {
       const was = held.get(id);
@@ -1136,6 +1142,54 @@ function Kit() {
                 {exitPicked ? `Pressed: ${exitPicked}` : 'Nothing pressed yet.'}
               </Text>
             </View>
+          </Section>
+
+          <Section
+            title="Bulk bar"
+            note="The inventory's multi-select bar. Both dialogs name the whole shape of the act before it happens — including what it will NOT do, which for a real selection is most of it: second copies of a player already going in, and cards no set has a slot for. Press either button to see its confirmation."
+          >
+            <View style={styles.row}>
+              {[0, 1, 12, 64].map((n) => (
+                <Pressable
+                  key={n}
+                  onPress={() => setBulkCount(n)}
+                  style={({ pressed }) => [
+                    styles.demoButton,
+                    { backgroundColor: n === bulkCount ? c.backgroundSelected : c.backgroundElement },
+                    pressed && { opacity: 0.6 },
+                  ]}>
+                  <Text style={[Type.strong, { color: c.text }]}>{`${n} selected`}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <BulkBar
+              count={bulkCount}
+              max={64}
+              sellGems={bulkCount * 8}
+              plan={KIT_COMMIT_PLAN}
+              planning={false}
+              stage={bulkStage}
+              busy={false}
+              error={null}
+              result={
+                bulkCount === 0
+                  ? {
+                      kind: 'sold',
+                      done: 11,
+                      skipped: 1,
+                      gems: 88,
+                      firstReason: 'card is in a lineup that has not been scored yet',
+                    }
+                  : null
+              }
+              onSell={() => setBulkStage('selling')}
+              onAdd={() => setBulkStage('adding')}
+              onConfirmSell={() => setBulkStage('idle')}
+              onConfirmAdd={() => setBulkStage('idle')}
+              onCancelStage={() => setBulkStage('idle')}
+              onClear={() => setBulkCount(0)}
+              onDismissResult={() => setBulkCount(12)}
+            />
           </Section>
 
           <Section title="Empty state" note="Bold line, quiet line, at most one action.">

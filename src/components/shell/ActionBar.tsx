@@ -46,6 +46,7 @@ import { horizontalStrip } from '@/components/ui/scroll-strip';
 
 export type ActionIconName =
   | 'search'
+  | 'select'
   | 'trend'
   | 'sort'
   | 'available'
@@ -300,6 +301,62 @@ export function ActionIcon({
               transform: [{ rotate: '45deg' }],
             }}
           />
+        </View>
+      );
+
+    case 'select':
+      /* A CHECKBOX, which is the one glyph in this set whose two states are the
+         thing it depicts rather than a fill applied to it. The box is always an
+         outline and the TICK is what appears — empty box off, ticked box on —
+         so it reads as "choose cards" at rest and "you are choosing" while the
+         button is lit.
+         
+         That is why it ignores `skin`, unlike every case below. `skin` fills the
+         shape in `color` when focused, and `ToggleButton` passes the page colour
+         as `color` on a lit button — so a filled box would leave the tick the
+         same colour as the box it sits in, which is no tick at all. */
+      return (
+        <View style={box} accessibilityElementsHidden importantForAccessibility="no">
+          <View
+            style={{
+              position: 'absolute',
+              top: 3 * u,
+              left: 3 * u,
+              width: 18 * u,
+              height: 18 * u,
+              borderRadius: 4 * u,
+              borderWidth: stroke,
+              borderColor: color,
+            }}
+          />
+          {focused ? (
+            <>
+              <View
+                style={{
+                  position: 'absolute',
+                  left: 6.5 * u,
+                  top: 12 * u,
+                  width: 5 * u,
+                  height: stroke,
+                  borderRadius: 1 * u,
+                  backgroundColor: color,
+                  transform: [{ rotate: '45deg' }],
+                }}
+              />
+              <View
+                style={{
+                  position: 'absolute',
+                  left: 9 * u,
+                  top: 10.5 * u,
+                  width: 9 * u,
+                  height: stroke,
+                  borderRadius: 1 * u,
+                  backgroundColor: color,
+                  transform: [{ rotate: '-45deg' }],
+                }}
+              />
+            </>
+          ) : null}
         </View>
       );
 

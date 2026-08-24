@@ -15,6 +15,7 @@ import type { SetMember } from '@/components/collection/SetChecklist';
 import type { CardSet } from '@/components/collection/sets';
 import type { CollectionCard } from '@/components/collection/types';
 import type { CardActions, CardActionSet } from '@/components/cards/card-actions';
+import type { CommitPlan } from '@/components/collection/bulk';
 
 /**
  * The four sample cards, one per tier.
@@ -513,4 +514,29 @@ export const KIT_SET_FILLED: CardActionSet = {
   slotFilled: true,
   setComplete: false,
   canCommit: false,
+};
+
+/**
+ * A commit plan for the bulk bar's gallery, and it is deliberately the AWKWARD
+ * shape rather than the tidy one: three sets, twelve copies ticked but only
+ * eight players going in, two of them second copies and two belonging to no
+ * open set. A plan where everything lines up would show none of the sentences
+ * the dialog exists to say.
+ */
+export const KIT_COMMIT_PLAN: CommitPlan = {
+  legs: [
+    { setCode: 'team-buf-2026', setName: 'Buffalo Bills', cardIds: ['c1', 'c2', 'c3'], gems: 12 },
+    { setCode: 'team-cin-2026', setName: 'Cincinnati Bengals', cardIds: ['c4', 'c5'], gems: 8 },
+    {
+      setCode: 'daily-wr-2026-08-24',
+      setName: 'Receiver of the day',
+      cardIds: ['c6', 'c7', 'c8'],
+      gems: 120,
+    },
+  ],
+  cards: 8,
+  gems: 140,
+  noSet: 2,
+  duplicate: 2,
+  anySpare: true,
 };

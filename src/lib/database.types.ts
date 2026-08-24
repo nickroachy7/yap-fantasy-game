@@ -1523,6 +1523,7 @@ export type Database = {
         Returns: number
       }
       sell_card: { Args: { p_card_instance_id: string }; Returns: Json }
+      sell_cards: { Args: { p_card_instance_ids: string[] }; Returns: Json }
       set_checklist: {
         Args: { p_set_code: string }
         Returns: {

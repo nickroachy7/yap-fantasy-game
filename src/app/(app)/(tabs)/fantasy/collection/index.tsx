@@ -28,7 +28,10 @@ import {
   InventoryControls,
   ResultLine,
 } from '@/components/collection/CollectionFilters';
+import { BulkBar } from '@/components/collection/BulkBar';
+import { SELECTION_MAX, sellTotal } from '@/components/collection/bulk';
 import { CollectionSummary } from '@/components/collection/CollectionSummary';
+import { useBulk } from '@/components/collection/use-bulk';
 import { PacksButton } from '@/components/shell/PacksButton';
 import { EmptyCollection, EmptyFilterResult } from '@/components/collection/EmptyInventory';
 import { InventoryCard } from '@/components/collection/InventoryCard';
@@ -50,6 +53,7 @@ import {
 import { useCollection } from '@/components/collection/use-collection';
 import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
 import { SearchField } from '@/components/ui/Controls';
+import { ToggleButton } from '@/components/ui/MenuButton';
 import { Screen } from '@/components/shell/Screen';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
@@ -142,6 +146,23 @@ export default function InventoryScreen() {
      outside press is a field you cannot tap beside. */
   const [showSearch, setShowSearch] = useState(false);
 
+  /**
+   * MULTI-SELECT, and it is a MODE rather than a long-press.
+   *
+   * A cell in this grid opens the card, and that is the tap people already know.
+   * Overloading it — long-press to start selecting, tap to select once you are —
+   * gives one gesture two meanings depending on a state with nothing on screen
+   * to announce it, and there is no long-press on the web build at all. So the
+   * mode is a button, and while it is on a tap ticks instead of opening.
+   *
+   * IDS, NOT CARDS. The rows are replaced wholesale every time the collection is
+   * re-read — after a sale, after a commit — so holding the objects would hold a
+   * copy of a card that no longer exists. Ids survive that, and anything the
+   * selection needs is looked up against the current rows. See `selectedCards`.
+   */
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+
   /* ---- grid geometry ------------------------------------------------- *
    * MEASURED, not recomputed. This used to derive the column width from the
    * window, which meant restating the frame's own arithmetic — the content
@@ -229,6 +250,41 @@ export default function InventoryScreen() {
   const onRefresh = useCallback(async () => {
     await Promise.all([refresh(), refreshPlayer()]);
   }, [refresh, refreshPlayer]);
+
+  /* Resolved against the CURRENT rows, so a card that has just been sold out
+     from under the selection simply is not in here any more. */
+  const selectedCards = useMemo(
+    () => all.filter((card) => selected.has(card.id)),
+    [all, selected],
+  );
+  const selectedGems = useMemo(() => sellTotal(selectedCards), [selectedCards]);
+
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
+
+  const bulk = useBulk(clearSelection);
+
+  const toggleCard = useCallback((id: string) => {
+    setSelected((held) => {
+      const next = new Set(held);
+      if (next.has(id)) next.delete(id);
+      // The ceiling is the SERVER's — both bulk functions refuse past 64 — so
+      // the tick simply does not take rather than the run failing later. The
+      // bar says the number when it is reached.
+      else if (next.size < SELECTION_MAX) next.add(id);
+      return next;
+    });
+  }, []);
+
+  /* Leaving the mode drops the selection with it. A set of ticks you cannot see
+     is a set of ticks that will surprise somebody the next time the mode opens.
+     Blocked mid-run: the ids are what the call in flight is about. */
+  const toggleSelecting = useCallback(() => {
+    if (bulk.busy) return;
+    setSelecting((on) => {
+      if (on) setSelected(new Set());
+      return !on;
+    });
+  }, [bulk.busy]);
 
   /**
    * A player who owns nothing gets the packs sheet opened FOR them, once.
@@ -341,6 +397,15 @@ export default function InventoryScreen() {
               <View style={styles.chips}>
                 <PositionFilter value={position} onChange={setPosition} />
               </View>
+              {/* The mode switch, on the controls' own row and in their own
+                  language — a round `ToggleButton`, lit while the mode is on,
+                  exactly like Search beside it. */}
+              <ToggleButton
+                icon="select"
+                label={selecting ? 'Stop selecting cards' : 'Select several cards'}
+                on={selecting}
+                onPress={toggleSelecting}
+              />
               <InventoryControls
                 searchable={searchable}
                 searchOpen={showSearch}
@@ -421,14 +486,44 @@ export default function InventoryScreen() {
                 </View>
               }
               ListEmptyComponent={<EmptyFilterResult onClear={clearFilters} hasFilters={filtered} />}
+              extraData={selecting ? selected : null}
               renderItem={({ item }) => (
                 <InventoryCard
                   card={item}
                   width={itemWidth}
-                  onPress={openCard(item)}
+                  selecting={selecting}
+                  selected={selected.has(item.id)}
+                  onPress={selecting ? () => toggleCard(item.id) : openCard(item)}
                 />
               )}
             />
+
+            {/* PINNED UNDER THE GRID, not pushed into it. The bar appears the
+                moment the mode opens rather than on the first tick, so the grid
+                does not reflow under a thumb that has just started picking —
+                and it sits outside the FlatList for the same reason the summary
+                does: anything inside it scrolls away from the action it
+                describes. */}
+            {selecting ? (
+              <BulkBar
+                count={selected.size}
+                max={SELECTION_MAX}
+                sellGems={selectedGems}
+                plan={bulk.plan}
+                planning={bulk.planning}
+                stage={bulk.stage}
+                busy={bulk.busy}
+                error={bulk.error}
+                result={bulk.result}
+                onSell={bulk.askSell}
+                onAdd={() => bulk.askAdd(selectedCards)}
+                onConfirmSell={() => bulk.runSell(selectedCards)}
+                onConfirmAdd={bulk.runAdd}
+                onCancelStage={bulk.cancel}
+                onClear={clearSelection}
+                onDismissResult={bulk.dismissResult}
+              />
+            ) : null}
           </>
         )}
       </View>
