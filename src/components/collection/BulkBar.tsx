@@ -260,6 +260,13 @@ function addBody(plan: CommitPlan): string {
   const lead = `Going into ${where}, paying ${plan.gems} gems. A committed card is burnt: it leaves your collection for good and cannot be started or sold again.`;
 
   const left: string[] = [];
+  if (plan.alreadyIn > 0) {
+    left.push(
+      plan.alreadyIn === 1
+        ? '1 is a player already in his set'
+        : `${plan.alreadyIn} are players already in their sets`,
+    );
+  }
   if (plan.duplicate > 0) {
     left.push(
       plan.duplicate === 1

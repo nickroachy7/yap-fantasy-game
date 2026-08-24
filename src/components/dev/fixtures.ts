@@ -105,6 +105,9 @@ export const OWNED_CARDS: CollectionCard[] = SAMPLE_CARDS.map((m, i) => ({
   // it null on purpose: a player with no scored games yet is a real state and
   // the card must draw it as absence rather than as a zero.
   fpPerGame: m.perGame,
+  // Every third sample is a player already in a set, so the grid's IN SET pill
+  // is exercised beside cards without it rather than on a page of them.
+  inSet: i % 3 === 1,
   id: `sample-${i}`,
   cardId: `card-${i}`,
   playerName: m.playerName,
@@ -519,9 +522,9 @@ export const KIT_SET_FILLED: CardActionSet = {
 /**
  * A commit plan for the bulk bar's gallery, and it is deliberately the AWKWARD
  * shape rather than the tidy one: three sets, twelve copies ticked but only
- * eight players going in, two of them second copies and two belonging to no
- * open set. A plan where everything lines up would show none of the sentences
- * the dialog exists to say.
+ * eight players going in — two second copies, one player already in his set,
+ * one belonging to no open set. A plan where everything lines up would show
+ * none of the sentences the dialog exists to say.
  */
 export const KIT_COMMIT_PLAN: CommitPlan = {
   legs: [
@@ -536,7 +539,9 @@ export const KIT_COMMIT_PLAN: CommitPlan = {
   ],
   cards: 8,
   gems: 140,
-  noSet: 2,
+  // All three reasons a copy stays behind, so the dialog has to say all three.
+  alreadyIn: 1,
+  noSet: 1,
   duplicate: 2,
   anySpare: true,
 };

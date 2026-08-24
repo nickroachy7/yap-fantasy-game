@@ -67,6 +67,8 @@ export type PlannableSet = {
   pays: number;
   /** The server's own conjunction: not full, not already holding this player. */
   canCommit: boolean;
+  /** This player is already in this set — the reason that is not "no set". */
+  slotFilled: boolean;
 };
 
 /** What `card_actions` said about one copy, as much of it as the routing looks at. */
@@ -102,10 +104,18 @@ export type CommitPlan = {
   /** What the whole plan pays at today's prices. */
   gems: number;
   /**
-   * Selected copies the plan cannot use, and it is not one number because the
-   * two reasons are not one piece of news: `noSet` belongs to no set that can
-   * take it, `duplicate` is a second copy of a player already going in.
+   * Selected copies the plan cannot use, and it is THREE numbers because they
+   * are three different pieces of news. Reported separately because collapsing
+   * them is what produced "0 added — 3 skipped, no set has a slot open for
+   * these" over a selection whose cards were all already in their sets: true of
+   * none of them, and the one thing the player would have wanted to know.
+   *
+   *   alreadyIn  a set this card belongs to already holds this player;
+   *   noSet      no set it belongs to can take it, for any other reason —
+   *              including belonging to no active set at all;
+   *   duplicate  a second copy of a player already going in on THIS run.
    */
+  alreadyIn: number;
   noSet: number;
   duplicate: number;
   /** True when any leg burns a copy other than the one that was ticked. */
@@ -125,6 +135,7 @@ export function planCommits(
 
   const byCode = new Map<string, CommitLeg>();
   const takenCards = new Set<string>();
+  let alreadyIn = 0;
   let noSet = 0;
   let duplicate = 0;
   let anySpare = false;
@@ -133,7 +144,11 @@ export function planCommits(
     const can = actions.get(card.id);
     const target = can?.sets.find((s) => s.canCommit);
     if (!can || !target || !card.cardId) {
-      noSet += 1;
+      // Which KIND of "cannot", because they read completely differently. A
+      // slot already filled is the common case on a spare and is good news the
+      // player has forgotten; anything else is the shrug.
+      if (can?.sets.some((s) => s.slotFilled)) alreadyIn += 1;
+      else noSet += 1;
       continue;
     }
     if (takenCards.has(card.cardId)) {
@@ -160,6 +175,7 @@ export function planCommits(
     legs,
     cards: legs.reduce((n, l) => n + l.cardIds.length, 0),
     gems: legs.reduce((n, l) => n + l.gems, 0),
+    alreadyIn,
     noSet,
     duplicate,
     anySpare,

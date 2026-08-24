@@ -38,11 +38,13 @@ import {
   KIT_SET_DAILY,
   KIT_SET_FILLED,
   KIT_SET_OPEN,
+  OWNED_CARDS,
   OWNED_MANY,
   PULLED_FIXTURE,
   PULL_ACTIONS_FIXTURE,
 } from '@/components/dev/fixtures';
 import { BulkBar, type BulkStage } from '@/components/collection/BulkBar';
+import { InventoryCard } from '@/components/collection/InventoryCard';
 import { CardExits } from '@/components/cards/CardExits';
 import { PackReveal } from '@/components/cards/PackReveal';
 import type { Disposition } from '@/components/cards/use-pull-actions';
@@ -1141,6 +1143,32 @@ function Kit() {
               <Text style={[Type.fine, { color: c.textTertiary }]}>
                 {exitPicked ? `Pressed: ${exitPicked}` : 'Nothing pressed yet.'}
               </Text>
+            </View>
+          </Section>
+
+          <Section
+            title="Inventory cell"
+            note="The grid cell in every state multi-select can put it in. The first is AT REST and carries no marks at all — the same card, out of the mode. IN SET means a copy of that PLAYER is already committed; this copy is still yours and still sellable, which is why it is the positive tone rather than a grey-out. It appears only while you are choosing, because that is the only time it is news.">
+            <View style={styles.row}>
+              {[
+                { label: 'at rest', card: OWNED_CARDS[1], selecting: false, selected: false },
+                { label: 'pickable', card: OWNED_CARDS[0], selecting: true, selected: false },
+                { label: 'pickable, in a set', card: OWNED_CARDS[1], selecting: true, selected: false },
+                { label: 'picked', card: OWNED_CARDS[0], selecting: true, selected: true },
+                { label: 'picked, in a set', card: OWNED_CARDS[1], selecting: true, selected: true },
+              ].map((s2, i) => (
+                <View key={i} style={styles.iconCell}>
+                  <InventoryCard
+                    card={s2.card}
+                    width={106}
+                    selecting={s2.selecting}
+                    selected={s2.selected}
+                  />
+                  <Text style={[Type.micro, { color: c.textTertiary }]}>
+                    {s2.label.toUpperCase()}
+                  </Text>
+                </View>
+              ))}
             </View>
           </Section>
 

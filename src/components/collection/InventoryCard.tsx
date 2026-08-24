@@ -29,7 +29,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PlayerCard } from '@/components/cards';
-import { Colors, Type } from '@/constants/theme';
+import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { toCardModel, type CollectionCard } from './types';
 
@@ -75,20 +75,58 @@ export function InventoryCard({
          * mark for "in", nothing for "out", rather than two competing edges.
          */
         frameColor={selecting && selected ? c.positive : undefined}
+        /**
+         * ONE SLOT, TWO MARKS, so they are laid out as a row rather than
+         * fighting for the same point on the square. `PlayerCard` gives a
+         * single `overlay` and puts it low in the picture, clear of the
+         * nameplate — see its note for why the centre is the one place a mark
+         * cannot go — so both live in here or neither does.
+         *
+         * They answer different questions and a selection needs both at once:
+         * the circle is "is this one going", the pill is "this man is already
+         * in a set", which is precisely the thing you want to know while
+         * picking spares to push into one.
+         *
+         * BOTH ARE GATED ON THE MODE, INCLUDING THE PILL. It was drawn on the
+         * resting grid at first, which is a badge on a third of a collection
+         * answering a question nobody asked — you come to this screen to look
+         * at what you own, and every cell shouting about set membership is
+         * chrome over the thing you came for. It is only news while you are
+         * choosing cards to put INTO a set, so it appears with the ticks.
+         */
         overlay={
           selecting ? (
-            <View
-              style={[
-                styles.tick,
-                selected
-                  ? { backgroundColor: c.positive, borderColor: c.positive }
-                  : { backgroundColor: c.surfaceSunken + 'CC', borderColor: c.borderStrong },
-              ]}>
-              {/* A tick, drawn as type rather than as an icon: it has to hold
-                  at ~14pt on a 100pt cell, and the glyph is legible where a
-                  hand-built check of two Views is a smudge. */}
-              {selected ? (
-                <Text style={[Type.label, styles.mark, { color: c.background }]}>✓</Text>
+            <View style={styles.marks}>
+              {selecting ? (
+                <View
+                  style={[
+                    styles.tick,
+                    selected
+                      ? { backgroundColor: c.positive, borderColor: c.positive }
+                      : { backgroundColor: c.surfaceSunken + 'CC', borderColor: c.borderStrong },
+                  ]}>
+                  {/* A tick drawn as type rather than as an icon: it has to
+                      hold at ~14pt on a 100pt cell, where a hand-built check of
+                      two Views is a smudge. */}
+                  {selected ? (
+                    <Text style={[Type.label, styles.mark, { color: c.background }]}>✓</Text>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* IN SET, NOT "UNAVAILABLE", and the wording is the whole point.
+                  This copy is still yours and still sellable; what is gone is
+                  the slot. Drawn in the positive tone because it is something
+                  the player ACHIEVED and has forgotten, not a refusal. */}
+              {card.inSet ? (
+                <Text
+                  style={[
+                    Type.micro,
+                    styles.pill,
+                    { backgroundColor: c.positive, color: c.background },
+                  ]}>
+                  IN SET
+                </Text>
               ) : null}
             </View>
           ) : undefined
@@ -99,11 +137,16 @@ export function InventoryCard({
 }
 
 const styles = StyleSheet.create({
-  /* Sits in the card's own overlay slot, which lands low in the picture and
-     clear of the nameplate — see `PlayerCard.overlay` for why the centre of
-     the square is the one place it cannot go. */
+  /* The overlay slot lands low in the picture and clear of the nameplate — see
+     `PlayerCard.overlay` for why the centre of the square is the one place a
+     mark cannot go. Centred, so one mark alone is not off to a side. */
+  marks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.one,
+  },
   tick: {
-    alignSelf: 'center',
     width: 22,
     height: 22,
     borderRadius: 11,
@@ -112,4 +155,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   mark: { lineHeight: 14 },
+  /* `overflow: hidden` so the radius actually clips on web, which a Text with a
+     background otherwise ignores. */
+  pill: {
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    overflow: 'hidden',
+  },
 });

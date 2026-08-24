@@ -1131,6 +1131,7 @@ export type Database = {
           career_fp: number | null
           fp_per_game: number | null
           id: string | null
+          in_set: boolean | null
           injury_status: string | null
           lineup_starts: number | null
           next_tier_at: number | null

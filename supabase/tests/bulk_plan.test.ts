@@ -29,11 +29,18 @@ const card = (
   careerFp,
 });
 
-const set = (code: string, name: string, pays: number, canCommit = true): PlannableSet => ({
+const set = (
+  code: string,
+  name: string,
+  pays: number,
+  canCommit = true,
+  slotFilled = false,
+): PlannableSet => ({
   code,
   name,
   pays,
   canCommit,
+  slotFilled,
 });
 
 const offers = (
@@ -140,21 +147,39 @@ Deno.test('keeps the cheapest copy when deduping a player', () => {
   assertEquals(plan.duplicate, 1);
 });
 
-Deno.test('counts cards no set can take, separately from duplicates', () => {
+Deno.test('tells "already in his set" apart from "no set wants him"', () => {
+  // THE ONE THAT WAS WRONG IN SHIPPED CODE. Both were counted as `noSet`, so a
+  // selection of three spares whose players were all already in their sets came
+  // back "no set has a slot open for these" — true of none of them, and the one
+  // thing worth telling the player.
   const cards = [card('i1', 'c1', 8), card('i2', 'c2', 8), card('i3', 'c3', 8)];
   const actions = new Map([
     offers('i1', 'c1', [set('team-buf-2026', 'Buffalo Bills', 4)]),
-    // Belongs to a set that cannot take him.
-    offers('i2', 'c2', [set('team-kc-2026', 'Kansas City Chiefs', 4, false)]),
-    // Belongs to no set at all.
+    // His slot is taken — by a copy already committed.
+    offers('i2', 'c2', [set('team-kc-2026', 'Kansas City Chiefs', 4, false, true)]),
+    // Belongs to no active set at all.
     offers('i3', 'c3', []),
   ]);
 
   const plan = planCommits(cards, actions);
 
   assertEquals(plan.cards, 1);
-  assertEquals(plan.noSet, 2);
+  assertEquals(plan.alreadyIn, 1);
+  assertEquals(plan.noSet, 1);
   assertEquals(plan.duplicate, 0);
+});
+
+Deno.test('a full set is "no set", not "already in"', () => {
+  // `canCommit` is false for both, and the two must not be conflated: the
+  // player is NOT in this set, it simply cannot take another card.
+  const actions = new Map([
+    offers('i1', 'c1', [set('team-kc-2026', 'Kansas City Chiefs', 4, false, false)]),
+  ]);
+
+  const plan = planCommits([card('i1', 'c1', 8)], actions);
+
+  assertEquals(plan.alreadyIn, 0);
+  assertEquals(plan.noSet, 1);
 });
 
 Deno.test('a card with no offers at all is left alone, not assumed eligible', () => {
@@ -165,6 +190,7 @@ Deno.test('a card with no offers at all is left alone, not assumed eligible', ()
   assertEquals(plan.legs.length, 0);
   assertEquals(plan.cards, 0);
   assertEquals(plan.noSet, 1);
+  assertEquals(plan.alreadyIn, 0);
 });
 
 Deno.test('flags a plan that burns a copy other than the one ticked', () => {

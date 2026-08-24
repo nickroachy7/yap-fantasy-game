@@ -30,6 +30,7 @@ export type CollectionViewRow = Pick<
   | 'acquired_at'
   | 'sell_value'
   | 'fp_per_game'
+  | 'in_set'
 >;
 
 /** One owned card instance, with every null resolved to something renderable. */
@@ -59,6 +60,19 @@ export type CollectionCard = {
    * provider sells none and this app fabricates none.
    */
   fpPerGame: number | null;
+  /**
+   * Another copy of this same printed card is already committed to a set.
+   *
+   * A fact about the PLAYER, not about this copy: this one is still held, still
+   * sellable, still startable. What has gone is the slot it might have filled.
+   *
+   * NOT "ineligible", and the grid must not draw it as such. A card can belong
+   * to a team set and to today's daily at once, so a player already in one may
+   * still be commitable to the other — `card_actions.can_commit` is the only
+   * thing that answers that, and it is asked of a selection rather than of
+   * every cell. See the migration's note.
+   */
+  inSet: boolean;
 };
 
 /** Lineup-eligible positions, in the order the lineup screen lists them. */
@@ -133,6 +147,7 @@ export function normaliseRow(row: CollectionViewRow): CollectionCard {
     // Null-preserving: "no scored games yet" is not "averages nothing", and
     // the card draws the two differently.
     fpPerGame: row.fp_per_game == null ? null : num(row.fp_per_game),
+    inSet: row.in_set === true,
   };
 }
 

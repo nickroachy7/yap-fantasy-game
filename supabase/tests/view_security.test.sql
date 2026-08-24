@@ -34,9 +34,17 @@ begin
     join pg_namespace n on n.oid = c.relnamespace
    where n.nspname = 'public'
      and c.relkind = 'v'
+     -- MATCHED ON THE VALUE, NOT ON THE SPELLING. Postgres stores whatever the
+     -- CREATE VIEW wrote: every view here says `security_invoker = on` and one
+     -- written `= true` stored `security_invoker=true`, which is the same
+     -- setting and failed this test. A suite that reports a correctly-invoker
+     -- view as SECURITY DEFINER is worse than no suite — it teaches you to
+     -- distrust the alarm.
      and not coalesce(
            (select true from unnest(coalesce(c.reloptions, '{}')) o
-             where o = 'security_invoker=on'), false);
+             where split_part(o, '=', 1) = 'security_invoker'
+               and lower(split_part(o, '=', 2)) in ('on', 'true', '1', 'yes')),
+           false);
 
   if v_bad is not null then
     raise exception 'FAIL 1: view(s) in public run as SECURITY DEFINER: %', v_bad;
