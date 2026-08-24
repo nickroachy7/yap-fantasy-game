@@ -180,12 +180,22 @@ export default function ContestSheet() {
               not a thing you joined. Quiet and at the bottom: it is the exit,
               not an option being offered. */}
           {entered && contest.kind === 'lobby' ? (
-            <Pressable onPress={() => setLeaving(true)} style={styles.leave}>
-              <Text style={[Type.fine, { color: c.textSecondary }]}>
-                {contest.entryFeeGems > 0
-                  ? `Leave contest · ${contest.entryFeeGems} gems back`
-                  : 'Leave contest'}
+            <Pressable
+              onPress={() => setLeaving(true)}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.leave,
+                { borderColor: c.negative },
+                pressed && styles.leavePressed,
+              ]}>
+              <Text style={[Type.body, styles.leaveLabel, { color: c.negative }]}>
+                Leave contest
               </Text>
+              {contest.entryFeeGems > 0 ? (
+                <Text style={[Type.fine, { color: c.textSecondary }]}>
+                  {contest.entryFeeGems} gems back
+                </Text>
+              ) : null}
             </Pressable>
           ) : null}
         </View>
@@ -244,7 +254,24 @@ function Facts({ contest }: { contest: Contest }) {
 const styles = StyleSheet.create({
   body: { gap: Spacing.three },
   facts: { gap: 0 },
-  leave: { alignItems: 'center', paddingVertical: Spacing.two },
+  /* OUTLINED, NOT FILLED. It was a grey line of `fine` text and read as a
+     caption rather than a control — the one thing on the sheet somebody might
+     actually need and the quietest thing on it.
+
+     Bordered rather than solid because leaving is not destruction: the gems
+     come back in full and you can enter again while the games are still ahead.
+     A filled red button would be shouting a warning about an action that is
+     completely reversible, and this sheet already has one solid button — the
+     entry — which should stay the only one. */
+  leave: {
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: Spacing.two,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+  },
+  leavePressed: { opacity: 0.6 },
+  leaveLabel: { fontWeight: '700' },
   factRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
