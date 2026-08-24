@@ -679,6 +679,7 @@ export type Database = {
           card_count: number
           code: string
           created_at: string
+          daily_limit: number | null
           gem_cost: number
           guaranteed_positions: Json
           id: string
@@ -691,6 +692,7 @@ export type Database = {
           card_count: number
           code: string
           created_at?: string
+          daily_limit?: number | null
           gem_cost: number
           guaranteed_positions?: Json
           id?: string
@@ -703,6 +705,7 @@ export type Database = {
           card_count?: number
           code?: string
           created_at?: string
+          daily_limit?: number | null
           gem_cost?: number
           guaranteed_positions?: Json
           id?: string
@@ -1480,6 +1483,7 @@ export type Database = {
           week: number
         }[]
       }
+      daily_pack_status: { Args: never; Returns: Json }
       daily_set_position: { Args: { p_day: string }; Returns: string }
       game_config_value: {
         Args: { p_default?: number; p_key: string }
@@ -1614,6 +1618,7 @@ export type Database = {
         }
         Returns: string
       }
+      settle_week_payouts: { Args: { p_season?: number }; Returns: Json }
       slate_in_play: {
         Args: never
         Returns: {

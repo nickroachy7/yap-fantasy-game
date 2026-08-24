@@ -62,6 +62,7 @@ export default function PacksScreen() {
   const { gems, refresh } = usePlayer();
 
   const [packs, setPacks] = useState<Pack[] | null>(null);
+  const [dailyAvailable, setDailyAvailable] = useState<boolean | null>(null);
   /** pack_id -> how many times this player has opened it. */
   const [openings, setOpenings] = useState<Map<string, number>>(() => new Map());
   const [silverAt, setSilverAt] = useState<number>(50);
@@ -73,17 +74,22 @@ export default function PacksScreen() {
      the shelf and the pack-opening share a single error line, and splitting
      them into two states would leave one of them stale on screen. */
   const load = useCallback<Load>(async (live) => {
-    const [packRes, openedRes, tierRes] = await Promise.all([
+    const [packRes, openedRes, dailyRes, tierRes] = await Promise.all([
       supabase
         .from('packs')
         // is_active is filtered here rather than displayed: open_pack() rejects
         // an inactive pack outright, so listing one is offering a button whose
         // only possible outcome is an error.
-        .select('id, code, name, gem_cost, card_count, once_per_user, guaranteed_positions')
+        .select('id, code, name, gem_cost, card_count, once_per_user, daily_limit, guaranteed_positions')
         .eq('is_active', true)
         .order('gem_cost'),
       // RLS scopes this to the caller, so it is exactly "packs I have opened".
       supabase.from('pack_openings').select('pack_id'),
+      // Whether today's free pack is still there. Asked of the server rather
+      // than worked out from the openings above, because "today" has a
+      // definition (the UTC day, matching the daily set) and the client does
+      // not get to hold a second opinion about it.
+      supabase.rpc('daily_pack_status'),
       // The silver floor is tunable in the database; reading it beats baking
       // 200 into the client and having the card lie after a balance change.
       supabase.from('tier_thresholds').select('min_career_fp').eq('tier', 'silver').maybeSingle(),
@@ -91,6 +97,11 @@ export default function PacksScreen() {
     if (!live()) return;
     if (packRes.error) return void setError(packRes.error.message);
     if (openedRes.error) return void setError(openedRes.error.message);
+    // A failure here is not worth blocking the shelf for: the button falls back
+    // to disabled, and open_pack refuses a second claim anyway.
+    setDailyAvailable(
+      dailyRes.error ? false : (dailyRes.data as { available?: boolean } | null)?.available === true,
+    );
 
     setError(null);
     setPacks(packRes.data as Pack[]);
@@ -274,6 +285,7 @@ export default function PacksScreen() {
       ) : (
         <PackShelf
           packs={packs}
+          dailyAvailable={dailyAvailable}
           gems={gems}
           openings={openings}
           openingCode={openingCode}

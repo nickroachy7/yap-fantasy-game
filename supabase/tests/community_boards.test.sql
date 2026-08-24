@@ -142,8 +142,13 @@ begin
     values (v_a, v_card1, 0, 0);
   end loop;
 
+  -- 300 rather than the 800 this was written with. The tier ladder became
+  -- 50/200/600 in 20260821250000, which promoted 800 fp from gold to DIAMOND
+  -- and quietly made B's two copies worth as much as anything in the fixture —
+  -- so the ranking this file exists to check had nothing left to check. 300 is
+  -- gold under the current ladder, which is what 800 meant when it was chosen.
   insert into public.card_instances (user_id, card_id, career_fp, settled_fp, lineup_starts)
-  values (v_b, v_card1, 800, 800, 10), (v_b, v_card2, 800, 800, 10);
+  values (v_b, v_card1, 300, 300, 10), (v_b, v_card2, 300, 300, 10);
 
   insert into public.card_instances (user_id, card_id, career_fp, settled_fp, lineup_starts)
   values (v_c, v_card1, 3000, 3000, 20);
@@ -258,12 +263,28 @@ begin
       v_row.held, v_row.players, v_row.value_gems;
   end if;
 
+  -- C HOLDS ONE DIAMOND AND HAS BURNT ANOTHER, and since 20260824200600 both
+  -- count. That migration reversed the rule this assertion used to encode:
+  -- selling REMOVES a card and committing only immobilises one, so a committed
+  -- copy stays on the board frozen at the tier it went in at. `held` stays 1
+  -- and `in_sets` carries the other, which is the distinction that lets the
+  -- board show how much of a shelf can still grow.
   select * into v_row from public.board_collection(v_season, 500) where user_id = v_c;
-  if v_row.value_gems <> 500 or v_row.diamond <> 1 or v_row.held <> 1 then
-    raise exception 'FAIL 2: C value=% diamond=% held=%, expected 500/1/1 (a burnt copy must not count)',
-      v_row.value_gems, v_row.diamond, v_row.held;
+  if v_row.value_gems <> 1000 or v_row.held <> 1 or v_row.in_sets <> 1 then
+    raise exception 'FAIL 2: C value=% held=% in_sets=%, expected 1000/1/1 (a committed copy still counts)',
+      v_row.value_gems, v_row.held, v_row.in_sets;
   end if;
-  raise notice 'PASS 2: collections rank by sell value; sold and burnt copies do not count';
+  if v_row.in_sets_gems <> 500 then
+    raise exception 'FAIL 2: C in_sets_gems=%, expected 500', v_row.in_sets_gems;
+  end if;
+
+  -- A's SOLD copy is the other half of the same rule and must still be absent.
+  select * into v_row from public.board_collection(v_season, 500) where user_id = v_a;
+  if v_row.in_sets <> 0 or v_row.value_gems <> 80 then
+    raise exception 'FAIL 2: A value=% in_sets=%, expected 80/0 (a sold copy must not count)',
+      v_row.value_gems, v_row.in_sets;
+  end if;
+  raise notice 'PASS 2: collections rank by sell value; sold copies are gone, committed copies are frozen';
 
   ------------------------------------------------- 3. cards: held and scoring only
   if exists (select 1 from public.board_cards(v_season, null, 500) where career_fp >= 4000) then

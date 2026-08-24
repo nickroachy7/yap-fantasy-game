@@ -44,6 +44,8 @@ export type Pack = {
   gem_cost: number;
   card_count: number;
   once_per_user: boolean;
+  /** Opens allowed per day, or null for a pack with no daily limit. */
+  daily_limit: number | null;
   guaranteed_positions: Json;
 };
 
@@ -96,6 +98,7 @@ export function countPositions(cards: Pulled[]): Coverage[] {
 
 export function PackShelf({
   packs,
+  dailyAvailable,
   gems,
   openings,
   openingCode,
@@ -103,6 +106,14 @@ export function PackShelf({
 }: {
   /** null while the first read is in flight. */
   packs: Pack[] | null;
+  /**
+   * Whether today's free pack is still available, straight from
+   * `daily_pack_status()`. NOT derived from `openings`, which counts every open
+   * ever and cannot say what "today" is — the day boundary is the server's, and
+   * a client that guessed it would draw a live button that always errors, or a
+   * dead one that should work.
+   */
+  dailyAvailable: boolean | null;
   gems: number;
   /** pack_id -> how many times this player has opened it. */
   openings: Map<string, number>;
@@ -130,6 +141,7 @@ export function PackShelf({
             pack={p}
             gems={gems}
             opened={openings.get(p.id) ?? 0}
+            dailyAvailable={dailyAvailable}
             busy={openingCode === p.code}
             // Any open in flight blocks every pack: the balance is about to
             // change, so a second purchase would be decided against a stale one.
@@ -182,6 +194,7 @@ function PackCard({
   pack,
   gems,
   opened,
+  dailyAvailable,
   busy,
   locked,
   onOpen,
@@ -189,6 +202,7 @@ function PackCard({
   pack: Pack;
   gems: number;
   opened: number;
+  dailyAvailable: boolean | null;
   busy: boolean;
   locked: boolean;
   onOpen: () => void;
@@ -197,25 +211,44 @@ function PackCard({
   const c = Colors[scheme];
   const accent = TierColors[scheme].gold.accent;
 
-  const claimed = pack.once_per_user && opened > 0;
+  const isDaily = pack.daily_limit !== null;
+  /**
+   * Two kinds of "claimed", and they must not read the same. A once-per-player
+   * pack is SPENT — that button is never coming back. A daily is merely used up
+   * for now, and telling somebody "already claimed" for something that returns
+   * in a few hours is how a reward turns into a dead end.
+   *
+   * Null while the status is still loading: treated as claimed, because a
+   * button that works is the safer thing to arrive at late.
+   */
+  const claimedToday = isDaily && dailyAvailable !== true;
+  const claimed = (pack.once_per_user && opened > 0) || claimedToday;
   const free = pack.gem_cost === 0;
   const affordable = gems >= pack.gem_cost;
   const blocked = locked || claimed || !affordable;
   const coverage = coverageOf(pack.guaranteed_positions);
 
-  const label = claimed ? 'Claimed' : free ? 'Claim free pack' : 'Open';
+  const label = claimedToday
+    ? 'Back tomorrow'
+    : claimed
+      ? 'Claimed'
+      : free
+        ? 'Claim free pack'
+        : 'Open';
   /**
    * The one line that answers "can I press this, and what happens to my
    * balance if I do". Stating the shortfall beats "Not enough gems", which
    * leaves the player to do the subtraction against a number in the header.
    */
-  const money = claimed
-    ? 'Already claimed — one per player'
-    : free
-      ? 'Free · does not touch your balance'
-      : affordable
-        ? `${gems.toLocaleString()} → ${(gems - pack.gem_cost).toLocaleString()} gems`
-        : `${(pack.gem_cost - gems).toLocaleString()} more gems needed`;
+  const money = claimedToday
+    ? 'Claimed today — a new one every day'
+    : claimed
+      ? 'Already claimed — one per player'
+      : free
+        ? 'Free · does not touch your balance'
+        : affordable
+          ? `${gems.toLocaleString()} → ${(gems - pack.gem_cost).toLocaleString()} gems`
+          : `${(pack.gem_cost - gems).toLocaleString()} more gems needed`;
 
   return (
     <View style={[styles.pack, { backgroundColor: c.surface, borderColor: c.border }]}>
@@ -227,7 +260,8 @@ function PackCard({
           <Text style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
             {`${pack.card_count} cards`}
             {pack.once_per_user ? ' · one per player' : ''}
-            {opened > 0 && !pack.once_per_user ? ` · opened ${opened}×` : ''}
+            {isDaily ? ' · one a day' : ''}
+            {opened > 0 && !pack.once_per_user && !isDaily ? ` · opened ${opened}×` : ''}
           </Text>
         </View>
 
