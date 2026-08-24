@@ -252,20 +252,26 @@ const ALL_CARD_VIEWS: NavChild[] = [
      the tab navigator, so its path is a root one. See `app/(app)/search.tsx`. */
   { href: '/search', label: 'Search', icon: 'search', takeover: true },
   { href: '/fantasy/players', label: 'Trend', icon: 'trend' },
-  /* THIS WORD IS NOW USED TWICE, one row apart, and it should not be. The
-     board above is called Leaders as of 2026-08-24, so on this screen the strip
-     says LEADERS and the bar directly under it says Leaders — pointing at two
-     genuinely different rankings. This one is the best CARDS by fantasy points;
-     that one is the standings between MANAGERS.
+  /* TOP, AND IT WAS LEADERS — renamed the same day the board above became
+     Leaders, because for one commit the two shared a word one row apart. The
+     strip said LEADERS and this bar, directly under it, said Leaders, pointing
+     at two genuinely different rankings: that board ranks MANAGERS, this page
+     ranks CARDS.
 
-     The strip's own header warns that the two rows can only coexist because
-     they do not look alike; sharing a word is the other way for them to
-     converge, and it is worse than sharing a treatment because the reader
-     cannot see it at a glance. The fix belongs HERE rather than on the board —
-     "Leaders" is the right name for a table of managers and a borrowed one for
-     a table of cards, which want something like Top or Best. Left as it is
-     pending a call on the word. */
-  { href: '/fantasy/players/leaders', label: 'Leaders', icon: 'standings' },
+     The strip's own header warns that those two rows can only coexist because
+     they do not look alike. Sharing a word is the other way for them to
+     converge and it is worse than sharing a treatment, because the reader
+     cannot see it at a glance — both look correct, and you only find out by
+     pressing one.
+
+     THE RENAME BELONGED ON THIS SIDE. "Leaders" is the right name for a table
+     of managers and a borrowed one for a table of cards; the board above is the
+     one people mean when they say the leaderboard. "Top" also sits better in
+     the row it is actually in — SEARCH / TREND / TOP are three one-word ways to
+     look at the same pool, and it was the only one of the three that needed two
+     syllables to say so. The ROUTE stays `/fantasy/players/leaders`, for the
+     same reason `/fantasy/players` stayed under the All Cards label. */
+  { href: '/fantasy/players/leaders', label: 'Top', icon: 'standings' },
 ];
 
 /**
@@ -337,12 +343,11 @@ export const FANTASY_SECTIONS: NavSection[] = [
      now, so the `tabLabel` that existed to keep "Leaderboard" from truncating
      to "Leaderboa…" at 13pt is gone with it.
 
-     NAME COLLISION, KNOWN AND UNRESOLVED: All Cards has a sub-page called
-     Leaders too (`/fantasy/players/leaders`, the best CARDS by points), and on
-     that board the two sit one row apart — LEADERS in the strip above, Leaders
-     in the action bar below. They are different things: this board ranks
-     MANAGERS, that one ranks cards. Renaming the sub-page is the fix and it has
-     not been made; see the note on `ALL_CARD_VIEWS`.
+     IT OWNS THE WORD. All Cards had a sub-page called Leaders for one commit,
+     which put the same word in two bars one row apart pointing at two different
+     rankings; that page is called Top now. This is the board that ranks
+     MANAGERS, and it is the one people mean by "the leaderboard" — see the note
+     on `ALL_CARD_VIEWS` for why the rename went there rather than here.
 
      It has no children, and it is the only section without any. It had two —
      STANDINGS and SCORING — and the strip they produced cost every phone screen
@@ -447,8 +452,9 @@ function allChildren(): NavChild[] {
  * A browser window is not a phone with more pixels, and the three-level tree
  * above is the shape a phone forced on us. Fifteen rows of indented rail was
  * the app's own file structure printed down the side of the window: to reach
- * Leaders you read "Fantasy", then "Players", then "Leaders" — three words to
- * name one board, two of which are not places you can be. `/fantasy` is a
+ * Top you read "Fantasy", then "Players", then "Leaders" — three words to name
+ * one board, two of which are not places you can be. (Those were the labels at
+ * the time; the board is All Cards and the view is Top now.) `/fantasy` is a
  * redirect and `/fantasy/players` opens on Trend, so two of the rail's ranks
  * were labels pretending to be destinations.
  *

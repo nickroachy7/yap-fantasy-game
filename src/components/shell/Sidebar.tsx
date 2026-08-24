@@ -8,8 +8,8 @@
  * once is every PLACE, and two of those three ranks were not places. `/fantasy`
  * is a redirect, `/fantasy/players` opens straight onto Trend, and neither row
  * could ever be the page you were on — so the rail spent two of its levels
- * naming folders, and reaching Leaders meant reading three words to arrive at
- * one board.
+ * naming folders, and reaching the Top view meant reading three words to arrive
+ * at one board.
  *
  * Flattened it is seven rows, every one a destination, every one one click away,
  * and the indent that carried the hierarchy is gone because there is no longer

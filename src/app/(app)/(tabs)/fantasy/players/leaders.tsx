@@ -1,5 +1,11 @@
 /**
- * The best players of the season, in order.
+ * The best cards of the season, in order. Called TOP in the bar.
+ *
+ * It was called Leaders until 2026-08-24, when the board one level up — the
+ * standings between MANAGERS — took that word. Two bars a row apart both
+ * reading "Leaders" and pointing at different rankings is a collision the
+ * reader cannot see, so the narrower meaning moved: this ranks cards, that
+ * ranks people. The route is still `/fantasy/players/leaders`.
  *
  * WHAT THIS IS FOR THAT SEARCH IS NOT
  *
@@ -151,7 +157,7 @@ export default function LeadersScreen() {
       : `${result.season ?? ''} season · ${board.length} ranked by points`.trim();
 
   return (
-    <Screen title="Leaders" measure="table" context={context} scroll={false}>
+    <Screen title="Top" measure="table" context={context} scroll={false}>
       {/* The list runs edge to edge, so the chrome supplies the gutter the
           page does not. See the same block on the Trend board. */}
       <View style={styles.controls}>
