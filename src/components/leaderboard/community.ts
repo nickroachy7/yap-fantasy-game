@@ -328,8 +328,14 @@ export const BOARD_META: Record<BoardId, BoardMeta> = {
     unit: 'win rate',
   },
   collection: {
-    label: 'Collection',
-    title: 'Collections',
+    /* COLLECTION VALUE, not "Collection". The board ranks what a shelf would
+       SELL for, and the bare noun named the thing rather than the measure —
+       next to boards called Points and Record it read as "biggest collection",
+       which is the one reading it is not: thirty bronze duplicates lose to
+       sixteen played cards. It also collided with the Collection TAB in the
+       nav, two words apart in the same chrome, meaning different things. */
+    label: 'Collection Value',
+    title: 'Collection value',
     blurb:
       'What a shelf would sell for. Tier is earned by starting a card, so a played collection outgrows a hoarded one.',
     emptyTitle: 'Nobody holds a card yet',
