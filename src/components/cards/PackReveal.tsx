@@ -22,12 +22,21 @@
  *   times the area of eight cards laid out at once, and the pull is the one
  *   moment in this app that is purely about looking at a card.
  *
- *   THE DECISION IS MADE HERE. Most of a pack is duplicates, and until now the
- *   only thing the reveal let you do was look at them — selling lived on
- *   `card/[id]`, committing lived on `set/[code]`, so clearing a pack meant
- *   leaving the sheet and finding eight cards in an inventory that had just
- *   grown by eight. Both exits are on the card now, priced by the server. See
- *   `use-pull-actions`.
+ *   THE DECISION IS MADE HERE, AND ON THE CARD. Most of a pack is duplicates,
+ *   and until now the only thing the reveal let you do was look at them —
+ *   selling lived on `card/[id]`, committing lived on `set/[code]`, so clearing
+ *   a pack meant leaving the sheet and finding eight cards in an inventory that
+ *   had just grown by eight. Both exits are on the card now, priced by the
+ *   server. See `use-pull-actions`.
+ *
+ *   EACH CARD CARRIES ITS OWN PAIR, inside its own slide. The first version put
+ *   ONE panel under the deck and pointed it at whichever card was in front of
+ *   you, which is fewer pixels and the wrong object: the buttons then belong to
+ *   the carousel rather than to the card, so "sell this" is a claim about a
+ *   selection you have to trust the panel got right. Swipe fast and the panel
+ *   is mid-swap while your thumb is already on the button. Under the card there
+ *   is nothing to get wrong — what you press is attached to what you are
+ *   looking at, and it travels with it.
  *
  * WHY THE FLIP IS 2D
  *
@@ -71,6 +80,7 @@ import Animated, {
   Easing,
   Extrapolation,
   interpolate,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -311,10 +321,6 @@ export function PackReveal({
   );
 
   const allRevealed = revealed.size >= pulled.length;
-  const current = pulled[focus];
-  const action = current ? actions.get(current.card_instance_id) : undefined;
-  const became = current ? disposed.get(current.card_instance_id) : undefined;
-
   /* What this pack has paid out so far. Only drawn once something has been
      spent, because "+0 gems" on an untouched pack reads as a reward that
      failed to arrive. */
@@ -422,30 +428,31 @@ export function PackReveal({
               onReveal={() => {
                 reveal(p.card_instance_id);
                 if (i !== focus) goTo(i);
-              }}>
+              }}
+              actions={(turned) => (
+                <CardActions
+                  player={p.player_name ?? 'This card'}
+                  revealed={turned}
+                  action={actions.get(p.card_instance_id)}
+                  loading={loadingActions}
+                  became={disposed.get(p.card_instance_id)}
+                  busy={busy === p.card_instance_id}
+                  /* Every button on every card waits on a write in flight —
+                     both RPCs move the one wallet, so a second one decided
+                     against a balance that is about to change is the shape of a
+                     double-spend. */
+                  locked={busy !== null && busy !== p.card_instance_id}
+                  error={busy === p.card_instance_id ? error : null}
+                  onDismissError={onDismissError}
+                  onSell={() => onSell(p.card_instance_id)}
+                  onCommit={(code) => onCommit(p.card_instance_id, code)}
+                />
+              )}>
               <PlayerCard model={toModel(p)} size="detail" fixedWidth={false} />
             </RevealSlot>
           ))}
         </ScrollView>
       </View>
-
-      {/* ---- what to do with the one in front of you --------------------- */}
-      {current ? (
-        <CardActions
-          key={current.card_instance_id}
-          player={current.player_name ?? 'This card'}
-          revealed={revealed.has(current.card_instance_id)}
-          action={action}
-          loading={loadingActions}
-          became={became}
-          busy={busy === current.card_instance_id}
-          locked={busy !== null && busy !== current.card_instance_id}
-          error={busy === current.card_instance_id ? error : null}
-          onDismissError={onDismissError}
-          onSell={() => onSell(current.card_instance_id)}
-          onCommit={(code) => onCommit(current.card_instance_id, code)}
-        />
-      ) : null}
 
       <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
         New cards start at bronze. Start them in a lineup to earn their way up — or spend the
@@ -517,6 +524,7 @@ function RevealSlot({
   index,
   count,
   onReveal,
+  actions,
   children,
 }: {
   width: number;
@@ -527,14 +535,45 @@ function RevealSlot({
   index: number;
   count: number;
   onReveal: () => void;
+  /**
+   * This card's own sell / add-to-set panel, drawn under it.
+   *
+   * Taken as a function of `turned` rather than as a node, because whether the
+   * card has finished turning is the slot's fact and the panel's business, and
+   * nothing above here can know it without duplicating the timing.
+   */
+  actions: (turned: boolean) => React.ReactNode;
   children: React.ReactNode;
 }) {
   const flip = useSharedValue(revealed ? 1 : 0);
 
+  /**
+   * The turn is FINISHED, which is a different moment from "the turn started".
+   *
+   * `revealed` flips the instant the card reaches the middle of the deck, and
+   * the turn takes `FLIP_MS` after that. Hanging the panel off `revealed` put
+   * "Add to a set · 2" and a priced sell button directly beneath a card still
+   * showing its back and the words TAP TO REVEAL — pressable, for four hundred
+   * milliseconds, on a card the player had not seen. That was survivable when
+   * one shared panel sat below the whole deck; with the buttons under the card
+   * they belong to it is simply wrong.
+   *
+   * Set from the timing's own completion callback rather than a parallel
+   * timeout, so it cannot drift from the animation it is reporting on, and it
+   * never fires for a turn that was interrupted. It only ever goes true: a card
+   * is never turned back over, and the deck remounts for each new pack.
+   */
+  const [turned, setTurned] = useState(revealed);
+
   useEffect(() => {
-    flip.value = revealed
-      ? withTiming(1, { duration: FLIP_MS, easing: Easing.inOut(Easing.cubic) })
-      : 0;
+    if (!revealed) return;
+    flip.value = withTiming(
+      1,
+      { duration: FLIP_MS, easing: Easing.inOut(Easing.cubic) },
+      (finished) => {
+        if (finished) runOnJS(setTurned)(true);
+      },
+    );
   }, [revealed, flip]);
 
   /* Both halves read the same 0..1. The back owns the first half of it and the
@@ -555,24 +594,36 @@ function RevealSlot({
   }));
 
   return (
-    <View style={[{ width }, WEB_SNAP_CHILD]}>
-      {/* `aria-hidden` rather than the platform pair it stands for. React
-          Native maps it to `accessibilityElementsHidden` on iOS and
-          `importantForAccessibility` on Android, and react-native-web emits the
-          real attribute — where the pair on its own does nothing at all, so the
-          browser went on announcing both the face-down card's back AND the
-          player printed on the face nobody has turned over yet. */}
-      <Animated.View
-        style={[faceStyle, { pointerEvents: revealed ? 'auto' : 'none' }]}
-        aria-hidden={!revealed}>
-        {children}
-      </Animated.View>
+    <View style={[{ width }, WEB_SNAP_CHILD, styles.slot]}>
+      {/* THE CARD BOX, and the turn happens only in here. The panel below must
+          not flip with it — it belongs to the card but it is not printed on it,
+          and a set picker that shrank to nothing edge-on would read as the UI
+          breaking rather than as a card turning over. */}
+      <View>
+        {/* `aria-hidden` rather than the platform pair it stands for. React
+            Native maps it to `accessibilityElementsHidden` on iOS and
+            `importantForAccessibility` on Android, and react-native-web emits
+            the real attribute — where the pair on its own does nothing at all,
+            so the browser went on announcing both the face-down card's back AND
+            the player printed on the face nobody has turned over yet. */}
+        <Animated.View
+          style={[faceStyle, { pointerEvents: revealed ? 'auto' : 'none' }]}
+          aria-hidden={!revealed}>
+          {children}
+        </Animated.View>
 
-      <Animated.View
-        style={[StyleSheet.absoluteFill, backStyle, { pointerEvents: revealed ? 'none' : 'auto' }]}
-        aria-hidden={revealed}>
-        <CardBack tone={tone} index={index} count={count} onPress={onReveal} />
-      </Animated.View>
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            backStyle,
+            { pointerEvents: revealed ? 'none' : 'auto' },
+          ]}
+          aria-hidden={revealed}>
+          <CardBack tone={tone} index={index} count={count} onPress={onReveal} />
+        </Animated.View>
+      </View>
+
+      {actions(turned)}
     </View>
   );
 }
@@ -635,15 +686,19 @@ function CardBack({
 type Stage = 'idle' | 'picking' | 'selling';
 
 /**
- * Sell it, or put it in a set — for whichever card is in front of you.
+ * Sell it, or put it in a set — for the one card this panel sits under.
  *
- * ONE PANEL, NOT A DIALOG PER CARD. Committing a card burns it, and the set
- * checklist rightly puts a `ConfirmDialog` in front of that: there, the act is
- * a batch of up to thirty cards chosen off a grid, and half of them may be
- * copies with a season of scoring on them. Here every card is seconds old,
- * bronze, and worth single-figure gems — and there are eight of them. A modal
- * per card would make clearing a pack eight modals, which is how a feature
- * intended to save a trip to the inventory becomes slower than the trip.
+ * ONE PANEL PER CARD, DRAWN UNDER IT, INSIDE ITS SLIDE. It is as wide as the
+ * card and no wider, which is what makes the buttons a column rather than a
+ * row — see `buttonRow`.
+ *
+ * NO DIALOG. Committing a card burns it, and the set checklist rightly puts a
+ * `ConfirmDialog` in front of that: there, the act is a batch of up to thirty
+ * cards chosen off a grid, and half of them may be copies with a season of
+ * scoring on them. Here every card is seconds old, bronze, and worth
+ * single-figure gems — and there are eight of them. A modal per card would make
+ * clearing a pack eight modals, which is how a feature intended to save a trip
+ * to the inventory becomes slower than the trip.
  *
  * SO THE SAFETY IS A SECOND TAP RATHER THAN A SECOND SURFACE. Both exits stage
  * through this panel: `Quick sell` becomes a priced confirm, `Add to set`
@@ -751,13 +806,14 @@ function CardActions({
           <Text style={[Type.fine, styles.measure, { color: c.textSecondary }]}>
             {`Selling is permanent. ${player} leaves your collection and cannot be pulled back — a future copy starts again at bronze.`}
           </Text>
-          <View style={styles.buttonRow}>
+          <View style={styles.buttonPair}>
             <Pressable
               onPress={close}
               disabled={busy}
               accessibilityRole="button"
               style={({ pressed }) => [
                 styles.button,
+                styles.buttonPairHalf,
                 { backgroundColor: c.backgroundElement },
                 pressed && styles.pressed,
               ]}>
@@ -774,6 +830,7 @@ function CardActions({
               accessibilityState={{ busy }}
               style={({ pressed }) => [
                 styles.button,
+                styles.buttonPairHalf,
                 { backgroundColor: c.negative },
                 pressed && styles.pressed,
                 busy && styles.dim,
@@ -808,7 +865,7 @@ function CardActions({
             accessibilityRole="button"
             style={({ pressed }) => [
               styles.button,
-              styles.buttonWide,
+              styles.buttonGrow,
               { backgroundColor: c.backgroundElement },
               pressed && styles.pressed,
             ]}>
@@ -860,6 +917,7 @@ function CardActions({
               accessibilityState={{ disabled: locked || busy }}
               style={({ pressed }) => [
                 styles.button,
+                styles.buttonGrow,
                 styles.sell,
                 { backgroundColor: c.backgroundElement, borderColor: c.border },
                 pressed && styles.pressed,
@@ -884,7 +942,7 @@ function CardActions({
               on the next tap, so without this the only warning that a DIFFERENT
               copy is about to burn would arrive after it had. */}
           {commitable.length === 1 && action?.burnsThisCopy === false ? (
-            <Text style={[Type.fine, styles.rowNote, styles.measure, { color: c.textTertiary }]}>
+            <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
               {`You hold a spare of ${player}. Adding him uses your least valuable copy, so this card stays in your collection.`}
             </Text>
           ) : null}
@@ -892,7 +950,7 @@ function CardActions({
           {/* Why there is nothing to press. Every one of these is a real state
               rather than a load that failed, so each says which. */}
           {commitable.length === 0 && !action?.sellable ? (
-            <Text style={[Type.fine, styles.rowNote, styles.measure, { color: c.textTertiary }]}>
+            <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
               {!action
                 ? 'This card is in your inventory. Sell it or add it to a set from there.'
                 : gone
@@ -985,6 +1043,10 @@ const styles = StyleSheet.create({
      See `SheetToneBand`, which does the same thing for the same reason. */
   bleed: { marginHorizontal: -Spacing.three },
   deck: { gap: Spacing.three, alignItems: 'flex-start' },
+  /* The card and its own panel are one column. `flex-start` on the deck above
+     lets each slide be its own height, so opening a set picker on one card
+     grows that card's slide rather than every slide in the pack. */
+  slot: { gap: Spacing.two },
 
   back: {
     flex: 1,
@@ -998,7 +1060,11 @@ const styles = StyleSheet.create({
   backBar: { position: 'absolute', left: '-10%', right: '-10%', height: 10 },
   inert: { pointerEvents: 'none' },
 
-  panel: { gap: Spacing.two, minHeight: 56, justifyContent: 'center' },
+  /* Held to a floor so the deck does not resize under a thumb as cards turn
+     over: a face-down card's one-line hint and a revealed card's two buttons
+     have to occupy about the same block, or scrolling the deck would make the
+     whole sheet jump every time a card landed. */
+  panel: { gap: Spacing.two, minHeight: 108, paddingTop: Spacing.one },
   panelCentred: { alignItems: 'center' },
   stageBlock: { gap: Spacing.two },
   stamp: {
@@ -1012,7 +1078,16 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one + 2,
   },
 
-  buttonRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.two },
+  /* A COLUMN, because the panel is now as wide as the card above it rather
+     than as wide as the sheet. "Add to Tennessee Titans · 4" beside "Quick sell
+     8" measures past 287pt on a phone, so a row either ellipsised the set's
+     name — the one word on the button worth reading — or wrapped into a ragged
+     two lines that did not line up with the card's edges. */
+  buttonRow: { gap: Spacing.two },
+  /* The one pair that IS a row: two short words that fit side by side at any
+     card width, and reading "Keep it" above "Sell for 8" would make the safe
+     choice look like the primary one. */
+  buttonPair: { flexDirection: 'row', gap: Spacing.two },
   button: {
     borderRadius: Radius.chip,
     paddingHorizontal: Spacing.three,
@@ -1021,12 +1096,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonGrow: { flexGrow: 1, flexShrink: 1, minWidth: 160 },
-  /* A note inside the button row takes a line of its own rather than a column
-     beside a button — the wrap would otherwise hand it whatever is left, which
-     on a phone is a word and a half wide. */
-  rowNote: { flexBasis: '100%' },
-  buttonWide: { alignSelf: 'flex-start' },
+  buttonGrow: { alignSelf: 'stretch' },
+  buttonPairHalf: { flex: 1, minWidth: 0 },
   sell: {
     flexDirection: 'row',
     gap: Spacing.one + 2,

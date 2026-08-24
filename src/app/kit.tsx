@@ -1000,7 +1000,7 @@ function Kit() {
 
           <Section
             title="Pack reveal"
-            note="Cards face down, turned over as they reach the middle. Shown INSIDE the sheet, because that is the only place it appears and the deck runs to the sheet's edges by climbing back over its gutter — laid out inline it would prove nothing about that. The panel under the deck follows whichever card is in front of you: card 2 commits a spare copy, card 3 is in two sets so it opens the picker, card 4's slot is already filled, card 5 is in no set at all.">
+            note="Cards face down, turned over as they reach the middle, each carrying its own sell / add-to-set pair underneath it. Shown INSIDE the sheet, because that is the only place it appears and the deck runs to the sheet's edges by climbing back over its gutter — laid out inline it would prove nothing about that. The five cards are the five states that pair can be in: card 1 ordinary, card 2 commits a spare copy so the card stays yours, card 3 is in two sets so it opens the picker, card 4's slot is already filled, card 5 is in no set at all.">
             <View style={styles.row}>
               <Pressable
                 onPress={() => setPullOpen(true)}
