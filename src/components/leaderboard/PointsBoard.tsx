@@ -26,7 +26,6 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { useTabBarInset } from '@/components/shell/useResponsive';
-import { Panel } from '@/components/ui/Panel';
 import { MenuButton, MenuHeading, MenuItem } from '@/components/ui/MenuButton';
 import { DASH } from '@/components/ui/DataTable';
 import { Colors, Spacing, Type, type CardTier } from '@/constants/theme';
@@ -35,7 +34,7 @@ import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
 import { BoardControls } from './BoardControls';
 import { BoardRow } from './BoardRow';
-import { Podium } from './Podium';
+import { BoardTop, hasBoardTop } from './BoardTop';
 import {
   BOARD_META,
   fetchTopTiers,
@@ -44,7 +43,6 @@ import {
   type BoardRowModel,
 } from './community';
 import { WeekBreakdown } from './WeekBreakdown';
-import { YourRow } from './YourRow';
 import {
   BOARD_LIMIT,
   buildStandings,
@@ -68,6 +66,8 @@ export function PointsBoard({
   slate,
   season,
   seasonType,
+  /** "Preseason 2026" — the slate these points were scored in. */
+  slateContext,
   meId,
   onRefreshSlate,
   board,
@@ -77,6 +77,7 @@ export function PointsBoard({
   slate: Slate | null;
   season: number;
   seasonType: number;
+  slateContext: string;
   meId: string | null;
   onRefreshSlate: () => Promise<void>;
   /** Owned by the screen; drawn here — see `BoardControls`. */
@@ -96,6 +97,7 @@ export function PointsBoard({
   const [topTiers, setTopTiers] = useState<Map<string, CardTier>>(NO_TIERS);
 
   const loadedSlate = useRef<string | null>(null);
+  const list = useRef<FlatList<BoardRowModel>>(null);
 
   // Loading is two-phase, so a slow pull-to-refresh can land after a fast one.
   // `live()` is the token that keeps the older response from winning.
@@ -198,46 +200,60 @@ export function PointsBoard({
 
   const meta = BOARD_META.points;
 
-  /* THE SAME SKELETON AS EVERY OTHER BOARD, in the same order: what this board
-     is, its own control, the top three, your row, then the list. This one used
-     to open on its week tabs with no heading at all — the only board that never
-     said what it ranked — because its tabs and the other five's headings were
-     built from two different lists. See `BOARD_IDS`. */
+  /* THE SAME SKELETON AS EVERY OTHER BOARD, in the same order: the board strip
+     and this board's own control, a line saying what the rows are counted over,
+     the top three with your row under them, then the list under one sentence
+     saying what it ranks. Only the last of those is inside the list — see
+     `BoardTop` for why the rest is pinned.
+
+     This board used to open on its week tabs with no heading at all — the only
+     board that never said what it ranked — because its tabs and the other
+     five's headings were built from two different lists. See `BOARD_IDS`. */
   const listHeader = (
     <View style={styles.head}>
-      {/* The blurb alone. The heading that used to sit over it repeated the
-          word already on the chip directly above, in a larger font. */}
       <Text style={[Type.bodyRelaxed, styles.blurb, { color: c.textSecondary }]}>{meta.blurb}</Text>
-
-      <Podium rows={boardRows} meId={meId} />
-
-      {/* The same pinned row as every other board. It replaced a bespoke
-          stat panel — see `YourRow` for why the row beats a summary of it. */}
-      <YourRow
-        row={mine}
-        field={boardRows.length}
-        absent={absentReason}
-        unit="points"
-        title="Where you stand"
-      />
-
-      {/* Heading and count only — the rows below draw their own identity.
-          It also separates the pinned row above from the list, where the
-          reader appears a second time. */}
-      {rows.length > 0 ? (
-        <Panel
-          title="Standings"
-          hint={detailKnown ? `${rows.length} ranked` : 'Loading week detail…'}
-        />
-      ) : null}
     </View>
   );
+
+  /**
+   * The scope, spelled out for the line under the chips.
+   *
+   * "Season to date" rather than the slate's own week, because those are two
+   * different facts and printing the second where the first belongs is how a
+   * reader ends up believing a week board is the whole season. When a week IS
+   * picked, this says that week and the slate's current one is simply not what
+   * the board is showing.
+   */
+  const scopeContext =
+    activeScope === 'season' ? 'Season to date' : weekTabLabel(seasonType, activeScope);
+
+  /* Jump to the reader's real row from the pinned band — see `BoardTop`.
+
+     No `getItemLayout` on this board and there cannot be one: a points row
+     expands into its week breakdown, so a row's height is not a constant. The
+     failure handler is the price — `scrollToIndex` cannot reach an unrendered
+     row without the arithmetic, so it lands on an estimate first and lets the
+     list settle before asking again. */
+  const jumpToMine = mine
+    ? () => {
+        const index = boardRows.indexOf(mine);
+        if (index >= 0) list.current?.scrollToIndex({ index, viewPosition: 0.5, animated: true });
+      }
+    : undefined;
 
   if (entries === null && !error) return <ActivityIndicator style={styles.centred} />;
   if (error) return <Text style={[Type.body, styles.centred, { color: c.negative }]}>{error}</Text>;
 
   const controls = (
-    <BoardControls board={board} onBoardChange={onBoardChange}>
+    <BoardControls
+      board={board}
+      onBoardChange={onBoardChange}
+      /* The slate, the slice of it on screen, and how many rows that slice
+         holds. "Loading week detail…" while phase two is in flight, because
+         the count is the one part of the line that changes when it lands. */
+      context={`${slateContext} · ${scopeContext} · ${
+        detailKnown ? `${rows.length} ranked` : 'loading week detail…'
+      }`}>
       {/* A lone "Season" option is chrome, not a choice.
 
           The circle carries the VALUE — `SZN`, `W3` — rather than a glyph for
@@ -274,9 +290,32 @@ export function PointsBoard({
   return (
     <>
       {controls}
+      {/* Pinned, not in the list header — the whole point of the change. See
+          `BoardTop`. The wrapper is skipped rather than left empty when there
+          is no frame to draw, so its gutter would otherwise be a gap above the
+          empty state. */}
+      {hasBoardTop(meId) ? (
+        <View style={styles.top}>
+          <BoardTop
+            mine={mine}
+            meId={meId}
+            unit="points"
+            absent={absentReason}
+            onJumpToMine={jumpToMine}
+          />
+        </View>
+      ) : null}
       <FlatList
+        ref={list}
         data={boardRows}
         style={styles.fill}
+        onScrollToIndexFailed={({ index, averageItemLength }) => {
+          list.current?.scrollToOffset({ offset: index * averageItemLength, animated: true });
+          setTimeout(
+            () => list.current?.scrollToIndex({ index, viewPosition: 0.5, animated: true }),
+            120,
+          );
+        }}
         extraData={listExtra}
         keyExtractor={(r) => r.key}
         contentContainerStyle={[styles.list, { paddingBottom: tabInset + Spacing.four }]}
@@ -417,14 +456,12 @@ function EmptyBoard({ slate }: { slate: Slate | null }) {
 
 const styles = StyleSheet.create({
   head: {
-    gap: 14,
     paddingBottom: Spacing.two,
     paddingHorizontal: Spacing.three,
   },
-  intro: { gap: 2 },
-  /* Hugs its chip rather than spanning the page — the same `controls` row the
-     Scores page draws under its header. */
-  controls: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  /* The pinned frame's own gutter, matching the chips above it and the rows'
+     content below it. */
+  top: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
   blurb: { maxWidth: 560 },
   fill: { flex: 1 },
   /* VERTICAL ONLY. The rows are bled to the edges of the page, exactly as the
@@ -432,7 +469,10 @@ const styles = StyleSheet.create({
      is inside a row rather than to the list around it. Everything that is NOT
      a row — the heading, the blurb, the panels — takes the gutter back through
      `head` below. */
-  list: { paddingVertical: Spacing.three },
+  /* Vertically tighter at the top than it was: the frame directly above
+     already spaces the list off the chrome, so a third gap here read as a
+     hole between the pinned block and the rows it belongs to. */
+  list: { paddingTop: Spacing.one, paddingBottom: Spacing.three },
   centred: {
     flex: 1,
     alignItems: 'center',

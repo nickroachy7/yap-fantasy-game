@@ -7,36 +7,37 @@
  * round trips to render one table, and four of them would be thrown away by the
  * first tab press.
  *
- * The three parts, top to bottom, are the same on every board:
+ * The four parts, top to bottom, are the same on every board. The first three
+ * are PINNED and the last one scrolls:
  *
- *   1. A title and one line saying what this board ranks and on what. Without
- *      it "GEMS" and "RUNGS" are column headers with no referent — the reader
- *      has to infer the game's rules from four letters.
- *   2. WHERE YOU STAND, always visible, so the answer to the only question the
- *      reader actually came with is above the fold rather than somewhere in a
- *      list of two hundred. It also has room the 34pt row does not, so the
- *      columns a phone drops are all readable here.
- *   3. The table.
+ *   1. The board strip, and this board's own filter beside it.
+ *   2. A line saying what slate the rows are counted over and how many there
+ *      are — see `BoardControls`, which also explains why the field size moved
+ *      here from the panel that used to carry it.
+ *   3. `BoardTop`: the leading three and your own row, in one frame. Always
+ *      visible, so the answer to the only question the reader actually came
+ *      with cannot scroll away — which is what it used to do.
+ *   4. The table, under one line saying what this board ranks. Without that
+ *      line "GEMS" and "RUNGS" are column headers with no referent and the
+ *      reader has to infer the game's rules from four letters.
  *
  * Every board's empty state says WHICH empty it is. "No rows" is
  * indistinguishable from a broken query, and this screen has shipped looking
  * broken once already — see the note on the points board's own empty state.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { POS_FILTERS, type PosFilter } from '@/components/cards/PositionFilter';
 import { MenuButton, MenuHeading, MenuItem } from '@/components/ui/MenuButton';
 import { useTabBarInset } from '@/components/shell/useResponsive';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Panel } from '@/components/ui/Panel';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { BoardControls } from './BoardControls';
-import { BoardRow } from './BoardRow';
-import { Podium } from './Podium';
-import { YourRow } from './YourRow';
+import { BOARD_ROW_HEIGHT, BoardRow } from './BoardRow';
+import { BoardTop, hasBoardTop } from './BoardTop';
 import {
   BOARD_META,
   buildBoard,
@@ -45,6 +46,7 @@ import {
   findMine,
   type BoardId,
   type CommunityBoardId,
+  type BoardRowModel,
   type CommunityData,
 } from './community';
 import type { CardTier } from '@/constants/theme';
@@ -56,6 +58,8 @@ export function CommunityBoard({
   id,
   season,
   seasonType,
+  /** "Preseason 2026" — the slate these rows are counted over. */
+  slateContext,
   meId,
   /** Pull-to-refresh should re-read the slate too — a week can roll over. */
   onRefreshSlate,
@@ -65,6 +69,7 @@ export function CommunityBoard({
   id: CommunityBoardId;
   season: number;
   seasonType: number;
+  slateContext: string;
   meId: string | null;
   onRefreshSlate: () => Promise<void>;
   /** Owned by the screen; drawn here — see `BoardControls`. */
@@ -74,6 +79,7 @@ export function CommunityBoard({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const tabInset = useTabBarInset();
+  const list = useRef<FlatList<BoardRowModel>>(null);
 
   const [position, setPosition] = useState<PosFilter>('ALL');
   const [data, setData] = useState<CommunityData | null>(null);
@@ -116,30 +122,33 @@ export function CommunityBoard({
   );
   const mine = useMemo(() => (rows ? findMine(rows, meId) : null), [rows, meId]);
 
+  /**
+   * What the list holds, above the rows and nothing else.
+   *
+   * Everything that used to be in here — the podium, "Where you stand", the
+   * "Standings" heading — is now pinned outside the list, so the ONE thing
+   * left is the one thing that should scroll away: a sentence you read once
+   * per board. It sits directly over the rows it describes, which is where a
+   * caption belongs; without it "GEMS" and "RUNGS" are four letters with no
+   * referent and the reader has to infer the game's rules from a column.
+   */
   const header = (
     <View style={styles.head}>
-      {/* The blurb alone. The heading that used to sit over it repeated the
-          word already on the chip directly above, in a larger font. */}
       <Text style={[Type.bodyRelaxed, styles.blurb, { color: c.textSecondary }]}>{meta.blurb}</Text>
-
-      <Podium rows={rows ?? []} meId={meId} />
-
-      <YourRow
-        row={mine}
-        field={rows?.length ?? 0}
-        absent={meta.absent}
-        unit={meta.unit}
-        title={id === 'cards' ? 'Your best card' : 'Where you stand'}
-      />
-
-      {/* Between the pinned row and the list, and load-bearing: the reader is
-          in the list as well as pinned above it, so without a heading their
-          row appears twice in succession and reads as a duplicate. */}
-      {rows && rows.length > 0 ? (
-        <Panel title="Standings" hint={fieldHint(id, rows.length)} />
-      ) : null}
     </View>
   );
+
+  /* The pinned band scrolls the list to the reader's real row — see `BoardTop`.
+     `getItemLayout` below is what lets it reach a row that has never been
+     rendered; these boards have no expansion, so every row is exactly one
+     `BOARD_ROW_HEIGHT` and the arithmetic is not an estimate. */
+  const jumpToMine =
+    mine && rows
+      ? () => {
+          const index = rows.indexOf(mine);
+          if (index >= 0) list.current?.scrollToIndex({ index, viewPosition: 0.5, animated: true });
+        }
+      : undefined;
 
   if (loading) return <ActivityIndicator style={styles.centred} />;
 
@@ -157,11 +166,18 @@ export function CommunityBoard({
   }
 
   const controls = (
-    <BoardControls board={board} onBoardChange={onBoardChange}>
+    <BoardControls
+      board={board}
+      onBoardChange={onBoardChange}
+      /* The slate, then how many rows are under it. The old "Where you stand"
+         panel carried the field size as its hint; it is a fact about the BOARD
+         rather than about the reader, so it belongs on the board's own line. */
+      context={rows ? `${slateContext} · ${fieldHint(id, rows.length)}` : slateContext}>
       {/* This board's own control, where the points board puts its week button.
 
-          A round menu rather than the Players section's chip row: the board bar
-          beside it takes the width, and six pills cannot share a line with it.
+          A round menu rather than a second row of chips: the board strip beside
+          it is already chips, and seven more of them on the same line would read
+          as thirteen equal choices rather than as a board and a filter on it.
           The circle carries the current position, so it still says what it is
           filtered to. */}
       {id === 'cards' ? (
@@ -190,9 +206,30 @@ export function CommunityBoard({
   return (
     <>
       {controls}
+      {/* Pinned, not in the list header — the whole point of the change. See
+          `BoardTop`. The wrapper is skipped rather than left empty when there
+          is no frame to draw, so its gutter would otherwise be a gap above the
+          empty state. */}
+      {hasBoardTop(meId) ? (
+        <View style={styles.top}>
+          <BoardTop
+            mine={mine}
+            meId={meId}
+            unit={meta.unit}
+            absent={meta.absent}
+            onJumpToMine={jumpToMine}
+          />
+        </View>
+      ) : null}
       <FlatList
+        ref={list}
         data={rows ?? []}
         style={styles.fill}
+        getItemLayout={(_, index) => ({
+          length: BOARD_ROW_HEIGHT,
+          offset: BOARD_ROW_HEIGHT * index,
+          index,
+        })}
         // The signed-in reader's tint and the column set are both outside `rows`.
         extraData={meId}
         keyExtractor={(row) => row.key}
@@ -235,11 +272,12 @@ function fieldHint(id: CommunityBoardId, rows: number): string {
 
 const styles = StyleSheet.create({
   head: {
-    gap: 14,
     paddingBottom: Spacing.two,
     paddingHorizontal: Spacing.three,
   },
-  intro: { gap: 2 },
+  /* The pinned frame's own gutter, matching the chips above it and the rows'
+     content below it. */
+  top: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
   blurb: { maxWidth: 560 },
   fill: { flex: 1 },
   /* VERTICAL ONLY. The rows are bled to the edges of the page, exactly as the
@@ -247,7 +285,10 @@ const styles = StyleSheet.create({
      is inside a row rather than to the list around it. Everything that is NOT
      a row — the heading, the blurb, the panels — takes the gutter back through
      `head` below. */
-  list: { paddingVertical: Spacing.three },
+  /* Vertically tighter at the top than it was: the frame directly above
+     already spaces the list off the chrome, so a third gap here read as a
+     hole between the pinned block and the rows it belongs to. */
+  list: { paddingTop: Spacing.one, paddingBottom: Spacing.three },
   centred: { flex: 1, justifyContent: 'center', padding: Spacing.four },
   empty: {
     gap: Spacing.one,

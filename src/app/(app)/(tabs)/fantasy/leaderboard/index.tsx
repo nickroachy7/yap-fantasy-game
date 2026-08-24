@@ -21,23 +21,17 @@
  * sideways, and would make the phone's back gesture walk the reader through
  * boards they were only flicking past.
  *
- * WHY A DROPDOWN AND NOT A STRIP OF TABS. It WAS a strip of tabs, and it was
- * the exact mistake `FantasyTopNav` documents: "if they ever converge on the
- * same treatment, the page grows two identical strips again and the reader has
- * to work out which is which by trying them." A word with a rule under it is
- * that file's treatment, drawn one row above this. Points had three of them
- * stacked — section nav, boards, weeks.
+ * WHY A BAR AND NOT A ROW OF PEERS. It has been underlined tabs and it has been
+ * a scrolling strip of filter pills, and neither survived a 375pt phone: tabs
+ * collided with `FantasyTopNav`'s own treatment one row above, and six pills
+ * needed about 520pt in a 343pt row so the strip opened clipped at both ends.
+ * `BoardControls` carries the full argument.
  *
- * It was also too many for a strip. `DropdownChip`'s own note is the argument:
- * a row of peers "become a horizontally scrolling strip where the option you
- * want is usually off-screen". At 375pt exactly that happened — Sets sat past
- * the right edge with nothing to say the row scrolled, so two of the six boards
- * were undiscoverable on a phone. The grid shows all six at once.
- *
- * WHY THE STRIP IS PINNED while the week tabs inside the points board scroll
- * away with the content. They are different ranks of control: this one says
- * WHICH BOARD you are reading and has to stay reachable from row two hundred;
- * the week tabs filter the board you are already on.
+ * WHY THE BAR IS PINNED, with the scope control, the context line and your own
+ * row beside it, while everything else scrolls. They are different ranks of
+ * thing: which board, what it is counted over, and where you stand in it all
+ * have to be answerable from row two hundred; the sentence describing the board
+ * is read once and should go.
  *
  * THE SLATE IS READ HERE, ONCE. Every board needs the same season and season
  * type, so six boards each calling `current_slate()` would be six round trips
@@ -88,14 +82,24 @@ export default function LeaderboardScreen() {
     await refresh();
   }, [refresh]);
 
-  const headerContext = useMemo(
-    () =>
-      [
-        slate ? `${slateLabel(slate.season_type)} ${slate.season}` : `${SEASON} season`,
-        slate?.week ? `Week ${slate.week}` : null,
-      ]
-        .filter(Boolean)
-        .join(' · '),
+  /**
+   * "Preseason 2026" — the slate every board is counted over, handed down for
+   * each board to finish with its own scope and field size.
+   *
+   * IT IS NOT PASSED TO `Screen` ANY MORE, and that is a fix rather than a
+   * removal. `Screen`'s `context` prop is wide-only by design, so this line
+   * rendered on web and NOWHERE on a phone — leaving the phone build with no
+   * statement anywhere of which season or week its numbers belonged to. The
+   * boards draw it themselves now, under the board strip, on both builds. See
+   * `BoardControls`.
+   *
+   * The WEEK is deliberately not in here. The points board can be showing a
+   * week other than the slate's current one, and a line that said "Week 3"
+   * above a board of Week 1 scores would be a wrong statement rather than a
+   * missing one. Each board appends the scope it is actually showing.
+   */
+  const slateContext = useMemo(
+    () => (slate ? `${slateLabel(slate.season_type)} ${slate.season}` : `${SEASON} season`),
     [slate],
   );
 
@@ -121,6 +125,7 @@ export default function LeaderboardScreen() {
           slate={slate}
           season={season}
           seasonType={seasonType}
+          slateContext={slateContext}
           meId={meId}
           onRefreshSlate={refreshSlate}
           board={board}
@@ -133,6 +138,7 @@ export default function LeaderboardScreen() {
         id={board}
         season={season}
         seasonType={seasonType}
+        slateContext={slateContext}
         meId={meId}
         onRefreshSlate={refreshSlate}
         board={board}
@@ -144,10 +150,10 @@ export default function LeaderboardScreen() {
   return (
     // scroll={false}: each board owns a FlatList, and nesting a virtualised
     // list inside a ScrollView defeats the virtualisation.
-    <Screen title="Leaderboard" measure="table" context={headerContext} scroll={false}>
+    <Screen title="Leaderboard" measure="table" scroll={false}>
       {/* The board draws the control row — see `BoardControls` for why both
-          chips have to be drawn by the same component. This screen still owns
-          which board is selected; it just no longer draws the chip itself. */}
+          controls have to be drawn by the same component. This screen still
+          owns which board is selected; it just no longer draws the strip. */}
       <View style={styles.body}>{body()}</View>
     </Screen>
   );

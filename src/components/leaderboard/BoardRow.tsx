@@ -98,6 +98,9 @@ export function BoardRow({
   unit,
   expanded,
   onToggle,
+  onPress,
+  pressHint,
+  rule = true,
   children,
 }: {
   row: BoardRowModel;
@@ -106,11 +109,33 @@ export function BoardRow({
   /** Only the points board expands, into its week-by-week breakdown. */
   expanded?: boolean;
   onToggle?: () => void;
+  /**
+   * A press that is NOT an expansion — the copy of your row inside `BoardTop`
+   * uses it to scroll the list to where you actually are.
+   *
+   * Separate from `onToggle` rather than sharing it, because the two say
+   * different things to a screen reader: one reveals a breakdown in place, the
+   * other moves the page. Overloading one prop would have announced "shows
+   * this player's week by week scores" on a control that does nothing of the
+   * kind.
+   */
+  onPress?: () => void;
+  /** What `onPress` does, for the reader who cannot see the list move. */
+  pressHint?: string;
+  /**
+   * False for a row that is the last thing inside a frame. The rule is the
+   * divider between this row and the next one, and against the bottom edge of
+   * `BoardTop`'s frame it doubles with the border a hairline above it.
+   */
+  rule?: boolean;
   children?: ReactNode;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const [pressed, setPressed] = useState(false);
+  /* One handler, whichever prop supplied it. A row never has both: the list
+     expands, the pinned copy jumps. */
+  const press = onToggle ?? onPress;
 
   const summary = [
     `Rank ${row.rank}`,
@@ -212,23 +237,25 @@ export function BoardRow({
       style={{
         backgroundColor: isMe ? c.backgroundMine : c.background,
       }}>
-      {onToggle ? (
+      {press ? (
         <Pressable
-          onPress={onToggle}
+          onPress={press}
           accessibilityRole="button"
           accessibilityLabel={summary}
-          accessibilityHint="Shows this player's week by week scores"
-          accessibilityState={{ expanded: Boolean(expanded) }}
+          accessibilityHint={
+            onToggle ? "Shows this player's week by week scores" : pressHint
+          }
+          accessibilityState={onToggle ? { expanded: Boolean(expanded) } : undefined}
           onPressIn={() => setPressed(true)}
           onPressOut={() => setPressed(false)}
           style={[styles.row, pressed && { backgroundColor: c.backgroundElement }]}>
           {body}
-          <View style={[styles.rule, { backgroundColor: c.border }]} />
+          {rule ? <View style={[styles.rule, { backgroundColor: c.border }]} /> : null}
         </Pressable>
       ) : (
         <View accessible accessibilityRole="text" accessibilityLabel={summary} style={styles.row}>
           {body}
-          <View style={[styles.rule, { backgroundColor: c.border }]} />
+          {rule ? <View style={[styles.rule, { backgroundColor: c.border }]} /> : null}
         </View>
       )}
       {expanded ? children : null}

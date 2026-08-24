@@ -59,8 +59,7 @@ import { parseProfile } from '@/components/players/profile';
 import { ScoreStrip } from '@/components/scores/ScoreStrip';
 import type { ScoreGame, ScoreTeam } from '@/components/scores/scoreboard';
 import { BoardRow } from '@/components/leaderboard/BoardRow';
-import { Podium } from '@/components/leaderboard/Podium';
-import { YourRow } from '@/components/leaderboard/YourRow';
+import { BoardTop } from '@/components/leaderboard/BoardTop';
 import { standingRows } from '@/components/leaderboard/PointsBoard';
 import type { Standing } from '@/components/leaderboard/board';
 import {
@@ -442,7 +441,10 @@ function LeaderboardFixture() {
           to show what the screen looks like, and the pickers are part of that.
           Points gets a second chip, exactly as `PointsBoard` gives it one. */}
       <View style={styles.boardControls}>
-        <BoardControls board={id} onBoardChange={setId}>
+        <BoardControls
+          board={id}
+          onBoardChange={setId}
+          context={`Preseason 2026 · ${built.length} ranked`}>
           {points ? (
             <MenuButton
               text={scope === 'season' ? 'SZN' : `P${scope}`}
@@ -468,20 +470,19 @@ function LeaderboardFixture() {
           ) : null}
         </BoardControls>
       </View>
-      <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>{meta.blurb}</Text>
-      <Podium rows={built} meId={MEID} />
-
-      {/* Pinned above the list on every real board. Drawn here so the fixture
-          shows the whole board, not only its list. */}
-      <YourRow
-        row={built.find((r) => r.userId === MEID) ?? null}
-        field={built.length}
-        absent="You are not on this board yet."
+      {/* Pinned above the list on every real board, and the one block the
+          screen is built around. Drawn here so the fixture shows the whole
+          board, not only its list. */}
+      <BoardTop
+        mine={built.find((r) => r.userId === MEID) ?? null}
+        meId={MEID}
         unit={meta.unit}
-        title={id === 'cards' ? 'Your best card' : 'Where you stand'}
+        absent="You are not on this board yet."
       />
 
-      <Panel title="Standings" hint={`${built.length} ranked`} />
+      {/* The one thing still inside the real boards' list header, and the only
+          thing above the rows. */}
+      <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>{meta.blurb}</Text>
 
       {/* Bled past the gallery Screen's own 16pt padding, because the real
           boards bleed past the list's — otherwise this fixture would show a
