@@ -93,6 +93,16 @@ export type SwapRequest =
        * learn, because it governs the whole afternoon.
        */
       lockedIds: Set<string>;
+      /**
+       * Why a given id is in `lockedIds`, in the words the reader needs.
+       *
+       * There are two reasons now and they call for different sentences: a
+       * player whose game has kicked off, and a card already playing in one of
+       * your other contests this week. The second is FIXABLE — go and take him
+       * out of the other lineup — so a row that said "already started" about it
+       * would send somebody to wait out a game that has not begun.
+       */
+      reasonFor?: (id: string) => string;
     }
   | { kind: 'bench'; card: LineupCard; destinations: SwapDestination[] };
 
@@ -265,7 +275,7 @@ function SlotBody({
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const { slot, current, eligiblePositions, lockedIds } = request;
+  const { slot, current, eligiblePositions, lockedIds, reasonFor } = request;
 
   /* The incumbent is pinned above, so he is not also in the list — one player
      appearing twice in a list you are choosing from is a bug report waiting to
@@ -342,7 +352,9 @@ function SlotBody({
             dimmed
             badge={<PositionBadge label={card.position} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />}
             right={<WeekFigure {...weekFigure(card)} />}
-            accessibilityLabel={`${card.name} has already started and cannot be brought in`}
+            accessibilityLabel={`${card.name} ${
+              reasonFor?.(card.id) ?? 'has already started and cannot be brought in'
+            }`}
           />
         ))}
       </View>
@@ -414,13 +426,20 @@ function ClearRow({
   );
 }
 
-/** "3 eligible RB", and what it does when some of them have kicked off. */
+/**
+ * "3 eligible RB", and what it does when some of them cannot be brought in.
+ *
+ * "unavailable" rather than "locked" since there are two ways to be shut out
+ * and only one of them is a kickoff — a card playing in another contest this
+ * week is equally unpickable and nothing to do with the clock. The per-row
+ * reason is on each band's accessibility label; this is the count.
+ */
 function countLabel(request: Extract<SwapRequest, { kind: 'slot' }>): string {
   const rest = request.options.filter((o) => o.id !== request.current?.id);
   const open = rest.filter((o) => !request.lockedIds.has(o.id)).length;
   const shut = rest.length - open;
   const head = `${open} eligible ${request.eligiblePositions}`;
-  return shut > 0 ? `${head} · ${shut} locked` : head;
+  return shut > 0 ? `${head} · ${shut} unavailable` : head;
 }
 
 /**

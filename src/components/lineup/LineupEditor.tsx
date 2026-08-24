@@ -188,6 +188,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
     savedPoints,
     scoredAt,
     finalizedAt,
+    elsewhere,
     loading,
     error: loadError,
     reload,
@@ -274,11 +275,60 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
    */
   const [lockNow, setLockNow] = useState(() => Date.now());
 
+  /**
+   * Cards that cannot be brought in, for either of the two reasons there are.
+   *
+   * KICKED OFF is the original one: his game has begun, so picking him now
+   * would be choosing a starter after watching him play.
+   *
+   * PLAYING ELSEWHERE is the new one, and it had been invisible. A card is in
+   * one contest a week (`card_plays_one_contest`), and `set_lineup` refuses the
+   * WHOLE submission if any slot breaks that — so a bench that offered a card
+   * already in your main lineup produced a board that silently stopped saving,
+   * with the reason rendered below sixteen bench rows. Do not offer what the
+   * server will always refuse.
+   *
+   * One set, because both answer the same question for the boards: may this
+   * row be pressed? They are told apart only where the reason is SAID, which
+   * is `reasonFor` below.
+   */
   const lockedIds = useMemo(() => {
     const out = new Set<string>();
     for (const card of cards) if (isLocked(card.game, lockNow)) out.add(card.id);
     return out;
   }, [cards, lockNow]);
+
+  /**
+   * What the PICKERS refuse: kicked off, or playing elsewhere.
+   *
+   * Kept apart from `lockedIds` rather than folded into it, and the difference
+   * is not cosmetic. `lockedIds` means "his game has started", which is what
+   * `allLocked` reads to decide the week is underway and what `isCardLocked`
+   * reads to stop a started player being taken OUT of a slot. A card sitting
+   * in another contest is neither of those things — it has not kicked off and
+   * it is not in this lineup at all — so merging them would have the board
+   * announce a locked week to somebody whose cards are simply committed
+   * elsewhere.
+   */
+  const unavailableIds = useMemo(() => {
+    const out = new Set(lockedIds);
+    for (const id of elsewhere.keys()) out.add(id);
+    return out;
+  }, [lockedIds, elsewhere]);
+
+  /**
+   * Why a dimmed row is dimmed, in the words the reader needs.
+   *
+   * Kickoff wins when both are true — it is the one that cannot be undone by
+   * going and changing another lineup.
+   */
+  const reasonFor = useCallback(
+    (id: string): string =>
+      cards.some((c) => c.id === id && isLocked(c.game, lockNow))
+        ? 'has already started and cannot be brought in'
+        : `is already playing in ${elsewhere.get(id) ?? 'another contest'}`,
+    [cards, lockNow, elsewhere],
+  );
 
   const nextLockMs = useMemo(() => nextLockAtMs(cards, lockNow), [cards, lockNow]);
 
@@ -350,10 +400,10 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
       new Map(
         [...eligibleBySlot].map(([slot, list]) => [
           slot,
-          list.filter((card) => !lockedIds.has(card.id)).length,
+          list.filter((card) => !unavailableIds.has(card.id)).length,
         ]),
       ),
-    [eligibleBySlot, lockedIds],
+    [eligibleBySlot, unavailableIds],
   );
 
   /* Grouped by position, not sorted by the reader — see `sortByPosition`. The
@@ -494,7 +544,8 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
         eligiblePositions: cfg.eligible_positions.join('/'),
         current: occupant,
         options: eligibleBySlot.get(cfg.slot) ?? [],
-        lockedIds,
+        lockedIds: unavailableIds,
+        reasonFor,
       };
     }
     const card = byId.get(swap.cardId);
@@ -512,7 +563,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
         }))
         .filter((d) => !isCardLocked(d.occupant)),
     };
-  }, [swap, slots, picks, byId, eligibleBySlot, isCardLocked, lockedIds]);
+  }, [swap, slots, picks, byId, eligibleBySlot, isCardLocked, unavailableIds, reasonFor]);
 
   /**
    * Re-read both halves of the fixture, without the pull-to-refresh spinner.
@@ -809,6 +860,17 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
           column it is actually in: `Screen` caps content at a ContentMeasure
           and the wide rail takes 236 more, so a page sized from the window is
           wrong by hundreds of points on a desktop. */}
+      {/* AT THE TOP, NOT AT THE BOTTOM. This used to sit under the bench, which
+          is sixteen rows down on a phone and further inside the contest sheet
+          — so a submission the server refused looked exactly like one that
+          worked, and the board simply stopped saving without saying so. A
+          failure has to be visible from where the action was taken. */}
+      {submitError ?? loadError ? (
+        <Text style={[Type.fine, styles.centreText, { color: c.negative }]}>
+          {submitError ?? loadError}
+        </Text>
+      ) : null}
+
       {pinned ? null : (
         <View onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}>
           <ContestCarousel
@@ -870,7 +932,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
               picks={picks}
               eligibleCounts={eligibleCounts}
               openSlot={swap?.kind === 'slot' ? swap.slot : null}
-              lockedIds={lockedIds}
+              lockedIds={unavailableIds}
               savedPoints={savedPoints}
               scored={scoredAt !== null}
               onOpenSlot={openSlot}
@@ -888,7 +950,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
               cards={bench}
               targetSlotFor={targetSlotFor}
               startableFor={startableFor}
-              lockedIds={lockedIds}
+              lockedIds={unavailableIds}
               onOpen={openBenchCard}
               onOpenProfile={openProfile}
               offSeasonCount={offSeasonCount}
@@ -934,11 +996,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen' }: LineupEditorPr
         </Text>
       ) : null}
 
-      {submitError ?? loadError ? (
-        <Text style={[Type.fine, styles.centreText, { color: c.negative }]}>
-          {submitError ?? loadError}
-        </Text>
-      ) : null}
+
 
       <SwapSheet
         request={swapRequest}

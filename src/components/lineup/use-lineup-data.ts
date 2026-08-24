@@ -271,6 +271,23 @@ export type LineupContest = {
 export type LineupData = {
   slate: Slate | null;
   /**
+   * Cards already playing in one of your OTHER contests this week, mapped to
+   * the name of the contest holding each.
+   *
+   * THE BOARD MUST NOT OFFER WHAT THE SERVER WILL REFUSE. `set_lineup` rejects
+   * the whole submission if any card is playing elsewhere this week
+   * (`card_plays_one_contest`), and the bench used to know nothing about it —
+   * so it happily offered a card sitting in your main lineup, took the pick,
+   * and then every autosave from that moment on failed with an error rendered
+   * below sixteen bench rows where nobody would ever see it. The lineup simply
+   * stopped saving and said nothing.
+   *
+   * "your main lineup" for the free contest rather than its name, which is the
+   * week and reads as a contradiction inside a sentence about this week. Same
+   * wording `set_lineup` uses, so the dimmed row and the error agree.
+   */
+  elsewhere: Map<string, string>;
+  /**
    * Which contest this board is editing. Null only before the first load, or
    * when the slate has no fixtures at all.
    */
@@ -326,6 +343,7 @@ export type LineupData = {
 export function useLineupData(contestCode?: string): LineupData {
   const [slate, setSlate] = useState<Slate | null>(null);
   const [contest, setContest] = useState<LineupContest | null>(null);
+  const [elsewhere, setElsewhere] = useState<Map<string, string>>(new Map());
   const [inPlay, setInPlay] = useState(false);
   const [hasLiveGame, setHasLiveGame] = useState(false);
   const [lockAt, setLockAt] = useState<string | null>(null);
@@ -433,7 +451,7 @@ export function useLineupData(contestCode?: string): LineupData {
     const owned = coll.data.filter((r): r is CollectionRow & { id: string } => Boolean(r.id));
     const playerIds = [...new Set(owned.map((r) => r.player_id).filter((id): id is string => Boolean(id)))];
 
-    const [cfg, lock, existing, gamesRes, stats] = await Promise.all([
+    const [cfg, lock, existing, others, gamesRes, stats] = await Promise.all([
       ct
         ? supabase
             .from('contest_format_slots')
@@ -449,6 +467,19 @@ export function useLineupData(contestCode?: string): LineupData {
           })
         : Promise.resolve({ data: null, error: null }),
       ct ? readLineup(ct.id) : Promise.resolve({ data: null, error: null }),
+      /* Every lineup you hold on this slate, with its slots. RLS scopes it to
+         you, so no user filter is sent and none would help. One query rather
+         than one per contest: the count is small and a card that cannot be
+         picked must be un-pickable on the FIRST paint, not after a round trip
+         per rival contest. */
+      s
+        ? supabase
+            .from('lineups')
+            .select('contest_id, contests(name, kind), lineup_slots(card_instance_id)')
+            .eq('season', s.season)
+            .eq('season_type', s.season_type)
+            .eq('week', s.week)
+        : Promise.resolve({ data: null, error: null }),
       s
         ? supabase
             .from('games')
@@ -505,6 +536,19 @@ export function useLineupData(contestCode?: string): LineupData {
 
     // Re-hydrate a lineup already submitted for this week. Its existence is
     // also the answer to "have I entered", which the paid board's button reads.
+    type OtherRow = {
+      contest_id: string;
+      contests: { name: string; kind: string } | null;
+      lineup_slots: { card_instance_id: string }[] | null;
+    };
+    const held = new Map<string, string>();
+    for (const row of ((others as { data: OtherRow[] | null }).data ?? [])) {
+      if (!ct || row.contest_id === ct.id) continue;
+      const where = row.contests?.kind === 'free' ? 'your main lineup' : (row.contests?.name ?? 'another contest');
+      for (const slot of row.lineup_slots ?? []) held.set(slot.card_instance_id, where);
+    }
+    setElsewhere(held);
+
     const prior = existing.data as PriorLineup;
     if (ct) setContest({ ...ct, unentered: !prior });
     applyLineup(prior);
@@ -574,6 +618,7 @@ export function useLineupData(contestCode?: string): LineupData {
   return {
     slate,
     contest,
+    elsewhere,
     inPlay,
     hasLiveGame,
     lockAt,
