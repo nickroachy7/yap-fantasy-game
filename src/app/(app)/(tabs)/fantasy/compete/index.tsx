@@ -41,7 +41,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BenchBoard } from '@/components/lineup/BenchBoard';
-import { ContestCard } from '@/components/lineup/ContestCard';
+import { ContestCarousel } from '@/components/lineup/ContestCarousel';
+import { useMyContests } from '@/components/contests/use-my-contests';
 import { useFieldRecord } from '@/components/lineup/field';
 import { SlotBoard } from '@/components/lineup/SlotBoard';
 import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
@@ -111,7 +112,42 @@ export default function LineupScreen() {
    * has to survive a reload and be linkable from the lobby.
    */
   const { contest: contestParam } = useLocalSearchParams<{ contest?: string }>();
-  const contestCode = typeof contestParam === 'string' ? contestParam : undefined;
+  const linkedCode = typeof contestParam === 'string' ? contestParam : undefined;
+
+  const { contests: myContests, reload: reloadMyContests } = useMyContests(linkedCode);
+
+  /**
+   * WHICH CARD OF THE CAROUSEL IS IN FRONT, and it is the board's key as well
+   * as the card's — swiping changes both, because they are one object.
+   *
+   * State rather than the route, and the route param only SEEDS it. A swipe is
+   * not a navigation: routing every one of them would push a history entry per
+   * card and make the back gesture walk the carousel instead of leaving the
+   * screen. The param exists so the lobby can open you on a particular contest
+   * — after that this owns it.
+   */
+  /* DERIVED UNTIL THE READER SWIPES, rather than seeded by an effect. The
+     linked contest arrives with the data, so an effect would have to write
+     state the moment it lands — which is the `set-state-in-effect` pattern
+     `use-loader`'s header exists to argue against, and it costs a render
+     showing the wrong card before the right one. `swiped` is null until a
+     swipe actually happens, and from then on it owns the selection. */
+  const [swiped, setSwiped] = useState<number | null>(null);
+  const linkedIndex = linkedCode
+    ? (myContests?.findIndex((ct) => ct.code === linkedCode) ?? -1)
+    : -1;
+  const rawIndex = swiped ?? (linkedIndex > 0 ? linkedIndex : 0);
+
+  /* Clamped, because the list can shrink under the index: a contest settles,
+     or the week rolls over, and the card that was in front is gone. */
+  const cardIndex = myContests?.length ? Math.min(rawIndex, myContests.length - 1) : 0;
+  const current = myContests?.length ? myContests[cardIndex] : null;
+  /* The free contest is the default and passes no code, which is what every
+     caller written before the lobby existed meant. */
+  const contestCode = current && current.kind !== 'free' ? current.code : undefined;
+
+  /** Measured, not derived from the window — see `ContestCarousel.width`. */
+  const [cardWidth, setCardWidth] = useState(0);
 
   const {
     slate,
@@ -122,7 +158,6 @@ export default function LineupScreen() {
     cards,
     savedPicks,
     savedPoints,
-    totalPoints,
     scoredAt,
     finalizedAt,
     loading,
@@ -337,7 +372,11 @@ export default function LineupScreen() {
    * `slate` on every countdown tick, and a hook that depended on the object
    * would re-read the season once a second.
    */
-  const { current: field, record, reload: reloadField } = useFieldRecord(slate);
+  /* `record` only — the SEASON record, which the free contest's card shows.
+     The week's distribution now comes per contest from `useMyContests`, since
+     `median_record` is deliberately free-only and a lobby card needs its own
+     field. See `20260825070000`. */
+  const { record, reload: reloadField } = useFieldRecord(slate);
 
   /* Both of these clear the failure state as well as the error text: a new
      choice is a new thing to try, and it deserves an attempt of its own. */
@@ -460,8 +499,8 @@ export default function LineupScreen() {
    * watching a game on into a screen that appears to be struggling.
    */
   const reread = useCallback(async () => {
-    await Promise.all([reload(), reloadField()]);
-  }, [reload, reloadField]);
+    await Promise.all([reload(), reloadField(), reloadMyContests()]);
+  }, [reload, reloadField, reloadMyContests]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -573,9 +612,15 @@ export default function LineupScreen() {
      * thing that knows what actually stuck — but only of the row that changed.
      */
     await reloadLineup();
+    /* The CARD is stale too, not just the board: `filled` and this contest's
+       distribution both move with a submission, and on a carousel that is the
+       thing the reader is looking straight at. Not awaited — the board is
+       already correct and the card catching up a moment later is invisible,
+       where blocking the button on it is not. */
+    void reloadMyContests();
     setEdits({});
     setSaving(false);
-  }, [slate, picks, contestCode, reloadLineup, reload]);
+  }, [slate, picks, contestCode, reloadLineup, reload, reloadMyContests]);
 
   /**
    * The autosave.
@@ -723,19 +768,24 @@ export default function LineupScreen() {
       context={context}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}>
-      <ContestCard
-        displayName={displayName}
-        weekLabel={week}
-        lockAt={nextLockAt ?? lockAt}
-        locked={allLocked}
-        now={now}
-        /* Passed raw. Whether a nought is a SCORE or just an unswept row is a
-           question about the field, not about this lineup, so the card decides
-           it from `field.high` — see the note there. */
-        myPoints={totalPoints}
-        field={field}
-        record={record}
-      />
+      {/* MEASURED HERE so the carousel pages on the width of the column it is
+          actually in. `Screen` caps content at a ContentMeasure and the wide
+          rail takes 236 more, so a page sized from the window is wrong by
+          hundreds of points on a desktop. */}
+      <View onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}>
+        <ContestCarousel
+          contests={myContests ?? []}
+          index={cardIndex}
+          onIndexChange={setSwiped}
+          displayName={displayName}
+          weekLabel={week}
+          lockAt={nextLockAt ?? lockAt}
+          locked={allLocked}
+          now={now}
+          record={record}
+          width={cardWidth}
+        />
+      </View>
 
       {/* ONE CAPTION, AND WHICH ONE DEPENDS ON WHETHER THE WEEK HAS STARTED.
  

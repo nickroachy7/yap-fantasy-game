@@ -23,10 +23,14 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  * playing somewhere else — so this page has to state it rather than wait to
  * enforce it. Hence the footnote under the list, which is not decoration.
  *
- * THE FREE CONTEST IS LISTED BUT IT IS NOT A CHOICE. Every account is entered
- * automatically, so it appears here for completeness and to say whether your
- * lineup is in — and the row goes to the lineup rather than to an entry flow,
- * because there is nothing to enter.
+ * THIS PAGE IS THE LOBBY AND NOTHING ELSE: contests you could join, not ones
+ * you are in. Your entries live on the carousel at the top of the Lineup board,
+ * over the lineup each belongs to. Showing them in both places would make
+ * "where do I edit this" a question with two answers, and the answer that lost
+ * would still be one tap away — which is how two editors get built.
+ *
+ * The free contest never appears. Nobody chose it and nobody can leave it, so
+ * it is not a thing to browse.
  *
  * THERE IS ONE LOBBY CONTEST AND IT COSTS GEMS. The fee is not flavour: a
  * second contest is a second source of score gems (`award_score_gems` pays 1.5
@@ -41,50 +45,46 @@ export default function ContestsScreen() {
   const router = useRouter();
   const { contests, loading, error } = useContests();
 
-  const free = contests?.filter((c) => c.kind === 'free') ?? [];
-  const lobby = contests?.filter((c) => c.kind === 'lobby') ?? [];
+  /* THE LOBBY IS WHAT YOU ARE NOT ALREADY IN. Contests you have entered live
+     on the carousel at the top of the Lineup board, where their card sits over
+     the lineup it belongs to — listing them here as well would put the same
+     contest on two screens and make "which one do I edit" a question with two
+     answers. See the note on the takeover in `contest/[code]`.
+
+     The free contest never appears: nobody chose it and nobody can leave it. */
+  const open = (contests ?? []).filter((c) => c.kind !== 'free' && c.mine === null);
+  const entered = (contests ?? []).filter((c) => c.kind !== 'free' && c.mine !== null).length;
 
   const context = loading
     ? undefined
-    : contests === null
-      ? undefined
-      : lobby.length > 0
-        ? `${lobby.length} open · ${free.length + lobby.length} this week`
-        : 'One card plays one contest a week';
+    : open.length > 0
+      ? `${open.length} open · one card plays one contest`
+      : 'One card plays one contest a week';
 
   return (
     <Screen title="Contests" measure="form" context={context}>
       {error ? <ErrorLine message={error} /> : null}
-      <Panel title="Your week">
-        {free.length === 0 && !loading ? (
-          <EmptyState
-            pad={false}
-            title="No slate yet"
-            body="There are no fixtures loaded for a week to be played."
-          />
-        ) : (
-          free.map((c) => (
-            <ContestRow key={c.id} contest={c} onPress={() => router.replace('/fantasy/compete')} />
-          ))
-        )}
-      </Panel>
 
-      <Panel title="Lobby">
-        {lobby.length > 0 ? (
-          lobby.map((c) => (
+      <Panel title="Open">
+        {open.length > 0 ? (
+          open.map((c) => (
             <ContestRow
               key={c.id}
               contest={c}
               onPress={() =>
-                router.push({ pathname: '/fantasy/compete', params: { contest: c.code } })
+                router.push({ pathname: '/contest/[code]', params: { code: c.code } })
               }
             />
           ))
-        ) : (
+        ) : loading ? null : (
           <EmptyState
             pad={false}
-            title="The lobby opens soon"
-            body="Extra contests you can enter with the cards you are not already playing. Small formats — three cards, no quarterback or kicker to find."
+            title={entered > 0 ? "You're in everything that's open" : 'Nothing open right now'}
+            body={
+              entered > 0
+                ? 'Your entries are on the Lineup board — swipe the card at the top to move between them.'
+                : 'Extra contests appear here each week. Small formats, so there is no quarterback or kicker to find.'
+            }
           />
         )}
       </Panel>

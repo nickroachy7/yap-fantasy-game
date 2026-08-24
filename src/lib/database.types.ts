@@ -1717,6 +1717,34 @@ export type Database = {
           week: number
         }[]
       }
+      my_contest_cards: {
+        Args: { p_include?: string }
+        Returns: {
+          ahead: number
+          average: number
+          code: string
+          contest_id: string
+          entrants: number
+          entry_fee_gems: number
+          filled: number
+          final: boolean
+          format_code: string
+          format_name: string
+          high: number
+          kind: Database["public"]["Enums"]["contest_kind"]
+          lineup_id: string
+          low: number
+          median: number
+          my_points: number
+          my_rank: number
+          name: string
+          result: string
+          season: number
+          season_type: number
+          slot_count: number
+          week: number
+        }[]
+      }
       open_pack: {
         Args: { p_pack_code: string }
         Returns: {

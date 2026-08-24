@@ -124,6 +124,18 @@ export default function AppLayout() {
             it is the same kind of object: something you open off a row, read,
             and put down again. */}
         <Stack.Screen name="set/[code]" options={sheetOptions} />
+        {/* A contest, opened off a lobby row: what it asks of you, what it
+            costs, and the button that enters it. Same presentation as the set
+            checklist above, and for the same reason — you open it, read it,
+            act once, and put it down.
+
+            THE LINEUP IS NOT IN HERE, deliberately. Filling one is not a
+            sheet-sized task (a bench of twenty, per-slot swapping, locks,
+            autosave) and `SwapSheet` is itself a bottom sheet under 900px, so
+            editing in here would stack two of them on a phone. Entering
+            dismisses onto that contest's card in the lineup carousel, which is
+            the one editor. */}
+        <Stack.Screen name="contest/[code]" options={sheetOptions} />
         {/* Packs. Same presentation again, and for the same reason: you open
             it, spend, and put it down. It replaced `collection/shop`, which
             was a whole sub-page for a shelf of two rows — see there. */}

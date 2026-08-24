@@ -622,7 +622,7 @@ export function webSectionOf(pathname: string): WebSection | null {
  * declared as `Stack.Screen`s in `(app)/_layout.tsx` and appear nowhere in this
  * file's tree. If a fourth sheet is added there, add it here.
  */
-const SHEET_PREFIXES = ['/player/', '/card/', '/set/'] as const;
+const SHEET_PREFIXES = ['/player/', '/card/', '/set/', '/contest/'] as const;
 
 export function isOverlayPath(pathname: string): boolean {
   const takeovers = allChildren().filter((c) => c.takeover);

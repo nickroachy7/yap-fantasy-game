@@ -223,6 +223,7 @@ export function ContestCard({
   myPoints,
   field,
   record,
+  standingLine,
 }: {
   displayName: string;
   /** "Preseason · Week 3" — without the lock state, which the head rail carries. */
@@ -240,6 +241,19 @@ export function ContestCard({
   /** This week's field. Null while it loads, or before anyone has entered. */
   field: FieldWeek | null;
   record: Record_;
+  /**
+   * Overrides the season record under the name.
+   *
+   * A SEASON RECORD IS A PROPERTY OF THE SEASON CONTEST, and only the free one
+   * has a season. A lobby contest is a single week that is entered and settled
+   * and gone, so "Season 0-0" under it would be inventing a standing for
+   * something with no history to stand on — and worse, it reads as the SAME
+   * number the free card above it is showing.
+   *
+   * A lobby card says what the contest asks of you instead ("Flex Three · 3
+   * cards"), which is the fact its owner actually needs while swiping past.
+   */
+  standingLine?: string;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -347,7 +361,7 @@ export function ContestCard({
    * summarises. The bar IS this week's standing; the rank is the same fact as
    * a number, so that is where it belongs.
    */
-  const seasonLine = `Season ${recordLabel(record)}`;
+  const seasonLine = standingLine ?? `Season ${recordLabel(record)}`;
 
   const weekLine =
     field === null
