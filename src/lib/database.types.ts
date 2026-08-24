@@ -57,6 +57,8 @@ export type Database = {
           source: Database["public"]["Enums"]["acquisition_source"]
           tier: Database["public"]["Enums"]["card_tier"]
           user_id: string
+          wiped_at: string | null
+          wiped_by_run: string | null
         }
         Insert: {
           acquired_at?: string
@@ -75,6 +77,8 @@ export type Database = {
           source?: Database["public"]["Enums"]["acquisition_source"]
           tier?: Database["public"]["Enums"]["card_tier"]
           user_id: string
+          wiped_at?: string | null
+          wiped_by_run?: string | null
         }
         Update: {
           acquired_at?: string
@@ -93,6 +97,8 @@ export type Database = {
           source?: Database["public"]["Enums"]["acquisition_source"]
           tier?: Database["public"]["Enums"]["card_tier"]
           user_id?: string
+          wiped_at?: string | null
+          wiped_by_run?: string | null
         }
         Relationships: [
           {
@@ -128,6 +134,13 @@ export type Database = {
             columns: ["pack_opening_id"]
             isOneToOne: false
             referencedRelation: "pack_openings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_instances_wiped_by_run_fkey"
+            columns: ["wiped_by_run"]
+            isOneToOne: false
+            referencedRelation: "runs"
             referencedColumns: ["id"]
           },
         ]
@@ -379,6 +392,8 @@ export type Database = {
           created_at: string
           entry_fee_gems: number
           format_code: string
+          hearts_at_risk: number
+          hearts_on_win: number
           id: string
           kind: Database["public"]["Enums"]["contest_kind"]
           max_entrants: number | null
@@ -386,12 +401,16 @@ export type Database = {
           season: number
           season_type: number
           week: number
+          win_condition: Database["public"]["Enums"]["contest_win_condition"]
+          win_rank: number | null
         }
         Insert: {
           code: string
           created_at?: string
           entry_fee_gems?: number
           format_code: string
+          hearts_at_risk?: number
+          hearts_on_win?: number
           id?: string
           kind: Database["public"]["Enums"]["contest_kind"]
           max_entrants?: number | null
@@ -399,12 +418,16 @@ export type Database = {
           season: number
           season_type: number
           week: number
+          win_condition?: Database["public"]["Enums"]["contest_win_condition"]
+          win_rank?: number | null
         }
         Update: {
           code?: string
           created_at?: string
           entry_fee_gems?: number
           format_code?: string
+          hearts_at_risk?: number
+          hearts_on_win?: number
           id?: string
           kind?: Database["public"]["Enums"]["contest_kind"]
           max_entrants?: number | null
@@ -412,6 +435,8 @@ export type Database = {
           season?: number
           season_type?: number
           week?: number
+          win_condition?: Database["public"]["Enums"]["contest_win_condition"]
+          win_rank?: number | null
         }
         Relationships: [
           {
@@ -701,6 +726,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "lineup_slots_card_instance_id_fkey"
+            columns: ["card_instance_id"]
+            isOneToOne: false
+            referencedRelation: "my_lost_cards"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "lineup_slots_lineup_id_fkey"
             columns: ["lineup_id"]
             isOneToOne: false
@@ -714,6 +746,7 @@ export type Database = {
           contest_id: string
           finalized_at: string | null
           id: string
+          run_id: string | null
           scored_at: string | null
           season: number
           season_type: number
@@ -726,6 +759,7 @@ export type Database = {
           contest_id: string
           finalized_at?: string | null
           id?: string
+          run_id?: string | null
           scored_at?: string | null
           season: number
           season_type?: number
@@ -738,6 +772,7 @@ export type Database = {
           contest_id?: string
           finalized_at?: string | null
           id?: string
+          run_id?: string | null
           scored_at?: string | null
           season?: number
           season_type?: number
@@ -752,6 +787,13 @@ export type Database = {
             columns: ["contest_id"]
             isOneToOne: false
             referencedRelation: "contests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lineups_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
             referencedColumns: ["id"]
           },
         ]
@@ -985,6 +1027,112 @@ export type Database = {
           display_name?: string
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      run_carry_ladder: {
+        Row: {
+          card_slots: number
+          min_wins: number
+        }
+        Insert: {
+          card_slots: number
+          min_wins: number
+        }
+        Update: {
+          card_slots?: number
+          min_wins?: number
+        }
+        Relationships: []
+      }
+      run_contest_results: {
+        Row: {
+          contest_id: string
+          hearts_delta: number
+          lineup_id: string
+          result: string
+          run_id: string
+          settled_at: string
+          user_id: string
+        }
+        Insert: {
+          contest_id: string
+          hearts_delta: number
+          lineup_id: string
+          result: string
+          run_id: string
+          settled_at?: string
+          user_id: string
+        }
+        Update: {
+          contest_id?: string
+          hearts_delta?: number
+          lineup_id?: string
+          result?: string
+          run_id?: string
+          settled_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "run_contest_results_contest_id_fkey"
+            columns: ["contest_id"]
+            isOneToOne: false
+            referencedRelation: "contests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_contest_results_lineup_id_fkey"
+            columns: ["lineup_id"]
+            isOneToOne: false
+            referencedRelation: "lineups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "run_contest_results_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      runs: {
+        Row: {
+          ended_at: string | null
+          ended_reason: string | null
+          hearts: number
+          id: string
+          losses: number
+          max_hearts: number
+          settled_at: string | null
+          started_at: string
+          user_id: string
+          wins: number
+        }
+        Insert: {
+          ended_at?: string | null
+          ended_reason?: string | null
+          hearts: number
+          id?: string
+          losses?: number
+          max_hearts: number
+          settled_at?: string | null
+          started_at?: string
+          user_id: string
+          wins?: number
+        }
+        Update: {
+          ended_at?: string | null
+          ended_reason?: string | null
+          hearts?: number
+          id?: string
+          losses?: number
+          max_hearts?: number
+          settled_at?: string | null
+          started_at?: string
+          user_id?: string
+          wins?: number
         }
         Relationships: []
       }
@@ -1365,6 +1513,59 @@ export type Database = {
           },
         ]
       }
+      my_lost_cards: {
+        Row: {
+          acquired_at: string | null
+          card_id: string | null
+          career_fp: number | null
+          fp_per_game: number | null
+          id: string | null
+          in_set: boolean | null
+          injury_status: string | null
+          lineup_starts: number | null
+          next_tier_at: number | null
+          next_tier_label: Database["public"]["Enums"]["card_tier"] | null
+          player_id: string | null
+          player_name: string | null
+          position_abbreviation: string | null
+          season: number | null
+          sell_value: number | null
+          team_abbreviation: string | null
+          tier: Database["public"]["Enums"]["card_tier"] | null
+          tier_floor_fp: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "cards_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["player_id"]
+          },
+          {
+            foreignKeyName: "cards_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       my_sets: {
         Row: {
           claimable_gems: number | null
@@ -1598,6 +1799,7 @@ export type Database = {
       }
       card_actions: { Args: { p_card_instance_ids: string[] }; Returns: Json }
       card_profile: { Args: { p_card_instance_id: string }; Returns: Json }
+      claim_carry: { Args: { p_card_instance_ids?: string[] }; Returns: Json }
       claim_set_reward: { Args: { p_set_code: string }; Returns: Json }
       commit_candidate: {
         Args: {
@@ -1624,17 +1826,54 @@ export type Database = {
           entry_fee_gems: number
           format_code: string
           format_name: string
+          hearts_at_risk: number
+          hearts_on_win: number
           id: string
           kind: Database["public"]["Enums"]["contest_kind"]
           max_entrants: number
           my_filled: number
+          my_hearts: number
           my_lineup_id: string
           name: string
           season: number
           season_type: number
           slot_count: number
           week: number
+          win_condition: Database["public"]["Enums"]["contest_win_condition"]
+          win_rank: number
         }[]
+      }
+      contest_results: {
+        Args: { p_contest: string }
+        Returns: {
+          entrants: number
+          lineup_id: string
+          points: number
+          result: string
+          rnk: number
+          user_id: string
+        }[]
+      }
+      current_run: {
+        Args: never
+        Returns: {
+          ended_at: string | null
+          ended_reason: string | null
+          hearts: number
+          id: string
+          losses: number
+          max_hearts: number
+          settled_at: string | null
+          started_at: string
+          user_id: string
+          wins: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "runs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       current_slate: {
         Args: never
@@ -1746,6 +1985,7 @@ export type Database = {
           week: number
         }[]
       }
+      my_run: { Args: never; Returns: Json }
       open_pack: {
         Args: { p_pack_code: string }
         Returns: {
@@ -1784,6 +2024,7 @@ export type Database = {
       roster_status: { Args: never; Returns: Json }
       rotate_daily_set: { Args: never; Returns: Json }
       rotate_weekly_set: { Args: never; Returns: Json }
+      run_carry_slots: { Args: { p_wins: number }; Returns: number }
       score_week: {
         Args: { p_season: number; p_season_type: number; p_week: number }
         Returns: Json
@@ -1820,6 +2061,10 @@ export type Database = {
         }
         Returns: string
       }
+      settle_run_week: {
+        Args: { p_season: number; p_season_type: number; p_week: number }
+        Returns: Json
+      }
       settle_week_payouts: { Args: { p_season?: number }; Returns: Json }
       slate_in_play: {
         Args: never
@@ -1839,6 +2084,14 @@ export type Database = {
         }[]
       }
       verify_sync_secret: { Args: { candidate: string }; Returns: boolean }
+      wagered_entries: {
+        Args: { p_user: string }
+        Returns: {
+          contest_id: string
+          hearts_at_risk: number
+          lineup_id: string
+        }[]
+      }
       week_is_complete: {
         Args: { p_season: number; p_season_type: number; p_week: number }
         Returns: boolean
@@ -1852,11 +2105,13 @@ export type Database = {
         Returns: Json
       }
       weekly_set_monday: { Args: { p_day: string }; Returns: string }
+      wipe_run: { Args: { p_run: string }; Returns: Json }
     }
     Enums: {
       acquisition_source: "pack" | "grant" | "admin"
       card_tier: "bronze" | "silver" | "gold" | "diamond"
       contest_kind: "free" | "lobby"
+      contest_win_condition: "median" | "top_n"
       gem_reason:
         | "signup_bonus"
         | "weekly_grant"
@@ -1870,6 +2125,7 @@ export type Database = {
         | "mvp_bonus"
         | "contest_entry"
         | "contest_refund"
+        | "run_wipe"
       rarity: "common" | "uncommon" | "rare" | "epic" | "legendary"
     }
     CompositeTypes: {
@@ -2004,6 +2260,7 @@ export const Constants = {
       acquisition_source: ["pack", "grant", "admin"],
       card_tier: ["bronze", "silver", "gold", "diamond"],
       contest_kind: ["free", "lobby"],
+      contest_win_condition: ["median", "top_n"],
       gem_reason: [
         "signup_bonus",
         "weekly_grant",
@@ -2017,6 +2274,7 @@ export const Constants = {
         "mvp_bonus",
         "contest_entry",
         "contest_refund",
+        "run_wipe",
       ],
       rarity: ["common", "uncommon", "rare", "epic", "legendary"],
     },

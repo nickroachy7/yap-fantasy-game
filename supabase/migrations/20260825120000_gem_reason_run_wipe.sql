@@ -1,0 +1,13 @@
+-- Its own migration because `alter type ... add value` cannot be used by other
+-- statements in the same transaction — the same reason `contest_entry` and
+-- `contest_refund` each got a file. The wipe that spends it lands in
+-- `20260825170000_claim_carry`.
+--
+-- WHY THE WIPE IS LEDGERED RATHER THAN JUST ZEROED
+--
+-- `gem_balances` is a running total that the ledger is supposed to explain. A
+-- balance set to zero with no ledger row breaks that: every reconciliation
+-- after it reads as though gems went missing, and the one place a player will
+-- look hardest for an accounting error is the screen that just took everything
+-- off them.
+alter type public.gem_reason add value if not exists 'run_wipe';

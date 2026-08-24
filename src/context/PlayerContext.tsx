@@ -1,12 +1,24 @@
 /**
- * The signed-in player's headline state: gems and identity.
+ * The signed-in player's headline state: gems, hearts and identity.
  *
  * Lives in context because the header renders on every tab — without this each
  * screen would fetch the balance separately and they would drift apart after a
  * pack opening.
+ *
+ * THE RUN IS HERE FOR THE SAME REASON THE BALANCE IS. Hearts are the second
+ * resource this game asks a player to spend, they are drawn in the same strip
+ * of chrome, and they move on the same events — entering a contest costs gems
+ * and puts a heart at risk in one action. Loading them separately would let the
+ * header show a fee it can afford next to a run that has already ended.
+ *
+ * `my_run()` CREATES a run on first read, which is why it is called from the
+ * chrome rather than from the lobby: the run has to exist before anything can
+ * price itself against it, and the alternative — creating one at entry — means
+ * a player cannot see what they are risking until after they have risked it.
  */
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
+import { parseRun, type Run } from '@/components/runs/run';
 import { useAuth } from '@/context/AuthContext';
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
@@ -15,9 +27,14 @@ export type PlayerState = {
   gems: number;
   displayName: string;
   cardCount: number;
+  /**
+   * The live run, or the dead one still owed a carry. Null only before the
+   * first load — every signed-in player has one, because reading it makes one.
+   */
+  run: Run | null;
   loading: boolean;
   error: string | null;
-  /** Call after anything that spends or earns gems. */
+  /** Call after anything that spends or earns gems, or moves a heart. */
   refresh: () => Promise<void>;
 };
 
@@ -34,6 +51,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [gems, setGems] = useState(0);
   const [displayName, setDisplayName] = useState('player');
   const [cardCount, setCardCount] = useState(0);
+  const [run, setRun] = useState<Run | null>(null);
 
   const load = useCallback<Load>(
     async (live) => {
@@ -67,7 +85,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
        * fact, so a comment claiming it for a batch is a claim about tables it
        * has not checked.
        */
-      const [profile, balance, cards] = await Promise.all([
+      const [profile, balance, cards, runRow] = await Promise.all([
         supabase.from('profiles').select('display_name').eq('id', session.user.id).single(),
         supabase.from('gem_balances').select('balance').single(),
         /* `is_held`, not every row this user has ever had. A sold copy is still
@@ -80,13 +98,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           .from('card_instances')
           .select('id', { count: 'exact', head: true })
           .eq('is_held', true),
+        supabase.rpc('my_run'),
       ]);
       if (!live()) return;
-      const failure = profile.error ?? balance.error ?? cards.error;
+      const failure = profile.error ?? balance.error ?? cards.error ?? runRow.error;
       if (failure) return failure.message;
       setDisplayName(profile.data?.display_name ?? 'player');
       setGems(balance.data?.balance ?? 0);
       setCardCount(cards.count ?? 0);
+      setRun(parseRun(runRow.data));
     },
     [session],
   );
@@ -97,8 +117,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     // Without a session there is nothing to read and nothing true to show, so
     // this stays loading — the header draws an em dash rather than a confident
     // balance of zero, which is what it did before the read was extracted.
-    () => ({ gems, displayName, cardCount, loading: loading || !session, error, refresh }),
-    [gems, displayName, cardCount, loading, error, refresh, session],
+    () => ({ gems, displayName, cardCount, run, loading: loading || !session, error, refresh }),
+    [gems, displayName, cardCount, run, loading, error, refresh, session],
   );
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;

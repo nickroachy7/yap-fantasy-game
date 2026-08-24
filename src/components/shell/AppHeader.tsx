@@ -1,5 +1,5 @@
 /**
- * The app header: the wordmark, and the gem balance. That is all of it.
+ * The app header: the wordmark, the hearts, and the gem balance.
  *
  * NO BAND. It used to paint itself `#0E0F12` — a shade off the page, plus a
  * gold bloom in the corner — so the chrome read as a fixed branded strip
@@ -31,6 +31,23 @@
  * PRE WK 3. `Screen` still takes `context` and still renders it on WIDE, under
  * the page heading, where there is a heading for it to qualify.
  *
+ * THE HEARTS SIT NEXT TO THE BALANCE because they are the same kind of fact —
+ * what you have to spend — and because the two move together: entering a
+ * contest takes gems and puts a heart at risk in one action. Splitting them
+ * across the chrome would let a player read a fee they can afford beside a run
+ * that has already ended.
+ *
+ * They are drawn only while a run has hearts to draw. A dead run awaiting its
+ * carry shows nothing here rather than an empty rack, because the empty rack is
+ * the death screen's line to deliver, and a masthead cannot deliver it — see
+ * `run-over`. Nothing at all is a quieter way to say "not right now" than three
+ * hollow pips repeated on every tab.
+ *
+ * THE RACK IS WHAT YOU HOLD, NOT THE CEILING. It used to draw `max_hearts`
+ * pips, which meant a new run — 3 hearts, healing to 5 — opened as three filled
+ * and two empty, i.e. as a run that had already lost twice. Outlined pips now
+ * mean WAGERED: hearts riding on a contest that has not settled. See `Hearts`.
+ *
  * THE BALANCE IS A NUMBER, NOT A WIDGET. The pill it used to sit in — border,
  * inset fill, a 8pt "GEMS" label above the figure — was three pieces of
  * decoration around one fact, stacked into two lines to fit. The gem glyph
@@ -52,6 +69,7 @@ import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { YapMark } from '@/components/brand/YapLogo';
+import { Hearts } from '@/components/runs/Hearts';
 import { Colors, Spacing, TierColors } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -96,7 +114,7 @@ export function AppHeader({
   const c = Colors[scheme];
   const accent = TierColors[scheme].gold.accent;
   const top = useSafeAreaInsets().top;
-  const { gems, loading } = usePlayer();
+  const { gems, run, loading } = usePlayer();
 
   return (
     <View style={[styles.base, { paddingTop: top, backgroundColor: c.background }]}>
@@ -111,11 +129,16 @@ export function AppHeader({
           <Text style={[styles.wordmark, { color: c.text }]}>YAP FANTASY</Text>
         </View>
 
-        <View style={styles.balance}>
-          <Gem size={12} color={accent} />
-          <Text style={[styles.figure, NUMERIC, { color: c.text }]}>
-            {loading ? '—' : gems.toLocaleString()}
-          </Text>
+        <View style={styles.right}>
+          {!loading && run && !run.awaitingCarry ? (
+            <Hearts hearts={run.hearts} wagered={run.wagered} />
+          ) : null}
+          <View style={styles.balance}>
+            <Gem size={12} color={accent} />
+            <Text style={[styles.figure, NUMERIC, { color: c.text }]}>
+              {loading ? '—' : gems.toLocaleString()}
+            </Text>
+          </View>
         </View>
       </View>
     </View>
@@ -151,7 +174,10 @@ const styles = StyleSheet.create({
     ...Platform.select({ web: { fontFamily: 'inherit' }, default: {} }),
   },
   /* `flexShrink: 0` so a long context line truncates rather than squeezing the
-     balance — the figure is the reason the right side exists. */
+     balance — the figure is the reason the right side exists. The gap between
+     hearts and gems is wider than the gap inside either, so the two read as
+     two facts rather than one row of mixed glyphs. */
+  right: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, flexShrink: 0 },
   balance: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 0 },
   figure: { fontSize: 17, fontWeight: '800', letterSpacing: -0.2 },
 });

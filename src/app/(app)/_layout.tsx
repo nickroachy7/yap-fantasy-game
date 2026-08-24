@@ -140,6 +140,19 @@ export default function AppLayout() {
             it, spend, and put it down. It replaced `collection/shop`, which
             was a whole sub-page for a shelf of two rows — see there. */}
         <Stack.Screen name="packs" options={sheetOptions} />
+        {/* The death screen. An ORDINARY PUSH, and that is the decision:
+            every other route in this stack is presented over the app, and this
+            one deliberately is not.
+
+            A sheet or a full-screen modal would put the death on top of
+            everything and make dismissing it the only thing to do. But there IS
+            something else to do — the free contest risks no hearts, belongs to
+            no run, and is specifically the floor a dead player still has. A
+            death that locks the app is a suspension, which is what a weekly
+            game cannot afford. So this is a page you are pointed at and can
+            walk away from; the carry does not expire, and everything with a
+            heart on it refuses until it is answered. See `run-over` itself. */}
+        <Stack.Screen name="run-over" />
         {/* Search is a TAKEOVER, not a sheet: it covers the header and the tab
             bar as well as the page, which is the whole point of it and the
             reason it cannot live under `(tabs)`. `fullScreenModal` is the one

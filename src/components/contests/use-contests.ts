@@ -10,6 +10,13 @@
  * `contest_lobby()` is SECURITY DEFINER for exactly that reason and returns
  * only aggregates — a count and a boolean — never anybody else's rows.
  *
+ * IT ALSO CARRIES THE STAKES. A contest that can end a run and one that cannot
+ * are not the same product, and the difference is invisible from the fee — both
+ * cost 40 gems. `hearts_at_risk`, `hearts_on_win` and the win condition come
+ * down with the row so a lobby can never draw the two identically; entering
+ * something that kills a run without being told it could is the worst surprise
+ * this feature can hand somebody.
+ *
  * NOT SESSION-CACHED, unlike the collection and the sets. Those answer "what do
  * I own", which changes only when you act; this answers "what is open, how full
  * is it, can I afford it", which changes when a WEEK rolls over and when other
@@ -47,6 +54,22 @@ export type Contest = {
   mine: { lineupId: string; filled: number } | null;
   /** True when you are already in, or hold the fee. */
   affordable: boolean;
+
+  /**
+   * HOW THIS CONTEST DECIDES A WINNER. `median` is even money — you beat the
+   * middle of the field or you do not. `top_n` pays only the first `winRank`
+   * places, so most of its field loses, which is why a row has to say which it
+   * is BEFORE a heart is committed to it.
+   */
+  winCondition: 'median' | 'top_n';
+  /** For `top_n`: the last place that still counts as a win. */
+  winRank: number | null;
+  /** Hearts a loss here costs the run. 0 means it cannot end you. */
+  heartsAtRisk: number;
+  /** Hearts a win heals, capped at the run's maximum. */
+  heartsOnWin: number;
+  /** Hearts the caller's run is holding, or null before they have one. */
+  myHearts: number | null;
 };
 
 type Row = {
@@ -66,6 +89,11 @@ type Row = {
   my_lineup_id: string | null;
   my_filled: number;
   affordable: boolean;
+  win_condition: 'median' | 'top_n';
+  win_rank: number | null;
+  hearts_at_risk: number;
+  hearts_on_win: number;
+  my_hearts: number | null;
 };
 
 export type ContestsState = {
@@ -102,6 +130,11 @@ export function useContests(): ContestsState {
           ? { lineupId: r.my_lineup_id, filled: Number(r.my_filled ?? 0) }
           : null,
         affordable: r.affordable,
+        winCondition: r.win_condition,
+        winRank: r.win_rank,
+        heartsAtRisk: Number(r.hearts_at_risk ?? 0),
+        heartsOnWin: Number(r.hearts_on_win ?? 0),
+        myHearts: r.my_hearts === null || r.my_hearts === undefined ? null : Number(r.my_hearts),
       })),
     );
     return null;
