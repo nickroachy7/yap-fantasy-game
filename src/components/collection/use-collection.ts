@@ -99,6 +99,27 @@ export function invalidateCollection(): void {
   collection.invalidate();
 }
 
+/**
+ * How many times the collection has been invalidated — "have the cards changed
+ * since I last looked".
+ *
+ * EXPORTED FOR THE LINEUP, which is not a `sessionCache` and cannot compare
+ * versions of its own. The lineup tab stays mounted for the whole session, so
+ * committing a card on the Sets tab left it holding a copy the server had
+ * already burnt — and the next autosave sent that dead id and was refused with
+ * "card does not belong to you", which stopped the autosave for the rest of the
+ * session. See `useLineupData`.
+ *
+ * THE COLLECTION IS THE RIGHT SIGNAL rather than a lineup-specific one: the
+ * bench IS the collection, and every path that mints or destroys a card already
+ * calls `invalidateCollection` — packs, the card profile, the set checklist,
+ * the bulk bar. A second counter beside it would be one more thing for the next
+ * mutation to forget.
+ */
+export function collectionVersion(): number {
+  return collection.version('mine');
+}
+
 export function useCollection(): CollectionState {
   /* Seeded from the cache's synchronous peek, so returning from the Shop draws
      the grid you left in the first render rather than a spinner. `useLoader`

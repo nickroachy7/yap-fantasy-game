@@ -32,8 +32,10 @@
  * and between a week's last game and the next week's first this function rolls
  * forward on its own with days to spare.
  */
-import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 
+import { collectionVersion } from '@/components/collection/use-collection';
 import type { CardTier } from '@/constants/theme';
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { fetchAllPages } from '@/lib/paged';
@@ -463,6 +465,38 @@ export function useLineupData(): LineupData {
   // Quiet, like the old `reload`: it cleared the error and re-read, but never
   // put the screen back into its first-load spinner.
   const { loading, error, refresh } = useLoader(load);
+
+  /**
+   * CATCH UP WHEN THE CARDS HAVE CHANGED UNDER US, which is the whole of a real
+   * bug rather than a nicety.
+   *
+   * This screen is a TAB, so it mounts once and stays mounted for the session —
+   * and unlike `useSets` and `useCollection` it holds its state in plain
+   * `useState` with no cache to compare against. So committing a card on the
+   * Sets tab, or selling one from the inventory, left this screen holding a
+   * copy the server had already destroyed: `savedPicks` still named it in a
+   * slot and `cards` still offered it on the bench.
+   *
+   * The next edit then autosaved the whole slot map, dead id included,
+   * `set_lineup` refused the lot with "card does not belong to you", and the
+   * screen set `blocked` — which is deliberately sticky, so THE AUTOSAVE STAYED
+   * OFF for the rest of the session. Nothing on screen explained why, because
+   * from the reader's side they had simply moved a card on another tab.
+   *
+   * `collectionVersion()` moves on every mint and every destroy, because every
+   * one of those paths already calls `invalidateCollection`. Comparing it on
+   * focus costs nothing when nothing has happened — an ordinary tab switch does
+   * not move it — and re-reads exactly when it has.
+   */
+  const seenCards = useRef(collectionVersion());
+
+  useFocusEffect(
+    useCallback(() => {
+      if (seenCards.current === collectionVersion()) return;
+      seenCards.current = collectionVersion();
+      void refresh();
+    }, [refresh]),
+  );
 
   return {
     slate,

@@ -503,6 +503,37 @@ export default function LineupScreen() {
       p_slots: payload,
     });
     if (err) {
+      /**
+       * A CARD THAT IS GONE IS THE ONE FAILURE THE EDITS CANNOT SURVIVE.
+       *
+       * `set_lineup` refuses the whole call if any slot names a copy that is no
+       * longer held, and a copy stops being held when it is sold or COMMITTED
+       * TO A SET. Both of those happen on other tabs, and this screen is a tab
+       * that stays mounted — so it could be holding a card the server destroyed
+       * minutes ago, and every autosave from then on was refused with the same
+       * message until the session ended.
+       *
+       * `useLineupData` now re-reads on focus when the collection has moved,
+       * which is what stops this arising in the ordinary flow. This is the
+       * backstop for the rest: a second device, or a sweep that burnt something
+       * while this tab was the one in front.
+       *
+       * The edits go WITH the re-read here, and only here. Everywhere else they
+       * are kept on purpose — losing them is the thing autosave exists to
+       * prevent — but an edit naming a destroyed card can never be saved by
+       * anyone, so keeping it only guarantees the next retry fails the same way.
+       */
+      if (err.code === '42501' || /does not belong to you/i.test(err.message)) {
+        setSubmitError(
+          'Some of those cards are no longer in your collection — sold, or added to a set. The board has been refreshed.',
+        );
+        setEdits({});
+        await reload();
+        setBlocked(false);
+        setSaving(false);
+        return;
+      }
+
       setSubmitError(err.message);
       // Edits are deliberately NOT cleared: they are the user's work, and the
       // server refusing them is not a reason to throw them away. See `blocked`.
@@ -531,7 +562,7 @@ export default function LineupScreen() {
     await reloadLineup();
     setEdits({});
     setSaving(false);
-  }, [slate, picks, reloadLineup]);
+  }, [slate, picks, reloadLineup, reload]);
 
   /**
    * The autosave.
