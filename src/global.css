@@ -20,7 +20,25 @@
  */
 :root {
   color-scheme: dark;
-  background-color: #000000;
+  /**
+   * NOT the page's black, and that is the point.
+   *
+   * This is the CANVAS colour — what the browser paints outside the body box.
+   * On a phone that is exactly the strip iOS Safari leaves between the tab bar
+   * and its own floating toolbar, which the page's layout cannot reach at any
+   * viewport height: sized to the visible window the app stops above it, and
+   * sized to the whole screen the app's header disappears under the address
+   * bar instead.
+   *
+   * Painting the canvas in `Colors.dark.surfaceSheet` — the tab bar's own fill —
+   * makes that strip read as the bar continuing rather than as a black gap
+   * below it. Everywhere the app does reach, `body` covers this completely, so
+   * it is invisible on every other platform.
+   *
+   * Duplicated from the theme because CSS cannot see it; if `surfaceSheet`
+   * moves, this moves with it.
+   */
+  background-color: #0e1013;
 }
 
 body {
@@ -51,34 +69,22 @@ body {
 html,
 body {
   /**
-   * `100vh`, and the distinction from `100%` is the whole fix.
+   * `100dvh` — the window as it actually is, chrome included.
    *
-   * In iOS Safari these are NOT the same measurement. `height: 100%` on the
-   * root resolves against the SMALL viewport — the area above the browser's
-   * bottom toolbar — and so does `100dvh` while that toolbar is on screen.
-   * `100vh` is the LARGE viewport: the full height of the screen, with the
-   * toolbar treated as something drawn OVER the page rather than something the
-   * page has to stop short of.
+   * The alternatives were both tried on a phone and both broke something.
+   * Expo's reset ships `height: 100%`, which in iOS Safari is the SMALL
+   * viewport and identical to this in practice. `100vh` is the LARGE viewport:
+   * it makes the app reach the bottom of the screen, but it reaches the TOP as
+   * well, and Safari's address bar then covers the masthead. Chrome at the
+   * bottom is a cosmetic strip; chrome over the header is the app's title and
+   * primary navigation gone.
    *
-   * Expo's own reset ships `html, body { height: 100% }`, so the app has always
-   * been sized to the small viewport, ending in a hard edge above Safari's
-   * toolbar with the page showing through underneath. The tab bar is the last
-   * thing in that box, so its fill stopped there too and left a black strip
-   * between the bar and the browser chrome. Sizing to `100dvh` was the same
-   * measurement by another name and changed nothing, which is what pointed at
-   * this.
-   *
-   * At `100vh` the app reaches the bottom of the screen and the bar's fill
-   * carries on behind the toolbar, which is what makes it read as continuing
-   * rather than stopping. Safari's toolbar overlaps the last stretch of it —
-   * that is fine and is why the bar pads its CONTENT by
-   * `env(safe-area-inset-bottom)` (see the tabs layout): the icons and labels
-   * stay clear of the chrome while the fill behind them does not.
-   *
-   * `100%` stays first as the fallback for anything without viewport units.
+   * So the layout stays inside the visible window, and the strip Safari leaves
+   * below the tab bar is dealt with as a COLOUR rather than as a layout
+   * problem — see the root background below.
    */
   height: 100%;
-  height: 100vh;
+  height: 100dvh;
 }
 
 #root {
