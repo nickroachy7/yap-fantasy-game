@@ -7,20 +7,20 @@
  * inventing a presentation of its own.
  *
  * ---------------------------------------------------------------------------
- * THE LINEUP IS DELIBERATELY NOT IN HERE
+ * THE LINEUP IS IN HERE, AND IT IS THE SAME COMPONENT AS THE BOARD'S
  * ---------------------------------------------------------------------------
  *
- * Two reasons, and the second is the one that would have hurt.
+ * This shipped once without it, on two arguments. The first was wrong:
+ * `SwapSheet` is a React Native `Modal`, so it presents ABOVE this sheet
+ * rather than nesting inside it — there was never a sheet-on-a-sheet.
  *
- * A lineup is not a sheet-sized task: slots, a bench of twenty-odd, per-slot
- * swapping, kickoff locks and an autosave. And `SwapSheet` is ITSELF a bottom
- * sheet under 900px — so editing in here would stack a sheet on a sheet on
- * every phone in the beta.
- *
- * More importantly there would then be two lineup editors, which is the
- * parallel-copy problem `sections.ts` warns about at length, applied to the
- * most complicated screen in the game. Entering dismisses onto this contest's
- * card in the lineup carousel, which is the one editor there is.
+ * The second was real — two lineup editors would be the parallel-copy problem
+ * `sections.ts` warns about, applied to the most complicated screen in the
+ * game — but the answer to it is to extract the editor, not to leave the
+ * sheet a dead end that tells you to go somewhere else. `LineupEditor` is that
+ * extraction, and it draws no carousel when pinned to one contest: this
+ * surface is already about a single contest, and a row of cards for the others
+ * would be offering to leave it.
  *
  * ---------------------------------------------------------------------------
  * ENTERING IS `set_lineup`, NOT AN `enter_contest`
@@ -32,17 +32,18 @@
  * CREATE path, which is what makes it idempotent against the client's
  * autosave. See `20260825050000`.
  *
- * So this screen does not enter anything: it sends you to the board with the
- * contest named, and the fee is taken by the first submission that names a
- * card. That is why the button says "Set your lineup" rather than "Pay 40
- * gems" — the gems go when the lineup does, and a button that claimed to take
- * them here would be describing a charge that has not happened.
+ * So this screen has no enter button at all: you fill the lineup below and the
+ * fee goes with the first submission that names a card. Saying "Pay 40 gems"
+ * on a control up here would be describing a charge that has not happened, and
+ * a separate confirm step would be a second thing to press for one decision.
+ * The line under the facts says when the gems move; the autosave does the rest.
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useContests, type Contest } from '@/components/contests/use-contests';
+import { LineupEditor } from '@/components/lineup/LineupEditor';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -67,41 +68,21 @@ export default function ContestSheet() {
     else router.dismissTo('/fantasy/compete/contests');
   }, [router]);
 
-  /* Replaces rather than pushes: the sheet is the way IN to the board, not a
-     step you come back through. Leaving it on the stack would put a contest
-     you have already entered behind the lineup you entered it with. */
-  const open = useCallback(() => {
-    if (!contest) return;
-    router.dismissTo({
-      pathname: '/fantasy/compete',
-      params: { contest: contest.code },
-    });
-  }, [router, contest]);
-
   const entered = contest?.mine != null;
   const full =
     contest?.maxEntrants != null && contest.entrants >= contest.maxEntrants && !entered;
   const broke = Boolean(contest && !entered && !contest.affordable);
-
-  const action = entered
-    ? 'Open your lineup'
-    : full
-      ? 'Contest is full'
-      : broke
-        ? `Costs ${contest?.entryFeeGems} gems`
-        : 'Set your lineup';
+  /* The two states where there is nothing to fill in. Both are refusals
+     `set_lineup` would make anyway on the first submission — this is only so
+     the reader meets them before spending ten minutes picking a lineup. */
+  const barred = full || broke;
 
   return (
     <PlayerSheetFrame
       title={contest?.name}
       subtitle={contest ? `${contest.formatName} · ${contest.slotCount} cards` : undefined}
       onClose={close}
-      closeLabel="Close contest"
-      footer={
-        contest ? (
-          <FooterButton label={action} disabled={full || broke} onPress={open} />
-        ) : null
-      }>
+      closeLabel="Close contest">
       {error ? (
         <Text style={[Type.fine, { color: c.negative }]}>{error}</Text>
       ) : loading && !contest ? null : !contest ? (
@@ -112,11 +93,10 @@ export default function ContestSheet() {
         <View style={styles.body}>
           <Facts contest={contest} />
 
-          {/* THE RULE, said here because here is where somebody decides to
-              take it on. It is the reason a second contest costs you something
-              real rather than being a second place to put the same eight
-              cards, and it is invisible on the board — you meet it there only
-              as a refusal. */}
+          {/* THE RULE, said here because here is where somebody takes it on. It
+              is what makes a second contest cost something real rather than
+              being a second place to put the same eight cards, and it is
+              invisible on the board — there you meet it only as a refusal. */}
           <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
             A card can only play in one contest a week. Whatever you field here
             comes out of the cards you are not already playing.
@@ -129,6 +109,16 @@ export default function ContestSheet() {
                 : `The ${contest.entryFeeGems} gems are taken when you submit your first lineup, not now.`}
             </Text>
           ) : null}
+
+          {barred ? (
+            <Text style={[Type.body, { color: c.textSecondary }]}>
+              {full
+                ? 'This contest is full.'
+                : `You need ${contest.entryFeeGems} gems to enter.`}
+            </Text>
+          ) : (
+            <LineupEditor pinnedContest={contest.code} frame="plain" />
+          )}
         </View>
       )}
     </PlayerSheetFrame>
@@ -163,33 +153,6 @@ function Facts({ contest }: { contest: Contest }) {
   );
 }
 
-function FooterButton({
-  label,
-  disabled,
-  onPress,
-}: {
-  label: string;
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  return (
-    <Text
-      accessibilityRole="button"
-      onPress={disabled ? undefined : onPress}
-      style={[
-        styles.button,
-        {
-          backgroundColor: disabled ? c.surface : c.text,
-          color: disabled ? c.textSecondary : c.background,
-        },
-      ]}>
-      {label}
-    </Text>
-  );
-}
-
 const styles = StyleSheet.create({
   body: { gap: Spacing.three },
   facts: { gap: 0 },
@@ -199,13 +162,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: Spacing.two,
     borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  button: {
-    textAlign: 'center',
-    paddingVertical: Spacing.two,
-    borderRadius: 12,
-    fontSize: 15,
-    fontWeight: '700',
-    overflow: 'hidden',
   },
 });
