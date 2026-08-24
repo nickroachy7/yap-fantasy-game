@@ -360,12 +360,12 @@ export const BOARD_META: Record<BoardId, BoardMeta> = {
     label: 'Sets',
     title: 'Set progress',
     blurb:
-      'Rungs claimed on the team ladders, dailies cleared, and the cards burnt getting there.',
-    emptyTitle: 'Nobody has claimed a rung yet',
+      'Set rewards claimed, dailies cleared, and the cards burnt getting there.',
+    emptyTitle: 'Nobody has claimed a set reward yet',
     emptyBody:
-      'A team set pays at a quarter, a half, three quarters and all of its requirement. Commit cards to start climbing.',
-    absent: 'You have not claimed a set rung yet.',
-    unit: 'rungs',
+      'A team set pays six times as you fill it, starting at a tenth of the roster. Commit cards to start collecting.',
+    absent: 'You have not claimed a set reward yet.',
+    unit: 'rewards',
   },
 };
 

@@ -72,6 +72,7 @@ import {
   planFor,
   progressOf,
   remainingOf,
+  setRule,
   setTone,
   statusOf,
   type CardSet,
@@ -229,8 +230,9 @@ export function SetFilters({
  * off the top of the sheet.
  *
  * ONE SLOT, TWO STATES, and they are the same act at two stages. Autofill
- * PROPOSES a batch from the rules in `autofillSelection` — bronze and
- * duplicates first — and then gets out of the way; every card is a toggle, so
+ * PROPOSES a batch from the rules in `autofillSelection` — the cheapest copies
+ * that qualify, duplicates first — and then gets out of the way; every card is
+ * a toggle, so
  * taking two out and putting a third in is two taps rather than a different
  * screen. Once anything is ticked the slot becomes the submit bar, because at
  * that point the batch is the page's next action. Nothing here is destructive:
@@ -474,13 +476,10 @@ export function SetChecklist({
             {/* The rule, stated in full, because this is the one screen with
                 room for it: what completing means, that it pays along the way,
                 and — the part a progress bar cannot say — that filling a slot
-                costs the card. */}
+                costs the card. The wording lives in `setRule` so that it can be
+                checked against the server without mounting this sheet. */}
             <Text style={[Type.body, styles.rule, { color: c.textSecondary }]}>
-              {set.family === 'daily'
-                ? `Add any ${set.required} of these ${set.totalCards.toLocaleString()} cards before midnight and the set pays out. A card added to a set is gone from your collection for good.`
-                : set.family === 'team'
-                  ? `A complete set is all ${set.totalCards} ${set.name} cards, and it pays at every quarter of the way. A card added to a set is gone from your collection for good.`
-                  : `Add ${set.required} of these ${set.totalCards} cards to complete the set, and it pays at every quarter of the way. A card added to a set is gone from your collection for good.`}
+              {setRule(set)}
             </Text>
           </View>
 
@@ -519,14 +518,17 @@ export function SetChecklist({
 
           {/* THE LADDER ITSELF, which the list behind this sheet has no room
               for. It is the whole answer to "why would I keep going on a set I
-              will never finish": four rungs, what each wants, what each pays,
-              and which are behind you.
+              will never finish": every reward on it, what each wants, what
+              each pays, and which are behind you.
 
-              A DAILY HAS ONE RUNG, so the table would be a single row restating
-              the line above it — and a one-row table reads as a ladder with
-              three rungs missing. It is left off there; the reward row below
+              A ONE-REWARD SET SKIPS IT, which is the daily and the weekly. The
+              table would be a single row restating the line above it, and a
+              one-row table reads as a ladder with the rest of its rungs
+              missing. Keyed off the ladder itself rather than off the family,
+              so a family that grows a second reward gets the table without
+              anybody remembering to come back here. The reward row below
               already says what clearing it pays. */}
-          {set.family === 'daily' ? null : (
+          {set.milestones.length < 2 ? null : (
           <View
             style={[styles.ladder, { borderColor: c.border, backgroundColor: c.surfaceSheet }]}>
             {set.milestones.map((m, i) => (

@@ -32,7 +32,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gem } from '@/components/shell/AppHeader';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import type { CardActionSet } from './card-actions';
+import { commitBlockedBy, type CardActionSet } from './card-actions';
 import { SetPickRow } from './SetPickRow';
 
 export function CardExits({
@@ -66,6 +66,11 @@ export function CardExits({
 
   const commitable = sets.filter((x) => x.canCommit);
   const blocked = sets.filter((x) => !x.canCommit);
+  /* THREE REASONS NOW, NOT TWO. A weekly refuses a copy for being under its
+     tier floor, which is neither "already in" nor "full", and the wording for
+     all three lives in `commitBlockedBy` so this view cannot invent a fourth.
+     See the note on `CardActionSet.minTier`. */
+  const why = blocked.length > 0 ? commitBlockedBy(blocked[0], playerName) : null;
   const spare = !burnsThisCopy;
 
   return (
@@ -133,11 +138,7 @@ export function CardExits({
             disabled
             accessibilityRole="button"
             accessibilityState={{ disabled: true }}
-            accessibilityLabel={
-              blocked[0].slotFilled
-                ? `${playerName} is already in ${blocked[0].name}. This copy cannot be added.`
-                : `${blocked[0].name} is complete and cannot take another card.`
-            }
+            accessibilityLabel={why?.body}
             style={[
               styles.exit,
               styles.dim,
@@ -146,12 +147,12 @@ export function CardExits({
             <Text
               numberOfLines={1}
               style={[Type.strong, styles.label, { color: c.textSecondary }]}>
-              {blocked[0].slotFilled ? 'ALREADY IN SET' : 'SET IS FULL'}
+              {why?.label}
             </Text>
             {/* A tick in the positive tone, because a filled slot is something
-                the player DID rather than a refusal. Nothing for a full set —
-                that one is not their doing. */}
-            {blocked[0].slotFilled ? (
+                the player DID rather than a refusal. Nothing for the other two —
+                neither of those is their doing. */}
+            {why?.done ? (
               <Text style={[Type.strong, styles.tick, { color: c.positive }]}>✓</Text>
             ) : null}
           </Pressable>
@@ -196,11 +197,7 @@ export function CardExits({
           that stops the greyed button reading as "this card is finished" — that
           the copy is still yours to sell or to start. */}
       {commitable.length === 0 && blocked.length > 0 ? (
-        <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
-          {blocked[0].slotFilled
-            ? `${blocked[0].name} already has ${playerName}. This copy is still yours — you can sell it or start it.`
-            : `${blocked[0].name} has met its requirement, so it cannot take another card. This copy is still yours to sell or start.`}
-        </Text>
+        <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>{why?.body}</Text>
       ) : null}
 
       {/* The spare-copy caveat, on the one path that never opens the picker the

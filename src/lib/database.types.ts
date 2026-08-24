@@ -210,6 +210,7 @@ export type Database = {
           family: string
           id: string
           is_active: boolean
+          min_tier: Database["public"]["Enums"]["card_tier"] | null
           name: string
           opens_on: string | null
           required_count: number
@@ -224,6 +225,7 @@ export type Database = {
           family: string
           id?: string
           is_active?: boolean
+          min_tier?: Database["public"]["Enums"]["card_tier"] | null
           name: string
           opens_on?: string | null
           required_count: number
@@ -238,6 +240,7 @@ export type Database = {
           family?: string
           id?: string
           is_active?: boolean
+          min_tier?: Database["public"]["Enums"]["card_tier"] | null
           name?: string
           opens_on?: string | null
           required_count?: number
@@ -1243,6 +1246,7 @@ export type Database = {
           complete: boolean | null
           family: string | null
           milestones: Json | null
+          min_tier: Database["public"]["Enums"]["card_tier"] | null
           name: string | null
           next_at: number | null
           next_reward: number | null
@@ -1466,7 +1470,13 @@ export type Database = {
       card_actions: { Args: { p_card_instance_ids: string[] }; Returns: Json }
       card_profile: { Args: { p_card_instance_id: string }; Returns: Json }
       claim_set_reward: { Args: { p_set_code: string }; Returns: Json }
-      commit_candidate: { Args: { p_card_id: string }; Returns: string }
+      commit_candidate: {
+        Args: {
+          p_card_id: string
+          p_min_tier?: Database["public"]["Enums"]["card_tier"]
+        }
+        Returns: string
+      }
       commit_card_to_set: {
         Args: { p_card_id: string; p_set_code: string }
         Returns: Json
@@ -1484,6 +1494,7 @@ export type Database = {
         }[]
       }
       daily_pack_status: { Args: never; Returns: Json }
+      daily_set_day: { Args: never; Returns: string }
       daily_set_position: { Args: { p_day: string }; Returns: string }
       game_config_value: {
         Args: { p_default?: number; p_key: string }
@@ -1581,8 +1592,14 @@ export type Database = {
         Args: { p_day: string; p_season: number }
         Returns: Json
       }
+      rebuild_weekly_set: {
+        Args: { p_day: string; p_season: number }
+        Returns: Json
+      }
       refresh_player_season_ranks: { Args: never; Returns: undefined }
       roster_status: { Args: never; Returns: Json }
+      rotate_daily_set: { Args: never; Returns: Json }
+      rotate_weekly_set: { Args: never; Returns: Json }
       score_week: {
         Args: { p_season: number; p_season_type: number; p_week: number }
         Returns: Json
@@ -1649,6 +1666,7 @@ export type Database = {
         Args: { p_season: number; p_season_type: number; p_week: number }
         Returns: Json
       }
+      weekly_set_monday: { Args: { p_day: string }; Returns: string }
     }
     Enums: {
       acquisition_source: "pack" | "grant" | "admin"

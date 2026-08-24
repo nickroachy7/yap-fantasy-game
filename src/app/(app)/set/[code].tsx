@@ -237,7 +237,7 @@ export default function SetChecklistScreen() {
      looked at. */
   const autofill = useCallback(() => {
     if (!set) return;
-    setSelected(autofillSelection(members ?? [], remainingOf(set)));
+    setSelected(autofillSelection(members ?? [], remainingOf(set), set.minTier));
   }, [set, members]);
 
   const submit = useCallback(async () => {

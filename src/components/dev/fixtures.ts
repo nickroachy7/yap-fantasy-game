@@ -147,16 +147,22 @@ export const OWNED_MANY: CollectionCard[] = Array.from({ length: 14 }, (_, i) =>
  * promised more would be promising an error.
  *
  * EVERY LADDER STATE IS SOMEWHERE IN HERE: a rung collected, a rung reached and
- * waiting, a rung ahead, and a set with all four behind it. The team sets carry
- * their whole roster as the requirement, which is what makes their bars sit at
- * a quarter or less — the case a bar measured only against completion would be
- * useless for, and the reason the rung marks exist.
+ * waiting, a rung ahead, and a set with every rung still in front of it. The
+ * team sets carry their whole roster as the requirement, which is what makes
+ * their bars sit at a quarter or less — the case a bar measured only against
+ * completion would be useless for, and the reason the rung marks exist.
  *
  * The numbers mirror the real 2026 build — a team's whole roster on the
- * 100/500/1500/5000 ladder, a daily's three cards on its single 40-gem rung,
- * 50% of sell value on a commit — so the layout is exercised at the widths
- * those figures actually produce. Fixtures may restate the server's numbers;
- * product code reads `my_sets`.
+ * six-rung 100/300/500/700/2500/5000 ladder, a daily's three cards on its
+ * single 40-gem rung, a weekly's three silvers on its single 250-gem one, 50%
+ * of sell value on a commit — so the layout is exercised at the widths those
+ * figures actually produce. Fixtures may restate the server's numbers; product
+ * code reads `my_sets`.
+ *
+ * THE WEEKLY IS THE ONE WITH A FLOOR, and it is in here specifically so the
+ * gallery has a row where `ready` is smaller than the number of members held.
+ * Every other family counts any copy; this one counts silver and better, and a
+ * layout reviewed only against unfloored sets would never show that case.
  *
  * NO POSITION SETS. The family is retired (see `SetFamily`), so a gallery full
  * of them would be reviewing a screen the server can no longer send. The four
@@ -177,6 +183,7 @@ export const SETS_FIXTURE: CardSet[] = [
     committed: 3,
     ready: 0,
     commitPayoutPct: 50,
+    minTier: null,
     complete: true,
     // ONE RUNG. A daily pays on the third card and not before — the whole
     // point of the family is that it does not trickle.
@@ -203,6 +210,7 @@ export const SETS_FIXTURE: CardSet[] = [
     committed: 3,
     ready: 2,
     commitPayoutPct: 50,
+    minTier: null,
     complete: true,
     milestones: [{ pct: 100, cards: 3, gems: 40, reached: true, claimed: true, paid: 40 }],
     totalReward: 40,
@@ -226,6 +234,7 @@ export const SETS_FIXTURE: CardSet[] = [
     committed: 1,
     ready: 5,
     commitPayoutPct: 50,
+    minTier: null,
     complete: false,
     milestones: [{ pct: 100, cards: 3, gems: 40, reached: false, claimed: false, paid: null }],
     totalReward: 40,
@@ -249,6 +258,7 @@ export const SETS_FIXTURE: CardSet[] = [
     committed: 0,
     ready: 0,
     commitPayoutPct: 50,
+    minTier: null,
     complete: false,
     milestones: [{ pct: 100, cards: 3, gems: 40, reached: false, claimed: false, paid: null }],
     totalReward: 40,
@@ -272,17 +282,20 @@ export const SETS_FIXTURE: CardSet[] = [
     committed: 9,
     ready: 1,
     commitPayoutPct: 50,
+    minTier: null,
     complete: false,
     milestones: [
-      { pct: 25, cards: 8, gems: 100, reached: true, claimed: true, paid: 100 },
-      { pct: 50, cards: 16, gems: 500, reached: false, claimed: false, paid: null },
-      { pct: 75, cards: 24, gems: 1500, reached: false, claimed: false, paid: null },
+      { pct: 10, cards: 4, gems: 100, reached: true, claimed: true, paid: 100 },
+      { pct: 25, cards: 8, gems: 300, reached: true, claimed: true, paid: 300 },
+      { pct: 40, cards: 13, gems: 500, reached: false, claimed: false, paid: null },
+      { pct: 50, cards: 16, gems: 700, reached: false, claimed: false, paid: null },
+      { pct: 75, cards: 24, gems: 2500, reached: false, claimed: false, paid: null },
       { pct: 100, cards: 32, gems: 5000, reached: false, claimed: false, paid: null },
     ],
-    totalReward: 7100,
+    totalReward: 9100,
     claimableGems: 0,
-    claimedGems: 100,
-    nextAt: 16,
+    claimedGems: 400,
+    nextAt: 13,
     nextReward: 500,
     sortOrder: 21,
   },
@@ -301,17 +314,20 @@ export const SETS_FIXTURE: CardSet[] = [
     committed: 8,
     ready: 2,
     commitPayoutPct: 50,
+    minTier: null,
     complete: false,
     milestones: [
-      { pct: 25, cards: 8, gems: 100, reached: true, claimed: false, paid: null },
-      { pct: 50, cards: 15, gems: 500, reached: false, claimed: false, paid: null },
-      { pct: 75, cards: 22, gems: 1500, reached: false, claimed: false, paid: null },
+      { pct: 10, cards: 3, gems: 100, reached: true, claimed: true, paid: 100 },
+      { pct: 25, cards: 8, gems: 300, reached: true, claimed: false, paid: null },
+      { pct: 40, cards: 12, gems: 500, reached: false, claimed: false, paid: null },
+      { pct: 50, cards: 15, gems: 700, reached: false, claimed: false, paid: null },
+      { pct: 75, cards: 22, gems: 2500, reached: false, claimed: false, paid: null },
       { pct: 100, cards: 29, gems: 5000, reached: false, claimed: false, paid: null },
     ],
-    totalReward: 7100,
-    claimableGems: 100,
-    claimedGems: 0,
-    nextAt: 15,
+    totalReward: 9100,
+    claimableGems: 300,
+    claimedGems: 100,
+    nextAt: 12,
     nextReward: 500,
     sortOrder: 9,
   },
@@ -328,19 +344,57 @@ export const SETS_FIXTURE: CardSet[] = [
     committed: 0,
     ready: 0,
     commitPayoutPct: 50,
+    minTier: null,
     complete: false,
     milestones: [
-      { pct: 25, cards: 7, gems: 100, reached: false, claimed: false, paid: null },
-      { pct: 50, cards: 14, gems: 500, reached: false, claimed: false, paid: null },
-      { pct: 75, cards: 21, gems: 1500, reached: false, claimed: false, paid: null },
+      { pct: 10, cards: 3, gems: 100, reached: false, claimed: false, paid: null },
+      { pct: 25, cards: 7, gems: 300, reached: false, claimed: false, paid: null },
+      { pct: 40, cards: 11, gems: 500, reached: false, claimed: false, paid: null },
+      { pct: 50, cards: 14, gems: 700, reached: false, claimed: false, paid: null },
+      { pct: 75, cards: 21, gems: 2500, reached: false, claimed: false, paid: null },
       { pct: 100, cards: 27, gems: 5000, reached: false, claimed: false, paid: null },
     ],
-    totalReward: 7100,
+    totalReward: 9100,
     claimableGems: 0,
     claimedGems: 0,
-    nextAt: 7,
+    nextAt: 3,
     nextReward: 100,
     sortOrder: 13,
+  },
+  {
+    // THE WEEKLY, and it is here because it is the only set in the game with a
+    // TIER FLOOR — the one row whose add buttons can be dark while the player
+    // is holding a copy of the card. `ready` is 2 against a requirement of 3
+    // even though the collection is full of bronzes, because only the silvers
+    // and better count towards it, and a fixture that ignored that would review
+    // a row the server cannot send.
+    //
+    // Part-filled rather than cleared: the interesting state is the one where
+    // the reward is visible and out of reach, because that is the moment the
+    // set is asking the player to give up a card they have been starting.
+    id: 'set-8',
+    code: 'weekly-2026-08-24',
+    name: 'Proven three',
+    family: 'weekly',
+    subtitle: 'Week of 24 August',
+    season: 2026,
+    // The whole mintable pool is the membership: position is not the
+    // constraint here, tier is.
+    required: 3,
+    totalCards: 968,
+    committed: 1,
+    ready: 2,
+    commitPayoutPct: 50,
+    minTier: 'silver',
+    complete: false,
+    // ONE REWARD, at completion, for the same reason the daily has one.
+    milestones: [{ pct: 100, cards: 3, gems: 250, reached: false, claimed: false, paid: null }],
+    totalReward: 250,
+    claimableGems: 0,
+    claimedGems: 0,
+    nextAt: 3,
+    nextReward: 250,
+    sortOrder: 0,
   },
 ];
 
@@ -409,6 +463,8 @@ const teamSet = (code: string, name: string, committed: number, required: number
   required,
   slotFilled: false,
   setComplete: false,
+  minTier: null,
+  burnsThisCopy: true,
   canCommit: true,
 });
 
@@ -442,7 +498,8 @@ export const PULL_ACTIONS_FIXTURE = new Map<string, CardActions>([
         {
           code: 'daily-wr-2026-08-23', name: 'Receiver of the day', family: 'daily',
           subtitle: 'Sunday 23 August', pays: 4, committed: 1, required: 3,
-          slotFilled: false, setComplete: false, canCommit: true,
+          slotFilled: false, setComplete: false, minTier: null,
+          burnsThisCopy: true, canCommit: true,
         },
         teamSet('team-cin-2026', 'Cincinnati Bengals', 3, 30),
       ],
@@ -457,7 +514,8 @@ export const PULL_ACTIONS_FIXTURE = new Map<string, CardActions>([
         {
           code: 'team-jax-2026', name: 'Jacksonville Jaguars', family: 'team',
           subtitle: 'AFC South', pays: 4, committed: 9, required: 28,
-          slotFilled: true, setComplete: false, canCommit: false,
+          slotFilled: true, setComplete: false, minTier: null,
+          burnsThisCopy: true, canCommit: false,
         },
       ],
     },
@@ -489,6 +547,8 @@ export const KIT_SET_OPEN: CardActionSet = {
   required: 31,
   slotFilled: false,
   setComplete: false,
+  minTier: null,
+  burnsThisCopy: true,
   canCommit: true,
 };
 
@@ -502,6 +562,8 @@ export const KIT_SET_DAILY: CardActionSet = {
   required: 3,
   slotFilled: false,
   setComplete: false,
+  minTier: null,
+  burnsThisCopy: true,
   canCommit: true,
 };
 
@@ -524,6 +586,35 @@ export const KIT_SET_COMPLETE: CardActionSet = {
   required: 3,
   slotFilled: false,
   setComplete: true,
+  minTier: null,
+  burnsThisCopy: true,
+  canCommit: false,
+};
+
+/**
+ * A set that will not take THIS COPY, which is the third refusal and the only
+ * one that is about the player's collection rather than about the set.
+ *
+ * It exists because the exits row used to know two reasons and reached for
+ * "SET IS FULL" for anything that was not "ALREADY IN SET" — so a weekly
+ * turning away a bronze would have told the player a set with one card in it
+ * was complete. The gallery needs the state to keep that honest.
+ */
+export const KIT_SET_UNDER_FLOOR: CardActionSet = {
+  code: 'weekly-2026-08-24',
+  name: 'Proven three',
+  family: 'weekly',
+  subtitle: 'Week of 24 August',
+  // 0, not 4: there is no copy this set would take, so there is nothing to
+  // price. A floored offer quoting the bronze would be the bug this fixture
+  // guards.
+  pays: 0,
+  committed: 1,
+  required: 3,
+  slotFilled: false,
+  setComplete: false,
+  minTier: 'silver',
+  burnsThisCopy: false,
   canCommit: false,
 };
 
@@ -537,6 +628,8 @@ export const KIT_SET_FILLED: CardActionSet = {
   required: 28,
   slotFilled: true,
   setComplete: false,
+  minTier: null,
+  burnsThisCopy: true,
   canCommit: false,
 };
 

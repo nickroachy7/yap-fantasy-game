@@ -363,7 +363,7 @@ function ChecklistFixture() {
         selected={selected}
         submitting={false}
         onAutofill={() =>
-          setSelected(autofillSelection(SET_MEMBERS_FIXTURE, set ? remainingOf(set) : 0))
+          setSelected(autofillSelection(SET_MEMBERS_FIXTURE, set ? remainingOf(set) : 0, set?.minTier ?? null))
         }
         onClear={() => setSelected([])}
         // Inert: there is no session behind this page, and the confirmation it

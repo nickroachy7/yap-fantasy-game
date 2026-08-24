@@ -36,9 +36,81 @@ export type CardActionSet = {
   slotFilled: boolean;
   /** The set has met its requirement, so a further commit buys nothing. */
   setComplete: boolean;
-  /** The one field a button binds to. Never re-derived from the three above. */
+  /**
+   * The lowest tier a copy may be to fill a slot here, or null for no floor.
+   *
+   * ONLY THE WEEKLY HAS ONE, and it is carried this far for one reason: it is
+   * the THIRD way a set can refuse a card, and the two the UI already knew
+   * about — the slot is taken, the set is full — are both about the SET. This
+   * one is about the copy, so a screen that did not have it would explain a
+   * floored refusal with whichever of the other two it happened to reach for
+   * and be wrong about the player's own collection.
+   */
+  minTier: string | null;
+  /**
+   * Whether the copy being asked about is the one THIS set would burn.
+   *
+   * Differs from `CardActions.burnsThisCopy`, which asks the same question of
+   * the collection with no set in mind. They part company exactly on a floored
+   * set: the cheapest copy you hold and the cheapest copy this set will accept
+   * are not the same card, and the profile is looking at one specific copy.
+   */
+  burnsThisCopy: boolean;
+  /** The one field a button binds to. Never re-derived from the others above. */
   canCommit: boolean;
 };
+
+/**
+ * Why a set will not take this card, as a two-word label and a sentence.
+ *
+ * HERE RATHER THAN IN THE COMPONENT because there are now three reasons and
+ * they are not interchangeable — one is something the player already did, one
+ * is about the set, and one is about which copy they are holding. A ternary
+ * chain in a view is where the third one gets folded into the second and the
+ * screen starts telling people a set is full when their card is simply too
+ * junior. It also means the wording is readable without a session.
+ *
+ * ORDER MATTERS. A slot already filled is checked first because it is the only
+ * one that is good news, and a full set before a floor because a set that
+ * cannot take ANY card is a better explanation than one about this copy.
+ */
+export function commitBlockedBy(
+  set: CardActionSet,
+  playerName: string,
+): { label: string; body: string; done: boolean } {
+  if (set.slotFilled) {
+    return {
+      label: 'ALREADY IN SET',
+      body: `${set.name} already has ${playerName}. This copy is still yours — you can sell it or start it.`,
+      done: true,
+    };
+  }
+
+  if (set.setComplete) {
+    return {
+      label: 'SET IS FULL',
+      body: `${set.name} has met its requirement, so it cannot take another card. This copy is still yours to sell or start.`,
+      done: false,
+    };
+  }
+
+  if (set.minTier) {
+    return {
+      label: `NEEDS ${set.minTier.toUpperCase()}`,
+      /* Says what to DO about it, which the other two cannot: a tier is earned
+         by starting the card, so this refusal has a way out that the player
+         controls. */
+      body: `${set.name} only takes ${set.minTier} copies or better, and yours is not there yet. Start ${playerName} in your lineup and this copy will climb.`,
+      done: false,
+    };
+  }
+
+  return {
+    label: 'CANNOT ADD',
+    body: `${set.name} cannot take this card right now. This copy is still yours to sell or start.`,
+    done: false,
+  };
+}
 
 /** What a single copy can be turned into right now. */
 export type CardActions = {
@@ -86,6 +158,8 @@ type ActionRow = {
     required?: number;
     slot_filled?: boolean;
     set_complete?: boolean;
+    min_tier?: string | null;
+    burns_this_copy?: boolean;
     can_commit?: boolean;
   }[];
 };
@@ -114,6 +188,8 @@ function normalise(raw: ActionRow): CardActions | null {
         required: Math.max(1, num(s.required)),
         slotFilled: s.slot_filled === true,
         setComplete: s.set_complete === true,
+        minTier: typeof s.min_tier === 'string' ? s.min_tier : null,
+        burnsThisCopy: s.burns_this_copy === true,
         canCommit: s.can_commit === true,
       })),
   };

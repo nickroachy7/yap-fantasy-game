@@ -23,17 +23,32 @@
  *               about it today. A page showing only the first is a progress
  *               bar with no lever attached.
  *
- * A SET PAYS ALONG THE WAY, not only at the end. Four rungs at a quarter, half,
- * three quarters and all of the requirement, each claimable once. A TEAM set's
- * requirement is its whole roster — thirty-odd cards, a multi-season chase — so
- * without the ladder the only visible reward would be one nobody ever reaches.
- * The rungs are what make constant progress worth something.
+ * A SET PAYS ALONG THE WAY, not only at the end. A team ladder has six rewards
+ * on it — a tenth, a quarter, two fifths, a half, three quarters and all of the
+ * requirement — each claimable once. A TEAM set's requirement is its whole
+ * roster, thirty-odd cards and a multi-season chase, so without the ladder the
+ * only visible reward would be one nobody ever reaches. The rungs are what make
+ * constant progress worth something.
  *
- * A DAILY IS THE OTHER SHAPE, and it exists so the standing sets do not have to
- * be both things at once. Three cards of one position, one rung, paid on the
- * third, gone at midnight. It is the faucet; the team sets are the chase. The
- * family that used to try to be both — six cards out of a pool of hundreds — is
- * retired, and the note on `SetFamily` says why.
+ * "RUNG" IS THIS FILE'S WORD, NOT THE PLAYER'S. It reads well in code, where a
+ * ladder is the obvious metaphor, and it tested badly on screen — players did
+ * not know what a rung was. Every player-facing string says REWARD instead. Do
+ * not let the internal name leak back into copy.
+ *
+ * THREE SHAPES, AND THE PAGE IS ORGANISED BY HOW LONG YOU HAVE.
+ *
+ *   DAILY        three cards of one position, out of the whole pool, so it is
+ *                always clearable from spares. One reward, gone at midnight.
+ *                This is the faucet.
+ *   WEEKLY       three cards, any position, every one SILVER OR BETTER. Tier is
+ *                earned by starting a card and cannot be bought, so this is the
+ *                only set junk cannot clear — and the only one with a
+ *                `minTier`. One reward, gone Monday.
+ *   SEASON LONG  a club's whole roster, six rewards on the way up, the last of
+ *                them a multi-season chase. This is the chase.
+ *
+ * The family that used to try to be both faucet and chase — six cards out of a
+ * pool of hundreds — is retired, and the note on `SetFamily` says why.
  */
 import { positionColors } from '@/constants/positions';
 import { teamWash } from '@/constants/teams';
@@ -49,7 +64,23 @@ import type { Database } from '@/lib/database.types';
  * silently relabel any that survived as a team set, which is worse than a
  * dead branch. The DAILY family took over the job it was doing badly.
  */
-export type SetFamily = 'team' | 'position' | 'daily';
+export type SetFamily = 'team' | 'position' | 'daily' | 'weekly';
+
+/**
+ * The tier floor a set puts on the COPY you commit, or null for no floor.
+ *
+ * Only the weekly has one. It is what stops a set being satisfied with junk:
+ * tier is earned by starting a card and cannot be bought, so a floor of
+ * 'silver' asks for cards you have actually played rather than cards you
+ * happen to hold. The server enforces it in `commit_card_to_set` and applies it
+ * everywhere a copy is counted or priced; the client's job is only to explain
+ * it and to stop the autofill proposing something that would be refused.
+ */
+export type TierFloor = 'bronze' | 'silver' | 'gold' | 'diamond';
+
+const TIER_ORDER: Record<TierFloor, number> = { bronze: 1, silver: 2, gold: 3, diamond: 4 };
+
+const isTier = (v: string | null): v is TierFloor => v !== null && v in TIER_ORDER;
 
 /** One rung. `paid` is null until it is claimed, and is what actually landed. */
 export type Milestone = {
@@ -109,6 +140,8 @@ export type CardSet = {
   ready: number;
   /** Share of a copy's sell value paid when it is committed. Server-set. */
   commitPayoutPct: number;
+  /** Lowest tier a copy may be to fill a slot here. Null on every family but weekly. */
+  minTier: TierFloor | null;
   /** Every rung on this set's ladder, in order. */
   milestones: Milestone[];
   /** What the whole ladder pays, at today's prices. */
@@ -137,7 +170,7 @@ export type CardSet = {
 export type SetStatus = 'claimed' | 'ready' | 'progress';
 
 const isFamily = (v: string | null): v is SetFamily =>
-  v === 'team' || v === 'position' || v === 'daily';
+  v === 'team' || v === 'position' || v === 'daily' || v === 'weekly';
 
 const num = (v: number | null): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
@@ -158,6 +191,7 @@ export function normaliseSet(row: SetViewRow): CardSet {
     committed: num(row.committed),
     ready: num(row.ready),
     commitPayoutPct: num(row.commit_payout_pct),
+    minTier: isTier(row.min_tier) ? row.min_tier : null,
     milestones: parseMilestones(row.milestones),
     totalReward: num(row.total_reward),
     claimableGems: num(row.claimable_gems),
@@ -219,10 +253,10 @@ export function actionableOf(set: CardSet): number {
  * eventually disagree.
  *
  * NOT FILTERED BY FAMILY, deliberately, though it is the obvious other axis.
- * The list already draws dailies and teams as separate titled sections, so a
- * Daily/Team pair of chips would hide one of two headings the reader can
- * already see — where these four cut ACROSS both sections and answer the
- * question a chip row is for: what can I do something about right now.
+ * The list already draws Daily, Weekly and Season long as separate titled
+ * sections, so a chip per family would hide headings the reader can already
+ * see — where these four cut ACROSS all three and answer the question a chip
+ * row is for: what can I do something about right now.
  */
 export type SetListFilter = 'ALL' | 'READY' | 'CAN_ADD' | 'CLAIMED';
 
@@ -326,16 +360,32 @@ export type SetSection = {
   sets: CardSet[];
 };
 
+/**
+ * THREE SECTIONS, NAMED FOR THEIR CLOCK.
+ *
+ * They used to be named for their CONTENTS — "Today", "By position", "By team" —
+ * which described what was in each pile and left the reader to work out what
+ * separated them. What actually separates them is how long you have: a daily is
+ * gone at midnight, a weekly on Monday, and a team set is the thing you are
+ * still chasing in December. That is also the order of urgency, so naming them
+ * for the clock puts the list in the order a player should read it.
+ *
+ * "Season long" rather than "By team" for the same reason. A club is the SUBJECT
+ * of that set, not the commitment it asks for, and the subject is already on
+ * every row.
+ */
 const FAMILY_TITLE: Record<SetFamily, string> = {
-  daily: 'Today',
+  daily: 'Daily',
+  weekly: 'Weekly',
   position: 'By position',
-  team: 'By team',
+  team: 'Season long',
 };
 
 const FAMILY_NOTE: Record<SetFamily, string> = {
-  daily: 'Three of one position, and it pays on the third. Gone at midnight.',
+  daily: 'Three of one position, out of whatever you are holding. Gone at midnight.',
+  weekly: 'Three cards you have actually played, silver or better. Gone Monday.',
   position: 'Retired. Nothing new is offered here.',
-  team: "A club's whole roster. Pays at every quarter of the way.",
+  team: "A club's whole roster. It pays six times on the way up, and the last one is a chase.",
 };
 
 /**
@@ -371,12 +421,12 @@ export function groupSets(sets: CardSet[]): SetSection[] {
     });
   }
 
-  /* DAILY FIRST, then the standing sets. It is the only section with a clock
-     on it — everything below is a chase you can come back to next month — so
-     burying it under thirty-two team rows would be hiding the one thing that
-     expires. Position sits between them only for the rows that predate its
-     retirement; the server sends none. */
-  for (const family of ['daily', 'position', 'team'] as const) {
+  /* DAILY, WEEKLY, SEASON LONG — shortest clock first, which is both the order
+     of urgency and the order the sections are named for. Burying the two that
+     expire under thirty-two team rows would hide the only rows with a deadline.
+     Position sits at the end only for rows that predate its retirement; the
+     server sends none, so in practice this is three sections. */
+  for (const family of ['daily', 'weekly', 'team', 'position'] as const) {
     const rest = sets.filter((s) => s.family === family && statusOf(s) !== 'ready');
     if (rest.length === 0) continue;
 
@@ -418,11 +468,22 @@ function byProgressThenOrder(a: CardSet, b: CardSet): number {
  * point rather than a verdict, so its rules can protect the common case without
  * ever being the last word:
  *
- *  1. BRONZE ONLY. A copy above bronze is one you have STARTED — tier is
- *     earned, never assigned — so a card that arrived by pressing one button
- *     should not be one you have been playing. They are still selectable by
- *     hand, and `planFor` names any that are, because choosing to burn one is a
- *     real decision and deserves restating before it happens.
+ *  1. BRONZE ONLY, UNLESS THE SET HAS A FLOOR. A copy above bronze is one you
+ *     have STARTED — tier is earned, never assigned — so a card that arrived by
+ *     pressing one button should not be one you have been playing. They are
+ *     still selectable by hand, and `planFor` names any that are, because
+ *     choosing to burn one is a real decision and deserves restating before it
+ *     happens.
+ *
+ *     A WEEKLY INVERTS THIS AND THE INVERSION IS THE WHOLE POINT OF IT. Its
+ *     floor is silver, so bronze-only would propose nothing at all, every time,
+ *     on the one set built to ask for cards you have played. Where a floor
+ *     exists the server has already sieved the candidates down to copies that
+ *     qualify — `commit_tier` on every row is the copy it would really burn —
+ *     so the rule becomes simply "the cheapest that qualify", and rule 2 and 3
+ *     below still order them. What it must never do is propose a copy the
+ *     server would refuse: that is a button that errors, which this function
+ *     exists to prevent.
  *  2. DUPLICATES FIRST. Committing a spare costs you nothing you could still
  *     start; committing your only copy costs you the player. When candidates
  *     outnumber slots, the spares should be the ones proposed.
@@ -449,9 +510,25 @@ export function isAddable(m: FillCandidate): boolean {
   return !m.committed && m.held > 0;
 }
 
-export function autofillSelection(candidates: FillCandidate[], remaining: number): string[] {
+export function autofillSelection(
+  candidates: FillCandidate[],
+  remaining: number,
+  minTier: TierFloor | null = null,
+): string[] {
+  /* Above the floor is decided by the SERVER, which is why this compares
+     against `commit_tier` — the tier of the copy that would actually be burnt,
+     already chosen under the same floor — rather than re-deriving which of your
+     copies qualifies. A second opinion about that here is the divergence this
+     file's header keeps warning about. */
+  const eligible = (m: FillCandidate): boolean => {
+    if (!isAddable(m)) return false;
+    if (minTier === null) return m.commit_tier === 'bronze';
+
+    return m.commit_tier !== null && TIER_ORDER[m.commit_tier as TierFloor] >= TIER_ORDER[minTier];
+  };
+
   return candidates
-    .filter((m) => isAddable(m) && m.commit_tier === 'bronze')
+    .filter(eligible)
     .sort(
       (a, b) =>
         b.held - a.held ||
@@ -545,16 +622,22 @@ export function fillWarning(set: CardSet, plan: FillPlan): string {
     );
   }
 
-  /* Named, because a card above bronze is one this player has been starting and
-     the autofill would never have picked it — it is in the batch because
-     somebody ticked it. */
+  /* Named, because a card above bronze is one this player has been starting.
+     "THAT INCLUDES" ONLY WHEN IT IS A SUBSET. On an unfloored set these are the
+     exceptions — the autofill would never have picked them, so they are in the
+     batch because somebody ticked them, and singling them out is the warning.
+     On a weekly every copy is above bronze by the set's own rule, so the same
+     sentence would be listing the entire selection back under a word that says
+     "and also", which reads as a bug in the sentence. */
   if (plan.precious.length > 0) {
     const named = plan.precious.map((p) => `your ${p.tier} ${p.name}`);
     const list =
       named.length === 1
         ? named[0]
         : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`;
-    parts.push(`That includes ${list}.`);
+    parts.push(
+      plan.precious.length === plan.cards ? `That is ${list}.` : `That includes ${list}.`,
+    );
   }
 
   /* The rung, and only ever the NEXT one. A team ladder totals thousands of
@@ -574,6 +657,50 @@ export function fillWarning(set: CardSet, plan: FillPlan): string {
 }
 
 /**
+ * The rule, as one sentence, for the top of a set's checklist.
+ *
+ * HERE RATHER THAN IN THE SHEET because it is the one piece of copy in this
+ * feature that has to agree with the server exactly — how many cards, whether
+ * there is a deadline, whether a bronze counts — and a ternary buried in a
+ * header five hundred lines into a component is where that agreement goes to
+ * rot. It also means the wording can be read, and changed, without a session.
+ *
+ * IT COUNTS THE REWARDS RATHER THAN NAMING THEM. The team ladder said "pays at
+ * every quarter of the way" for as long as it had four rewards at 25/50/75/100
+ * and went silently wrong the moment it had six. `milestones.length` is the
+ * same fact taken from the data the server sent, so re-tuning a ladder cannot
+ * leave a sentence behind describing the old one.
+ *
+ * THE FLOOR IS STATED IN PLAIN WORDS, not as a tier name on its own. "Silver or
+ * better" means nothing to somebody who has not worked out that tier is earned
+ * by starting a card, and that is precisely the player who needs to be told —
+ * so the sentence says what it takes to get one.
+ */
+export function setRule(set: CardSet): string {
+  const gone = 'A card added to a set is gone from your collection for good.';
+  const pays =
+    set.milestones.length > 1 ? `and it pays ${set.milestones.length} times on the way up` : '';
+
+  if (set.family === 'daily') {
+    return `Add any ${set.required} of these ${set.totalCards.toLocaleString()} cards before midnight and the set pays out. ${gone}`;
+  }
+
+  if (set.family === 'weekly') {
+    const floor = set.minTier
+      ? ` Every one has to be ${set.minTier} or better, which means a card you have started enough to level up — a copy straight out of a pack will not do.`
+      : '';
+
+    return `Add any ${set.required} cards before Monday and the set pays out.${floor} ${gone}`;
+  }
+
+  if (set.family === 'team') {
+    return `A complete set is all ${set.totalCards} ${set.name} cards, ${pays || 'and it pays along the way'}. ${gone}`;
+  }
+
+  return `Add ${set.required} of these ${set.totalCards} cards to complete the set, ${pays || 'and it pays on the last one'}. ${gone}`;
+}
+
+/**
  * The colour to wash a set's checklist header with.
  *
  * Every sheet in the app is coloured by what it is ABOUT — a card profile by
@@ -590,8 +717,17 @@ export function fillWarning(set: CardSet, plan: FillPlan): string {
  * Parsed from the code rather than taken from a column because the code IS the
  * identifier the claim RPC uses, so it cannot drift from what the set is. Null
  * for anything unrecognised, which draws no wash rather than a guess.
+ *
+ * A WEEKLY HAS NO SUBJECT TO TAKE A COLOUR FROM, and that is the honest answer
+ * rather than a gap. Its code is `weekly-2026-08-24` — a date, no club and no
+ * position — because it accepts any card at any position from any team. Where
+ * the others parse a subject out of segment 1 this one would find '2026', so it
+ * returns null and the sheet draws plain, which is what every set did before
+ * washes existed.
  */
 export function setTone(set: Pick<CardSet, 'code' | 'family'>): string | null {
+  if (set.family === 'weekly') return null;
+
   const key = set.code.split('-')[1];
   if (!key) return null;
   if (set.family === 'team') return teamWash(key);

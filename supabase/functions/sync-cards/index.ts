@@ -11,7 +11,7 @@
  * what makes a re-run safe once rarity is being set by something else.
  *
  * Once the templates are written it calls `rebuild_card_sets`, which folds any
- * new card into its team set, and then `rebuild_daily_set`, which ensures the
+ * new card into its team set, and then `rotate_daily_set`, which ensures the
  * day's daily exists and retires yesterday's. Both calls are best-effort: see
  * the notes at the call sites for why their failure must not fail the sync.
  *
@@ -179,16 +179,16 @@ Deno.serve(async (req) => {
     // daily nobody could clear on the day is not a reward, it is a claim
     // waiting to be found. `rebuild_daily_set` retires anything older itself.
     //
-    // The date is the server's, deliberately: the rotation is a pure function
-    // of it (`daily_set_position`), so the set a day produces has to be decided
-    // in one place and this is not that place.
+    // THE DAY IS THE DATABASE'S, and this call takes no arguments so that it
+    // cannot be otherwise. It used to pass `new Date().toISOString()` — the UTC
+    // date, computed on whichever machine happened to be running this function
+    // — while the note right here claimed the day "has to be decided in one
+    // place and this is not that place". It now genuinely is not: the day is
+    // `daily_set_day()`, the Eastern date, and the hourly `rotate-daily-set`
+    // job reads the same function. See 20260824233000_daily_set_rotates.sql.
     let dailyBuilt: unknown = null;
-    const today = new Date().toISOString().slice(0, 10);
-    const { data: daily, error: dailyError } = await supabase.rpc('rebuild_daily_set', {
-      p_season: season,
-      p_day: today,
-    });
-    if (dailyError) console.error('rebuild_daily_set failed', dailyError);
+    const { data: daily, error: dailyError } = await supabase.rpc('rotate_daily_set');
+    if (dailyError) console.error('rotate_daily_set failed', dailyError);
     else dailyBuilt = daily;
 
     return json({

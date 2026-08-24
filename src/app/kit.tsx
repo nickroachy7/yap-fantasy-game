@@ -37,6 +37,7 @@ import {
   KIT_COMMIT_PLAN,
   KIT_SET_DAILY,
   KIT_SET_COMPLETE,
+  KIT_SET_UNDER_FLOOR,
   KIT_SET_FILLED,
   KIT_SET_OPEN,
   OWNED_CARDS,
@@ -1148,6 +1149,21 @@ function Kit() {
                 tier="bronze"
                 sellValue={8}
                 sets={[KIT_SET_COMPLETE]}
+                burnsThisCopy
+                busy={false}
+                onCommit={(x) => setExitPicked(`add to ${x.name}`)}
+                onSell={() => setExitPicked('sell for 8')}
+              />
+              {/* The THIRD closed reason, and the only one about the copy
+                  rather than the set: a weekly takes silver and better, and
+                  this is a bronze. It has to read differently from both of the
+                  above, because it is the only one with a way out — start the
+                  card and the copy climbs. */}
+              <CardExits
+                playerName="Tank Dell"
+                tier="bronze"
+                sellValue={8}
+                sets={[KIT_SET_UNDER_FLOOR]}
                 burnsThisCopy
                 busy={false}
                 onCommit={(x) => setExitPicked(`add to ${x.name}`)}

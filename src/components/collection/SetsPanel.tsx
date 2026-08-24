@@ -241,7 +241,7 @@ export function SetsPanel({
                names the chip so the way out is obvious. */
             <Text style={[Type.body, styles.centredText, { color: c.textTertiary }]}>
               {filter === 'READY'
-                ? 'No sets have a reward waiting. Add cards to a set to reach its next rung.'
+                ? 'No sets have a reward waiting. Add cards to a set to reach the next one.'
                 : filter === 'CAN_ADD'
                   ? 'None of your cards fit an open slot right now. Open a pack, or check back after a game.'
                   : 'You have not finished a set yet.'}

@@ -832,15 +832,42 @@ begin
     raise exception 'FAIL: a team set does not require its whole roster';
   end if;
 
-  -- Every active TEAM set has the full four-rung ladder. A daily has exactly
-  -- one, at completion — four rungs on a three-card set would pay at one card,
-  -- which is the trickle the daily family was introduced to replace.
+  -- EVERY ACTIVE SET CARRIES ITS FAMILY'S WHOLE LADDER, and the ladder is read
+  -- from `card_set_ladder_defaults` rather than pinned at a number here.
+  --
+  -- It used to assert exactly four, which is what the team ladder had until it
+  -- was resliced into six for the same total (see
+  -- 20260824234000_team_ladder_more_rungs.sql). A count in this file makes
+  -- every future reslice look like a regression, which is precisely what the
+  -- header of this suite says not to do: the defaults table exists so those
+  -- figures can move, and what must hold is that a rebuild reproduces it
+  -- faithfully — no rung dropped, none invented.
   if exists (
-    select 1 from public.card_sets s
-     where s.season = 2026 and s.is_active and s.family = 'team'
-       and (select count(*) from public.card_set_milestones ml where ml.set_id = s.id) <> 4
+    select 1
+      from public.card_sets s
+     where s.season = 2026 and s.is_active
+       and exists (select 1 from public.card_set_ladder_defaults d where d.family = s.family)
+       and (select count(*) from public.card_set_milestones ml where ml.set_id = s.id)
+           <> (select count(*) from public.card_set_ladder_defaults d where d.family = s.family)
   ) then
-    raise exception 'FAIL: an active team set does not have four milestones';
+    raise exception 'FAIL: an active set does not carry its family''s full ladder';
+  end if;
+
+  -- And the rungs are the SAME rungs, at the same prices. A count alone would
+  -- pass on a set carrying six rungs that were the wrong six.
+  if exists (
+    select 1
+      from public.card_sets s
+      join public.card_set_ladder_defaults d on d.family = s.family
+     where s.season = 2026 and s.is_active
+       and not exists (
+         select 1 from public.card_set_milestones ml
+          where ml.set_id = s.id
+            and ml.threshold_pct = d.threshold_pct
+            and ml.reward_gems = d.reward_gems
+       )
+  ) then
+    raise exception 'FAIL: a set''s ladder does not match its family''s defaults';
   end if;
 
   raise notice 'card_sets: rebuild assertions passed';
