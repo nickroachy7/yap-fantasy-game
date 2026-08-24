@@ -39,12 +39,14 @@
  * The line under the facts says when the gems move; the autosave does the rest.
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useContests, type Contest } from '@/components/contests/use-contests';
 import { LineupEditor } from '@/components/lineup/LineupEditor';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { supabase } from '@/lib/supabase';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -54,7 +56,10 @@ export default function ContestSheet() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
-  const { contests, loading, error } = useContests();
+  const { contests, loading, error, reload } = useContests();
+  const [leaving, setLeaving] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
   const contest = useMemo(
     () => contests?.find((ct) => ct.code === code) ?? null,
     [contests, code],
@@ -76,6 +81,33 @@ export default function ContestSheet() {
      `set_lineup` would make anyway on the first submission — this is only so
      the reader meets them before spending ten minutes picking a lineup. */
   const barred = full || broke;
+
+  /**
+   * LEAVING GIVES THE GEMS BACK, so this is not a destructive act in the sense
+   * the dialog means — but it does delete a lineup somebody built, which is
+   * why it asks at all rather than acting on one press.
+   *
+   * Refused server-side once any of your cards has kicked off; the dialog does
+   * not try to predict that, because the per-player lock moves with the
+   * fixtures and a client that guessed would be wrong for the four days an NFL
+   * week runs. The error comes back and is shown in the dialog.
+   */
+  const leave = useCallback(async () => {
+    if (!contest) return;
+    setBusy(true);
+    setLeaveError(null);
+    const { error: err } = await supabase.rpc('leave_contest', {
+      p_contest_code: contest.code,
+    });
+    setBusy(false);
+    if (err) {
+      setLeaveError(err.message);
+      return;
+    }
+    setLeaving(false);
+    reload();
+    close();
+  }, [contest, reload, close]);
 
   return (
     <PlayerSheetFrame
@@ -119,8 +151,40 @@ export default function ContestSheet() {
           ) : (
             <LineupEditor pinnedContest={contest.code} frame="plain" />
           )}
+
+          {/* Only once you are in, and never on the free contest — that one is
+              not a thing you joined. Quiet and at the bottom: it is the exit,
+              not an option being offered. */}
+          {entered && contest.kind === 'lobby' ? (
+            <Pressable onPress={() => setLeaving(true)} style={styles.leave}>
+              <Text style={[Type.fine, { color: c.textSecondary }]}>
+                {contest.entryFeeGems > 0
+                  ? `Leave contest · ${contest.entryFeeGems} gems back`
+                  : 'Leave contest'}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       )}
+      <ConfirmDialog
+        visible={leaving}
+        title={`Leave ${contest?.name ?? 'this contest'}?`}
+        body={
+          contest && contest.entryFeeGems > 0
+            ? `Your lineup is deleted and ${contest.entryFeeGems} gems go back to your balance. You can enter again while the games are still ahead.`
+            : 'Your lineup for this contest is deleted.'
+        }
+        warning="The cards go back to your bench and can be played somewhere else this week."
+        confirmLabel="Leave"
+        destructive
+        busy={busy}
+        error={leaveError ?? undefined}
+        onConfirm={() => void leave()}
+        onCancel={() => {
+          setLeaving(false);
+          setLeaveError(null);
+        }}
+      />
     </PlayerSheetFrame>
   );
 }
@@ -156,6 +220,7 @@ function Facts({ contest }: { contest: Contest }) {
 const styles = StyleSheet.create({
   body: { gap: Spacing.three },
   facts: { gap: 0 },
+  leave: { alignItems: 'center', paddingVertical: Spacing.two },
   factRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

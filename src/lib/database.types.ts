@@ -1684,6 +1684,7 @@ export type Database = {
           weeks_played: number
         }[]
       }
+      leave_contest: { Args: { p_contest_code: string }; Returns: Json }
       lineup_slate: {
         Args: never
         Returns: {
@@ -1868,6 +1869,7 @@ export type Database = {
         | "position_bonus"
         | "mvp_bonus"
         | "contest_entry"
+        | "contest_refund"
       rarity: "common" | "uncommon" | "rare" | "epic" | "legendary"
     }
     CompositeTypes: {
@@ -2014,6 +2016,7 @@ export const Constants = {
         "position_bonus",
         "mvp_bonus",
         "contest_entry",
+        "contest_refund",
       ],
       rarity: ["common", "uncommon", "rare", "epic", "legendary"],
     },

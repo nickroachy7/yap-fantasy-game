@@ -290,6 +290,47 @@ begin
     raise exception 'FAIL: the free contest charged something: %', v_n;
   end if;
 
+  -- 14. LEAVING GIVES THE GEMS BACK AND FREES THE CARDS.
+  select balance into v_n from public.gem_balances where user_id = a;
+  perform public.leave_contest('test:lobby:94');
+
+  select balance into v_n from public.gem_balances where user_id = a;
+  if v_n <> 60 then
+    raise exception 'FAIL: leaving did not refund the entry — balance is %', v_n;
+  end if;
+
+  if exists (select 1 from public.lineups l join public.contests c on c.id = l.contest_id
+              where l.user_id = a and c.code = 'test:lobby:94') then
+    raise exception 'FAIL: the entry survived leaving';
+  end if;
+
+  -- 15. AND RE-ENTERING CHARGES AGAIN. The entry charge used to be keyed on
+  --     (user, contest), which cannot tell a retry from a re-entry — so this
+  --     call failed on a ledger constraint rather than taking the gems.
+  perform public.set_lineup(2026, 1::smallint, wk,
+    jsonb_build_array(jsonb_build_object('slot','FLEX1','card_instance_id',wr2)),
+    'test:lobby:94');
+
+  select balance into v_n from public.gem_balances where user_id = a;
+  if v_n <> 35 then
+    raise exception 'FAIL: re-entering did not charge again — balance is %', v_n;
+  end if;
+
+  -- 16. THE FREE CONTEST CANNOT BE LEFT. Everybody is in it, and a `leave`
+  --     that emptied your main lineup is a delete button wearing a kind word.
+  --     MATCHED ON THE MESSAGE and using THIS suite's week: 'free:2026:1:4' is
+  --     a real contest but not this test's, so an unknown-code refusal would
+  --     have passed a bare errcode check while proving nothing — both raise
+  --     22023.
+  begin
+    perform public.leave_contest('free:2026:1:94');
+    raise exception 'FAIL: the free contest was left';
+  exception when sqlstate '22023' then
+    if sqlerrm not like '%everybody is in it%' then
+      raise exception 'FAIL: refused, but not for being the free contest: %', sqlerrm;
+    end if;
+  end;
+
   raise notice 'contests suite: all assertions passed';
 end $$;
 

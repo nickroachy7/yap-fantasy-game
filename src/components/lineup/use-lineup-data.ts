@@ -33,7 +33,7 @@
  * forward on its own with days to spare.
  */
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { collectionVersion } from '@/components/collection/use-collection';
 import type { CardTier } from '@/constants/theme';
@@ -228,33 +228,24 @@ function buildSchedule(
   return out;
 }
 
-/** The one row a submission changes, and the only thing worth re-reading after one. */
-type PriorLineup = {
-  total_points: number | null;
+type ContestRow = {
+  id: string;
+  code: string;
+  name: string;
+  kind: 'free' | 'lobby';
+  format_code: string;
+  entry_fee_gems: number;
+};
+
+/** One of the caller's lineups on this slate, with its slots. */
+type SlateLineup = {
+  id: string;
+  contest_id: string;
+  total_points: number | string | null;
   scored_at: string | null;
   finalized_at: string | null;
-  lineup_slots?: { slot: string; card_instance_id: string; points: number | null }[];
-} | null;
-
-const LINEUP_SELECT =
-  'id, total_points, scored_at, finalized_at, lineup_slots(slot, card_instance_id, points)';
-
-/**
- * KEYED ON THE CONTEST, not on the slate.
- *
- * It filtered by season/type/week and took `maybeSingle()`, which was exactly
- * right while a week held one lineup and became a live bug the moment it could
- * hold two: the moment a player enters anything in the lobby, the free
- * contest's own screen starts erroring on multiple rows returned. A week is no
- * longer a key — `lineups_user_id_contest_key` is.
- */
-function readLineup(contestId: string) {
-  return supabase
-    .from('lineups')
-    .select(LINEUP_SELECT)
-    .eq('contest_id', contestId)
-    .maybeSingle();
-}
+  lineup_slots: { slot: string; card_instance_id: string; points: number | null }[] | null;
+};
 
 /** The contest a lineup screen is editing, and the format it must be filled to. */
 export type LineupContest = {
@@ -342,18 +333,31 @@ export type LineupData = {
 
 export function useLineupData(contestCode?: string): LineupData {
   const [slate, setSlate] = useState<Slate | null>(null);
-  const [contest, setContest] = useState<LineupContest | null>(null);
-  const [elsewhere, setElsewhere] = useState<Map<string, string>>(new Map());
+  /**
+   * EVERYTHING FOR THE WHOLE SLATE, HELD RAW, and this is what makes swiping
+   * the carousel cost nothing.
+   *
+   * The first cut keyed the fetch on `contestCode`, so every swipe re-ran the
+   * entire load — the paged collection, the team list, a stat line per player
+   * owned — and the screen's `if (loading)` blanked the board while it did.
+   * Two contests, and moving between them was a full page refresh for data
+   * that was identical both times.
+   *
+   * None of it is per-contest. A slate has a handful of contests, three
+   * formats hold fourteen slot rows between them, and your lineups for the
+   * week are at most one each — so all of it comes back in the SAME round trip
+   * as the collection, and picking a contest afterwards is a `useMemo`. The
+   * load no longer depends on `contestCode` at all.
+   */
+  const [contestRows, setContestRows] = useState<ContestRow[]>([]);
+  const [formatSlots, setFormatSlots] = useState<Map<string, SlotConfig[]>>(new Map());
+  const [myLineups, setMyLineups] = useState<SlateLineup[]>([]);
   const [inPlay, setInPlay] = useState(false);
   const [hasLiveGame, setHasLiveGame] = useState(false);
   const [lockAt, setLockAt] = useState<string | null>(null);
-  const [slots, setSlots] = useState<SlotConfig[]>([]);
+
   const [cards, setCards] = useState<LineupCard[]>([]);
-  const [savedPicks, setSavedPicks] = useState<Record<string, string>>({});
-  const [savedPoints, setSavedPoints] = useState<Record<string, number | null>>({});
-  const [totalPoints, setTotalPoints] = useState<number | null>(null);
-  const [scoredAt, setScoredAt] = useState<string | null>(null);
-  const [finalizedAt, setFinalizedAt] = useState<string | null>(null);
+
 
   /**
    * Write one lineup row into the five pieces of state it feeds. Shared by the
@@ -361,28 +365,6 @@ export function useLineupData(contestCode?: string): LineupData {
    * what an absent lineup means — both resolve it to empty rather than leaving
    * whatever was there before.
    */
-  const applyLineup = useCallback((prior: PriorLineup) => {
-    setSavedPicks(
-      prior?.lineup_slots
-        ? Object.fromEntries(prior.lineup_slots.map((r) => [r.slot, r.card_instance_id]))
-        : {},
-    );
-    setSavedPoints(
-      prior?.lineup_slots
-        ? Object.fromEntries(
-            prior.lineup_slots.map((r) => [r.slot, r.points === null ? null : Number(r.points)]),
-          )
-        : {},
-    );
-    setTotalPoints(
-      prior?.total_points === null || prior?.total_points === undefined
-        ? null
-        : Number(prior.total_points),
-    );
-    setScoredAt(prior?.scored_at ?? null);
-    setFinalizedAt(prior?.finalized_at ?? null);
-  }, []);
-
   const load = useCallback<Load>(async (live) => {
     // `lineup_slate()` names the one week this screen is about. The collection,
     // slot config and team list do not depend on it, so they ride along rather
@@ -411,53 +393,41 @@ export function useLineupData(contestCode?: string): LineupData {
     let failure: string | null = null;
     if (coll.error) failure = coll.error;
 
-    /* WHICH CONTEST, and it has to be resolved before the slots can be: the
-       slot list belongs to the contest's FORMAT now, so a three-card lobby
-       board and the eight-card free one ask for different rows. This is the
-       one round trip that had to become sequential — everything after it still
-       goes out together. */
-    let ct: LineupContest | null = null;
-    if (s) {
-      const q = supabase
-        .from('contests')
-        .select('id, code, name, kind, format_code, entry_fee_gems')
-        .eq('season', s.season)
-        .eq('season_type', s.season_type)
-        .eq('week', s.week);
-
-      const { data: cRow, error: cErr } = contestCode
-        ? await q.eq('code', contestCode).maybeSingle()
-        : await q.eq('kind', 'free').maybeSingle();
-
-      if (!live()) return;
-      if (cErr) failure = cErr.message;
-      else if (!cRow) failure = contestCode ? 'That contest is no longer open.' : failure;
-      else
-        ct = {
-          id: cRow.id,
-          code: cRow.code,
-          name: cRow.name,
-          kind: cRow.kind as 'free' | 'lobby',
-          formatCode: cRow.format_code,
-          entryFeeGems: cRow.entry_fee_gems,
-          /* Filled in below, once the lineup read comes back: an entry exists
-             exactly when a lineup row does, which is what makes the fee
-             idempotent server-side too. See `20260825050000`. */
-          unentered: true,
-        };
-    }
-    setContest(ct);
-
     const owned = coll.data.filter((r): r is CollectionRow & { id: string } => Boolean(r.id));
     const playerIds = [...new Set(owned.map((r) => r.player_id).filter((id): id is string => Boolean(id)))];
 
-    const [cfg, lock, existing, others, gamesRes, stats] = await Promise.all([
-      ct
+    /* EVERY CONTEST ON THE SLATE, EVERY FORMAT'S SLOTS, AND EVERY LINEUP YOU
+       HOLD — all of it, in one batch, because none of it is big and picking a
+       contest out of it afterwards is free. This is what makes a carousel
+       swipe cost nothing; see the note on `contestRows`. */
+    const [contestsRes, fmtRes, minesRes, lock, gamesRes, stats] = await Promise.all([
+      s
         ? supabase
-            .from('contest_format_slots')
-            .select('slot, eligible_positions, display_order')
-            .eq('format_code', ct.formatCode)
-            .order('display_order')
+            .from('contests')
+            .select('id, code, name, kind, format_code, entry_fee_gems')
+            .eq('season', s.season)
+            .eq('season_type', s.season_type)
+            .eq('week', s.week)
+        : Promise.resolve({ data: null, error: null }),
+      /* Fourteen rows across three formats. Fetching only the one format in
+         front would put a round trip on every swipe to save nothing. */
+      supabase
+        .from('contest_format_slots')
+        .select('format_code, slot, eligible_positions, display_order')
+        .order('display_order'),
+      /* RLS scopes this to you, so no user filter is sent and none would help.
+         It answers three questions at once: which contests you are in, what
+         each of those lineups holds, and — for every contest that is NOT the
+         one on screen — which cards are unavailable. */
+      s
+        ? supabase
+            .from('lineups')
+            .select(
+              'id, contest_id, total_points, scored_at, finalized_at, lineup_slots(slot, card_instance_id, points)',
+            )
+            .eq('season', s.season)
+            .eq('season_type', s.season_type)
+            .eq('week', s.week)
         : Promise.resolve({ data: null, error: null }),
       s
         ? supabase.rpc('week_lock_time', {
@@ -465,20 +435,6 @@ export function useLineupData(contestCode?: string): LineupData {
             p_season_type: s.season_type,
             p_week: s.week,
           })
-        : Promise.resolve({ data: null, error: null }),
-      ct ? readLineup(ct.id) : Promise.resolve({ data: null, error: null }),
-      /* Every lineup you hold on this slate, with its slots. RLS scopes it to
-         you, so no user filter is sent and none would help. One query rather
-         than one per contest: the count is small and a card that cannot be
-         picked must be un-pickable on the FIRST paint, not after a round trip
-         per rival contest. */
-      s
-        ? supabase
-            .from('lineups')
-            .select('contest_id, contests(name, kind), lineup_slots(card_instance_id)')
-            .eq('season', s.season)
-            .eq('season_type', s.season_type)
-            .eq('week', s.week)
         : Promise.resolve({ data: null, error: null }),
       s
         ? supabase
@@ -497,8 +453,28 @@ export function useLineupData(contestCode?: string): LineupData {
     /* Same precedence as before: the collection's failure is the one reported
        if both the slot config and the collection fail, because it is the one
        that empties the screen. */
-    if (cfg.error) failure = failure ?? cfg.error.message;
-    else setSlots((cfg.data ?? []) as SlotConfig[]);
+    if (contestsRes.error) failure = failure ?? contestsRes.error.message;
+    if (fmtRes.error) failure = failure ?? fmtRes.error.message;
+    if (minesRes.error) failure = failure ?? minesRes.error.message;
+
+    setContestRows((contestsRes.data ?? []) as ContestRow[]);
+
+    /* Grouped by format once here rather than filtered per render: the board
+       asks for one format's slots on every paint, and the answer only changes
+       when this load runs. */
+    const byFormat = new Map<string, SlotConfig[]>();
+    for (const row of (fmtRes.data ?? []) as (SlotConfig & { format_code: string })[]) {
+      const list = byFormat.get(row.format_code) ?? [];
+      list.push({
+        slot: row.slot,
+        eligible_positions: row.eligible_positions,
+        display_order: row.display_order,
+      });
+      byFormat.set(row.format_code, list);
+    }
+    setFormatSlots(byFormat);
+    setMyLineups((minesRes.data ?? []) as unknown as SlateLineup[]);
+
     if (!lock.error && lock.data) setLockAt(String(lock.data));
 
     const weekGames = (gamesRes.data ?? []) as GameRow[];
@@ -534,50 +510,117 @@ export function useLineupData(contestCode?: string): LineupData {
       })),
     );
 
-    // Re-hydrate a lineup already submitted for this week. Its existence is
-    // also the answer to "have I entered", which the paid board's button reads.
-    type OtherRow = {
-      contest_id: string;
-      contests: { name: string; kind: string } | null;
-      lineup_slots: { card_instance_id: string }[] | null;
-    };
-    const held = new Map<string, string>();
-    for (const row of ((others as { data: OtherRow[] | null }).data ?? [])) {
-      if (!ct || row.contest_id === ct.id) continue;
-      const where = row.contests?.kind === 'free' ? 'your main lineup' : (row.contests?.name ?? 'another contest');
-      for (const slot of row.lineup_slots ?? []) held.set(slot.card_instance_id, where);
-    }
-    setElsewhere(held);
-
-    const prior = existing.data as PriorLineup;
-    if (ct) setContest({ ...ct, unentered: !prior });
-    applyLineup(prior);
     return failure;
-  }, [applyLineup, contestCode]);
+    /* NO `contestCode` IN THESE DEPS, and that is the whole point. Nothing this
+       function fetches depends on which contest is in front, so swiping the
+       carousel does not re-run it — see `contestRows`. */
+  }, []);
+
+  /* ------------------------------------------------------------------ *
+   * DERIVED PER CONTEST. No fetching below this line.
+   *
+   * Everything the board shows for ONE contest is a projection of the
+   * slate-wide state above. That is what makes swiping the carousel free: it
+   * changes `contestCode`, these memos recompute, and no request is sent.
+   * ------------------------------------------------------------------ */
+
+  const contest = useMemo<LineupContest | null>(() => {
+    if (contestRows.length === 0) return null;
+    const row = contestCode
+      ? contestRows.find((r) => r.code === contestCode)
+      : contestRows.find((r) => r.kind === 'free');
+    if (!row) return null;
+    return {
+      id: row.id,
+      code: row.code,
+      name: row.name,
+      kind: row.kind,
+      formatCode: row.format_code,
+      entryFeeGems: row.entry_fee_gems,
+      /* An entry exists exactly when a lineup row does — which is also what
+         makes the fee idempotent server-side. See `20260825050000`. */
+      unentered: !myLineups.some((l) => l.contest_id === row.id),
+    };
+  }, [contestRows, contestCode, myLineups]);
+
+  const slots = useMemo<SlotConfig[]>(
+    () => (contest ? (formatSlots.get(contest.formatCode) ?? []) : []),
+    [contest, formatSlots],
+  );
+
+  /** The caller's lineup in the contest on screen, if they have one. */
+  const mine = useMemo(
+    () => (contest ? (myLineups.find((l) => l.contest_id === contest.id) ?? null) : null),
+    [contest, myLineups],
+  );
+
+  const savedPicks = useMemo(
+    () =>
+      Object.fromEntries((mine?.lineup_slots ?? []).map((r) => [r.slot, r.card_instance_id])),
+    [mine],
+  );
+
+  const savedPoints = useMemo(
+    () =>
+      Object.fromEntries(
+        (mine?.lineup_slots ?? []).map((r) => [r.slot, r.points === null ? null : Number(r.points)]),
+      ),
+    [mine],
+  );
+
+  const totalPoints = useMemo(
+    () => (mine?.total_points === null || mine?.total_points === undefined ? null : Number(mine.total_points)),
+    [mine],
+  );
 
   /**
-   * Re-read ONLY the lineup row.
+   * Cards held by your OTHER lineups this week, mapped to what is holding each.
+   *
+   * Derived rather than fetched, and it changes as you swipe: the free
+   * contest's own board must warn about cards committed to the lobby, and the
+   * lobby's board about cards in your main lineup. Same set, opposite sides.
+   */
+  const elsewhere = useMemo(() => {
+    const held = new Map<string, string>();
+    for (const l of myLineups) {
+      if (contest && l.contest_id === contest.id) continue;
+      const row = contestRows.find((r) => r.id === l.contest_id);
+      const where = row?.kind === 'free' ? 'your main lineup' : (row?.name ?? 'another contest');
+      for (const slot of l.lineup_slots ?? []) held.set(slot.card_instance_id, where);
+    }
+    return held;
+  }, [myLineups, contestRows, contest]);
+
+  /**
+   * Re-read ONLY the lineups for the slate.
    *
    * What a submission changes is one row and its slots. `reload()` re-reads the
-   * slate, the slot config, the whole paged collection, the team list, the lock
-   * time, the week's fixtures and every stat line for every player you own —
-   * chunked, so several round trips — and every one of those answers is
-   * identical to the one it already had. Doing that after each swap is what made
-   * moving a player feel slow: the board sat on stale state for as long as the
-   * heaviest query took.
+   * whole paged collection, the team list, the fixtures and a stat line per
+   * player owned — chunked, so several round trips — and every one of those
+   * answers is identical to the one it already had. Doing that after each swap
+   * is what made moving a player feel slow.
    *
-   * Points are deliberately not chased here. A swapped slot keeps the OLD card's
+   * It re-reads ALL of them rather than just the one on screen, because an
+   * entry changes what is available in the OTHER contests too: the card you
+   * just started here is the card the next board has to grey out.
+   *
+   * Points are deliberately not chased. A swapped slot keeps the OLD card's
    * points until the next sweep recomputes them, so there is nothing fresher to
    * fetch; the 60s poll brings them in when they exist.
    */
   const reloadLineup = useCallback(async () => {
-    if (!contest) return;
-    const { data, error: err } = await readLineup(contest.id);
+    if (!slate) return;
+    const { data, error: err } = await supabase
+      .from('lineups')
+      .select(
+        'id, contest_id, total_points, scored_at, finalized_at, lineup_slots(slot, card_instance_id, points)',
+      )
+      .eq('season', slate.season)
+      .eq('season_type', slate.season_type)
+      .eq('week', slate.week);
     if (err) return;
-    const prior = data as PriorLineup;
-    setContest((c) => (c ? { ...c, unentered: !prior } : c));
-    applyLineup(prior);
-  }, [contest, applyLineup]);
+    setMyLineups((data ?? []) as unknown as SlateLineup[]);
+  }, [slate]);
 
   // Quiet, like the old `reload`: it cleared the error and re-read, but never
   // put the screen back into its first-load spinner.
@@ -627,8 +670,8 @@ export function useLineupData(contestCode?: string): LineupData {
     savedPicks,
     savedPoints,
     totalPoints,
-    scoredAt,
-    finalizedAt,
+    scoredAt: mine?.scored_at ?? null,
+    finalizedAt: mine?.finalized_at ?? null,
     loading,
     error,
     reload: refresh,
