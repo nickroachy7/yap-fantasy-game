@@ -186,9 +186,15 @@ insert into public.card_instances (id, user_id, card_id, career_fp, settled_fp)
 values ('54444444-0000-0000-0000-00000000000b',
         '51111111-1111-1111-1111-111111111111',
         (select id from set_test_cards where n = 1), 0, 0),
+       -- 300, not the 800 this was written with. 20260821250000 re-cut the
+       -- ladder to 50/200/600, which promoted 800 fp from gold to DIAMOND and
+       -- broke the assertion below that names this copy gold. 300 is gold under
+       -- the current ladder; all this copy has to be is worth more than the
+       -- bronze one, so that "the commit takes the least valuable copy" has
+       -- something to choose between.
        ('54444444-0000-0000-0000-00000000000f',
         '51111111-1111-1111-1111-111111111111',
-        (select id from set_test_cards where n = 1), 800, 800);
+        (select id from set_test_cards where n = 1), 300, 300);
 -- A third copy, so "three copies fill one slot" is a real case rather than an
 -- assumed one.
 insert into public.card_instances (user_id, card_id, career_fp, settled_fp)
@@ -356,22 +362,43 @@ insert into public.lineup_slots (lineup_id, slot, card_instance_id)
 values ('55555555-5555-5555-5555-555555555555', 'QB', '54444444-0000-0000-0000-000000000002');
 set local role authenticated;
 
+-- A STARTER CAN BE COMMITTED, AND THE SLOT IT WAS STANDING IN IS FREED.
+--
+-- This block used to assert the opposite: that committing a card sitting in an
+-- unscored lineup was REFUSED. 20260821230000 reversed that deliberately — the
+-- slot belongs to us, so emptying it in the same transaction as the burn is a
+-- better remedy than refusing an action the player clearly meant. The test was
+-- written a few hours before that migration and kept asserting the old rule.
 do $$
-declare ok boolean := false; r jsonb;
+declare r jsonb; v_slots integer; v_inst uuid;
 begin
-  begin
-    r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 2));
-  exception when others then
-    ok := sqlerrm like '%not been scored%';
-    if not ok then raise exception 'FAIL: an in-lineup card was blocked by the wrong rule: %', sqlerrm; end if;
-  end;
-  if not ok then raise exception 'FAIL: a card in an unscored lineup was burnt'; end if;
+  select id into v_inst from public.card_instances
+   where id = '54444444-0000-0000-0000-000000000002';
+
+  r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 2));
+
+  if (r ->> 'card_instance_id')::uuid <> v_inst then
+    raise exception 'FAIL: the commit took % rather than the started copy', r ->> 'card_instance_id';
+  end if;
+
+  -- The half that makes this safe rather than merely permissive: the lineup
+  -- must not be left naming a card that no longer exists to be scored.
+  select count(*) into v_slots
+    from public.lineup_slots
+   where lineup_id = '55555555-5555-5555-5555-555555555555';
+  if v_slots <> 0 then
+    raise exception 'FAIL: committing a starter left % slots holding it', v_slots;
+  end if;
+
+  if (select is_held from public.card_instances where id = v_inst) is not false then
+    raise exception 'FAIL: the committed copy is still held';
+  end if;
 end;
 $$;
 
--- Release it, and hand over the rest of the set.
+-- Hand over the rest of the set. The lineup slot no longer needs releasing —
+-- the commit above freed it, which is the behaviour that block now checks.
 reset role;
-delete from public.lineup_slots where lineup_id = '55555555-5555-5555-5555-555555555555';
 insert into public.card_instances (user_id, card_id)
 values ('51111111-1111-1111-1111-111111111111', (select id from set_test_cards where n = 3)),
        ('51111111-1111-1111-1111-111111111111', (select id from set_test_cards where n = 4)),
@@ -381,7 +408,10 @@ set local role authenticated;
 do $$
 declare ok boolean := false; r jsonb; v record;
 begin
-  r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 2));
+  -- Card 2 went in above, as a starter whose slot was freed by the commit. It
+  -- used to be committed here instead, because the block above expected the
+  -- attempt to be refused. Three are committed either way — 1, 2 and 3 — which
+  -- is what the two rungs below are counted against.
   r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 3));
 
   -- ---- TWO RUNGS AT ONCE -------------------------------------------------
@@ -614,8 +644,12 @@ select ('64444444-0000-0000-0000-00000000000' || n)::uuid,
   join public.players p on p.external_id = 9400 + n
   join public.cards c on c.player_id = p.id;
 
--- The SECOND card in the array order is the one in a lineup, so the skip is
--- proved to happen in the middle of the run rather than at its end.
+-- The SECOND card in the array order is the one in a lineup. Since
+-- 20260821230000 that is no longer a refusal — the commit frees the slot — so
+-- it now proves the opposite: a STARTER can be bulk-committed, mid-run, and the
+-- lineup it was standing in does not keep it. The mid-run REFUSAL that this
+-- fixture used to provide is supplied below by a non-member card spliced into
+-- the middle of the array instead.
 insert into public.lineups (id, user_id, season, season_type, week)
 values ('65555555-5555-5555-5555-555555555555', '61111111-1111-1111-1111-111111111111', 2026, 1, 1);
 insert into public.lineup_slots (lineup_id, slot, card_instance_id)
@@ -633,14 +667,22 @@ begin
     from public.cards c join public.players p on p.id = c.player_id
    where p.external_id between 9401 and 9405;
 
+  -- Splice a card that is not in this set into the middle of the run, so that a
+  -- refusal is still proved to happen mid-array and not merely at the end. The
+  -- cards after it must still go in; a bulk action that abandoned its tail on
+  -- the first refusal would pass every other assertion in this block.
+  v_ids := v_ids[1:1]
+        || array[(select id from set_test_cards where n = 6)]
+        || v_ids[2:5];
+
   r := public.commit_cards_to_set('bulk-set-2026', v_ids);
 
-  -- Three in, two refused: one for its lineup, one for arriving after the bar.
+  -- Three in, three refused: the non-member, and two that arrived after the bar.
   if (r ->> 'added')::integer <> 3 then
     raise exception 'FAIL: the fill added %, expected 3', r ->> 'added';
   end if;
-  if (r ->> 'skipped')::integer <> 2 then
-    raise exception 'FAIL: the fill skipped %, expected 2', r ->> 'skipped';
+  if (r ->> 'skipped')::integer <> 3 then
+    raise exception 'FAIL: the fill skipped %, expected 3', r ->> 'skipped';
   end if;
   -- Five bronze copies at 8 gems, half of it each.
   if (r ->> 'paid')::integer <> 12 then
@@ -655,9 +697,9 @@ begin
   -- worse than one that refused outright.
   if not exists (
     select 1 from jsonb_array_elements(r -> 'refusals') x
-     where x ->> 'reason' like '%not been scored%'
+     where x ->> 'reason' like '%not in this set%'
   ) then
-    raise exception 'FAIL: the in-lineup card was not reported as such: %', r -> 'refusals';
+    raise exception 'FAIL: the non-member was not reported as such: %', r -> 'refusals';
   end if;
   if not exists (
     select 1 from jsonb_array_elements(r -> 'refusals') x
@@ -668,9 +710,19 @@ begin
 
   -- THE CARD IN THE LINEUP SURVIVED. It is the whole reason a refusal must not
   -- take the transaction with it.
+  -- The started copy went in, and the lineup does not still name it. Both
+  -- halves matter: a lineup left pointing at a burnt card is a slot that scores
+  -- nothing with no error anywhere.
   if (select is_held from public.card_instances where id = '64444444-0000-0000-0000-000000000002')
-     is not true then
-    raise exception 'FAIL: a skipped card was burnt anyway';
+     is not false then
+    raise exception 'FAIL: the started copy was not committed by the bulk fill';
+  end if;
+  if exists (
+    select 1 from public.lineup_slots
+     where lineup_id = '65555555-5555-5555-5555-555555555555'
+       and card_instance_id = '64444444-0000-0000-0000-000000000002'
+  ) then
+    raise exception 'FAIL: the bulk fill burnt a starter without freeing its slot';
   end if;
 
   select committed, complete, claimable_gems into v from public.my_sets where code = 'bulk-set-2026';

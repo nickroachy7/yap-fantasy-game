@@ -103,11 +103,17 @@ begin
   select ci.id into v_bench from public.card_instances ci
    where ci.user_id = v_user and ci.card_id = v_bench;
 
-  /* 195 points apiece, five short of the silver threshold at 200, earned in a
+  /* 195 points apiece, five short of the GOLD threshold at 200, earned in a
    * finished week each. Chosen so the 18 points scored below are unambiguously
    * enough to promote — the test can then assert that promotion does NOT
    * happen yet, which is a far stronger statement than asserting it against a
    * card that was never close.
+   *
+   * 200 was the SILVER line when this was written; 20260821250000 re-cut the
+   * ladder to 50/200/600 and it is the gold line now. The figures are left
+   * alone because what they encode — five short of a threshold, then eighteen
+   * over it — is the whole point of the fixture, and only the names of the two
+   * tiers either side of it have moved.
    *
    * A week each rather than one shared week: `lineups` is unique per user and
    * week, and there is one QB slot, so two cards cannot both have started in
@@ -146,8 +152,9 @@ begin
     raise exception 'FAIL: fixture card did not arrive on 195 earned points, got %',
       (select career_fp from public.card_instances where id = v_starter);
   end if;
-  if (select tier::text from public.card_instances where id = v_starter) <> 'bronze' then
-    raise exception 'FAIL: fixture card should be bronze on 195 fp';
+  if (select tier::text from public.card_instances where id = v_starter) <> 'silver' then
+    raise exception 'FAIL: fixture card should be silver on 195 fp, got %',
+      (select tier::text from public.card_instances where id = v_starter);
   end if;
   checks := checks + 1;
 
@@ -186,11 +193,11 @@ begin
   end if;
   checks := checks + 1;
 
-  -- CLAIM 3. Its tier has not, even though 213 clears silver at 200.
+  -- CLAIM 3. Its tier has not, even though 213 clears gold at 200.
   if v_settled <> 195 then
     raise exception 'FAIL claim 3: settled_fp moved during a live week, got %', v_settled;
   end if;
-  if v_tier <> 'bronze' then
+  if v_tier <> 'silver' then
     raise exception 'FAIL claim 3: card promoted to % in the middle of a game', v_tier;
   end if;
   checks := checks + 1;
@@ -239,7 +246,7 @@ begin
   end if;
   checks := checks + 1;
 
-  if v_tier <> 'silver' then
+  if v_tier <> 'gold' then
     raise exception 'FAIL: card on 213 settled points did not promote, still %', v_tier;
   end if;
   checks := checks + 1;
