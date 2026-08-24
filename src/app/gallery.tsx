@@ -165,7 +165,7 @@ const VIEW_TITLE: Record<View_, string> = {
   inventory: 'Inventory',
   sets: 'Sets',
   checklist: 'Jacksonville Jaguars',
-  leaderboard: 'Leaderboard',
+  leaderboard: 'Leaders',
   lineup: 'Lineup',
   recap: 'Week 3 recap',
   profile: 'Christian McCaffrey',

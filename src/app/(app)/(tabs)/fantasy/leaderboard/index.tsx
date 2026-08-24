@@ -150,7 +150,7 @@ export default function LeaderboardScreen() {
   return (
     // scroll={false}: each board owns a FlatList, and nesting a virtualised
     // list inside a ScrollView defeats the virtualisation.
-    <Screen title="Leaderboard" measure="table" scroll={false}>
+    <Screen title="Leaders" measure="table" scroll={false}>
       {/* The board draws the control row — see `BoardControls` for why both
           controls have to be drawn by the same component. This screen still
           owns which board is selected; it just no longer draws the strip. */}

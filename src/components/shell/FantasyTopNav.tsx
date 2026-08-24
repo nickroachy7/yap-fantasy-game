@@ -8,10 +8,14 @@
  *
  * FOUR AGAIN, AND IT WAS THREE. All Cards came back from being a bottom tab on
  * 2026-08-24 when the bar became a list of products; the strip was built for
- * four and had been carrying three since. Nothing here changed to take it —
- * the widths below were measured against four words and still hold, because
- * COMPETE / ALL CARDS / COLLECT / BOARD is 28 characters, exactly what LINEUP /
- * COLLECTION / PLAYERS / BOARD was when they were measured.
+ * four and had been carrying three since.
+ *
+ * THE WORDS ARE LONGER THAN ANY SET THIS HAS HELD. COMPETE / COLLECT / ALL
+ * CARDS / LEADERS is 30 characters against the 28 of LINEUP / COLLECTION /
+ * PLAYERS / BOARD, which the layout below was measured on. It still fits at
+ * 320pt with nothing truncated — but the even gaps it produces there fell from
+ * ~17 to 13, and that is not free: the touch slop had to come down with them.
+ * See `hitSlop`. There is not room for another two characters at this size.
  *
  * IT IS ON EVERY SCREEN OF THE TAB, with nothing in front of it. A hub page
  * listing these same four was built and cut first; see `fantasy/index.tsx`.
@@ -48,8 +52,8 @@
  *    corners and the middle as adrift.
  *
  * `space-evenly` puts the same gap in all five places — before, between and
- * after — so the row has one rhythm at any width: 17pt on a 320pt viewport,
- * 32 on a 393, 41 on a 440. Four peers should be evenly weighted, and evenly
+ * after — so the row has one rhythm at any width: 13pt on a 320pt viewport,
+ * 28 on a 393, 38 on a 440, with the labels as they stand today. Four peers should be evenly weighted, and evenly
  * weighted is the one thing neither of the other two layouts could be.
  *
  * THE PRICE IS THE PAGE GUTTER, paid knowingly. The labels no longer start at
@@ -139,12 +143,21 @@ export function FantasyTopNav({
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               /* The words are the targets and the space between them is dead,
-                 so the touch area claims some of it. 8 a side, which at the
-                 tightest viewport this strip has (320, where every gap works
-                 out at ~17) still leaves two neighbouring slops clear of each
-                 other — an overlap would hand a tap to whichever item happened
-                 to render last. */
-              hitSlop={{ left: 8, right: 8, top: 4, bottom: 4 }}
+                 so the touch area claims some of it. SIX a side, and the number
+                 is derived rather than chosen: two neighbouring slops must stay
+                 clear of each other, or a tap in the gap goes to whichever item
+                 happened to render last.
+
+                 It was 8, against gaps of ~17 at the tightest viewport this
+                 strip has. Renaming Board to Leaders on 2026-08-24 cost two
+                 characters and closed the gaps to 13 — measured, on a 320pt
+                 viewport — at which 8 a side overlaps by 3. Six leaves a point
+                 of dead space between them.
+
+                 SO THIS MOVES WITH THE LABELS. Any section renamed longer
+                 tightens the gaps again; re-measure rather than assuming the
+                 slop still fits. */
+              hitSlop={{ left: 6, right: 6, top: 4, bottom: 4 }}
               /* REPLACE, not push. The four are peers you flip between, and
                  pushing would build a back stack out of every flip — press
                  Lineup, Collection, Players, then back three times to get out of

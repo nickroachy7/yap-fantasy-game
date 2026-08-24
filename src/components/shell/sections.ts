@@ -8,8 +8,8 @@
  *                      Leagues, Scores, Profile. These are products, not
  *                      screens.
  *   2. FANTASY_SECTIONS — the row under the header once you are inside Yap.
- *                      Compete, All Cards, Collect, Board. These used to BE the
- *                      bottom bar.
+ *                      Compete, Collect, All Cards, Leaders. These used to BE
+ *                      the bottom bar.
  *   3. NavChild      — a section's OR a tab's sub-pages, drawn by `SectionNav`
  *                      as the page's action bar.
  *
@@ -26,12 +26,12 @@
  * reading Yap, Leagues, Players, Scores, Profile offers one of the card game's
  * own boards at the same rank as the card game, and nothing about the bar tells
  * a reader that pressing Players keeps them inside Yap while pressing Leagues
- * does not. It is a board again, named All Cards, second in the level-2 strip.
+ * does not. It is a board again, named All Cards, third in the level-2 strip.
  *
- * LEVEL 2 IS MOSTLY VERBS NOW, NOT OBJECTS. It was Lineup, Collection, Sets,
- * Board — four things you own or read. It is Compete, All Cards, Collect,
- * Board: what you are there to DO, with the objects as views beneath, and one
- * noun in the middle that is a pool rather than a job.
+ * LEVEL 2 IS TWO VERBS THEN TWO NOUNS. It was Lineup, Collection, Sets, Board
+ * — four things you own or read. It is Compete, Collect, All Cards, Leaders:
+ * what you are there to DO with your own team, then the two boards you go to
+ * read about everybody else's.
  *
  * Grouping by intent is only right when the things inside share a job, and
  * these two do. Compete had no choice: contests mean there is no longer *a*
@@ -61,8 +61,9 @@
  * presentation now derives from here, which is what makes that claim true.
  *
  * Order inside Yap is deliberate, and it follows what a week actually looks
- * like: play your team, see what exists to be had, sort out what you own, then
- * see where that put you.
+ * like: play your team, sort out what you own, see what else is out there, then
+ * see where all of that put you. Your two boards first, the league's two after
+ * — the pairs are not interleaved.
  *
  * One child of any parent that has several deliberately shares the parent's own
  * href. The nav needs an item for the landing page or there is no way back to
@@ -136,16 +137,16 @@ export type NavSection = {
    * Shorter name for a bar where labels share the screen width. Falls back to
    * `label`.
    *
-   * Only Leaderboard needs one, and it needs one in BOTH bars it appears in —
-   * the wide rail has room, the narrow top nav does not. Measured at 13pt
-   * across four items on a 320pt viewport, an iPhone SE: "Leaderboard" alone
-   * wants more than its quarter and truncated to "Leaderboa…", which reads as
-   * a bug rather than as an abbreviation.
+   * NOTHING USES IT TODAY. Leaderboard was the one that did — at 13pt across
+   * four items on a 320pt viewport, an iPhone SE, "Leaderboard" wanted more
+   * than its quarter and truncated to "Leaderboa…" — and it shortened to
+   * "Board", the app's own name for that screen. Renaming the board to
+   * "Leaders" on 2026-08-24 made the abbreviation pointless: seven characters
+   * fit both bars, so there is one word rather than two.
    *
-   * "Board" rather than an invented abbreviation: it is already this app's own
-   * shorthand for that screen — `leaderboard/board.ts`, `BOARD_LIMIT`, the
-   * screen's own doc comment ("The global board"), and the shell gallery's
-   * label for it.
+   * It stays because the constraint has not gone anywhere. Four labels sharing
+   * 320pt is tight (see `FantasyTopNav`), and the next long section name will
+   * want exactly this rather than a second layout.
    */
   tabLabel?: string;
   /**
@@ -251,6 +252,19 @@ const ALL_CARD_VIEWS: NavChild[] = [
      the tab navigator, so its path is a root one. See `app/(app)/search.tsx`. */
   { href: '/search', label: 'Search', icon: 'search', takeover: true },
   { href: '/fantasy/players', label: 'Trend', icon: 'trend' },
+  /* THIS WORD IS NOW USED TWICE, one row apart, and it should not be. The
+     board above is called Leaders as of 2026-08-24, so on this screen the strip
+     says LEADERS and the bar directly under it says Leaders — pointing at two
+     genuinely different rankings. This one is the best CARDS by fantasy points;
+     that one is the standings between MANAGERS.
+
+     The strip's own header warns that the two rows can only coexist because
+     they do not look alike; sharing a word is the other way for them to
+     converge, and it is worse than sharing a treatment because the reader
+     cannot see it at a glance. The fix belongs HERE rather than on the board —
+     "Leaders" is the right name for a table of managers and a borrowed one for
+     a table of cards, which want something like Top or Best. Left as it is
+     pending a call on the word. */
   { href: '/fantasy/players/leaders', label: 'Leaders', icon: 'standings' },
 ];
 
@@ -276,6 +290,15 @@ export const FANTASY_SECTIONS: NavSection[] = [
     icon: 'lineup',
     children: COMPETE_VIEWS,
   },
+  /* COLLECT, which was Collection and Sets as peers. Two boards for one loop —
+     look at your cards, decide what to do with them — and the exit was on the
+     board you had to go out of your way to open. */
+  {
+    href: '/fantasy/collect',
+    label: 'Collect',
+    icon: 'collection',
+    children: COLLECT_VIEWS,
+  },
   /* ALL CARDS, which was the Players TAB and is a board again.
    *
    * IT CAME BACK, and the argument that sent it down to the bottom bar was not
@@ -287,12 +310,13 @@ export const FANTASY_SECTIONS: NavSection[] = [
    * the same rank as the game, which is the level confusion the bar was
    * reorganised to remove.
    *
-   * SO THE ASYMMETRY IN THIS ARRAY IS GONE, and the note under Leaderboard
-   * about verb/verb/noun no longer describes it. Two of the four boards are now
-   * about everybody else — this one and the Leaderboard — and they sit at
-   * opposite ends of the strip rather than together, because the order follows
-   * the week rather than the grammar: see what you can play, see what exists to
-   * be had, see what you own, see where it put you.
+   * THIRD, NOT SECOND, and the order is the week rather than the grammar: play
+   * your team, sort out what you own, see what else is out there, then see
+   * where all of that put you. It sat second for one commit, between Compete
+   * and Collect, which split the two boards that are about YOUR team with one
+   * that is about everybody's. The two pairs read better whole — your side of
+   * the game first, the rest of it after — and it puts All Cards next to
+   * Leaders, which is where the other two outward-looking boards belong.
    *
    * "ALL CARDS" RATHER THAN "PLAYERS", and it is the honest name. Every row on
    * these three views is a card template — what it costs to pull, what it has
@@ -309,16 +333,18 @@ export const FANTASY_SECTIONS: NavSection[] = [
     icon: 'players',
     children: ALL_CARD_VIEWS,
   },
-  /* COLLECT, which was Collection and Sets as peers. Two boards for one loop —
-     look at your cards, decide what to do with them — and the exit was on the
-     board you had to go out of your way to open. */
-  {
-    href: '/fantasy/collect',
-    label: 'Collect',
-    icon: 'collection',
-    children: COLLECT_VIEWS,
-  },
-  /* No children, and the only section still without any. It had two —
+  /* LEADERS, which was Leaderboard-shortened-to-Board. One word in both bars
+     now, so the `tabLabel` that existed to keep "Leaderboard" from truncating
+     to "Leaderboa…" at 13pt is gone with it.
+
+     NAME COLLISION, KNOWN AND UNRESOLVED: All Cards has a sub-page called
+     Leaders too (`/fantasy/players/leaders`, the best CARDS by points), and on
+     that board the two sit one row apart — LEADERS in the strip above, Leaders
+     in the action bar below. They are different things: this board ranks
+     MANAGERS, that one ranks cards. Renaming the sub-page is the fix and it has
+     not been made; see the note on `ALL_CARD_VIEWS`.
+
+     It has no children, and it is the only section without any. It had two —
      STANDINGS and SCORING — and the strip they produced cost every phone screen
      a permanent row of navigation to offer one board and one reference page you
      read once. The board itself now carries a six-way switcher, so that strip
@@ -326,15 +352,11 @@ export const FANTASY_SECTIONS: NavSection[] = [
      data. Scoring moved to `/scoring`, reached from Profile -> Settings.
 
      IT IS LAST, and it is the end of the sentence the strip tells: play your
-     team, look at what exists, look at what you own, see where that put you.
-     It used to be the odd one out — two verbs and a noun — and the note here
-     said the asymmetry was the point. All Cards coming back up from the bottom
-     bar ended that: there are two boards about everybody else now, and they
-     bracket the two that are about you. */
+     team, sort out what you own, see what else is out there, then see where all
+     of that put you. */
   {
     href: '/fantasy/leaderboard',
-    label: 'Leaderboard',
-    tabLabel: 'Board',
+    label: 'Leaders',
     icon: 'leaderboard',
   },
 ];
@@ -540,18 +562,6 @@ const WEB_NAV_SPEC: WebNavSpec[] = [
      because they are genuinely one board again, and now matched by Compete.
      The rail was never the thing that wanted them separate; a phone was. */
   { href: '/fantasy/compete', section: '/fantasy/compete', measure: 'form' },
-  /* THREE FOLDED BOARDS now, and this one is here rather than further down
-     because the rail follows the same order the phone's strip does. It came
-     back from being a bottom TAB; nothing about the fold changed with the move,
-     because the rail never cared which level a board lived at. */
-  {
-    href: '/fantasy/players',
-    section: '/fantasy/players',
-    also: ['/search'],
-    /* Both views already ask for `table`; naming it here is what stops the
-       next one being added at a different width. */
-    measure: 'table',
-  },
   { href: '/fantasy/collect', section: '/fantasy/collect', measure: 'table' },
   /* Directly under the board that makes you want more cards, which is the
      question it answers. It is still the sheet it is on a phone (see
@@ -560,6 +570,18 @@ const WEB_NAV_SPEC: WebNavSpec[] = [
      the alternative — a second, desktop-only packs PAGE — would be two
      implementations of one shop. */
   { href: '/packs' },
+  /* THREE FOLDED BOARDS now. This one came back from being a bottom TAB, and
+     nothing about the fold changed with the move — the rail never cared which
+     level a board lived at. Its place in the list is the phone strip's order
+     with Packs spliced in after the board that sells it. */
+  {
+    href: '/fantasy/players',
+    section: '/fantasy/players',
+    also: ['/search'],
+    /* Both views already ask for `table`; naming it here is what stops the
+       next one being added at a different width. */
+    measure: 'table',
+  },
   { href: '/fantasy/leaderboard' },
   /* THE OTHER PRODUCT, and the break above it is the one place the flat rail
      still says "different kind of thing". Everything above is a board of the
@@ -577,8 +599,8 @@ const WEB_NAV_SPEC: WebNavSpec[] = [
  * NOTHING ABOVE IS RETYPED IN `WEB_NAV_SPEC`, and that is the whole point of
  * the lookup. The first version spelled out all six labels and all six icons,
  * which is precisely the parallel copy this file's header warns about — rename
- * "Leaderboard" in FANTASY_SECTIONS and the rail would quietly keep the old
- * word. Every row's key already appears in the tree exactly once, so the tree
+ * "Leaders" in FANTASY_SECTIONS and the rail would quietly keep the old word —
+ * which is not hypothetical: that section has been renamed twice. Every row's key already appears in the tree exactly once, so the tree
  * can simply be asked.
  *
  * WHICH ARRAY ANSWERS ALSO SAYS WHICH GLYPH SET IT IS. Sections and tabs carry
