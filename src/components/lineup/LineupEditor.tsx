@@ -46,8 +46,6 @@ import {
   ActivityIndicator,
   AppState,
   Pressable,
-  RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -72,7 +70,6 @@ import {
   type SortKey,
 } from '@/components/lineup/model';
 import { useLineupData } from '@/components/lineup/use-lineup-data';
-import { useChromeInset, useChromeScroll } from '@/components/shell/collapse';
 import { Screen } from '@/components/shell/Screen';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, Spacing, Type } from '@/constants/theme';
@@ -147,13 +144,6 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
   const c = Colors[scheme];
   const router = useRouter();
   const wide = useIsWide();
-  /* The boards own the scroll on this page (see the return), so they are also
-     what tells the section bar above to get out of the way. */
-  const chromeScroll = useChromeScroll();
-  /* See `useChromeInset`: room at the end of the scroll for the strip that sits
-     below the screen edge while the section bar is up. */
-  const chromeInset = useChromeInset();
-
   /**
    * WHICH CONTEST THIS BOARD IS EDITING. Absent means the free one, which is
    * what every link into this screen meant before the lobby existed and what
@@ -925,9 +915,9 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
   const context = slate && phase ? `${week} · ${phase}` : week;
 
 
-  /* WHAT IS DRAWN IS THE SAME IN BOTH FRAMES; WHAT SCROLLS IS NOT — see the two
-     returns below. The page pins the contest card and scrolls the boards under
-     it; the sheet has no card to pin and stays one scroll. */
+  /* THE SAME PARTS IN BOTH FRAMES, and now the same scroll too — see the two
+     returns below. The page draws the contest card above the boards; the sheet
+     is already about one contest and draws no card. */
 
   /* AT THE TOP, NOT AT THE BOTTOM. This used to sit under the bench, which is
      sixteen rows down on a phone and further inside the contest sheet — so a
@@ -969,7 +959,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
     </View>
   );
 
-  /** Everything under the card — and on the page, the only part that scrolls. */
+  /** Everything under the card. */
   const boards = (
     <>
       {/* ONE CAPTION, AND WHICH ONE DEPENDS ON WHETHER THE WEEK HAS STARTED.
@@ -1129,7 +1119,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
     />
   );
 
-  /* The sheet supplies its own container, and has no card to pin. */
+  /* The sheet supplies its own container, and draws no card. */
   if (frame === 'plain')
     return (
       <>
@@ -1140,37 +1130,29 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
     );
 
   /**
-   * THE CARD DOES NOT SCROLL.
+   * ONE SCROLL, CARD INCLUDED.
    *
-   * It is the top of the table the board belongs to — where you stand in the
-   * contest these slots are being filled for — so it is what every swap below
-   * it is measured against. Scrolled away, a reader is choosing between two
-   * players with the reason for the choice off the screen, and on a phone it is
-   * off the screen after one flick, which is to say for the whole of the task.
+   * The card was pinned above a scrolling board so the standing it is context
+   * for could not leave the screen mid-swap. It costs more than it is worth on
+   * a phone: a fixed 150pt of chrome over the boards means the bench is
+   * permanently a flick away, and the reader who wants the card back is one
+   * flick from it anyway.
    *
-   * So `Screen` stops owning the scroll and the boards get their own, which is
-   * also where pull-to-refresh moves to. The gutter and the 14pt rhythm that
-   * `Screen`'s scrolling box was supplying are re-stated on the two containers
-   * below — that is the cost of the split, and it is why `bleed` still cancels
-   * exactly 16.
+   * So `Screen` owns the scroll again — which is also where the gutter, the
+   * 14pt rhythm, pull-to-refresh and the section-bar collapse come from, and
+   * why none of them are re-stated here. `bleed` still cancels exactly 16
+   * because that gutter is unchanged.
    */
   return (
-    <Screen title="Lineup" measure="table" context={context} scroll={false}>
-      <View style={styles.fill}>
-        <View style={styles.pinned}>
-          {notice}
-          {card}
-        </View>
-        <ScrollView
-          style={styles.fill}
-          contentContainerStyle={[styles.scrolled, { paddingBottom: Spacing.three + chromeInset }]}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />
-          }
-          {...chromeScroll}>
-          {boards}
-        </ScrollView>
-      </View>
+    <Screen
+      title="Lineup"
+      measure="table"
+      context={context}
+      refreshing={refreshing}
+      onRefresh={() => void onRefresh()}>
+      {notice}
+      {card}
+      {boards}
       {sheets}
     </Screen>
   );
@@ -1189,12 +1171,6 @@ function SectionHead({ label, hint, tone }: { label: string; hint: string; tone:
 }
 
 const styles = StyleSheet.create({
-  fill: { flex: 1 },
-  /* What `Screen`'s content box used to give the whole page, now given to the
-     two halves separately: the gutter, and the 14 between stacked blocks. The
-     bottom 14 here is the gap the boards scroll under. */
-  pinned: { paddingHorizontal: Spacing.three, paddingBottom: 14, gap: 14 },
-  scrolled: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.three, gap: 14 },
   enter: { paddingVertical: Spacing.two, borderRadius: 12, alignItems: 'center' },
   enterLabel: { fontWeight: '700' },
   pad: { paddingVertical: Spacing.four },
