@@ -303,9 +303,29 @@ begin
     raise exception 'FAIL: first of five in a top-three should be a win, got %', coalesce(v_res,'null');
   end if;
 
-  -- 9. THE WEEK NETS OUT AS ONE DELTA. A loss and a healing win on the same
-  --    slate cancel; if these were settled one at a time the answer would
-  --    depend on which row was processed first.
+  -- 9. A HEART IS RIDING UNTIL SETTLEMENT SAYS OTHERWISE, not until the sweep
+  --    does. `scored_at` is written by the gameday sweep as each lineup is
+  --    scored; hearts only move once every fixture in the week is final, which
+  --    on a real NFL week is days later. Reading exposure off `scored_at` meant
+  --    the masthead said nothing was at stake while the lobby row it came from
+  --    still advertised one.
+  if (select coalesce(sum(hearts_at_risk), 0) from public.wagered_entries(a)) <> 2 then
+    raise exception 'FAIL: two entered heart contests should be two hearts riding, got %',
+      (select coalesce(sum(hearts_at_risk), 0) from public.wagered_entries(a));
+  end if;
+
+  --    The sweep runs. Both entries are scored, and both hearts are still on
+  --    the line, because nothing has settled them.
+  update public.lineups set scored_at = now()
+   where user_id = a and season = 2026 and season_type = 1 and week = 95;
+
+  if (select coalesce(sum(hearts_at_risk), 0) from public.wagered_entries(a)) <> 2 then
+    raise exception 'FAIL: hearts stopped riding when the sweep scored the lineup';
+  end if;
+
+  -- 10. THE WEEK NETS OUT AS ONE DELTA. A loss and a healing win on the same
+  --     slate cancel; if these were settled one at a time the answer would
+  --     depend on which row was processed first.
   perform public.settle_run_week(2026, 1::smallint, 95);
   select hearts, wins into v_after, v_wins from public.runs where id = v_run;
   if v_after <> v_before then
@@ -315,7 +335,14 @@ begin
     raise exception 'FAIL: the win was not counted, wins = %', v_wins;
   end if;
 
-  -- 10. EXACTLY ONCE. Re-running settlement is routine on gameday, and a second
+  --     And now that it has settled, nothing is riding on it any more — the
+  --     window closes on the result, which is the only thing that can move a
+  --     heart.
+  if (select count(*) from public.wagered_entries(a)) <> 0 then
+    raise exception 'FAIL: a settled entry is still counted as riding';
+  end if;
+
+  -- 11. EXACTLY ONCE. Re-running settlement is routine on gameday, and a second
   --     pass must not take a second heart.
   perform public.settle_run_week(2026, 1::smallint, 95);
   perform public.settle_run_week(2026, 1::smallint, 95);
@@ -324,7 +351,7 @@ begin
     raise exception 'FAIL: settlement is not idempotent (hearts %, wins %)', v_after, v_wins;
   end if;
 
-  -- 11. THE FREE CONTEST NEVER REACHES A RUN, however it finished.
+  -- 12. THE FREE CONTEST NEVER REACHES A RUN, however it finished.
   if exists (
     select 1 from public.run_contest_results rr
       join public.contests c on c.id = rr.contest_id
