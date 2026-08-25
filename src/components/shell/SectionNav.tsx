@@ -38,8 +38,9 @@
  * untouched — see that file for what went wrong while each page drew its own.
  * The pages themselves no longer mention it.
  *
- * IT OWNS ITS OWN SPACING, all four sides, and that is the fix for the thing
- * that went wrong before.
+ * IT OWNS ITS SPACING ABOVE AND BESIDE IT, and that is the fix for the thing
+ * that went wrong before. The gap BELOW it is the page's, and that split is
+ * newer — see the note on `wrap`.
  *
  * `Screen` pads its content horizontally when it scrolls and NOT when it does
  * not — a `scroll={false}` page hands the gutter to the virtualised list inside
@@ -52,11 +53,10 @@
  * which page it landed on.
  *
  * None of that survives the move. Sitting above the navigator it lands on the
- * same surface every time, so the gutter and both vertical gaps are simply
- * fixed here and no page can get them wrong by doing nothing. `paddingTop` is
- * the 16 the content box used to give it; `paddingBottom` is the gap to the
- * filters below. `Screen` gives its content no top padding while framed — see
- * `flush` there — so these numbers are the whole story.
+ * same surface every time, so the gutter is simply fixed here and no page can
+ * get it wrong by doing nothing. The vertical rhythm is 14 all the way down —
+ * hairline, bar, content — with this file paying for the first and `Screen`'s
+ * `flushTop` for the second.
  */
 import { usePathname, useRouter } from 'expo-router';
 import { useMemo } from 'react';
@@ -114,10 +114,17 @@ export function SectionNav({ section }: { /** e.g. `/fantasy/collect`. */ sectio
 
 const styles = StyleSheet.create({
   /* The same 16 the rows below use, so the bar lines up with the content it
-     navigates rather than sitting a few points inside or outside it. */
+     navigates rather than sitting a few points inside or outside it.
+
+     ABOVE ONLY. The gap UNDER the bar belongs to the page, not to this — see
+     `flushTop` in `Screen`, which is the one number that has to hold in both
+     states. While this bar paid for it the page had none of its own, so the
+     moment the bar collapsed the first card sat flush against the top nav's
+     hairline with nothing between them. The bar leaves; the gap must not leave
+     with it. */
   wrap: {
     paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.three,
-    paddingBottom: Spacing.two,
+    paddingTop: 14,
+    paddingBottom: 0,
   },
 });

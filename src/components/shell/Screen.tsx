@@ -301,6 +301,15 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.three,
   },
   /* Applied last, so it wins over whichever branch's padding came before it.
-     See `flush` — inside a section frame the nav above owns this gap. */
-  flushTop: { paddingTop: 0 },
+     See `flush`.
+
+     14 RATHER THAN THE PAGE'S 16, and it used to be zero. The section bar was
+     paying for this gap out of its own bottom padding, which worked for exactly
+     as long as the bar could not move: once it collapses, a page with no top
+     padding of its own arrives flush against the top nav's hairline — the card
+     on the lineup touched it. So the gap is the page's now and the bar pays
+     nothing, which makes the rhythm the same in both states: 14 under the
+     hairline to the bar, 14 under the bar to the content, 14 to whatever is
+     under that. */
+  flushTop: { paddingTop: 14 },
 });
