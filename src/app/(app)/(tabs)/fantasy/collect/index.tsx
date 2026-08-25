@@ -56,6 +56,7 @@ import { useCollection } from '@/components/collection/use-collection';
 import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
 import { SearchField } from '@/components/ui/Controls';
 import { ToggleButton } from '@/components/ui/MenuButton';
+import { useChromeScroll } from '@/components/shell/collapse';
 import { Screen } from '@/components/shell/Screen';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
@@ -106,6 +107,7 @@ export default function InventoryScreen() {
   const router = useRouter();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  const chromeScroll = useChromeScroll();
   /**
    * 0 until the list has been laid out; the grid waits rather than guess.
    *
@@ -455,6 +457,13 @@ export default function InventoryScreen() {
             ) : null}
 
             <FlatList
+              /* The grid is the page's scroll, so it is what tells the
+                 Collection/Sets bar above to slide up while you read down it.
+                 Everything else stays: the masthead and the board strip are
+                 pinned, and the summary and filters belong to this page rather
+                 than to the chrome — a control you just pressed must not
+                 leave. See `collapse.tsx`. */
+              {...chromeScroll}
               // numColumns cannot change on a live list, so a width change that
               // changes the column count remounts it. Holding the first render
               // until the measurement lands avoids one guaranteed remount.

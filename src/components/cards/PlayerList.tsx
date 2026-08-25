@@ -18,6 +18,7 @@
  */
 import { FlatList, StyleSheet } from 'react-native';
 
+import { useChromeScroll } from '@/components/shell/collapse';
 import { useTabBarInset } from '@/components/shell/useResponsive';
 import { Spacing } from '@/constants/theme';
 
@@ -45,9 +46,14 @@ export function PlayerList({
   onRefresh?: () => void;
 }) {
   const tabInset = useTabBarInset();
+  /* Fifty rows under a bar naming three boards is the case the collapse was
+     built for: the bar goes up as you read down and comes back the moment you
+     pull the other way. See `collapse.tsx`. */
+  const chromeScroll = useChromeScroll();
 
   return (
     <FlatList
+      {...chromeScroll}
       data={players}
       keyExtractor={keyExtractor}
       renderItem={({ item }) => (

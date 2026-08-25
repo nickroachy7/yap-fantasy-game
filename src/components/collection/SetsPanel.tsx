@@ -61,6 +61,7 @@ import {
   View,
 } from 'react-native';
 
+import { useChromeScroll } from '@/components/shell/collapse';
 import { useTabBarInset } from '@/components/shell/useResponsive';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
@@ -97,6 +98,9 @@ export function SetsPanel({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const tabInset = useTabBarInset();
+  /* This list is the page's scroll, so it is the one that tells the section
+     bar above to get out of the way. See `collapse.tsx`. */
+  const chromeScroll = useChromeScroll();
   // Single source of truth for the balance: the header reads the same value, so
   // a claim has to refresh THAT rather than keep a second copy here.
   const { refresh: refreshPlayer } = usePlayer();
@@ -291,6 +295,7 @@ export function SetsPanel({
       ) : null}
 
       <ScrollView
+        {...chromeScroll}
         style={styles.fill}
         contentContainerStyle={[
           styles.content,

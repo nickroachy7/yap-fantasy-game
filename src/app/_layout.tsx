@@ -2,6 +2,7 @@ import { DarkTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 
+import { ChromeCollapseProvider } from '@/components/shell/collapse';
 import { AuthProvider } from '@/context/AuthContext';
 
 SplashScreen.preventAutoHideAsync();
@@ -21,10 +22,16 @@ export default function RootLayout() {
       <ThemeProvider value={DarkTheme}>
         {/* Light glyphs, because the band behind them is always dark. */}
         <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(app)" />
-          <Stack.Screen name="(auth)" />
-        </Stack>
+        {/* Whether the section bar is up or down, held above every navigator
+            in the app — see `collapse.tsx`. At the ROOT rather than inside
+            `(app)` because it is a fact about the shell rather than about a
+            session. It draws nothing; a bar opts in with `CollapsingChrome`. */}
+        <ChromeCollapseProvider>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(app)" />
+            <Stack.Screen name="(auth)" />
+          </Stack>
+        </ChromeCollapseProvider>
       </ThemeProvider>
     </AuthProvider>
   );

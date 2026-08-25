@@ -9,6 +9,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppHeader } from '@/components/shell/AppHeader';
+import { useChromeScroll } from '@/components/shell/collapse';
 import { useFrame } from '@/components/shell/frame';
 import { isOverlayPath, webSectionOf } from '@/components/shell/sections';
 import { useIsWide } from '@/components/shell/useResponsive';
@@ -136,6 +137,7 @@ export function Screen({
    */
   const frame = useFrame();
   const flush = frame.nav && !isWide;
+  const chromeScroll = useChromeScroll();
 
   /* Null on a page that is a page in its own right, and on every phone: the
      narrow build still navigates these with the action bar and has no heading
@@ -182,6 +184,12 @@ export function Screen({
   const body = scroll ? (
     <ScrollView
       contentContainerStyle={[styles.content, flush && styles.flushTop, { maxWidth }]}
+      /* This page's scroll is what tells the section bar above to get out of
+         the way. Nothing on wide, where there is no such bar — see
+         `useChromeScroll`. A page that owns its own list (`scroll={false}`)
+         passes the same props to it instead; the collection grid, the player
+         boards and the leaderboards all do. */
+      {...chromeScroll}
       keyboardShouldPersistTaps="handled"
       refreshControl={
         onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} /> : undefined

@@ -25,6 +25,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
+import { useChromeScroll } from '@/components/shell/collapse';
 import { useTabBarInset } from '@/components/shell/useResponsive';
 import { MenuButton, MenuHeading, MenuItem } from '@/components/ui/MenuButton';
 import { DASH } from '@/components/ui/DataTable';
@@ -87,6 +88,9 @@ export function PointsBoard({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const tabInset = useTabBarInset();
+  /* This list is the page's scroll, so it is the one that tells the section
+     bar above to get out of the way. See `collapse.tsx`. */
+  const chromeScroll = useChromeScroll();
 
   const [entries, setEntries] = useState<Entry[] | null>(null);
   /** Null means "not fetched yet", which is not the same as "no scored weeks". */
@@ -306,6 +310,7 @@ export function PointsBoard({
         </View>
       ) : null}
       <FlatList
+        {...chromeScroll}
         ref={list}
         data={boardRows}
         style={styles.fill}
