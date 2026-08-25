@@ -738,6 +738,11 @@ function LineupFixture() {
           locked={false}
           now={Date.parse('2026-08-25T12:00:00Z')}
           record={{ wins: 1, losses: 0, ties: 0 }}
+          /* The fixture run, so the rack under the card draws all three heart
+             states and the focused pip can be seen moving as you swipe — see
+             `Foot` in the carousel. */
+          run={FIXTURE_PLAYER.run}
+          onEnter={() => {}}
           width={carouselWidth}
         />
       </View>

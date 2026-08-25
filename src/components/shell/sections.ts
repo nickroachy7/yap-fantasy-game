@@ -220,18 +220,34 @@ export const PACKS: NavChild = {
 };
 
 /**
- * The two views under Compete.
+ * The lobby, which is a SHEET over the lineup rather than a view beside it.
  *
- * LINEUP SHARES THE SECTION'S OWN HREF, which is this file's convention for a
- * parent that has several children: the bar needs an item for the landing page
- * or there is no way back to it. It is not an arbitrary pick of which child
- * goes first — the free contest is auto-entered, so it is the one view of this
- * board nobody chose to be on, and it is the one with a deadline.
+ * IT WAS A CHILD OF COMPETE and drew a two-item bar — LINEUP | CONTESTS — above
+ * every visit to the board. Two of the three rows of chrome on the game's main
+ * screen existed to name a pair that are not peers: the lineup is the screen,
+ * and the lobby is an errand you run once a week. A permanent bar to switch
+ * between them cost ~70pt on every visit and earned it almost never.
+ *
+ * Worse, it was the only door. A player who never pressed CONTESTS never
+ * learned there were any — nothing on the board they actually use said so. The
+ * way in is the LAST CARD OF THE CAROUSEL now (`ContestCarousel`), which puts
+ * "there are more contests" directly in the path of the one gesture that screen
+ * teaches, and the lobby opens over the lineup the way a profile or a set
+ * checklist does: something you open, act on, and put down.
+ *
+ * DECLARED HERE FOR THE SAME REASONS AS `PACKS`, which it now matches exactly:
+ * the rail resolves `/contests` to this label and glyph, and `isOverlayPath`
+ * reads `takeover` off it to know the sheet is mounted above the tabs. Nothing
+ * draws it as a nav item — `detached` says so — because the card that opens it
+ * is not a bar item.
  */
-const COMPETE_VIEWS: NavChild[] = [
-  { href: '/fantasy/compete', label: 'Lineup', icon: 'lineup' },
-  { href: '/fantasy/compete/contests', label: 'Contests', icon: 'contests' },
-];
+export const CONTESTS: NavChild = {
+  href: '/contests',
+  label: 'Contests',
+  icon: 'contests',
+  takeover: true,
+  detached: true,
+};
 
 /**
  * The three ways into the card pool, which came back up to level 2 with it.
@@ -294,7 +310,11 @@ export const FANTASY_SECTIONS: NavSection[] = [
     href: '/fantasy/compete',
     label: 'Compete',
     icon: 'lineup',
-    children: COMPETE_VIEWS,
+    /* NO CHILDREN, and it is the only board with none. Its second view became a
+       sheet reached from the carousel — see `CONTESTS` — which leaves one page
+       under this row and nothing for a bar to switch between. `SectionNav`
+       draws nothing for an empty section and `webSectionOf` folds no tabs, so
+       both presentations answer correctly without being told. */
   },
   /* COLLECT, which was Collection and Sets as peers. Two boards for one loop —
      look at your cards, decide what to do with them — and the exit was on the
@@ -449,16 +469,17 @@ export function childrenOf(href: string): NavChild[] {
  * Every sub-page declared anywhere in the tree, plus the ones that hang off no
  * bar at all.
  *
- * `PACKS` is the whole reason for the third term: it is a destination the rail
- * lists and a takeover `isOverlayPath` must know about, and it is drawn by two
- * pages rather than by anybody's nav — so it appears in no `children` array and
- * walking the tree alone would miss it.
+ * `PACKS` is the reason for the last two terms, and `CONTESTS` joined it: both
+ * are destinations the rail lists and takeovers `isOverlayPath` must know
+ * about, and both are drawn by a page rather than by anybody's nav — so they
+ * appear in no `children` array and walking the tree alone would miss them.
  */
 function allChildren(): NavChild[] {
   return [
     ...FANTASY_SECTIONS.flatMap((s) => s.children ?? []),
     ...NAV_TABS.flatMap((t) => t.children ?? []),
     PACKS,
+    CONTESTS,
   ];
 }
 
@@ -584,6 +605,11 @@ const WEB_NAV_SPEC: WebNavSpec[] = [
      because they are genuinely one board again, and now matched by Compete.
      The rail was never the thing that wanted them separate; a phone was. */
   { href: '/fantasy/compete', section: '/fantasy/compete', measure: 'form' },
+  /* The lobby, as its own row rather than as a tab under Compete — the same
+     treatment `/packs` gets below and for the same reason: it is a sheet, not a
+     view of the board. On a phone the carousel's last card is the way in; a
+     rail has room to name it outright. */
+  { href: '/contests' },
   { href: '/fantasy/collect', section: '/fantasy/collect', measure: 'table' },
   /* Directly under the board that makes you want more cards, which is the
      question it answers. It is still the sheet it is on a phone (see

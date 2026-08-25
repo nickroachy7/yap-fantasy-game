@@ -116,6 +116,18 @@ export function Hearts({
   hearts,
   wagered = 0,
   /**
+   * One pip to bring forward, dimming the rest — the heart a PARTICULAR contest
+   * has on the line, drawn under that contest's card in the lineup carousel.
+   *
+   * It is an index into the rack rather than a flag on a heart, because a heart
+   * is not a thing the schema knows about: `run.wagered` is a count, so nothing
+   * says which pip a given contest is risking. The carousel assigns them in its
+   * own order — the nth contest with a stake owns the nth wagered pip — which
+   * keeps the count honest and the highlight stable as you swipe. Null dims
+   * nothing, which is every other caller.
+   */
+  focus = null,
+  /**
    * Pips to draw in total — the run's `rack` (its high-water mark). Anything
    * between `hearts` and this is drawn BROKEN. Defaults to the hearts held,
    * which draws no damage at all, so a caller that does not know the rack
@@ -126,6 +138,7 @@ export function Hearts({
 }: {
   hearts: number;
   wagered?: number;
+  focus?: number | null;
   rack?: number;
   size?: number;
 }) {
@@ -144,15 +157,21 @@ export function Hearts({
       {Array.from({ length: total }, (_, i) => {
         const state: HeartState =
           i < held - atRisk ? 'safe' : i < held ? 'wagered' : 'broken';
+        /* The rack recedes rather than the focused pip getting louder. Making
+           one heart brighter than red means inventing a second red, and the
+           two would then have to be told apart at 13pt; taking the others down
+           says the same thing with the colour the app already has. */
+        const dimmed = focus !== null && i !== focus;
         return (
-          <Heart
-            key={i}
-            size={size}
-            state={state}
-            /* Broken goes grey rather than staying red at low opacity: a faint
-               red pip reads as a warning about the hearts you still have. */
-            color={state === 'broken' ? c.textSecondary : c.negative}
-          />
+          <View key={i} style={dimmed ? styles.dim : undefined}>
+            <Heart
+              size={size}
+              state={state}
+              /* Broken goes grey rather than staying red at low opacity: a faint
+                 red pip reads as a warning about the hearts you still have. */
+              color={state === 'broken' ? c.textSecondary : c.negative}
+            />
+          </View>
         );
       })}
     </View>
@@ -161,4 +180,8 @@ export function Hearts({
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  /* Far enough back that the focused pip is unmistakable, not so far that the
+     rack stops being readable as a count — the row still has to answer "how
+     many do I have" while it answers "which one is on this contest". */
+  dim: { opacity: 0.3 },
 });

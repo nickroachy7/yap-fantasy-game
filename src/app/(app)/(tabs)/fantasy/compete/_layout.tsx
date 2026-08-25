@@ -18,8 +18,15 @@ import { SectionFrame } from '@/components/shell/SectionFrame';
  * deadline on it — and cost the week's actual decision a tap it never used to
  * need. Contests are what you scroll to; your lineup is what you land on.
  *
- * `SectionFrame` draws the sub-page bar once above this navigator, so flipping
- * between the lineup and the lobby leaves the bar untouched.
+ * THE SECTION IS ONE PAGE NOW. The lobby was the second, under a two-item bar
+ * this frame drew above every visit; it is a sheet over the board instead, and
+ * the way in is the last card of the lineup carousel — see `CONTESTS` in
+ * `sections.ts` for what that bought and what it cost.
+ *
+ * `SectionFrame` stays. It draws no bar for a section with no children and
+ * costs nothing, and it is what a second page under Compete would need on the
+ * day there is one. What it still supplies is the frame state every page in
+ * here reads — that a masthead is already on screen.
  */
 export default function CompeteLayout() {
   return (

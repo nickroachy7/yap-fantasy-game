@@ -69,10 +69,14 @@ export default function ContestSheet() {
 
   /* Guarded for the same reason as the set checklist: `back()` on an empty
      stack does nothing, so a contest opened from a link or a refreshed tab had
-     a close button that did not close. The lobby is this sheet's landing. */
+     a close button that did not close.
+
+     THE BOARD IS THE LANDING, not the lobby it was. The lobby became a sheet,
+     and dismissing one sheet onto another leaves the reader inside a stack of
+     two things they never opened. Compete is the page underneath both. */
   const close = useCallback(() => {
     if (router.canGoBack()) router.back();
-    else router.dismissTo('/fantasy/compete/contests');
+    else router.dismissTo('/fantasy/compete');
   }, [router]);
 
   const entered = contest?.mine != null;

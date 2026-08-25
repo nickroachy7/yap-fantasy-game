@@ -123,7 +123,12 @@ export default function RunOverScreen() {
     invalidateCollection();
     await refresh();
     setBusy(false);
-    router.replace('/fantasy/compete/contests');
+    /* The board, not the lobby. The lobby is a sheet over this board now, and
+       replacing a page with a sheet leaves nothing underneath it to close onto
+       — see `CONTESTS` in `sections.ts`. Landing on Compete puts the new run's
+       free contest in front of them with the carousel's last card offering the
+       lobby one swipe away. */
+    router.replace('/fantasy/compete');
   }, [keep, refresh, router]);
 
   /* Nothing to answer. Reachable by deep link, by a back button after claiming,

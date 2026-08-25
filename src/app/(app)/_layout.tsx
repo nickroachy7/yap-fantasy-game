@@ -140,6 +140,12 @@ export default function AppLayout() {
             it, spend, and put it down. It replaced `collection/shop`, which
             was a whole sub-page for a shelf of two rows — see there. */}
         <Stack.Screen name="packs" options={sheetOptions} />
+        {/* The contest lobby, which was a page beside the lineup under a
+            two-item bar. It is the same kind of object as the three above —
+            open it, enter something, put it down — and the bar it cost was two
+            thirds of the chrome on the game's main screen. Reached from the
+            last card of the lineup carousel; see `CONTESTS` in `sections.ts`. */}
+        <Stack.Screen name="contests" options={sheetOptions} />
         {/* The death screen. An ORDINARY PUSH, and that is the decision:
             every other route in this stack is presented over the app, and this
             one deliberately is not.

@@ -241,7 +241,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
     reload,
     reloadLineup,
   } = useLineupData(contestCode);
-  const { displayName } = usePlayer();
+  const { displayName, run } = usePlayer();
 
   /**
    * Edits are an overlay on the saved lineup rather than a copy of it. Copying
@@ -958,6 +958,11 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
         locked={allLocked}
         now={now}
         record={record}
+        run={run}
+        /* The lobby, over this board. It is a sheet rather than a page now, so
+           this pushes and closing puts the reader back on the lineup they were
+           filling — see `CONTESTS` in `sections.ts`. */
+        onEnter={() => router.push('/contests')}
         width={cardWidth}
         onOpen={(ct) => router.push({ pathname: '/contest/[code]', params: { code: ct.code } })}
       />

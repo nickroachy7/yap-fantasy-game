@@ -31,24 +31,25 @@
  * PRE WK 3. `Screen` still takes `context` and still renders it on WIDE, under
  * the page heading, where there is a heading for it to qualify.
  *
- * THE HEARTS SIT NEXT TO THE BALANCE because they are the same kind of fact —
- * what you have to spend — and because the two move together: entering a
- * contest takes gems and puts a heart at risk in one action. Splitting them
- * across the chrome would let a player read a fee they can afford beside a run
- * that has already ended.
+ * THE HEARTS ARE GONE FROM HERE, and where they went is the argument.
  *
- * They are drawn only while a run has hearts to draw. A dead run awaiting its
- * carry shows nothing here rather than an empty rack, because the empty rack is
- * the death screen's line to deliver, and a masthead cannot deliver it — see
- * `run-over`. Nothing at all is a quieter way to say "not right now" than three
- * hollow pips repeated on every tab.
+ * They sat next to the balance on the reasoning that both are "what you have to
+ * spend", and that entering a contest costs gems and risks a heart in one
+ * action. The first half held; the second is what broke it. The gems are spent
+ * from every screen — packs, sets, contests — so the balance belongs to the
+ * chrome. A heart is only ever risked by ONE object, the contest, and that
+ * object has a card of its own on the board where the risking happens.
  *
- * THE RACK IS THE RUN'S HIGH-WATER MARK, NOT ITS CEILING. It used to draw
- * `max_hearts` pips, which meant a new run — 3 hearts, healing to 5 — opened as
- * three filled and two empty, i.e. as a run that had already lost twice. It now
- * draws all three states a heart can be in: solid is safe, a red outline is
- * WAGERED on a contest that has not settled, and a cracked grey one is a heart
- * this run actually lost. See `Hearts`.
+ * So the rack now sits under that card, in the carousel's foot, where the pip a
+ * particular contest is holding comes forward as you swipe to it — see `Foot`
+ * in `ContestCarousel`. What it says there it could never say up here: not "you
+ * have two hearts" on a screen full of cards for sale, but "THIS contest is
+ * holding this one, and that is what is behind it".
+ *
+ * The full rack is still read outright in two places, both of which are about
+ * the run rather than about a contest: the lobby's run panel, and the death
+ * screen. `Hearts` itself is unchanged apart from the focus it grew for the
+ * carousel.
  *
  * THE BALANCE IS A NUMBER, NOT A WIDGET. The pill it used to sit in — border,
  * inset fill, a 8pt "GEMS" label above the figure — was three pieces of
@@ -71,7 +72,6 @@ import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { YapMark } from '@/components/brand/YapLogo';
-import { Hearts } from '@/components/runs/Hearts';
 import { Colors, Spacing, TierColors } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -116,7 +116,7 @@ export function AppHeader({
   const c = Colors[scheme];
   const accent = TierColors[scheme].gold.accent;
   const top = useSafeAreaInsets().top;
-  const { gems, run, loading } = usePlayer();
+  const { gems, loading } = usePlayer();
 
   return (
     <View style={[styles.base, { paddingTop: top, backgroundColor: c.background }]}>
@@ -132,9 +132,6 @@ export function AppHeader({
         </View>
 
         <View style={styles.right}>
-          {!loading && run && !run.awaitingCarry ? (
-            <Hearts hearts={run.hearts} wagered={run.wagered} rack={run.rack} />
-          ) : null}
           <View style={styles.balance}>
             <Gem size={12} color={accent} />
             <Text style={[styles.figure, NUMERIC, { color: c.text }]}>
@@ -175,10 +172,11 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     ...Platform.select({ web: { fontFamily: 'inherit' }, default: {} }),
   },
-  /* `flexShrink: 0` so a long context line truncates rather than squeezing the
-     balance — the figure is the reason the right side exists. The gap between
-     hearts and gems is wider than the gap inside either, so the two read as
-     two facts rather than one row of mixed glyphs. */
+  /* `flexShrink: 0` so a long wordmark truncates rather than squeezing the
+     balance — the figure is the reason the right side exists. One child now
+     that the rack has moved to the contest card; the row stays because the
+     right side is a place, and the next thing that earns a spot beside the
+     balance should land in it rather than inventing its own. */
   right: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, flexShrink: 0 },
   balance: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 0 },
   figure: { fontSize: 17, fontWeight: '800', letterSpacing: -0.2 },

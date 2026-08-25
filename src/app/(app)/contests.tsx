@@ -1,11 +1,12 @@
 import { useRouter } from 'expo-router';
+import { useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ContestCard } from '@/components/contests/ContestCard';
 import { termsOfContest, useContests, type Contest } from '@/components/contests/use-contests';
 import { Hearts } from '@/components/runs/Hearts';
 import { nextRungLine, recordOf, wageredLine } from '@/components/runs/run';
-import { Screen } from '@/components/shell/Screen';
+import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
 import { StatusChip } from '@/components/ui/StatusChip';
@@ -15,6 +16,14 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 /**
  * Every contest on this week's slate, and which of them you have filed for.
+ *
+ * IT IS A SHEET NOW, over the lineup, and it used to be a page beside it under
+ * a two-item bar. What changed is not where the contests live but what the
+ * lobby IS: not a second view of the Compete board — the board is the lineup —
+ * but a place you open, enter something from, and put down again, which is the
+ * same object as a pack shelf or a set checklist and now takes the same
+ * presentation. The way in is the last card of the lineup carousel; see
+ * `CONTESTS` in `sections.ts` for what that fixed.
  *
  * WHAT THIS SCREEN IS FOR, and why it is not just a list.
  *
@@ -86,13 +95,30 @@ export default function ContestsScreen() {
       ? `${open.length} open · one card plays one contest`
       : 'One card plays one contest a week';
 
+  const close = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.dismissTo('/fantasy/compete');
+  }, [router]);
+
   return (
-    <Screen title="Contests" measure="form" context={context}>
+    <PlayerSheetFrame
+      title="Contests"
+      /* The count, or the rule when there is nothing to count. The sheet's
+         subtitle is the one line a reader gets before the list, so it says
+         whichever of the two is news. */
+      subtitle={context}
+      onClose={close}
+      closeLabel="Close contests">
       {error ? <ErrorLine message={error} /> : null}
 
       {/* THE RUN, ABOVE THE LOBBY, because the lobby cannot be read without it.
           Every stake below is priced in hearts, and a player deciding whether
-          to risk one needs to know how many are left in the same glance. */}
+          to risk one needs to know how many are left in the same glance.
+
+          IT IS ALSO THE ONLY FULL RACK LEFT ON A PHONE now that the masthead
+          has stopped drawing one — see `AppHeader`. The carousel shows the
+          hearts a contest you are IN has on the line; this shows the run they
+          come out of, which is the fact you need before entering another. */}
       {run ? <RunPanel run={run} onClaim={() => router.push('/run-over')} /> : null}
 
       <Panel title="Open" inset={false}>
@@ -122,7 +148,7 @@ export default function ContestsScreen() {
       </Panel>
 
       <Footnote />
-    </Screen>
+    </PlayerSheetFrame>
   );
 }
 

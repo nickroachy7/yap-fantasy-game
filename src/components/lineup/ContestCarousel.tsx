@@ -45,11 +45,13 @@
  * scroll-snap there, so the offset always settles on a real page and the
  * rounding below cannot land between two.
  */
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
   Platform,
+  Pressable,
   StyleSheet,
+  Text,
   View,
   useWindowDimensions,
   type NativeScrollEvent,
@@ -59,7 +61,9 @@ import {
 import { ClockOrChip, ContestCard, Standing } from '@/components/contests/ContestCard';
 import { termsOfEntry, type MyContest } from '@/components/contests/use-my-contests';
 import { recordLabel, type Record_ } from '@/components/lineup/field';
-import { Colors, Spacing } from '@/constants/theme';
+import { Hearts } from '@/components/runs/Hearts';
+import { Colors, Radius, Spacing, Type, selectionAccent } from '@/constants/theme';
+import type { PlayerState } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export function ContestCarousel({
@@ -72,6 +76,8 @@ export function ContestCarousel({
   locked,
   now,
   record,
+  run,
+  onEnter,
   width,
 }: {
   contests: MyContest[];
@@ -94,6 +100,14 @@ export function ContestCarousel({
   /** The SEASON record, which only the free contest's card shows. */
   record: Record_;
   /**
+   * The run, for the rack under the card. Null while it loads, and drawn only
+   * while the run has hearts to draw — a dead one awaiting its carry shows
+   * nothing here, exactly as the masthead used to decide. See the foot.
+   */
+  run: PlayerState['run'];
+  /** Open the lobby. The last page of the carousel is the way in. */
+  onEnter: () => void;
+  /**
    * The measured width of the column this sits in.
    *
    * MEASURED BY THE PARENT, not derived from the window. `Screen` caps its
@@ -104,37 +118,59 @@ export function ContestCarousel({
    */
   width: number;
 }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
   const listRef = useRef<FlatList<MyContest>>(null);
   const { width: windowWidth } = useWindowDimensions();
   /* Before the parent has measured, fall back to the window rather than to
      zero: a zero-width page makes `getItemLayout` divide by nothing and the
      list snaps to index NaN. */
-  const page = width > 0 ? width : windowWidth;
+  const pageWidth = width > 0 ? width : windowWidth;
+
+  /**
+   * WHICH PAGE, which is not the same question as which CONTEST.
+   *
+   * The last page is the lobby tile, and landing on it must not change the
+   * board underneath — a reader looking at "enter a new contest" still has the
+   * last contest's lineup below them, and swapping it for nothing would empty
+   * the screen behind an invitation. So the page is tracked here and
+   * `onIndexChange` fires only for the pages that are contests.
+   *
+   * Adjusted DURING RENDER when the parent moves the index — arriving from the
+   * contest sheet on a particular card — which is React's own pattern for
+   * "state derived from a prop that can also change on its own". Same
+   * construction, and same reasoning, as `lastPage` in `Screen`.
+   */
+  const [page, setPage] = useState(index);
+  const [lastIndex, setLastIndex] = useState(index);
+  /**
+   * How tall a card is, so the tile can be the same.
+   *
+   * MEASURED RATHER THAN STRETCHED. A row stretches its children by default and
+   * the tile asks for `flex: 1`, but a `ListFooterComponent` is wrapped by
+   * `VirtualizedList` in a box of its own that sizes to its content — so the
+   * tile came out card-width and text-height, with a hand's width of dead space
+   * under it before the foot row. The list's height is the tallest page either
+   * way; this makes the tile one of them instead of leaving the gap visible.
+   */
+  const [cardHeight, setCardHeight] = useState(0);
+  if (index !== lastIndex) {
+    setLastIndex(index);
+    setPage(index);
+  }
 
   /* "The scroll has settled on a page." Native learns that from momentum end;
      web from the debounced scroll event. Same arithmetic either way. */
   const onSettle = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const next = Math.round(e.nativeEvent.contentOffset.x / page);
-      if (next !== index && next >= 0 && next < contests.length) onIndexChange(next);
+      const next = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+      if (next < 0 || next > contests.length) return;
+      setPage(next);
+      // The tile is not a contest; the board below keeps the one it had.
+      if (next < contests.length && next !== index) onIndexChange(next);
     },
-    [page, index, contests.length, onIndexChange],
+    [pageWidth, contests.length, index, onIndexChange],
   );
 
   if (contests.length === 0) return null;
-
-  // See the header: one contest must look exactly like no carousel.
-  if (contests.length === 1) {
-    return (
-      <Card
-        contest={contests[0]}
-        onOpen={onOpen}
-        {...{ displayName, lockAt, locked, now, record }}
-      />
-    );
-  }
 
   return (
     <View>
@@ -152,7 +188,7 @@ export function ContestCarousel({
           ? { onScroll: onSettle, scrollEventThrottle: 16 }
           : null)}
         keyExtractor={(item) => item.id}
-        getItemLayout={(_, i) => ({ length: page, offset: page * i, index: i })}
+        getItemLayout={(_, i) => ({ length: pageWidth, offset: pageWidth * i, index: i })}
         /* OPENS ON THE LINKED CARD, not on the first one. Arriving from the
            contest sheet means the reader has just chosen a contest, and a
            carousel that marked it active while showing the free contest's card
@@ -160,8 +196,13 @@ export function ContestCarousel({
            down. Safe with `getItemLayout` supplied; without it the list cannot
            measure ahead and silently ignores this. */
         initialScrollIndex={index}
-        renderItem={({ item }) => (
-          <View style={{ width: page }}>
+        renderItem={({ item, index: i }) => (
+          <View
+            style={{ width: pageWidth }}
+            /* The first card only: they are within a few points of each other
+               — the same rows in the same order — and measuring every page
+               would set the same state from three directions on every swipe. */
+            onLayout={i === 0 ? (e) => setCardHeight(e.nativeEvent.layout.height) : undefined}>
             <Card
               contest={item}
               onOpen={onOpen}
@@ -169,15 +210,145 @@ export function ContestCarousel({
             />
           </View>
         )}
+        /* THE LAST PAGE IS THE WAY INTO THE LOBBY, and it is a footer rather
+           than an extra row of data so that nothing downstream has to hold a
+           union of "contest or invitation": `keyExtractor`, `getItemLayout`
+           and the index arithmetic all stay about contests. It is exactly one
+           page wide, so `round(x / page)` keeps working across it. */
+        ListFooterComponent={
+          <View style={{ width: pageWidth }}>
+            <EnterTile onPress={onEnter} minHeight={cardHeight} />
+          </View>
+        }
       />
-      <View style={styles.dots}>
-        {contests.map((ct, i) => (
+      <Foot
+        run={run}
+        contests={contests}
+        page={page}
+        pages={contests.length + 1}
+      />
+    </View>
+  );
+}
+
+/**
+ * The empty slot at the end of the swipe: the lobby, as a card you can reach
+ * with the gesture the carousel already teaches.
+ *
+ * IT IS THE ONLY DOOR ON THIS SCREEN NOW. The board's second view used to be a
+ * tab in a bar above the page; that bar is gone (see `CONTESTS` in
+ * `sections.ts`), and this took its job. Which is an improvement rather than a
+ * swap: the bar was a word at the top of a screen nobody looks at twice, and
+ * this is the next thing under your thumb after the contest you are already in.
+ *
+ * DASHED, AND DELIBERATELY NOT A BUTTON. The dashes say "a card could go here",
+ * which is what an empty slot is for — a solid panel with a label would read as
+ * another contest you are somehow already in, which is the one thing this must
+ * not look like.
+ */
+function EnterTile({ onPress, minHeight }: { onPress: () => void; minHeight: number }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Enter a new contest"
+      style={({ pressed }) => [
+        styles.tile,
+        { borderColor: c.border, minHeight },
+        pressed && styles.pressed,
+      ]}>
+      <Text style={[Type.strong, { color: c.text }]}>Enter a new contest</Text>
+      <Text style={[Type.fine, styles.tileBody, { color: c.textSecondary }]}>
+        See what is open this week. A card can only play in one contest, so
+        entering means playing deeper into your roster.
+      </Text>
+    </Pressable>
+  );
+}
+
+/**
+ * One row under the card: what this contest has on the line, and where you are
+ * in the swipe.
+ *
+ * THE RACK MOVED HERE FROM THE MASTHEAD, and the move is the point. Up there it
+ * stated your hearts on Collection and Players — screens where a heart cannot
+ * be won or lost — and it sat beside a gem balance with nothing linking it to
+ * the contest that was actually risking one. Here it is directly under the card
+ * whose stake it answers, and the pip THIS contest is holding comes forward as
+ * you swipe. The card says "RISK: 1 heart"; the row says which one, and what is
+ * left behind it.
+ *
+ * THE PAGE MARKS ARE RULES, NOT DOTS. Dots were a separate widget reporting
+ * position and nothing else, in an app whose whole navigation language is a
+ * word with a rule under it — see `FantasyTopNav`. As rules in this row they
+ * borrow that vocabulary and cost no line of their own.
+ */
+function Foot({
+  run,
+  contests,
+  page,
+  pages,
+}: {
+  run: PlayerState['run'];
+  contests: MyContest[];
+  page: number;
+  pages: number;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const accent = selectionAccent(scheme);
+
+  /* A dead run draws no rack, which is the masthead's old rule and its reason
+     holds here too: an empty rack is the death screen's line to deliver, and
+     three hollow pips under a contest card would be a worse way to say it. */
+  const rack = run && !run.awaitingCarry ? run : null;
+
+  /**
+   * WHICH PIP THIS CONTEST IS HOLDING.
+   *
+   * Nothing in the schema maps a heart to a contest — `run.wagered` is a count
+   * — so the mapping is made here and made consistently: `Hearts` draws safe
+   * pips first and wagered ones last, so the wagered block starts at
+   * `held - atRisk`, and the nth contest with a stake takes the nth pip of it.
+   * The count is the database's; only the order is ours, and it is stable
+   * because the carousel's order is.
+   *
+   * Null on the free contest, which risks nothing, and on the lobby tile, which
+   * is not a contest at all. Null also when the run has not caught up with an
+   * entry yet — a stake with no wagered pip behind it gets no highlight rather
+   * than a borrowed one.
+   */
+  const focus = (() => {
+    if (!rack) return null;
+    const current = contests[page];
+    if (!current || current.heartsAtRisk <= 0) return null;
+    const held = Math.max(0, rack.hearts);
+    const atRisk = Math.min(Math.max(0, rack.wagered), held);
+    const rank = contests.slice(0, page).filter((ct) => ct.heartsAtRisk > 0).length;
+    return rank < atRisk ? held - atRisk + rank : null;
+  })();
+
+  return (
+    <View style={styles.foot}>
+      {rack ? (
+        <Hearts
+          hearts={rack.hearts}
+          wagered={rack.wagered}
+          rack={rack.rack}
+          focus={focus}
+          size={14}
+        />
+      ) : (
+        <View />
+      )}
+      <View style={styles.rules}>
+        {Array.from({ length: pages }, (_, i) => (
           <View
-            key={ct.id}
-            style={[
-              styles.dot,
-              { backgroundColor: i === index ? c.text : c.border },
-            ]}
+            key={i}
+            style={[styles.rule, { backgroundColor: i === page ? accent : c.border }]}
           />
         ))}
       </View>
@@ -246,8 +417,39 @@ function Card({
 
 const styles = StyleSheet.create({
   /* Under the card rather than over it. The card's bottom edge is its axis
-     labels, and a dot row floating on top of those would read as a fourth
-     label. */
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingTop: Spacing.one },
-  dot: { width: 5, height: 5, borderRadius: 2.5 },
+     labels, and anything floating on top of those would read as a fourth
+     label.
+
+     The two ends sit on the card's own edges, inset by the 4 that keeps them
+     off its border — the rack lines up with the card's left rule and the page
+     marks with its right. */
+  foot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    paddingTop: Spacing.two,
+    paddingHorizontal: Spacing.one,
+  },
+  rules: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  /* The board strip's mark, at the size a page indicator can afford: 14 rather
+     than the width of a word, and the same 2pt rule and 1pt radius. */
+  rule: { width: 14, height: 2, borderRadius: 1 },
+  /* Stretches to the tallest page — a horizontal row stretches its children by
+     default — so the tile is the height of the card beside it and the foot
+     below does not move as you swipe onto it. */
+  tile: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: Spacing.two,
+    borderRadius: Radius.panel,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    padding: Spacing.four,
+  },
+  /* A measure rather than the full width: the sentence is the only thing on
+     this card and a line that runs the whole way across reads as a paragraph
+     of terms. */
+  tileBody: { maxWidth: 280 },
+  pressed: { opacity: 0.6 },
 });
