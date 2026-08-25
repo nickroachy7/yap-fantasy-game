@@ -13,12 +13,19 @@
  * already on among two or three peers, which is worth its 56pt on arrival and
  * worth none of it once you are twenty rows in.
  *
- * SO IT IS DRIVEN BY DIRECTION, NOT BY OFFSET. Tying the bar to the scroll
- * position — hide past 200pt, show under it — means the only way back to it is
- * to scroll all the way home. Tying it to direction means the gesture that asks
- * for it is the one you would make anyway: push up to read, pull down to leave.
- * The bar is never more than a flick away, which is what makes taking it away
- * acceptable in the first place.
+ * IT LEAVES ON A GESTURE AND RETURNS AT THE TOP, and the asymmetry is the whole
+ * design. Going is direction-driven: a short push up the page — the thing you
+ * are doing anyway — and it is gone. Coming back is POSITION-driven: it returns
+ * when you reach the top of the list, and at no other moment.
+ *
+ * A reveal on the upward gesture was tried first and is what this replaced. The
+ * trouble is that scrolling back up is not a request for navigation — it is
+ * re-reading, correcting an overshoot, chasing a row that went past — and every
+ * one of those threw the rows down the screen mid-sentence to make room for a
+ * bar nobody had asked for. Raising the threshold only moved the line; it did
+ * not change what was being guessed at. The top of the list, on the other hand,
+ * is unambiguous: you have finished with the rows, and the bar is what is there
+ * when you arrive.
  *
  * ONE PROGRESS VALUE, HELD ABOVE THE NAVIGATORS. `SectionFrame` is remounted
  * whenever you move between sections and its bar is redrawn, so the state
@@ -68,59 +75,35 @@ import Animated, {
 import { useIsWide } from '@/components/shell/useResponsive';
 
 /**
- * How far you must travel in one direction before the bar answers.
+ * How far you must push the page up before the bar goes.
  *
- * SHOWING COSTS MORE THAN HIDING, and by a lot. Both directions are guarded so
- * that reading is never mistaken for a request — but the two mistakes are not
- * equally cheap. Taking the bar away by accident costs a flick to get it back;
- * putting it back by accident throws the rows you were reading down the screen
- * mid-sentence, which is the one thing a list must never do. So a small drag up
- * — the ordinary correction you make while reading, the thumb settling, the
- * bounce at the end of a fling — leaves the bar exactly where it is, and only a
- * deliberate, sustained pull back up returns it.
- *
- * 72 is about a thumb's worth of screen: far enough that nothing incidental
- * reaches it, short enough that the gesture asking for the bar is over before
- * you think about it. The other way home is the top of the list, which shows
- * the bar unconditionally — see `TOP_ZONE`.
+ * Far enough that reading is never mistaken for a request, short enough that
+ * the request is over before you think about it. There is no matching number
+ * for the other direction: nothing brings the bar back except the top of the
+ * list — see `TOP_ZONE`.
  */
 const HIDE_TRAVEL = 28;
-const SHOW_TRAVEL = 72;
 
 /**
  * No hiding until there is this much scrolled past, and it is a SAFETY rather
  * than a taste: collapsing the bar makes the page taller, which on a barely
  * scrollable list can remove the very scroll that would bring the bar back.
- * Past 72pt there is always at least 72pt of scrolling-up available, so the
- * gesture that restores it is always possible. On iOS the rubber band would
- * cover this anyway; on web, where there is no bounce, nothing else does.
+ * Past 72pt there is always at least 72pt of scrolling-up available, so the top
+ * of the list — the only thing that restores the bar — is always reachable.
  */
 const HIDE_AFTER = 72;
 
-/** Inside this much of the top the bar is simply on, whatever the finger did. */
+/**
+ * Inside this much of the top the bar is on, whatever the finger did.
+ *
+ * THIS IS THE ONLY WAY BACK, so it is deliberately generous about what counts
+ * as the top: an offset that settles a point or two shy of zero, an iOS bounce
+ * passing through it, a list whose first row is a hair taller than it measured.
+ * Missing the top by 3pt and leaving the reader with no bar and no way to ask
+ * for one is a far worse failure than showing it 8pt early.
+ */
 const TOP_ZONE = 8;
 
-/**
- * How close to the END of the list counts as being at the end.
- *
- * THE LAST ROW IS NOT A GESTURE, and this is the fix for the one thing that
- * made the bar feel possessed: scrolling to the bottom put it back.
- *
- * Two different mechanisms, one symptom. Hiding the bar makes the page ~56pt
- * taller, which makes the maximum scroll offset ~56pt SMALLER — so a reader
- * already at the bottom gets their offset clamped down by the very act of
- * collapsing, and a clamp looks exactly like a scroll upwards. On iOS the
- * rubber band does the same thing from the other side: the fling overshoots the
- * end and settles back, and the settling is more than enough travel to trip the
- * reveal. Neither is a finger moving down the screen, and neither should be
- * read as one.
- *
- * Small on purpose. Everything inside this band is ignored rather than acted
- * on, so a reader who genuinely does drag back up from the last row gets the
- * bar as soon as they clear it, which is within a few points of where they
- * started.
- */
-const END_ZONE = 6;
 
 type Collapse = {
   /** 0 = bar fully drawn, 1 = fully collapsed. Read by every block. */
@@ -176,8 +159,7 @@ export function ChromeCollapseProvider({ children }: { children: ReactNode }) {
 
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
-      const y = contentOffset.y;
+      const y = e.nativeEvent.contentOffset.y;
       const dy = y - lastY.current;
       lastY.current = y;
 
@@ -190,22 +172,15 @@ export function ChromeCollapseProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      /* At the bottom nothing is decided — see `END_ZONE`. The accumulator is
-         cleared rather than kept, so the travel that has to be measured is the
-         travel back OFF the end and not whatever the bounce left behind. */
-      const end = contentSize.height - layoutMeasurement.height;
-      if (end > 0 && y >= end - END_ZONE) {
-        travel.current = 0;
-        return;
-      }
-
       if (dy === 0) return;
       // A flip in direction restarts the count; only sustained travel counts.
       if (dy > 0 !== travel.current > 0) travel.current = 0;
       travel.current += dy;
 
+      /* One direction only. Upward travel still resets the accumulator above —
+         so a drag back up costs a fresh 28pt before the bar can go again — but
+         it never brings the bar back; the top of the list does that. */
       if (travel.current > HIDE_TRAVEL && y > HIDE_AFTER) settle(true);
-      else if (travel.current < -SHOW_TRAVEL) settle(false);
     },
     [settle],
   );
