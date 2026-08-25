@@ -21,10 +21,34 @@
  * until it enters something, and most accounts most weeks — this has to be
  * indistinguishable from the card that was here before it: no dots, no page
  * indicator, nothing that implies there is something to swipe to.
+ *
+ * ---------------------------------------------------------------------------
+ * `onMomentumScrollEnd` DOES NOT EXIST ON WEB
+ * ---------------------------------------------------------------------------
+ *
+ * It was the only thing calling `onIndexChange`, so on web the card moved and
+ * the board underneath did not — the exact mismatch this component was built to
+ * fix, reintroduced by the one platform nobody swipes on during development.
+ *
+ * react-native-web's `ScrollViewBase` emits `onScroll` and nothing else. It
+ * synthesises a scroll-END by debouncing that same handler 100ms, but it calls
+ * `onScroll` with it rather than `onMomentumScrollEnd`, so the momentum prop is
+ * silently inert — it is accepted, forwarded to the scroll responder, and never
+ * fired. Checked in `node_modules`, not inferred from the symptom.
+ *
+ * So web listens on `onScroll` as well. The handler is the same one and it is
+ * idempotent — it compares against the current index and returns — so the extra
+ * ticks during a drag cost nothing but a page change as you pass the halfway
+ * point, which is what a snapping carousel should do anyway.
+ *
+ * The snapping itself is fine on web: `pagingEnabled` compiles to CSS
+ * scroll-snap there, so the offset always settles on a real page and the
+ * rounding below cannot land between two.
  */
 import { useCallback, useRef } from 'react';
 import {
   FlatList,
+  Platform,
   StyleSheet,
   View,
   useWindowDimensions,
@@ -92,7 +116,9 @@ export function ContestCarousel({
      list snaps to index NaN. */
   const page = width > 0 ? width : windowWidth;
 
-  const onMomentumEnd = useCallback(
+  /* "The scroll has settled on a page." Native learns that from momentum end;
+     web from the debounced scroll event. Same arithmetic either way. */
+  const onSettle = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const next = Math.round(e.nativeEvent.contentOffset.x / page);
       if (next !== index && next >= 0 && next < contests.length) onIndexChange(next);
@@ -121,7 +147,13 @@ export function ContestCarousel({
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={onMomentumEnd}
+        onMomentumScrollEnd={onSettle}
+        /* Web only, and only because the prop above never fires there. Adding
+           it on native as well would move the board mid-drag, which is a
+           behaviour change to the platform that already works. */
+        {...(Platform.OS === 'web'
+          ? { onScroll: onSettle, scrollEventThrottle: 16 }
+          : null)}
         keyExtractor={(item) => item.id}
         getItemLayout={(_, i) => ({ length: page, offset: page * i, index: i })}
         /* OPENS ON THE LINKED CARD, not on the first one. Arriving from the

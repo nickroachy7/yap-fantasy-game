@@ -83,6 +83,8 @@ import { Screen } from '@/components/shell/Screen';
 import { SegmentedControl, type Segment } from '@/components/shell/SegmentedControl';
 import { AppHeader } from '@/components/shell/AppHeader';
 import { FantasyTopNav } from '@/components/shell/FantasyTopNav';
+import { ContestCarousel } from '@/components/lineup/ContestCarousel';
+import type { MyContest } from '@/components/contests/use-my-contests';
 import { FrameProvider } from '@/components/shell/frame';
 import { RecapBody } from '@/components/recap/RecapBody';
 import type { Recap } from '@/components/recap/recap';
@@ -622,13 +624,119 @@ function LeaderboardFixture() {
 
 const SLOTS = ['QB', 'RB', 'RB', 'WR', 'WR', 'WR', 'TE', 'PK'];
 
+/**
+ * Two contests, so the carousel has something to swipe BETWEEN.
+ *
+ * This exists because a bug shipped that it would have caught: swiping the
+ * carousel on web moved the card and left the board underneath on the previous
+ * contest, because `onMomentumScrollEnd` is never fired by react-native-web.
+ * The component had no gallery coverage, the board is behind the auth gate, and
+ * nobody swipes a desktop browser during development — so the one platform the
+ * bug existed on was the one platform it could not be seen on.
+ *
+ * The free contest is first, as it always is, and carries the season record.
+ * The second is a lobby contest with a heart on it, so the stake mark on the
+ * card head has something to draw.
+ */
+const CONTEST_FIXTURES: MyContest[] = [
+  {
+    id: 'fx-free',
+    code: 'free:2026:1:4',
+    kind: 'free',
+    name: 'Preseason Week 4',
+    formatCode: 'main',
+    formatName: 'Full Roster',
+    slotCount: 8,
+    entryFeeGems: 0,
+    lineupId: 'fx-lineup-free',
+    filled: 8,
+    field: {
+      week: 4,
+      entrants: 12,
+      low: 41.2,
+      median: 88.6,
+      average: 90.1,
+      high: 142.8,
+      final: false,
+      myPoints: 96.4,
+      myRank: 5,
+      ahead: 7,
+      result: null,
+    },
+    heartsAtRisk: 1,
+    heartsOnWin: 0,
+  },
+  {
+    id: 'fx-flex',
+    code: 'flex3:2026:1:4',
+    kind: 'lobby',
+    name: 'Flex Three',
+    formatCode: 'flex3',
+    formatName: 'Flex Three',
+    slotCount: 3,
+    entryFeeGems: 40,
+    lineupId: 'fx-lineup-flex',
+    filled: 3,
+    field: {
+      week: 4,
+      entrants: 6,
+      low: 12.0,
+      median: 31.5,
+      average: 33.2,
+      high: 58.9,
+      final: false,
+      myPoints: 27.1,
+      myRank: 4,
+      ahead: 2,
+      result: null,
+    },
+    heartsAtRisk: 1,
+    heartsOnWin: 1,
+  },
+];
+
 function LineupFixture() {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const [contestIndex, setContestIndex] = useState(0);
+  const [carouselWidth, setCarouselWidth] = useState(0);
+
+  /* The assertion the gallery is here to make: the slot list below reads the
+     SAME index the carousel reports. If swiping stops moving this label, the
+     board and the card have come apart again. */
+  const active = CONTEST_FIXTURES[contestIndex] ?? CONTEST_FIXTURES[0];
+
+  return (
+    <View style={{ gap: Spacing.two }}>
+      <View onLayout={(e) => setCarouselWidth(e.nativeEvent.layout.width)}>
+        <ContestCarousel
+          contests={CONTEST_FIXTURES}
+          index={contestIndex}
+          onIndexChange={setContestIndex}
+          displayName="nickroachy"
+          weekLabel="Preseason · Week 4"
+          lockAt={null}
+          locked={false}
+          now={Date.parse('2026-08-25T12:00:00Z')}
+          record={{ wins: 1, losses: 0, ties: 0 }}
+          width={carouselWidth}
+        />
+      </View>
+      <Text style={[styles.banner, { color: c.textSecondary }]}>
+        {`showing: ${active.name} · ${active.slotCount} slots · index ${contestIndex}`}
+      </Text>
+      <LineupRows slotCount={active.slotCount} />
+    </View>
+  );
+}
+
+function LineupRows({ slotCount }: { slotCount: number }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
   return (
     <View style={styles.rows}>
-      {SLOTS.map((slot, i) => (
+      {SLOTS.slice(0, slotCount).map((slot, i) => (
         <View key={`${slot}-${i}`} style={[styles.row, { borderColor: c.backgroundElement }]}>
           <Text style={[styles.slot, { color: c.textSecondary }]}>{slot}</Text>
           <Text numberOfLines={1} style={[styles.rowName, { color: c.text }]}>
