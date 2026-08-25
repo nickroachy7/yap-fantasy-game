@@ -61,3 +61,74 @@ jobs:
           echo "  npm run test:sql"
           echo
           echo "See docs/testing.md."
+
+  # ── SHIP THE JS TO TESTERS ───────────────────────────────────────────────
+  #
+  # `needs: check` is the whole point: a push that fails typecheck, lint or the
+  # unit suites must not reach anyone's phone. Publishing is gated on green.
+  #
+  # This only ships JAVASCRIPT. Native changes — a new module with native code,
+  # icon/splash/permissions, an SDK bump, or a change to `expo.version` — still
+  # need a local Xcode archive and a TestFlight upload. See docs and the
+  # `runtimeVersion` note below.
+  #
+  # `runtimeVersion` is the `appVersion` policy, so an update only lands on
+  # builds whose `expo.version` matches. Bumping `expo.version` silently strands
+  # every existing install until testers reinstall from TestFlight — so bump
+  # `ios.buildNumber` for new binaries and leave `version` alone.
+  publish:
+    name: publish OTA update
+    needs: check
+    # Pushes to main only. A PR must not publish — it has not been merged, and
+    # updates go to real testers' phones.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # Fail loudly and early rather than letting eas-cli emit an opaque auth
+      # error a few minutes into the run.
+      - name: Require EXPO_TOKEN
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::EXPO_TOKEN secret is not set. Create one at"
+            echo "::error::https://expo.dev/settings/access-tokens and add it under"
+            echo "::error::GitHub repo Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Install EAS CLI
+        run: npm install --global eas-cli
+
+      # `--platform ios` is load-bearing. `platform=all` static-renders the web
+      # build in Node, which executes src/lib/supabase.ts and throws on the
+      # missing env — the export dies before anything publishes.
+      #
+      # The commit message goes through an env var rather than `${{ }}`
+      # interpolation: a message containing quotes or `$(...)` would otherwise
+      # be executed by the shell. Only the first line is used, since --message
+      # is a single line.
+      - name: Publish update
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          MSG="${COMMIT_MSG%%$'\n'*}"
+          [ -n "$MSG" ] || MSG="${GITHUB_SHA:0:7}"
+          eas update \
+            --branch production \
+            --message "$MSG" \
+            --environment production \
+            --platform ios \
+            --non-interactive

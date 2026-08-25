@@ -10,7 +10,11 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "bundleIdentifier": "com.yapfantasy.app",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "buildNumber": "2"
     },
     "android": {
       "adaptiveIcon": {
@@ -40,6 +44,22 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "42236604-eb1e-45fe-8fb1-4f6929a0bdb6"
+      }
+    },
+    "owner": "nickroachy",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/42236604-eb1e-45fe-8fb1-4f6929a0bdb6",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
     }
   }
 }
