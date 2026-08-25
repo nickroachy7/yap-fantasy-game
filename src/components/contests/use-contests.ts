@@ -28,6 +28,7 @@ import { useCallback, useState } from 'react';
 
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
+import type { ContestTerms } from './contest-model';
 
 export type Contest = {
   id: string;
@@ -70,6 +71,19 @@ export type Contest = {
   heartsOnWin: number;
   /** Hearts the caller's run is holding, or null before they have one. */
   myHearts: number | null;
+
+  /**
+   * Gems this contest has collected that it will pay back out.
+   *
+   * LIVE, AND SMALL EARLY. The pool is funded by entries — 25% of the fees
+   * taken, see `20260826020000` — so it is genuinely nought before the first
+   * one and genuinely tiny in a four-tester week. The lobby draws the real
+   * figure and says it grows; rounding it up to something respectable would be
+   * the grant that inverts the fee's whole justification.
+   */
+  prizePool: number;
+  /** The share of collected fees paid out, in basis points. 2500 = 25%. */
+  prizePoolBps: number;
 };
 
 type Row = {
@@ -94,6 +108,8 @@ type Row = {
   hearts_at_risk: number;
   hearts_on_win: number;
   my_hearts: number | null;
+  prize_pool: number;
+  prize_pool_bps: number;
 };
 
 export type ContestsState = {
@@ -135,6 +151,8 @@ export function useContests(): ContestsState {
         heartsAtRisk: Number(r.hearts_at_risk ?? 0),
         heartsOnWin: Number(r.hearts_on_win ?? 0),
         myHearts: r.my_hearts === null || r.my_hearts === undefined ? null : Number(r.my_hearts),
+        prizePool: Number(r.prize_pool ?? 0),
+        prizePoolBps: Number(r.prize_pool_bps ?? 0),
       })),
     );
     return null;
@@ -149,4 +167,27 @@ export function useContests(): ContestsState {
   );
 
   return { contests, loading, error, reload };
+}
+
+/**
+ * A lobby row, as the terms every surface describes it from.
+ *
+ * An ADAPTER rather than a second shape: `contest-model` deliberately takes a
+ * structural type so that the lobby's read and an entry's read can both be
+ * described without either becoming the other. This is where the lobby's
+ * column names meet it, and it is the only place they do.
+ */
+export function termsOfContest(c: Contest): ContestTerms {
+  return {
+    formatName: c.formatName,
+    slotCount: c.slotCount,
+    entryFeeGems: c.entryFeeGems,
+    heartsAtRisk: c.heartsAtRisk,
+    heartsOnWin: c.heartsOnWin,
+    winCondition: c.winCondition,
+    winRank: c.winRank,
+    prizePool: c.prizePool,
+    entrants: c.entrants,
+    maxEntrants: c.maxEntrants,
+  };
 }

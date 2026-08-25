@@ -17,6 +17,7 @@ import { useCallback, useState } from 'react';
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
 import type { FieldWeek } from '@/components/lineup/field';
+import type { ContestTerms, WinCondition } from './contest-model';
 
 export type MyContest = {
   id: string;
@@ -47,11 +48,42 @@ export type MyContest = {
    */
   heartsAtRisk: number;
   heartsOnWin: number;
+
+  /**
+   * HOW THIS CONTEST IS WON, which the card had no way of knowing.
+   *
+   * It drew the median as its mark on every contest, including `top_n` ones
+   * where the median decides nothing — a player above the middle of a field
+   * that pays three could be sixth and read it as winning. `cut` is the line
+   * that actually matters there: the lowest score still inside the paying
+   * places. Null under `median`, where the median IS the line, and null under
+   * `top_n` until enough of the field has scored to have one.
+   */
+  winCondition: WinCondition;
+  winRank: number | null;
+  cut: number | null;
+
+  /** Gems collected by this contest that will be paid back out. */
+  prizePool: number;
+  /**
+   * What YOU are owed out of it — null until the week is final and the places
+   * are decided.
+   *
+   * Deliberately not a running "you would win 60". That is a projection, and
+   * the same rule that keeps `PROJ` a dash on every card in this app applies
+   * with more force to a number denominated in gems.
+   */
+  myPrize: number | null;
 };
 
 type Row = {
   hearts_at_risk: number;
   hearts_on_win: number;
+  win_condition: WinCondition;
+  win_rank: number | null;
+  cut: number | string | null;
+  prize_pool: number | string | null;
+  my_prize: number | string | null;
   contest_id: string;
   code: string;
   kind: 'free' | 'lobby';
@@ -131,6 +163,11 @@ export function useMyContests(includeCode?: string): MyContestsState {
         },
         heartsAtRisk: Number(r.hearts_at_risk ?? 0),
         heartsOnWin: Number(r.hearts_on_win ?? 0),
+        winCondition: r.win_condition,
+        winRank: r.win_rank === null || r.win_rank === undefined ? null : Number(r.win_rank),
+        cut: num(r.cut),
+        prizePool: num(r.prize_pool) ?? 0,
+        myPrize: num(r.my_prize),
       })),
     );
     return null;
@@ -145,4 +182,28 @@ export function useMyContests(includeCode?: string): MyContestsState {
   );
 
   return { contests, loading, error, reload };
+}
+
+/**
+ * An entry, as the terms every surface describes it from. See
+ * `termsOfContest` — same reason, other read.
+ *
+ * `entrants` comes off the FIELD here rather than off a count, because that is
+ * the number this read actually has and the number the card is placing you
+ * inside. `maxEntrants` is deliberately absent: a card over a lineup you have
+ * already filed has no use for how many seats are left.
+ */
+export function termsOfEntry(c: MyContest): ContestTerms {
+  return {
+    formatName: c.formatName,
+    slotCount: c.slotCount,
+    entryFeeGems: c.entryFeeGems,
+    heartsAtRisk: c.heartsAtRisk,
+    heartsOnWin: c.heartsOnWin,
+    winCondition: c.winCondition,
+    winRank: c.winRank,
+    prizePool: c.prizePool,
+    entrants: c.field.entrants,
+    maxEntrants: null,
+  };
 }

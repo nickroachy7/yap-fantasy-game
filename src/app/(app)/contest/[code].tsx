@@ -42,7 +42,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useContests, type Contest } from '@/components/contests/use-contests';
+import { ContestTermsPanel } from '@/components/contests/ContestCard';
+import { termsOfContest, useContests } from '@/components/contests/use-contests';
+import { ContestFieldPanel } from '@/components/contests/ContestFieldPanel';
 import { LineupEditor } from '@/components/lineup/LineupEditor';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -123,7 +125,12 @@ export default function ContestSheet() {
         </Text>
       ) : (
         <View style={styles.body}>
-          <Facts contest={contest} />
+          {/* WHAT IT COSTS AND WHAT IT PAYS, in the card's own zone. This page
+              used to show Format / Entry / Entered and nothing else — so the
+              lobby could warn you a run was on the line and the page you opened
+              to think about it never mentioned the heart, the win condition or
+              the pool. See `ContestTermsPanel`. */}
+          <ContestTermsPanel terms={termsOfContest(contest)} />
 
           {/* THE RULE, said here because here is where somebody takes it on. It
               is what makes a second contest cost something real rather than
@@ -132,6 +139,19 @@ export default function ContestSheet() {
           <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
             A card can only play in one contest a week. Whatever you field here
             comes out of the cards you are not already playing.
+          </Text>
+
+          {/* WHY YOU ACTUALLY ENTER, said here because the card no longer says
+              it. The reward column is gems now — a currency the reader keeps
+              score in — and career_fp was the odd line out on it: not a balance
+              anybody holds, and next to "40 gems" it read as small print. It is
+              still the real return, so it gets a sentence on the one surface
+              with room to make the argument rather than a cramped column
+              nobody could price. */}
+          <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
+            The gems are the chase. What an entry actually buys is career FP on
+            cards that were earning nothing — the tier those cards climb is the
+            one thing packs cannot sell you.
           </Text>
 
           {contest.entryFeeGems > 0 ? (
@@ -175,6 +195,12 @@ export default function ContestSheet() {
               }
             />
           )}
+
+          {/* WHO ELSE IS IN IT. Under the lineup rather than over it: before
+              you have entered, the field is context for a decision the editor
+              above is where you take; after you have, it is the reason to come
+              back to this page at all. */}
+          <ContestFieldPanel contestId={contest.id} />
 
           {/* Only once you are in, and never on the free contest — that one is
               not a thing you joined. Quiet and at the bottom: it is the exit,
@@ -223,37 +249,8 @@ export default function ContestSheet() {
   );
 }
 
-/** The three numbers, as rows rather than prose. */
-function Facts({ contest }: { contest: Contest }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-
-  const rows: [string, string][] = [
-    ['Format', `${contest.formatName} · ${contest.slotCount} cards`],
-    ['Entry', contest.entryFeeGems > 0 ? `${contest.entryFeeGems} gems` : 'Free'],
-    [
-      'Entered',
-      contest.maxEntrants != null
-        ? `${contest.entrants} of ${contest.maxEntrants}`
-        : `${contest.entrants}`,
-    ],
-  ];
-
-  return (
-    <View style={styles.facts}>
-      {rows.map(([label, value]) => (
-        <View key={label} style={[styles.factRow, { borderBottomColor: c.border }]}>
-          <Text style={[Type.fine, { color: c.textSecondary }]}>{label}</Text>
-          <Text style={[Type.body, { color: c.text }]}>{value}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   body: { gap: Spacing.three },
-  facts: { gap: 0 },
   /* OUTLINED, NOT FILLED. It was a grey line of `fine` text and read as a
      caption rather than a control — the one thing on the sheet somebody might
      actually need and the quietest thing on it.
@@ -272,11 +269,4 @@ const styles = StyleSheet.create({
   },
   leavePressed: { opacity: 0.6 },
   leaveLabel: { fontWeight: '700' },
-  factRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: Spacing.two,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
 });

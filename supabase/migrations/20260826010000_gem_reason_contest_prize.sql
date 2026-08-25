@@ -1,0 +1,14 @@
+-- Gems paid OUT of a contest's pool to the players who won it.
+--
+-- Its own migration, like every other value added to this enum, because
+-- Postgres will not let a value added inside a transaction be USED in that same
+-- transaction. `20260826020000` is the one that spends it, and it needs this
+-- committed before it runs.
+--
+-- SEPARATE FROM `weekly_score_reward`, which every entry already earns whether
+-- it wins or loses. Those are two different economies wearing the same currency
+-- and the ledger has to be able to tell them apart: the score reward is the
+-- FAUCET (minted, 1.5 a point) and a prize is REDISTRIBUTION (fees collected,
+-- paid back out). Summed under one reason, nobody could ever audit whether the
+-- pool balanced.
+alter type public.gem_reason add value if not exists 'contest_prize';

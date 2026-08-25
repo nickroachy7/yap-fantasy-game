@@ -56,10 +56,9 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 
-import { Pressable } from 'react-native';
-import { ContestCard } from '@/components/lineup/ContestCard';
-import type { MyContest } from '@/components/contests/use-my-contests';
-import type { Record_ } from '@/components/lineup/field';
+import { ClockOrChip, ContestCard, Standing } from '@/components/contests/ContestCard';
+import { termsOfEntry, type MyContest } from '@/components/contests/use-my-contests';
+import { recordLabel, type Record_ } from '@/components/lineup/field';
 import { Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -69,7 +68,6 @@ export function ContestCarousel({
   onIndexChange,
   onOpen,
   displayName,
-  weekLabel,
   lockAt,
   locked,
   now,
@@ -90,7 +88,6 @@ export function ContestCarousel({
    */
   onOpen?: (contest: MyContest) => void;
   displayName: string;
-  weekLabel: string;
   lockAt: string | null;
   locked: boolean;
   now: number;
@@ -134,7 +131,7 @@ export function ContestCarousel({
       <Card
         contest={contests[0]}
         onOpen={onOpen}
-        {...{ displayName, weekLabel, lockAt, locked, now, record }}
+        {...{ displayName, lockAt, locked, now, record }}
       />
     );
   }
@@ -168,7 +165,7 @@ export function ContestCarousel({
             <Card
               contest={item}
               onOpen={onOpen}
-              {...{ displayName, weekLabel, lockAt, locked, now, record }}
+              {...{ displayName, lockAt, locked, now, record }}
             />
           </View>
         )}
@@ -189,15 +186,15 @@ export function ContestCarousel({
 }
 
 /**
- * One card.
+ * One card — the shared `ContestCard` with a `Standing` in its middle.
  *
- * The free contest keeps the season record under the name; a lobby contest
- * says what it asks of you instead — see `ContestCard.standingLine`.
+ * That middle is the ONLY thing this adds to what the lobby draws. See the
+ * header on `ContestCard`: head, terms and foot are the same rows in the same
+ * order on both surfaces, so entering a contest does not change its shape.
  */
 function Card({
   contest,
   displayName,
-  weekLabel,
   lockAt,
   locked,
   now,
@@ -206,46 +203,44 @@ function Card({
 }: {
   contest: MyContest;
   displayName: string;
-  weekLabel: string;
   lockAt: string | null;
   locked: boolean;
   now: number;
   record: Record_;
   onOpen?: (contest: MyContest) => void;
 }) {
-  /* `Pressable` around the card rather than a control ON it. The card is a
-     dense thing — a name, a standing, a distribution with three labels — and
-     any button placed inside it would be competing with the axis for the one
-     corner that is not already saying something. */
-  const inner = (
-    <ContestCard
-      displayName={contest.kind === 'free' ? displayName : contest.name}
-      weekLabel={weekLabel}
-      lockAt={lockAt}
-      locked={locked}
-      now={now}
-      myPoints={contest.field.myPoints}
-      field={contest.field}
-      record={record}
-      standingLine={
-        contest.kind === 'free'
-          ? undefined
-          : `${contest.formatName} · ${contest.slotCount} cards`
-      }
-      heartsAtRisk={contest.heartsAtRisk}
-      heartsOnWin={contest.heartsOnWin}
-    />
-  );
+  const terms = termsOfEntry(contest);
 
-  if (!onOpen) return inner;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Open ${contest.name}`}
-      onPress={() => onOpen(contest)}
-      style={({ pressed }) => (pressed ? { opacity: 0.75 } : null)}>
-      {inner}
-    </Pressable>
+    <ContestCard
+      /* THE CONTEST'S OWN NAME, on every card. The free one is called
+         "Preseason Week 4", so the week label this used to draw was the same
+         string arriving by a different route — and on a lobby card it was a
+         week the screen above already states. */
+      name={contest.name}
+      terms={terms}
+      state={
+        <ClockOrChip
+          lockAt={lockAt}
+          locked={locked}
+          final={contest.field.final}
+          now={now}
+        />
+      }
+      prize={contest.myPrize}
+      middle={
+        <Standing
+          manager={displayName}
+          subtitle={contest.kind === 'free' ? `Season ${recordLabel(record)}` : undefined}
+          terms={terms}
+          myPoints={contest.field.myPoints}
+          field={contest.field}
+          cut={contest.cut}
+          filled={contest.filled}
+        />
+      }
+      onPress={onOpen ? () => onOpen(contest) : undefined}
+    />
   );
 }
 

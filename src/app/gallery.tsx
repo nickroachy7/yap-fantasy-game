@@ -635,8 +635,15 @@ const SLOTS = ['QB', 'RB', 'RB', 'WR', 'WR', 'WR', 'TE', 'PK'];
  * bug existed on was the one platform it could not be seen on.
  *
  * The free contest is first, as it always is, and carries the season record.
- * The second is a lobby contest with a heart on it, so the stake mark on the
- * card head has something to draw.
+ * The second is a `top_n` lobby contest with a heart and a pool on it, so the
+ * card head has a stake to draw and — the reason it is `top_n` rather than a
+ * second median contest — the bar has a CUT to mark rather than a median.
+ *
+ * That second choice is not decoration. The card drew the median on every
+ * contest for weeks, including ones where the median decided nothing, and the
+ * only fixture that existed was a median contest, so nothing here could ever
+ * have shown it. A gallery whose fixtures all take the same branch is testing
+ * the branch, not the component.
  */
 const CONTEST_FIXTURES: MyContest[] = [
   {
@@ -665,17 +672,22 @@ const CONTEST_FIXTURES: MyContest[] = [
     },
     heartsAtRisk: 1,
     heartsOnWin: 0,
+    winCondition: 'median',
+    winRank: null,
+    cut: null,
+    prizePool: 0,
+    myPrize: null,
   },
   {
-    id: 'fx-flex',
-    code: 'flex3:2026:1:4',
+    id: 'fx-wr',
+    code: 'wr_room:2026:1:4',
     kind: 'lobby',
-    name: 'Flex Three',
-    formatCode: 'flex3',
-    formatName: 'Flex Three',
+    name: 'WR Room',
+    formatCode: 'wr_room',
+    formatName: 'WR Room',
     slotCount: 3,
     entryFeeGems: 40,
-    lineupId: 'fx-lineup-flex',
+    lineupId: 'fx-lineup-wr',
     filled: 3,
     field: {
       week: 4,
@@ -692,6 +704,14 @@ const CONTEST_FIXTURES: MyContest[] = [
     },
     heartsAtRisk: 1,
     heartsOnWin: 1,
+    winCondition: 'top_n',
+    winRank: 3,
+    /* Above the median (31.5) and BELOW the cut — the exact state the old card
+       could not draw. 27.1 reads as comfortably mid-field against a median and
+       as fourth of six against the line that actually pays. */
+    cut: 38.4,
+    prizePool: 240,
+    myPrize: null,
   },
 ];
 
@@ -714,7 +734,6 @@ function LineupFixture() {
           index={contestIndex}
           onIndexChange={setContestIndex}
           displayName="nickroachy"
-          weekLabel="Preseason · Week 4"
           lockAt={null}
           locked={false}
           now={Date.parse('2026-08-25T12:00:00Z')}

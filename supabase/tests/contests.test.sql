@@ -35,8 +35,14 @@ values (994001, 2026, 94, 1, now() + interval '7 days', 'scheduled');
 -- flex slots, so no quarterback or kicker has to be found — the reason small
 -- formats exist at all is that exclusivity plus an eight-card format would
 -- ration entry by kicker depth.
-insert into public.contests (code, kind, format_code, season, season_type, week, name, entry_fee_gems)
-values ('test:lobby:94', 'lobby', 'flex3', 2026, 1, 94, 'Test Flex Three', 25);
+--
+-- `prize_pool_bps` is not optional on anything that charges: since
+-- `20260826020000` the constraint `contests_paid_contests_pay_out` refuses a
+-- paid contest with no pool, so that "if it costs gems it pays gems" is a
+-- property of the schema rather than a thing every seed has to remember. This
+-- suite was the first thing that constraint caught.
+insert into public.contests (code, kind, format_code, season, season_type, week, name, entry_fee_gems, prize_pool_bps)
+values ('test:lobby:94', 'lobby', 'flex3', 2026, 1, 94, 'Test Flex Three', 25, 2500);
 
 -- Enough for one entry and change, but nowhere near the 999 contest below.
 insert into public.gem_balances (user_id, balance)
@@ -45,9 +51,9 @@ on conflict (user_id) do update set balance = 60;
 
 -- Two more paid contests, each testing one refusal: `lobby2` is FULL (a rival
 -- already holds its only seat) and `lobby3` is unaffordable.
-insert into public.contests (code, kind, format_code, season, season_type, week, name, entry_fee_gems, max_entrants)
-values ('test:lobby2:94', 'lobby', 'flex3', 2026, 1, 94, 'Test Full House', 25, 2),
-       ('test:lobby3:94', 'lobby', 'flex3', 2026, 1, 94, 'Test Rich Only', 999, null);
+insert into public.contests (code, kind, format_code, season, season_type, week, name, entry_fee_gems, max_entrants, prize_pool_bps)
+values ('test:lobby2:94', 'lobby', 'flex3', 2026, 1, 94, 'Test Full House', 25, 2, 2500),
+       ('test:lobby3:94', 'lobby', 'flex3', 2026, 1, 94, 'Test Rich Only', 999, null, 2500);
 
 -- The rival, and the two seats of `lobby2` filled by them. Written here rather
 -- than in the assertion block because `lineups` has no insert policy — see the

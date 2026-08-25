@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useContests, type Contest } from '@/components/contests/use-contests';
-import { Heart, Hearts } from '@/components/runs/Hearts';
+import { ContestCard } from '@/components/contests/ContestCard';
+import { termsOfContest, useContests, type Contest } from '@/components/contests/use-contests';
+import { Hearts } from '@/components/runs/Hearts';
 import { nextRungLine, recordOf, wageredLine } from '@/components/runs/run';
 import { Screen } from '@/components/shell/Screen';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -40,19 +41,27 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  * a point on every slot in every lineup filed), so a free-to-enter lobby is a
  * faucet with no tap. `20260825050000` sets out how 40 was arrived at.
  *
- * THERE ARE NO GEM PRIZES YET, which the row is honest about by not mentioning
- * any. What an entry buys today is career_fp on three cards that were earning
- * nothing — tier, the one currency packs cannot sell — and, on the rows that
- * risk a heart, the heart back if it wins.
+ * IF IT COSTS GEMS IT PAYS GEMS, and the database will not let a contest exist
+ * otherwise (`contests_paid_contests_pay_out`, 20260826020000). The pool is 25%
+ * of the fees that contest has collected — redistribution, never a grant — so
+ * it is genuinely small in a four-tester week and grows with the field. The
+ * card says the real figure and says what moves it; rounding it up to something
+ * respectable would be the mint that inverts the fee's whole justification.
  *
- * WHICH IS THE OTHER THING THIS SCREEN NOW HAS TO SAY. Some of these contests
- * can end your run (`hearts_at_risk`, 20260825130000) and some cannot, and
- * nothing about a fee or a format tells them apart — the two rows cost the same
- * 40 gems. A player who enters a run-ending contest without being told it was
- * one has been ambushed by their own lobby, so the stake is drawn on the row
- * itself rather than left to the contest page to disclose after the tap.
+ * WHAT AN ENTRY IS ACTUALLY FOR IS STILL TIER. career_fp on cards that were
+ * earning nothing is the reason to enter and the pool is the chase — the
+ * expected prize is deliberately below what the entry costs net of score gems,
+ * which is what stops the lobby becoming an arbitrage run with three bad cards.
+ * That is why the reward column names the career_fp as well as the gems.
  *
- * THE STAKE LINE IS ONLY ON ROWS THAT HAVE ONE. A "0 hearts" note on the safe
+ * WHICH IS THE OTHER THING THIS SCREEN HAS TO SAY. Some of these contests can
+ * end your run (`hearts_at_risk`, 20260825130000) and some cannot, and nothing
+ * about a fee or a format tells them apart — both cost the same 40 gems. A
+ * player who enters a run-ending contest without being told it was one has been
+ * ambushed by their own lobby, so the stake is drawn on the card itself rather
+ * than left to the contest page to disclose after the tap.
+ *
+ * THE STAKE MARK IS ONLY ON CARDS THAT HAVE ONE. A "0 hearts" note on the safe
  * contests would make the safe thing look like a lesser version of the risky
  * one, when it is simply a different offer.
  */
@@ -86,17 +95,19 @@ export default function ContestsScreen() {
           to risk one needs to know how many are left in the same glance. */}
       {run ? <RunPanel run={run} onClaim={() => router.push('/run-over')} /> : null}
 
-      <Panel title="Open">
+      <Panel title="Open" inset={false}>
         {open.length > 0 ? (
-          open.map((c) => (
-            <ContestRow
-              key={c.id}
-              contest={c}
-              onPress={() =>
-                router.push({ pathname: '/contest/[code]', params: { code: c.code } })
-              }
-            />
-          ))
+          <View style={styles.stack}>
+            {open.map((c) => (
+              <ContestEntry
+                key={c.id}
+                contest={c}
+                onPress={() =>
+                  router.push({ pathname: '/contest/[code]', params: { code: c.code } })
+                }
+              />
+            ))}
+          </View>
         ) : loading ? null : (
           <EmptyState
             pad={false}
@@ -181,18 +192,21 @@ function ErrorLine({ message }: { message: string }) {
 }
 
 /**
- * One contest.
+ * One contest, as a card.
  *
- * THE RIGHT-HAND FIGURE IS THE ENTRY, NOT THE PRIZE. A row that led with a
- * prize pool would be reading as a betting slip, and for the free contest —
- * which is most of this screen and all of it today — there is no prize to name.
- * What a player actually wants to know at a glance is whether their lineup is
- * in, which is the one thing that can still be wrong at this moment.
+ * IT WAS A ROW AND THAT WAS THE PROBLEM. A lobby row and the card that appears
+ * over your lineup once you enter were two different-looking objects describing
+ * one contest — so the moment a player most needs to recognise what they just
+ * joined was the moment it changed shape. The card is the contest's identity
+ * now, and the lobby draws the same one, minus the standing it does not have
+ * yet. See the header on `ContestCard`.
+ *
+ * THIS FUNCTION OWNS ONE THING: what is still WRONG or still to do. Everything
+ * else the row used to compose by hand — the price, the win condition, the
+ * seats, the stake — is the card's, built from `contest-model` so that no two
+ * surfaces can word the same fact differently.
  */
-function ContestRow({ contest, onPress }: { contest: Contest; onPress: () => void }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-
+function ContestEntry({ contest, onPress }: { contest: Contest; onPress: () => void }) {
   const filled = contest.mine?.filled ?? 0;
   const entered = contest.mine !== null;
 
@@ -209,80 +223,16 @@ function ContestRow({ contest, onPress }: { contest: Contest; onPress: () => voi
       ? { label: `${filled} of ${contest.slotCount}`, tone: 'warning' as const }
       : { label: 'Lineup in', tone: 'positive' as const };
 
-  /* The fee is only news until you have paid it. After that the row is about
-     the lineup, and repeating the price of something already bought is the
-     kind of detail that makes a list harder to scan rather than richer. */
-  const price = entered
-    ? 'Entered'
-    : contest.entryFeeGems > 0
-      ? `${contest.entryFeeGems} gems`
-      : 'Free';
-
-  /* HOW IT IS WON, in the fewest words that are still true. "Beat the median"
-     is even money and reads as such; "Top 3 win" does not, and is meant not to
-     — most of that field loses, which is exactly what the player is being asked
-     to price the heart against. */
-  const how =
-    contest.winCondition === 'top_n' && contest.winRank !== null
-      ? `Top ${contest.winRank} win`
-      : 'Beat the median';
-
-  const seats =
-    contest.maxEntrants !== null
-      ? `${contest.entrants} of ${contest.maxEntrants} in`
-      : contest.entrants > 0
-        ? `${contest.entrants} in`
-        : null;
-
+  /* NO MIDDLE. That is the entire difference between this card and the one over
+     your lineup — the head, the terms and the foot are the same rows in the
+     same order, so a contest you enter does not change shape on you. */
   return (
-    <Pressable
+    <ContestCard
+      name={contest.name}
+      terms={termsOfContest(contest)}
+      state={<StatusChip label={status.label} tone={status.tone} />}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, { borderColor: c.border }, pressed && styles.pressed]}>
-      <View style={styles.rowText}>
-        <Text style={[Type.body, { color: c.text }]} numberOfLines={1}>
-          {contest.name}
-        </Text>
-        <Text style={[Type.fine, { color: c.textSecondary }]} numberOfLines={1}>
-          {[`${contest.formatName} · ${contest.slotCount} cards`, price, seats]
-            .filter(Boolean)
-            .join(' · ')}
-        </Text>
-        {contest.heartsAtRisk > 0 ? <Stake contest={contest} how={how} /> : null}
-      </View>
-      <StatusChip label={status.label} tone={status.tone} />
-    </Pressable>
-  );
-}
-
-/**
- * What a row costs to lose, and what it pays to win.
- *
- * DRAWN WITH THE GLYPH, NOT THE WORD. "1 heart at risk" is a sentence a reader
- * skims past in a list of five rows; a red heart is a mark they stop on, which
- * is the whole point of putting it here rather than one tap deeper.
- *
- * THE HEAL IS ON THE SAME LINE AS THE RISK because it is the same trade and
- * splitting them would let a player read half of it. A contest that takes a
- * heart most weeks and gives one back when it lands is not a worse version of
- * the even-money row — it is the only place in the game hearts come FROM, and
- * a lobby that showed only the risk would make it look like a strictly harsher
- * option nobody should take.
- */
-function Stake({ contest, how }: { contest: Contest; how: string }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-
-  return (
-    <View style={styles.stake}>
-      <Heart size={10} state="safe" color={c.negative} />
-      <Text style={[Type.fine, { color: c.textSecondary }]} numberOfLines={1}>
-        {contest.heartsAtRisk === 1 ? '1 at risk' : `${contest.heartsAtRisk} at risk`}
-        {contest.heartsOnWin > 0
-          ? ` · +${contest.heartsOnWin} to win`
-          : ''}
-        {` · ${how}`}
-      </Text>
-    </View>
+    />
   );
 }
 
@@ -305,21 +255,13 @@ function Footnote() {
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.two,
-    paddingVertical: Spacing.two,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-      },
-  /* Takes the room the chip does not, so a long contest name truncates rather
-     than pushing the status off the right edge. */
+  /* Cards separated by space rather than by rules. A hairline between two
+     bordered cards reads as a third edge; the gap is what says these are
+     separate objects rather than rows of one table. */
+  stack: { gap: Spacing.two },
+  /* Takes the room the chip does not, so a long line truncates rather than
+     pushing the status off the right edge. */
   rowText: { flex: 1, gap: 2 },
-  /* Its own line rather than appended to the meta line: the meta line is
-     already three facts joined by separators, and a fourth would bury the one
-     that can end a run. */
-  stake: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
   /* No panel, no border: a live run is a status line and a box around it would
      give it the weight of something that needs acting on. */
   live: {

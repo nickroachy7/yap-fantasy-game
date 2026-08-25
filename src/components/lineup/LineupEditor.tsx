@@ -934,7 +934,6 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
             index={cardIndex}
             onIndexChange={setSwiped}
             displayName={displayName}
-            weekLabel={week}
             lockAt={nextLockAt ?? lockAt}
             locked={allLocked}
             now={now}

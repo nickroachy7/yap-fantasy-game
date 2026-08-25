@@ -398,6 +398,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["contest_kind"]
           max_entrants: number | null
           name: string
+          prize_pool_bps: number
           season: number
           season_type: number
           week: number
@@ -415,6 +416,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["contest_kind"]
           max_entrants?: number | null
           name: string
+          prize_pool_bps?: number
           season: number
           season_type: number
           week: number
@@ -432,6 +434,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["contest_kind"]
           max_entrants?: number | null
           name?: string
+          prize_pool_bps?: number
           season?: number
           season_type?: number
           week?: number
@@ -1704,6 +1707,10 @@ export type Database = {
         Args: { p_production_season?: number; p_season: number }
         Returns: Json
       }
+      award_contest_prizes: {
+        Args: { p_season: number; p_season_type: number; p_week: number }
+        Returns: Json
+      }
       award_position_bonuses: {
         Args: { p_season: number; p_season_type: number; p_week: number }
         Returns: Json
@@ -1820,6 +1827,35 @@ export type Database = {
         Returns: Json
       }
       contest_entrants: { Args: { p_contest: string }; Returns: number }
+      contest_field: {
+        Args: { p_contest: string }
+        Returns: {
+          avatar_key: string
+          display_name: string
+          filled: number
+          is_me: boolean
+          lineup_id: string
+          open: boolean
+          points: number
+          prize: number
+          result: string
+          rnk: number
+          user_id: string
+        }[]
+      }
+      contest_lineup: {
+        Args: { p_contest: string; p_user: string }
+        Returns: {
+          player_id: string
+          player_name: string
+          points: number
+          pos: string
+          slot: string
+          started: boolean
+          team: string
+          tier: Database["public"]["Enums"]["card_tier"]
+        }[]
+      }
       contest_lobby: {
         Args: never
         Returns: {
@@ -1838,6 +1874,8 @@ export type Database = {
           my_hearts: number
           my_lineup_id: string
           name: string
+          prize_pool: number
+          prize_pool_bps: number
           season: number
           season_type: number
           slot_count: number
@@ -1846,6 +1884,16 @@ export type Database = {
           win_rank: number
         }[]
       }
+      contest_payouts: {
+        Args: { p_contest: string }
+        Returns: {
+          gems: number
+          lineup_id: string
+          rnk: number
+          user_id: string
+        }[]
+      }
+      contest_prize_pool: { Args: { p_contest: string }; Returns: number }
       contest_results: {
         Args: { p_contest: string }
         Returns: {
@@ -1968,6 +2016,7 @@ export type Database = {
           average: number
           code: string
           contest_id: string
+          cut: number
           entrants: number
           entry_fee_gems: number
           filled: number
@@ -1982,13 +2031,17 @@ export type Database = {
           low: number
           median: number
           my_points: number
+          my_prize: number
           my_rank: number
           name: string
+          prize_pool: number
           result: string
           season: number
           season_type: number
           slot_count: number
           week: number
+          win_condition: Database["public"]["Enums"]["contest_win_condition"]
+          win_rank: number
         }[]
       }
       my_run: { Args: never; Returns: Json }
@@ -2132,6 +2185,7 @@ export type Database = {
         | "contest_entry"
         | "contest_refund"
         | "run_wipe"
+        | "contest_prize"
       rarity: "common" | "uncommon" | "rare" | "epic" | "legendary"
     }
     CompositeTypes: {
@@ -2281,6 +2335,7 @@ export const Constants = {
         "contest_entry",
         "contest_refund",
         "run_wipe",
+        "contest_prize",
       ],
       rarity: ["common", "uncommon", "rare", "epic", "legendary"],
     },

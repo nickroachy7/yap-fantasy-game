@@ -22,7 +22,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionBar } from '@/components/shell/ActionBar';
 import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
-import { ContestCard } from '@/components/lineup/ContestCard';
+import { ClockOrChip, ContestCard, Standing } from '@/components/contests/ContestCard';
+import type { ContestTerms } from '@/components/contests/contest-model';
+import { ContestFieldList } from '@/components/contests/ContestFieldPanel';
+import type { FieldEntrant } from '@/components/contests/use-contest-field';
 import type { FieldWeek } from '@/components/lineup/field';
 import { BADGE_SIZE, BADGE_WIDTH, BenchRow, StarterRow } from '@/components/lineup/LineupRow';
 import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
@@ -143,6 +146,77 @@ const DEMO_FIELD_BEHIND: FieldWeek = {
 const DEMO_FIELD_ALONE: FieldWeek = {
   week: 1, entrants: 1, low: 88.2, median: 88.2, average: 88.2, high: 88.2, final: true,
   myPoints: 88.2, myRank: 1, ahead: 0, result: null,
+};
+/**
+ * A `top_n` field, and the numbers are the point of it.
+ *
+ * 27.1 is ABOVE this field's median (24.8) and BELOW the third-place cut
+ * (38.4). Under the old card — which drew the median on every contest — that
+ * was a green bar past the mark, i.e. a player being shown they were winning a
+ * contest they were fourth in. Any fixture where the two lines agree cannot
+ * demonstrate the bug this rewrite fixes.
+ */
+const DEMO_FIELD_CUT: FieldWeek = {
+  week: 3, entrants: 6, low: 12.0, median: 24.8, average: 29.4, high: 58.9, final: false,
+  myPoints: 27.1, myRank: 4, ahead: 2, result: null,
+};
+
+/**
+ * The three shapes of terms the card is asked to draw.
+ *
+ * `KIT_TERMS_FREE` is the game's main contest: no fee, no pool, one heart. It
+ * is the case that must draw NO terms rail at all — a "0 gems / 0 pool" strip
+ * would make the contest everybody is in look like a lesser version of the
+ * ones they chose.
+ */
+const KIT_TERMS_FREE: ContestTerms = {
+  formatName: 'Full Roster', slotCount: 8, entryFeeGems: 0,
+  heartsAtRisk: 1, heartsOnWin: 0,
+  winCondition: 'median', winRank: null, prizePool: 0, entrants: 26, maxEntrants: null,
+};
+const KIT_TERMS_MEDIAN: ContestTerms = {
+  formatName: 'Flex Three', slotCount: 3, entryFeeGems: 40,
+  heartsAtRisk: 0, heartsOnWin: 0,
+  winCondition: 'median', winRank: null, prizePool: 120, entrants: 12, maxEntrants: null,
+};
+/**
+ * A field with one row per state the panel has to draw.
+ *
+ * The REVEAL RULE is the reason this fixture is long. A lineup opens when every
+ * card in it has kicked off, so on any given evening a real contest holds all
+ * four of these at once — settled, open, still locked, and you — and arranging
+ * that deliberately against a live database means waiting for a kickoff.
+ */
+const KIT_FIELD: FieldEntrant[] = [
+  {
+    userId: 'k1', displayName: 'seahawkcalvin', avatarKey: 'default',
+    lineupId: 'kl1', filled: 3, points: 61.4, rank: 1,
+    result: 'W', prize: 120, isMe: false, open: true,
+  },
+  {
+    userId: 'k2', displayName: 'Xx OG CHIEF Xx', avatarKey: 'default',
+    lineupId: 'kl2', filled: 3, points: 48.2, rank: 2,
+    result: 'W', prize: 72, isMe: false, open: true,
+  },
+  /* You, mid-table, with a lineup that is always your own to read. */
+  {
+    userId: 'k3', displayName: 'nickroachy', avatarKey: 'default',
+    lineupId: 'kl3', filled: 3, points: 27.1, rank: 3,
+    result: 'L', prize: null, isMe: true, open: true,
+  },
+  /* Still holding a card that has not kicked off — the state that must say so
+     in words rather than simply failing to respond to a tap. */
+  {
+    userId: 'k4', displayName: 'bloomguy', avatarKey: 'default',
+    lineupId: 'kl4', filled: 3, points: 0, rank: 4,
+    result: null, prize: null, isMe: false, open: false,
+  },
+];
+
+const KIT_TERMS_TOP_N: ContestTerms = {
+  formatName: 'WR Room', slotCount: 3, entryFeeGems: 40,
+  heartsAtRisk: 1, heartsOnWin: 1,
+  winCondition: 'top_n', winRank: 3, prizePool: 240, entrants: 6, maxEntrants: null,
 };
 
 const STARTERS: {
@@ -603,47 +677,116 @@ function Kit() {
 
           <Section
             title="Contest card"
-            note="Your score placed inside the whole field, low to high, with the median marked. Deliberately NOT a head-to-head — there is no opponent in this game. Two scopes, kept apart by the bar so neither borrows the other: the SEASON record under the name, THIS WEEK’s rank under the bar it summarises. The rank is withheld only while the whole field is tied on nought — before kickoff rank() hands every manager first place — which is why card one says “26 in the field” while card four, a field of one whose rank is never in doubt, says “Ranked #1 of 1”. Four states: nobody has played yet; live and past the median; final and short of it; and a field of one, which is its own median and has no range.">
+            note="ONE CARD. Head, terms and foot are the same rows in the same order everywhere — entering a contest INSERTS a middle band and moves nothing else, so it never changes shape on you. The first two here are lobby cards, with no middle. The rest are entered. Within the middle there are two states asking different questions: before kickoff there is no score, so the hero is slots filled and the rail is one segment per slot, with no axis labels because there is no axis; after, it is your score inside the whole field with the contest’s own line marked. The LAST card is the one that matters most — a top-three contest, where the median decides nothing and the mark is the CUT. 27.1 is above that field’s median and outside the places that pay, which is exactly the state the old card drew as winning."
+          >
             <ContestCard
-              displayName="nickroachy"
-              weekLabel="Preseason · Week 3"
-              lockAt={DEMO_LOCK_SOON}
-              locked={false}
-              now={DEMO_NOW}
-              myPoints={null}
-              field={DEMO_FIELD_UNPLAYED}
-              record={{ wins: 1, losses: 1, ties: 0 }}
+              name="WR Room"
+              terms={KIT_TERMS_TOP_N}
+              state={<StatusChip label="Enter" tone="warning" />}
+              onPress={() => {}}
+            />
+            {/* No entries yet, so no pool yet — the state a four-tester week
+                spends most of its time in, and the one a placeholder would have
+                papered over. */}
+            <ContestCard
+              name="Flex Three"
+              terms={{ ...KIT_TERMS_MEDIAN, prizePool: 0, entrants: 0 }}
+              state={<StatusChip label="Not enough gems" />}
+              onPress={() => {}}
+            />
+
+            {/* Entered. Same card, plus a middle. */}
+            <ContestCard
+              name="Preseason Week 3"
+              terms={KIT_TERMS_FREE}
+              state={<ClockOrChip lockAt={DEMO_LOCK_SOON} locked={false} final={false} now={DEMO_NOW} />}
+              middle={
+                <Standing
+                  manager="nickroachy"
+                  subtitle="Season 1-1"
+                  terms={KIT_TERMS_FREE}
+                  myPoints={null}
+                  field={DEMO_FIELD_UNPLAYED}
+                  cut={null}
+                  filled={7}
+                />
+              }
             />
             <ContestCard
-              displayName="nickroachy"
-              weekLabel="Preseason · Week 3"
-              lockAt={DEMO_LOCK_PAST}
-              locked
-              now={DEMO_NOW}
-              myPoints={118.4}
-              field={DEMO_FIELD_AHEAD}
-              record={{ wins: 2, losses: 1, ties: 0 }}
+              name="Preseason Week 3"
+              terms={KIT_TERMS_FREE}
+              state={<ClockOrChip lockAt={DEMO_LOCK_PAST} locked final={false} now={DEMO_NOW} />}
+              middle={
+                <Standing
+                  manager="nickroachy"
+                  subtitle="Season 2-1"
+                  terms={KIT_TERMS_FREE}
+                  myPoints={118.4}
+                  field={DEMO_FIELD_AHEAD}
+                  cut={null}
+                  filled={8}
+                />
+              }
             />
             <ContestCard
-              displayName="nickroachy"
-              weekLabel="Preseason · Week 2"
-              lockAt={DEMO_LOCK_PAST}
-              locked
-              now={DEMO_NOW}
-              myPoints={71.9}
-              field={DEMO_FIELD_BEHIND}
-              record={{ wins: 2, losses: 2, ties: 1 }}
+              name="Preseason Week 2"
+              terms={{ ...KIT_TERMS_FREE, entrants: DEMO_FIELD_BEHIND.entrants }}
+              state={<ClockOrChip lockAt={DEMO_LOCK_PAST} locked final now={DEMO_NOW} />}
+              middle={
+                <Standing
+                  manager="nickroachy"
+                  subtitle="Season 2-2-1"
+                  terms={{ ...KIT_TERMS_FREE, entrants: DEMO_FIELD_BEHIND.entrants }}
+                  myPoints={71.9}
+                  field={DEMO_FIELD_BEHIND}
+                  cut={null}
+                  filled={8}
+                />
+              }
             />
+            {/* A field of ONE: its own low, mark and high, so there is no range
+                to place anybody in and the rail stays a slot meter even though
+                there is a score. The rank is exempt from the tie rule — "#1 OF
+                1" is never in doubt and says exactly what it is worth. */}
             <ContestCard
-              displayName="nickroachy"
-              weekLabel="Preseason · Week 1"
-              lockAt={DEMO_LOCK_SOON}
-              locked={false}
-              now={DEMO_NOW}
-              myPoints={88.2}
-              field={DEMO_FIELD_ALONE}
-              record={{ wins: 0, losses: 0, ties: 0 }}
+              name="Preseason Week 1"
+              terms={{ ...KIT_TERMS_FREE, entrants: DEMO_FIELD_ALONE.entrants }}
+              state={<ClockOrChip lockAt={DEMO_LOCK_SOON} locked={false} final now={DEMO_NOW} />}
+              middle={
+                <Standing
+                  manager="nickroachy"
+                  subtitle="Season 0-0"
+                  terms={{ ...KIT_TERMS_FREE, entrants: DEMO_FIELD_ALONE.entrants }}
+                  myPoints={88.2}
+                  field={DEMO_FIELD_ALONE}
+                  cut={null}
+                  filled={8}
+                />
+              }
             />
+            {/* The cut, and a settled prize in place of the pool. */}
+            <ContestCard
+              name="WR Room"
+              terms={KIT_TERMS_TOP_N}
+              state={<ClockOrChip lockAt={DEMO_LOCK_PAST} locked final now={DEMO_NOW} />}
+              prize={120}
+              middle={
+                <Standing
+                  manager="nickroachy"
+                  terms={KIT_TERMS_TOP_N}
+                  myPoints={27.1}
+                  field={DEMO_FIELD_CUT}
+                  cut={38.4}
+                  filled={3}
+                />
+              }
+            />
+          </Section>
+
+          <Section
+            title="Contest field"
+            note="Who else is in a contest, on the contest’s own page. The card draws the community as a distribution because there is no opponent to draw; this is the other half — the same field, named. Rows open into the entrant’s lineup, but only once every card in it has kicked off: players lock one at a time, so opening earlier would hand the last person to file the shape of the whole field. A row that is not open yet says why, because a dead tap is indistinguishable from a bug. Your own row is tinted and always open.">
+            <ContestFieldList entrants={KIT_FIELD} contestId={null} />
           </Section>
 
           <Section
