@@ -43,10 +43,12 @@
  * `run-over`. Nothing at all is a quieter way to say "not right now" than three
  * hollow pips repeated on every tab.
  *
- * THE RACK IS WHAT YOU HOLD, NOT THE CEILING. It used to draw `max_hearts`
- * pips, which meant a new run — 3 hearts, healing to 5 — opened as three filled
- * and two empty, i.e. as a run that had already lost twice. Outlined pips now
- * mean WAGERED: hearts riding on a contest that has not settled. See `Hearts`.
+ * THE RACK IS THE RUN'S HIGH-WATER MARK, NOT ITS CEILING. It used to draw
+ * `max_hearts` pips, which meant a new run — 3 hearts, healing to 5 — opened as
+ * three filled and two empty, i.e. as a run that had already lost twice. It now
+ * draws all three states a heart can be in: solid is safe, a red outline is
+ * WAGERED on a contest that has not settled, and a cracked grey one is a heart
+ * this run actually lost. See `Hearts`.
  *
  * THE BALANCE IS A NUMBER, NOT A WIDGET. The pill it used to sit in — border,
  * inset fill, a 8pt "GEMS" label above the figure — was three pieces of
@@ -131,7 +133,7 @@ export function AppHeader({
 
         <View style={styles.right}>
           {!loading && run && !run.awaitingCarry ? (
-            <Hearts hearts={run.hearts} wagered={run.wagered} />
+            <Hearts hearts={run.hearts} wagered={run.wagered} rack={run.rack} />
           ) : null}
           <View style={styles.balance}>
             <Gem size={12} color={accent} />

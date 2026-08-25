@@ -132,6 +132,13 @@ begin
   if v_run.hearts <> public.game_config_value('run_starting_hearts', 3) then
     raise exception 'FAIL: a new run did not start on the configured hearts';
   end if;
+  -- NOTHING IS BROKEN ON A NEW RUN. The rack is the starting hearts and not
+  -- the ceiling, which is the whole of the bug 20260825250000 exists to
+  -- prevent: a rack of `max_hearts` drew a fresh run as two losses down.
+  if v_run.peak_hearts <> v_run.hearts then
+    raise exception 'FAIL: a new run opened with % of % hearts — phantom damage',
+      v_run.hearts, v_run.peak_hearts;
+  end if;
   v_run2 := public.current_run();
   if v_run2.id is distinct from v_run.id then
     raise exception 'FAIL: current_run minted a second live run';
@@ -401,6 +408,13 @@ begin
   if r.hearts <> 1 then raise exception 'FAIL: two losses should leave one heart, got %', r.hearts; end if;
   if r.ended_at is not null then raise exception 'FAIL: the run died with a heart left'; end if;
 
+  --     THE RACK DOES NOT SHRINK WITH THE DAMAGE. This is what makes a broken
+  --     heart drawable: one held against a rack of three is two pips gone, and
+  --     a rack that narrowed to match would hide the loss it exists to show.
+  if r.peak_hearts <> 3 then
+    raise exception 'FAIL: the rack narrowed as hearts fell, peak = %', r.peak_hearts;
+  end if;
+
   -- Week 97: two more against one heart. The delta is -2 against a balance of
   -- 1, so the clamp is what stands between this and a constraint violation.
   perform public.settle_run_week(2026, 1::smallint, 97);
@@ -576,5 +590,76 @@ begin
 end $$;
 
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- THE RACK GROWS WHEN A RUN HEALS.
+--
+-- Run on the FRESH run `claim_carry` just opened, because that is the only
+-- place in this suite where hearts can rise: every earlier week either nets to
+-- zero or loses. Week 98 is a win in the healing contest and nothing else, so
+-- three hearts become four and the rack has to widen to hold the fourth.
+-- ---------------------------------------------------------------------------
+
+insert into public.games (external_id, season, week, season_type, starts_at, status_state)
+values (998001, 2026, 98, 1, now() - interval '1 day', 'final');
+
+insert into public.contests (code, kind, format_code, season, season_type, week, name,
+                             entry_fee_gems, win_condition, win_rank, hearts_at_risk, hearts_on_win)
+values ('test:top3:98', 'lobby'::public.contest_kind, 'wr_room', 2026, 1, 98, 'Test Top Three',
+        0, 'top_n'::public.contest_win_condition, 3, 1::smallint, 1::smallint);
+
+insert into public.lineups (user_id, season, season_type, week, contest_id, total_points, run_id)
+select u.id, 2026, 1::smallint, 98, c.id,
+       case when u.id = '11111111-0000-0000-0000-000000000001' then 500 else u.n end,
+       case when u.id = '11111111-0000-0000-0000-000000000001'
+            then (select id from public.runs
+                   where user_id = '11111111-0000-0000-0000-000000000001' and ended_at is null)
+       end
+  from public.contests c,
+       (values ('11111111-0000-0000-0000-000000000001'::uuid, 0),
+               ('11111111-0000-0000-0000-000000000002'::uuid, 1),
+               ('11111111-0000-0000-0000-000000000003'::uuid, 2),
+               ('11111111-0000-0000-0000-000000000004'::uuid, 3),
+               ('11111111-0000-0000-0000-000000000005'::uuid, 4)) u(id, n)
+ where c.code = 'test:top3:98';
+
+insert into public.lineup_slots (lineup_id, slot, card_instance_id)
+select l.id, 'WR1', ci.id
+  from public.lineups l
+  join public.contests c on c.id = l.contest_id
+  join lateral (
+    select x.id from public.card_instances x
+     where x.user_id = l.user_id and x.is_held
+     order by x.id limit 1
+  ) ci on true
+ where c.code = 'test:top3:98'
+   and not exists (select 1 from public.lineup_slots s where s.lineup_id = l.id);
+
+do $$
+declare
+  a     constant uuid := '11111111-0000-0000-0000-000000000001';
+  r     public.runs;
+begin
+  select * into r from public.runs where user_id = a and ended_at is null;
+  if r.hearts <> 3 or r.peak_hearts <> 3 then
+    raise exception 'FAIL: fixture problem — new run is % of %', r.hearts, r.peak_hearts;
+  end if;
+
+  perform public.settle_run_week(2026, 1::smallint, 98);
+  select * into r from public.runs where user_id = a and ended_at is null;
+
+  -- 22. A WIN IN THE HEALING CONTEST ADDS A HEART...
+  if r.hearts <> 4 then
+    raise exception 'FAIL: a heal did not land, hearts = %', r.hearts;
+  end if;
+  -- 23. ...AND THE RACK WIDENS TO HOLD IT. Without this the fourth heart has
+  --     nowhere to be drawn, which is the failure mode a fixed starting-hearts
+  --     rack would have had.
+  if r.peak_hearts <> 4 then
+    raise exception 'FAIL: the rack did not grow with the heal, peak = %', r.peak_hearts;
+  end if;
+
+  raise notice 'runs suite: the rack passed';
+end $$;
 
 rollback;

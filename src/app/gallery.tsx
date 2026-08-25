@@ -96,14 +96,16 @@ const FIXTURE_PLAYER: PlayerState = {
   gems: 1240,
   displayName: 'nickroachy',
   cardCount: 14,
-  /* Mid-run, three hearts held with one of them already riding on this week's
-     slate, and one win off the next carry rung. Picked to exercise BOTH heart
-     states at once — a full rack with nothing wagered draws the same as a fresh
-     account and would not show the outlined pip at all. */
+  /* Two hearts held against a rack of three, one of the two already riding on
+     this week's slate, and one win off the next carry rung. Picked to exercise
+     ALL THREE heart states at once — safe, wagered and broken — because a full
+     rack with nothing wagered draws the same as a fresh account and would show
+     only one of them. */
   run: {
     id: 'fixture-run',
-    hearts: 3,
+    hearts: 2,
     maxHearts: 5,
+    rack: 3,
     wagered: 1,
     wageredIn: 1,
     wins: 2,

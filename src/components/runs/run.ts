@@ -20,9 +20,15 @@ export type Run = {
   /**
    * The ceiling a run can heal to. NOT a pip count — see the header on
    * `Hearts` for why drawing headroom made a new run look damaged. It is a
-   * sentence the run panel says, and the rack a death screen empties.
+   * sentence the run panel says, and nothing else.
    */
   maxHearts: number;
+  /**
+   * The most hearts this run has ever held, and the number of pips the chrome
+   * draws. Anything between `hearts` and this is a heart the run LOST, which is
+   * what makes a broken pip drawable at all. Grows on healing, never narrows.
+   */
+  rack: number;
   /**
    * Hearts riding on contests that have not settled. The number that turns
    * "should I enter this too" from a guess into a decision: three hearts with
@@ -58,6 +64,7 @@ type RunJson = {
   id: string;
   hearts: number;
   max_hearts: number;
+  rack: number;
   wagered: number;
   wagered_in: number;
   wins: number;
@@ -78,6 +85,9 @@ export function parseRun(data: unknown): Run | null {
     id: r.id,
     hearts: Number(r.hearts ?? 0),
     maxHearts: Number(r.max_hearts ?? 0),
+    /* Falls back to hearts held, never to the ceiling: a missing rack must draw
+       no damage rather than inventing some. */
+    rack: Number(r.rack ?? r.hearts ?? 0),
     wagered: Number(r.wagered ?? 0),
     wageredIn: Number(r.wagered_in ?? 0),
     wins: Number(r.wins ?? 0),

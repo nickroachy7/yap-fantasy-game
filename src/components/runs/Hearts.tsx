@@ -17,12 +17,24 @@
  * actually changes week to week.
  *
  * ---------------------------------------------------------------------------
- * THREE STATES, AND WHY THE MIDDLE ONE IS THE POINT
+ * THREE STATES, AND ALL THREE ARE DRAWN
  * ---------------------------------------------------------------------------
  *
- *   SAFE      solid       yours, and nothing can take it this week
- *   WAGERED   red outline yours, but riding on a contest that has not settled
- *   EMPTY     grey ghost  the rack a death screen counts down from
+ *   SAFE      solid red      yours, and nothing can take it this week
+ *   WAGERED   red outline    yours, but riding on a contest not yet settled
+ *   BROKEN    grey, cracked  this run held it and lost it
+ *
+ * BROKEN IS A DIFFERENT SHAPE, not a fainter one. A hollow grey heart and a
+ * hollow red heart differ only in hue, which is the one channel that fails on
+ * a small glyph at 13pt against a black masthead — and confusing "riding" with
+ * "gone" is the single worst misread available here. The crack makes them
+ * different objects at a glance, before colour is doing any work at all.
+ *
+ * WHAT IT IS COUNTED AGAINST is `rack`, the run's high-water mark, NOT its
+ * ceiling. Drawing against the ceiling is what made a fresh run — 3 hearts,
+ * healing to 5 — open as three filled and two empty, i.e. as two losses that
+ * had not happened. See 20260825250000; the rack grows on healing and never
+ * narrows, so damage stays visible instead of the row quietly shrinking.
  *
  * Wagered is the state the game was missing and the reason this component was
  * rewritten. A player holding three hearts who has already staked two on this
@@ -50,7 +62,15 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 const HEART =
   'M12 21s-7.5-4.7-9.6-9.1C.8 8.6 2.4 5 5.9 5c2 0 3.4 1.1 4.3 2.3.4.5.6.8 1.8.8s1.4-.3 1.8-.8C14.7 6.1 16.1 5 18.1 5c3.5 0 5.1 3.6 3.5 6.9C19.5 16.3 12 21 12 21z';
 
-export type HeartState = 'safe' | 'wagered' | 'empty';
+/**
+ * The crack: a lightning-bolt zigzag down the middle of the same 24-box, from
+ * the notch at the top to the point at the bottom. Deliberately off-centre at
+ * each turn — a symmetrical break reads as a fold or a seam rather than a
+ * fracture.
+ */
+const CRACK = 'M12 7.4l-2.1 3.5 3 1.9-2.4 3.4 1.6 2.6';
+
+export type HeartState = 'safe' | 'wagered' | 'broken';
 
 export function Heart({
   size = 13,
@@ -71,10 +91,23 @@ export function Heart({
            it is heavier than a hairline would be at 13pt. */
         strokeWidth={state === 'safe' ? 0 : 2}
         strokeLinejoin="round"
-        /* Only the empty pip recedes. A wagered one is at full strength because
-           it is a live stake, not a faded memory of one. */
-        opacity={state === 'empty' ? 0.32 : 1}
+        /* Only the broken pip recedes, and only part-way — far enough to sit
+           behind the live hearts, not so far that the count becomes a squint.
+           A wagered one is at full strength: it is a live stake, not a faded
+           memory of one. */
+        opacity={state === 'broken' ? 0.45 : 1}
       />
+      {state === 'broken' ? (
+        <Path
+          d={CRACK}
+          fill="none"
+          stroke={color}
+          strokeWidth={1.6}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={0.45}
+        />
+      ) : null}
     </Svg>
   );
 }
@@ -83,9 +116,10 @@ export function Hearts({
   hearts,
   wagered = 0,
   /**
-   * Pips to draw in total. Defaults to the hearts held, which is what the
-   * chrome wants. The death screen passes the run's ceiling so it can show an
-   * emptied rack rather than nothing at all.
+   * Pips to draw in total — the run's `rack` (its high-water mark). Anything
+   * between `hearts` and this is drawn BROKEN. Defaults to the hearts held,
+   * which draws no damage at all, so a caller that does not know the rack
+   * cannot accidentally invent losses.
    */
   rack,
   size = 13,
@@ -109,15 +143,15 @@ export function Hearts({
     <View style={styles.row}>
       {Array.from({ length: total }, (_, i) => {
         const state: HeartState =
-          i < held - atRisk ? 'safe' : i < held ? 'wagered' : 'empty';
+          i < held - atRisk ? 'safe' : i < held ? 'wagered' : 'broken';
         return (
           <Heart
             key={i}
             size={size}
             state={state}
-            /* Empty goes grey rather than staying red at low opacity: a faint
+            /* Broken goes grey rather than staying red at low opacity: a faint
                red pip reads as a warning about the hearts you still have. */
-            color={state === 'empty' ? c.textSecondary : c.negative}
+            color={state === 'broken' ? c.textSecondary : c.negative}
           />
         );
       })}

@@ -96,7 +96,7 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
               to deliver, not the chrome's. */}
           {!loading && run && !run.awaitingCarry ? (
             <View style={[styles.hearts, { borderColor: 'rgba(255,255,255,0.18)' }]}>
-              <Hearts hearts={run.hearts} wagered={run.wagered} size={12} />
+              <Hearts hearts={run.hearts} wagered={run.wagered} rack={run.rack} size={12} />
             </View>
           ) : null}
         </View>

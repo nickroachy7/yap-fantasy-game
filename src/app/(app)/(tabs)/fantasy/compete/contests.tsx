@@ -162,7 +162,7 @@ function RunPanel({ run, onClaim }: { run: NonNullable<ReturnType<typeof usePlay
 
   return (
     <View style={styles.live}>
-      <Hearts hearts={run.hearts} wagered={run.wagered} size={14} />
+      <Hearts hearts={run.hearts} wagered={run.wagered} rack={run.rack} size={14} />
       <Text style={[Type.fine, { color: c.textSecondary }]} numberOfLines={1}>
         {/* WHAT IS ON THE LINE COMES FIRST when there is anything on it. The
             record and the next rung are context you read weekly; a live stake

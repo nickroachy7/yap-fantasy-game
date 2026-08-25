@@ -149,11 +149,11 @@ export default function RunOverScreen() {
       <Panel title="The run">
         <View style={styles.summary}>
           <View style={styles.summaryLeft}>
-            {/* An EMPTIED RACK, which is the one place the ceiling is drawn as
-                pips. Everywhere else the chrome shows only hearts held — but
-                this screen is specifically about their absence, so there has to
-                be something absent to look at. */}
-            <Hearts hearts={0} rack={run?.maxHearts ?? 3} size={16} />
+            {/* THE RUN'S OWN RACK, fully broken. Not the ceiling: a run that
+                never healed above three should show three cracked hearts, not
+                five, or the screen overstates what was lost on the one page
+                that must not. */}
+            <Hearts hearts={0} rack={run?.rack ?? 3} size={16} />
             <Text style={[Type.fine, { color: c.textSecondary }]}>Out of hearts</Text>
           </View>
           <Text style={[Type.figure, NUMERIC, { color: c.text }]}>{record}</Text>

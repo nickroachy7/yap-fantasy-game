@@ -1105,6 +1105,7 @@ export type Database = {
           id: string
           losses: number
           max_hearts: number
+          peak_hearts: number
           settled_at: string | null
           started_at: string
           user_id: string
@@ -1117,6 +1118,7 @@ export type Database = {
           id?: string
           losses?: number
           max_hearts: number
+          peak_hearts: number
           settled_at?: string | null
           started_at?: string
           user_id: string
@@ -1129,6 +1131,7 @@ export type Database = {
           id?: string
           losses?: number
           max_hearts?: number
+          peak_hearts?: number
           settled_at?: string | null
           started_at?: string
           user_id?: string
@@ -1863,6 +1866,7 @@ export type Database = {
           id: string
           losses: number
           max_hearts: number
+          peak_hearts: number
           settled_at: string | null
           started_at: string
           user_id: string
