@@ -81,7 +81,10 @@ jobs:
     needs: check
     # Pushes to main only. A PR must not publish — it has not been merged, and
     # updates go to real testers' phones.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # DISABLED 2026-08-25. The beta is taken down pending an NDA review, so no
+    # push may reach a tester's phone. `check` above still runs on every push;
+    # only shipping is off. Delete the `false &&` to resume publishing.
+    if: false && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
