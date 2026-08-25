@@ -9,12 +9,16 @@
  * The screen reads top to bottom as the week does: where you stand (the contest
  * card, which places your score inside the whole community's range rather than
  * against an opponent — there are no pairings in this game), who is starting,
- * and who is not. What is ON this week — the fixtures, the live scores — was a
+ * and who is not. THE CARD IS PINNED and the two boards scroll under it: it is
+ * what every swap is measured against, and a reason for a choice that leaves
+ * the screen on the first flick is a reason nobody has while choosing. See the
+ * page's return. What is ON this week — the fixtures, the live scores — was a
  * band above all of it until the scoreboard was given its own tab; see
  * `(tabs)/scores.tsx` for why it moved and what it gained.
  * The starters and the bench used to be two tabs;
  * they are now one scroll, because choosing between them is the entire task and
- * a tab pair meant only ever seeing half of it.
+ * a tab pair meant only ever seeing half of it. That is still true of the two
+ * boards, which share a scroll — it is only the card above them that stays.
  *
  * Nothing here is a projection. Every number is either a clock or something
  * that has already happened.
@@ -38,7 +42,16 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  AppState,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { BenchBoard } from '@/components/lineup/BenchBoard';
 import { ContestCarousel } from '@/components/lineup/ContestCarousel';
@@ -59,6 +72,7 @@ import {
   type SortKey,
 } from '@/components/lineup/model';
 import { useLineupData } from '@/components/lineup/use-lineup-data';
+import { useChromeScroll } from '@/components/shell/collapse';
 import { Screen } from '@/components/shell/Screen';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, Spacing, Type } from '@/constants/theme';
@@ -133,6 +147,9 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
   const c = Colors[scheme];
   const router = useRouter();
   const wide = useIsWide();
+  /* The boards own the scroll on this page (see the return), so they are also
+     what tells the section bar above to get out of the way. */
+  const chromeScroll = useChromeScroll();
 
   /**
    * WHICH CONTEST THIS BOARD IS EDITING. Absent means the free one, which is
@@ -905,47 +922,48 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
   const context = slate && phase ? `${week} · ${phase}` : week;
 
 
-  /* THE BODY IS THE SAME IN BOTH FRAMES, and that is the point of the split.
-     What differs is only what is drawn AROUND it — a page with a title and a
-     pull-to-refresh, or nothing at all because the sheet supplies its own. */
-  const body = (
+  /* WHAT IS DRAWN IS THE SAME IN BOTH FRAMES; WHAT SCROLLS IS NOT — see the two
+     returns below. The page pins the contest card and scrolls the boards under
+     it; the sheet has no card to pin and stays one scroll. */
+
+  /* AT THE TOP, NOT AT THE BOTTOM. This used to sit under the bench, which is
+     sixteen rows down on a phone and further inside the contest sheet — so a
+     submission the server refused looked exactly like one that worked, and the
+     board simply stopped saving without saying so. A failure has to be visible
+     from where the action was taken. */
+  const notice =
+    submitError ?? loadError ? (
+      <Text style={[Type.fine, styles.centreText, { color: c.negative }]}>
+        {submitError ?? loadError}
+      </Text>
+    ) : null;
+
+  /* NO CAROUSEL IN THE SHEET. That surface is already about one contest, and a
+     row of cards for the others would be offering to leave it. MEASURED HERE
+     otherwise, so the carousel pages on the width of the column it is actually
+     in: `Screen` caps content at a ContentMeasure and the wide rail takes 236
+     more, so a page sized from the window is wrong by hundreds of points on a
+     desktop. */
+  const card = pinned ? null : (
+    <View onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}>
+      <ContestCarousel
+        contests={myContests ?? []}
+        index={cardIndex}
+        onIndexChange={setSwiped}
+        displayName={displayName}
+        lockAt={nextLockAt ?? lockAt}
+        locked={allLocked}
+        now={now}
+        record={record}
+        width={cardWidth}
+        onOpen={(ct) => router.push({ pathname: '/contest/[code]', params: { code: ct.code } })}
+      />
+    </View>
+  );
+
+  /** Everything under the card — and on the page, the only part that scrolls. */
+  const boards = (
     <>
-      {/* NO CAROUSEL IN THE SHEET. That surface is already about one contest,
-          and a row of cards for the others would be offering to leave it.
-          MEASURED HERE otherwise, so the carousel pages on the width of the
-          column it is actually in: `Screen` caps content at a ContentMeasure
-          and the wide rail takes 236 more, so a page sized from the window is
-          wrong by hundreds of points on a desktop. */}
-      {/* AT THE TOP, NOT AT THE BOTTOM. This used to sit under the bench, which
-          is sixteen rows down on a phone and further inside the contest sheet
-          — so a submission the server refused looked exactly like one that
-          worked, and the board simply stopped saving without saying so. A
-          failure has to be visible from where the action was taken. */}
-      {submitError ?? loadError ? (
-        <Text style={[Type.fine, styles.centreText, { color: c.negative }]}>
-          {submitError ?? loadError}
-        </Text>
-      ) : null}
-
-      {pinned ? null : (
-        <View onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}>
-          <ContestCarousel
-            contests={myContests ?? []}
-            index={cardIndex}
-            onIndexChange={setSwiped}
-            displayName={displayName}
-            lockAt={nextLockAt ?? lockAt}
-            locked={allLocked}
-            now={now}
-            record={record}
-            width={cardWidth}
-            onOpen={(ct) =>
-              router.push({ pathname: '/contest/[code]', params: { code: ct.code } })
-            }
-          />
-        </View>
-      )}
-
       {/* ONE CAPTION, AND WHICH ONE DEPENDS ON WHETHER THE WEEK HAS STARTED.
  
           Before kickoff the useful fact is the deadline. Once the week is in
@@ -1086,31 +1104,66 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
           lineup is allowed — an empty slot simply scores nothing.
         </Text>
       ) : null}
-
-
-
-      <SwapSheet
-        request={swapRequest}
-        wide={wide}
-        sort={sort}
-        onSort={setSort}
-        onPick={setPick}
-        onClear={clearPick}
-        onClose={closeSwap}
-      />
     </>
   );
 
-  if (frame === 'plain') return body;
+  /* OUTSIDE THE SCROLL on the page: a sheet is not content, and a child of the
+     box that scrolls under the card is exactly what it must not be. */
+  const sheets = (
+    <SwapSheet
+      request={swapRequest}
+      wide={wide}
+      sort={sort}
+      onSort={setSort}
+      onPick={setPick}
+      onClear={clearPick}
+      onClose={closeSwap}
+    />
+  );
 
+  /* The sheet supplies its own container, and has no card to pin. */
+  if (frame === 'plain')
+    return (
+      <>
+        {notice}
+        {boards}
+        {sheets}
+      </>
+    );
+
+  /**
+   * THE CARD DOES NOT SCROLL.
+   *
+   * It is the top of the table the board belongs to — where you stand in the
+   * contest these slots are being filled for — so it is what every swap below
+   * it is measured against. Scrolled away, a reader is choosing between two
+   * players with the reason for the choice off the screen, and on a phone it is
+   * off the screen after one flick, which is to say for the whole of the task.
+   *
+   * So `Screen` stops owning the scroll and the boards get their own, which is
+   * also where pull-to-refresh moves to. The gutter and the 14pt rhythm that
+   * `Screen`'s scrolling box was supplying are re-stated on the two containers
+   * below — that is the cost of the split, and it is why `bleed` still cancels
+   * exactly 16.
+   */
   return (
-    <Screen
-      title="Lineup"
-      measure="table"
-      context={context}
-      refreshing={refreshing}
-      onRefresh={() => void onRefresh()}>
-      {body}
+    <Screen title="Lineup" measure="table" context={context} scroll={false}>
+      <View style={styles.fill}>
+        <View style={styles.pinned}>
+          {notice}
+          {card}
+        </View>
+        <ScrollView
+          style={styles.fill}
+          contentContainerStyle={styles.scrolled}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />
+          }
+          {...chromeScroll}>
+          {boards}
+        </ScrollView>
+      </View>
+      {sheets}
     </Screen>
   );
 }
@@ -1128,6 +1181,12 @@ function SectionHead({ label, hint, tone }: { label: string; hint: string; tone:
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
+  /* What `Screen`'s content box used to give the whole page, now given to the
+     two halves separately: the gutter, and the 14 between stacked blocks. The
+     bottom 14 here is the gap the boards scroll under. */
+  pinned: { paddingHorizontal: Spacing.three, paddingBottom: 14, gap: 14 },
+  scrolled: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.three, gap: 14 },
   enter: { paddingVertical: Spacing.two, borderRadius: 12, alignItems: 'center' },
   enterLabel: { fontWeight: '700' },
   pad: { paddingVertical: Spacing.four },
