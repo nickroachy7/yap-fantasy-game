@@ -69,6 +69,32 @@ const MIN_PASSWORD = 8;
 const MIN_NAME = 2;
 const MAX_NAME = 24;
 
+/* THE SECOND-ACCOUNT BUG, CAUGHT AT THE ONLY POINT IT IS STILL RECOVERABLE.
+ *
+ * Someone who already has an account and does not remember the password has
+ * nowhere to go — there is no reset until SMTP lands. What they do instead is
+ * tap "Create an account", because it is the only button that does anything,
+ * and the fields are identical so nothing tells them they are in the wrong
+ * place. Supabase rejects the duplicate email, the raw "User already
+ * registered" prints under the form, and the obvious next move is to try a
+ * DIFFERENT email — which works, and silently abandons the collection on the
+ * first one. That is exactly how it played out with the first real tester.
+ *
+ * The code is `user_already_exists` when confirmation is off. With
+ * confirmation ON, Supabase deliberately returns a fake user rather than
+ * admitting the address is taken, so this cannot fire — `signUpWithPassword`
+ * throws its own "confirm your email" instead. Matching the message as well
+ * as the code is deliberate: the code is newer than the string, and getting
+ * this wrong costs someone their account.
+ */
+function isAlreadyRegistered(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const code = (err as { code?: unknown }).code;
+  if (code === 'user_already_exists' || code === 'email_exists') return true;
+  const message = (err as { message?: unknown }).message;
+  return typeof message === 'string' && /already registered|already exists/i.test(message);
+}
+
 export default function LoginScreen() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
@@ -95,6 +121,32 @@ export default function LoginScreen() {
       after?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /* Not `run`, because this is the one action whose failure is not just a
+     message to print: it has to move them to the other mode. Keeping it out
+     of `run` leaves that helper doing the one thing it does everywhere else. */
+  async function createAccount() {
+    setBusy(true);
+    setError(null);
+    try {
+      await signUpWithPassword(email, password, trimmedName);
+    } catch (err) {
+      if (isAlreadyRegistered(err)) {
+        /* Their email stays in the field — it is the right one, and retyping
+           it is friction on top of a mistake. The password does not: whatever
+           they just invented is not the one on the account, and leaving it
+           there would send them straight into a failed sign-in that looks
+           like the app rejecting a correct password. */
+        setMode('password');
+        setPassword('');
+        setError('That email already has an account. Sign in with it instead.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Something went wrong.');
+      }
     } finally {
       setBusy(false);
     }
@@ -228,7 +280,7 @@ export default function LoginScreen() {
                     label="Create account"
                     busy={busy}
                     disabled={!canCreate}
-                    onPress={() => run(() => signUpWithPassword(email, password, trimmedName))}
+                    onPress={createAccount}
                   />
                   <SecondaryButton
                     label="I already have an account"
