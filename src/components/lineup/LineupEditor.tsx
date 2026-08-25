@@ -72,7 +72,7 @@ import {
   type SortKey,
 } from '@/components/lineup/model';
 import { useLineupData } from '@/components/lineup/use-lineup-data';
-import { useChromeScroll } from '@/components/shell/collapse';
+import { useChromeInset, useChromeScroll } from '@/components/shell/collapse';
 import { Screen } from '@/components/shell/Screen';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, Spacing, Type } from '@/constants/theme';
@@ -150,6 +150,9 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
   /* The boards own the scroll on this page (see the return), so they are also
      what tells the section bar above to get out of the way. */
   const chromeScroll = useChromeScroll();
+  /* See `useChromeInset`: room at the end of the scroll for the strip that sits
+     below the screen edge while the section bar is up. */
+  const chromeInset = useChromeInset();
 
   /**
    * WHICH CONTEST THIS BOARD IS EDITING. Absent means the free one, which is
@@ -1155,7 +1158,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
         </View>
         <ScrollView
           style={styles.fill}
-          contentContainerStyle={styles.scrolled}
+          contentContainerStyle={[styles.scrolled, { paddingBottom: Spacing.three + chromeInset }]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />
           }

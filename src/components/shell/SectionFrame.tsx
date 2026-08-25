@@ -45,10 +45,9 @@
  * consults it on narrow.
  */
 import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
 
 import { AppHeader } from '@/components/shell/AppHeader';
-import { CollapsingChrome } from '@/components/shell/collapse';
+import { CollapsingSection } from '@/components/shell/collapse';
 import { FrameProvider } from '@/components/shell/frame';
 import { SectionNav } from '@/components/shell/SectionNav';
 import { childrenOf } from '@/components/shell/sections';
@@ -99,35 +98,41 @@ export function SectionFrame({
        would tell every page in the section there was no header the day this
        frame is used somewhere without one. */
     <FrameProvider value={masthead ? { header: !wide, nav } : { nav }}>
-      {/* The nav and the navigator are a column, and this is what makes them
-          one: the navigator below takes the rest of the height rather than
-          measuring to its content. No background — the frame above already
-          painted the page, and a second opaque layer here is a full-screen
-          overdraw on every section. */}
-      <View style={styles.fill}>
-        {/* Above the nav, and only when asked. Wide draws neither: the rail is
-            the navigation there and `WebHeader` is the masthead. */}
-        {masthead && !wide ? <AppHeader attached /> : null}
-        {/* Renders nothing on wide — it decides that itself, see there.
+      {/* The nav and the navigator are ONE SLIDING BLOCK, and that is what
+          `CollapsingSection` is for: the bar leaves by moving, not by shrinking,
+          and the pages move with it so the space it was taking becomes theirs.
+          Both halves have to be inside the same component because a transform
+          on the bar alone would leave a hole where it used to be — see
+          `collapse.tsx`. No background: the frame above already painted the
+          page, and a second opaque layer here is a full-screen overdraw on
+          every section. */}
+      <CollapsingSection
+        bar={
+          <>
+            {/* Above the nav, and only when asked. Wide draws neither: the rail
+                is the navigation there and `WebHeader` is the masthead.
 
-            IT IS THE ONE PIECE OF CHROME THAT MOVES. Scrolling a page down
-            slides it up out of the way and scrolling back up returns it, while
-            the masthead and the board strip above stay put — see `collapse.tsx`
-            for why this bar is the one that can afford to go. The wrapper is
-            inert on wide, where `SectionNav` already draws nothing.
+                INSIDE THE SLIDING BLOCK, so a frame that does draw one takes it
+                with the bar rather than leaving a masthead hanging over a
+                collapsed section. */}
+            {masthead && !wide ? <AppHeader attached /> : null}
+            {/* Renders nothing on wide — it decides that itself, see there.
 
-            The nav's own padding travels with it, which is the point — a
-            collapsed bar must leave NO gap behind, and the padding is part of
-            the bar (see `SectionNav`, which owns all four sides). */}
-        <CollapsingChrome>
-          <SectionNav section={section} />
-        </CollapsingChrome>
+                IT IS THE ONE PIECE OF CHROME THAT MOVES. Scrolling a page down
+                slides it up out of the way and returning to the top brings it
+                back, while the masthead and the board strip above stay put —
+                see `collapse.tsx` for why this bar is the one that can afford
+                to go.
+
+                The nav's own padding travels with it, which is the point — a
+                collapsed bar must leave NO gap behind, and the padding is part
+                of the bar (see `SectionNav`, which owns all four sides). */}
+            <SectionNav section={section} />
+          </>
+        }>
         {children}
-      </View>
+      </CollapsingSection>
     </FrameProvider>
   );
 }
 
-const styles = StyleSheet.create({
-  fill: { flex: 1 },
-});

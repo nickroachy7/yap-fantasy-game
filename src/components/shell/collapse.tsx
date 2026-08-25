@@ -29,20 +29,23 @@
  *
  * ONE PROGRESS VALUE, HELD ABOVE THE NAVIGATORS. `SectionFrame` is remounted
  * whenever you move between sections and its bar is redrawn, so the state
- * saying whether the bar is up or down cannot live inside it. It also leaves
- * room for a second block to join the movement later — every `CollapsingChrome`
- * reads the same progress and collapses INTO ITSELF, clipped by its own box
- * rather than sliding over its neighbour, so blocks need to know nothing about
- * each other's heights.
+ * saying whether the bar is up or down cannot live inside it.
+ *
+ * IT MOVES, IT DOES NOT SHRINK. `CollapsingSection` slides the bar and the
+ * pages under it as one block, on a transform, and never touches layout while
+ * it does. The first version animated the bar's box instead and was unusable
+ * for it — the whole argument is there.
  *
  * PLAIN JS SCROLL EVENTS, NOT `useAnimatedScrollHandler`. A Reanimated handler
  * only runs on the UI thread if it is attached to an `Animated.*` component,
  * which would mean converting every list in the app — and `Animated.FlatList`
  * on web is a different code path from the one the carousel already had to be
  * taught about (see `ContestCarousel`). What this handler does per event is
- * two subtractions and a compare; the ANIMATION still runs on the UI thread,
- * because all the JS side ever does is set a shared value once per direction
- * change. Wiring a list is one spread — see `useChromeScroll`.
+ * two subtractions and a compare, and it decides ONE thing: whether the bar is
+ * up or down. The slide itself never touches JS again — it is a timing on a
+ * shared value, so it plays at frame rate however busy the JS thread is, which
+ * is the property that makes a threshold worth having instead of tracking the
+ * finger. Wiring a list is one spread — see `useChromeScroll`.
  *
  * NARROW ONLY. On wide web the rail is the navigation and `SectionNav` draws
  * nothing at all; both halves of this file no-op there rather than making every
@@ -56,6 +59,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   type ReactNode,
 } from 'react';
 import {
@@ -66,6 +70,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -112,6 +117,10 @@ type Collapse = {
   onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
   /** Put the bar back immediately, no animation. Used on navigation. */
   reset: () => void;
+  /** The measured height of the bar on screen, once it has one. */
+  inset: number;
+  /** Announced by the section that drew the bar. */
+  setInset: (h: number) => void;
 };
 
 const CollapseContext = createContext<Collapse | null>(null);
@@ -132,6 +141,11 @@ export function ChromeCollapseProvider({ children }: { children: ReactNode }) {
   const lastY = useRef(0);
   const travel = useRef(0);
   const hidden = useRef(false);
+  /* Published so a page can leave room for it — see `useChromeInset`. State
+     rather than a ref because it is read during render, and a shared value
+     because the slide itself is read on the UI thread; the two are set from the
+     same measurement. */
+  const [inset, setInset] = useState(0);
 
   /**
    * The one place the progress value is written.
@@ -147,7 +161,14 @@ export function ChromeCollapseProvider({ children }: { children: ReactNode }) {
     if (hidden.current === next && !now) return;
     hidden.current = next;
     const to = next ? 1 : 0;
-    progress.value = now ? to : withTiming(to, { duration: next ? 200 : 180 });
+    progress.value = now
+      ? to
+      : /* Out-cubic, and longer than it needs to be to travel 56pt: the bar
+           should read as getting out of the way rather than as being switched
+           off, and the ease-out is what puts the deceleration at the end where
+           the eye follows it. Cheap to lengthen now that the whole slide is a
+           transform — see `CollapsingSection`. */
+        withTiming(to, { duration: next ? 260 : 240, easing: Easing.out(Easing.cubic) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -185,12 +206,13 @@ export function ChromeCollapseProvider({ children }: { children: ReactNode }) {
     [settle],
   );
 
-  /* All three are stable for the life of the provider — a shared value, and two
-     callbacks with no dependencies — so this is built once. Listing them as
-     dependencies would also make `progress` an argument to a hook, which is what
+  /* Rebuilt only when the measured bar height changes, which is once per
+     section. Everything else in here is stable for the life of the provider — a
+     shared value, two callbacks with no dependencies, a state setter — and
+     `progress` is deliberately not listed: passing it to a hook is what
      `react-hooks/immutability` reads as "do not assign to this". */
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const value = useMemo<Collapse>(() => ({ progress, onScroll, reset }), []);
+  const value = useMemo<Collapse>(() => ({ progress, onScroll, reset, inset, setInset }), [inset]);
 
   return (
     <CollapseContext.Provider value={value}>
@@ -250,60 +272,121 @@ export function useChromeScroll(): {
 const NO_SCROLL = {};
 
 /**
- * A bar that slides up out of the way when the page below it is scrolled down.
+ * How much room the bar takes at the top of the page, once it has been
+ * measured. Zero where there is no bar.
  *
- * HOW IT SHRINKS. The outer box has automatic height and clips; the inner one
- * carries a NEGATIVE top margin as it collapses. Yoga measures the outer box as
- * content-height-minus-that-margin, so the box shrinks by exactly as much as the
- * content has risen, whatever is inside it, and everything below moves up to
- * take the room. Margin rather than an animated `height` because the height has
- * to be measured before it can be animated, and a block whose height is zero
- * until its first layout flashes on mount — most visibly on web, where the
- * measurement is a frame behind.
+ * A page uses it to add that much to the BOTTOM of its scroll content, and the
+ * reason is `CollapsingSection`: the sliding block is one bar-height taller
+ * than the frame, so at rest its last bar-height sits below the screen edge.
+ * Content that reaches into that strip is fine on a list long enough to scroll
+ * — it comes up as you scroll and the bar leaves — but a page whose content
+ * ends just inside it would have no scroll to give and no way to show it. The
+ * extra padding guarantees the scroll exists.
  *
- * The clip is what keeps neighbours out of it: the content rises past the top of
- * its own box and is cut there, rather than drawing over the bar above.
+ * Lists that already pad by `useTabBarInset` clear it several times over and
+ * need nothing.
  */
-export function CollapsingChrome({ children }: { children: ReactNode }) {
+export function useChromeInset(): number {
+  const collapse = useCollapse();
+  const wide = useIsWide();
+  return wide || !collapse ? 0 : collapse.inset;
+}
+
+/**
+ * A section: its bar, and the pages under it, sliding as ONE BLOCK.
+ *
+ * NOTHING HERE CHANGES LAYOUT WHILE IT MOVES, and that is the whole design.
+ *
+ * The first version of this collapsed the bar by animating its box — a negative
+ * top margin, so the box shrank and everything below rose into the space. It
+ * was correct and it was unusable: a margin is a LAYOUT property, so every
+ * frame of the slide re-laid out the frame, which changed the height of the
+ * list container below it, which fired the list's `onLayout`, which made
+ * `VirtualizedList` re-measure and re-render — a dozen times over the slide. The
+ * frames were dropped and what reached the screen was the start and the end.
+ * The bar appeared to SNAP, on iOS Safari worst of all, and no easing or
+ * duration could have fixed it because the frames in between were never drawn.
+ *
+ * So the bar and the pages are one `transform` now. The block is a
+ * bar-height TALLER than the frame — `flex: 1` against a negative bottom margin
+ * — so sliding it up by exactly that much lands the pages flush against the top
+ * of the frame with their bottom edge back on the screen edge. The frame clips
+ * what leaves the top. Nothing measures, nothing re-renders, and the slide runs
+ * entirely on the UI thread whatever the JS thread is doing.
+ *
+ * THE COST IS AT REST, and it is the one thing to know about this component: a
+ * bar-height of the page hangs below the screen while the bar is up. It costs
+ * nothing visually — the visible area is exactly what it always was — but a
+ * page must not lay content into that strip without leaving a way to scroll to
+ * it. See `useChromeInset`.
+ *
+ * Wide draws neither part of this: `SectionNav` renders nothing there, so the
+ * pages are returned as they came.
+ */
+export function CollapsingSection({
+  /** The section's bar. */
+  bar,
+  /** The section's navigator. */
+  children,
+}: {
+  bar: ReactNode;
+  children: ReactNode;
+}) {
   const collapse = useCollapse();
   const wide = useIsWide();
   const height = useSharedValue(0);
+  /* The same number twice: on the UI thread for the slide, in React for the
+     negative margin that makes room for it. The margin must NOT be animated —
+     it is layout, and a layout prop written every frame is the exact mistake
+     this component exists to undo — so it goes through state and settles once. */
+  const [barHeight, setBarHeight] = useState(0);
+  const publish = collapse?.setInset;
 
   const onLayout = useCallback(
     (e: LayoutChangeEvent) => {
-      const h = e.nativeEvent.layout.height;
-      /* The margin does not change this measurement — `layout.height` is the
-         box, not the space it occupies — so this settles once and then only
-         moves if the bar itself changes shape — a section with a different
-         number of pages, or a rotation. */
-      if (h > 0) height.value = h;
+      const h = Math.round(e.nativeEvent.layout.height);
+      if (h <= 0) return;
+      height.value = h;
+      setBarHeight((prev) => (prev === h ? prev : h));
+      publish?.(h);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [publish],
   );
 
   const progress = collapse?.progress;
   const slide = useAnimatedStyle(() => ({
-    marginTop: -height.value * (progress?.value ?? 0),
+    transform: [{ translateY: -height.value * (progress?.value ?? 0) }],
   }));
 
-  if (wide || !collapse) return <>{children}</>;
+  if (wide || !collapse)
+    return (
+      <>
+        {bar}
+        {children}
+      </>
+    );
 
   return (
     <View style={styles.clip}>
-      <Animated.View style={slide}>
-        {/* THE MEASUREMENT IS ON A PLAIN VIEW, not on the animated one above
+      <Animated.View style={[styles.block, { marginBottom: -barHeight }, slide]}>
+        {/* THE MEASUREMENT IS ON A PLAIN VIEW, not on the animated one around
             it. Reanimated's wrapper does not forward `onLayout` on web —
             verified in the shell gallery, where the callback simply never
-            fired and the bar sat at its full height with the animation
-            running against a height of zero. A plain `View` measures on every
-            platform. */}
-        <View onLayout={onLayout}>{children}</View>
+            fired and the bar sat at its full height with the slide running
+            against a height of zero. A plain `View` measures everywhere. */}
+        <View onLayout={onLayout}>{bar}</View>
+        <View style={styles.pages}>{children}</View>
       </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  clip: { overflow: 'hidden' },
+  /* The frame. It clips because the block slides past its top edge, and a bar
+     drawn over the board strip above would be worse than one that is gone. */
+  clip: { flex: 1, overflow: 'hidden' },
+  /* One bar taller than the frame — see the component. */
+  block: { flex: 1 },
+  pages: { flex: 1 },
 });
