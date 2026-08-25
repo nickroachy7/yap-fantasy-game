@@ -6,16 +6,19 @@
  * you see the moment you open Yap — the same relationship a league app draws
  * between "which league am I in" and "draft / team / players / league".
  *
- * FOUR AGAIN, AND IT WAS THREE. All Cards came back from being a bottom tab on
+ * FOUR AGAIN, AND IT WAS THREE. Players came back from being a bottom tab on
  * 2026-08-24 when the bar became a list of products; the strip was built for
  * four and had been carrying three since.
  *
- * THE WORDS ARE LONGER THAN ANY SET THIS HAS HELD. COMPETE / COLLECT / ALL
- * CARDS / LEADERS is 30 characters against the 28 of LINEUP / COLLECTION /
- * PLAYERS / BOARD, which the layout below was measured on. It still fits at
- * 320pt with nothing truncated — but the even gaps it produces there fell from
- * ~17 to 13, and that is not free: the touch slop had to come down with them.
- * See `hitSlop`. There is not room for another two characters at this size.
+ * THE WORDS ARE BACK TO THE WIDTH THE LAYOUT WAS MEASURED ON. COMPETE /
+ * COLLECT / PLAYERS / LEADERS is 28 characters, the same as the LINEUP /
+ * COLLECTION / PLAYERS / BOARD this was built against. It went to 30 for a day
+ * when the third board was called All Cards, which closed the even gaps at
+ * 320pt from ~17 to 13 and forced the touch slop down with them; renaming it
+ * back to Players returns both. Re-measured rather than assumed: 320pt, gaps of
+ * 16/17/16, nothing truncated. See `hitSlop` — the slop stays at six, because
+ * six works at either width and a number that only just fits is a number that
+ * breaks on the next rename.
  *
  * IT IS ON EVERY SCREEN OF THE TAB, with nothing in front of it. A hub page
  * listing these same four was built and cut first; see `fantasy/index.tsx`.
@@ -130,11 +133,11 @@ export function FantasyTopNav({
       <View style={styles.inner}>
         {FANTASY_SECTIONS.map((section) => {
           // A section is active anywhere INSIDE it, not just on its own path,
-          // and three of the four have sub-pages: Compete, All Cards and
+          // and three of the four have sub-pages: Compete, Players and
           // Collect each hold two or three views that `SectionNav` draws one
           // row below. Without the prefix test the strip would go dark the
           // moment you moved off a board's landing view — press Leaders and
-          // ALL CARDS would stop being underlined.
+          // PLAYERS would stop being underlined.
           const active =
             pathname === section.href || pathname.startsWith(`${section.href}/`);
           return (
@@ -149,10 +152,15 @@ export function FantasyTopNav({
                  happened to render last.
 
                  It was 8, against gaps of ~17 at the tightest viewport this
-                 strip has. Renaming Board to Leaders on 2026-08-24 cost two
-                 characters and closed the gaps to 13 — measured, on a 320pt
-                 viewport — at which 8 a side overlaps by 3. Six leaves a point
-                 of dead space between them.
+                 strip has. Two renames on 2026-08-24 — Board to Leaders, then
+                 Players to All Cards — cost four characters between them and
+                 closed the gaps to 13 on a 320pt viewport, at which 8 a side
+                 overlaps by 3. Six leaves a point of dead space.
+
+                 All Cards went back to Players afterwards and the gaps returned
+                 to 16/17/16, re-measured. The slop STAYS at six anyway: eight
+                 would exactly touch at that width, and a number that only just
+                 fits is one that breaks on the next rename.
 
                  SO THIS MOVES WITH THE LABELS. Any section renamed longer
                  tightens the gaps again; re-measure rather than assuming the

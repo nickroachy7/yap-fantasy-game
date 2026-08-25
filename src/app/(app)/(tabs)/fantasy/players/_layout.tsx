@@ -3,7 +3,7 @@ import { Stack } from 'expo-router';
 import { SectionFrame } from '@/components/shell/SectionFrame';
 
 /**
- * ALL CARDS: the pool of every card in the game, as a board inside Yap again.
+ * PLAYERS: the pool of every card in the game, as a board inside Yap again.
  *
  * It was a bottom TAB between 2026-08-21 and 2026-08-24, on the argument that
  * the league's whole pool is not a view of your own team the way your lineup
@@ -23,13 +23,14 @@ import { SectionFrame } from '@/components/shell/SectionFrame';
  * `SectionFrame`. `Screen` supplies each page's remaining chrome and knows not
  * to draw the header a second time.
  *
- * THE ROUTE IS STILL `/fantasy/players` while the board is called All Cards.
- * Every deep link, both `dismissTo` fallbacks and the whole
- * `components/players` tree say player, and the label names the thing you can
- * own rather than the person on the front of it. Renaming the URL to agree
- * would be a migration with nothing in it for the reader.
+ * THE ROUTE AND THE LABEL AGREE AGAIN. It was called All Cards for one day —
+ * the argument being that every row here is a card template rather than a
+ * person — and the route stayed `/fantasy/players` throughout, because every
+ * deep link, both `dismissTo` fallbacks and the whole `components/players` tree
+ * say player. The label came back to meet it: a nav word's job is recognition,
+ * and All Cards was precision bought at the cost of it. See `sections.ts`.
  */
-export default function AllCardsLayout() {
+export default function PlayersLayout() {
   return (
     <SectionFrame section="/fantasy/players">
       <Stack screenOptions={{ headerShown: false, animation: 'none' }} />

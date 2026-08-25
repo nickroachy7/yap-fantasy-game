@@ -8,7 +8,7 @@
  *                      Leagues, Scores, Profile. These are products, not
  *                      screens.
  *   2. FANTASY_SECTIONS — the row under the header once you are inside Yap.
- *                      Compete, Collect, All Cards, Leaders. These used to BE
+ *                      Compete, Collect, Players, Leaders. These used to BE
  *                      the bottom bar.
  *   3. NavChild      — a section's OR a tab's sub-pages, drawn by `SectionNav`
  *                      as the page's action bar.
@@ -26,10 +26,10 @@
  * reading Yap, Leagues, Players, Scores, Profile offers one of the card game's
  * own boards at the same rank as the card game, and nothing about the bar tells
  * a reader that pressing Players keeps them inside Yap while pressing Leagues
- * does not. It is a board again, named All Cards, third in the level-2 strip.
+ * does not. It is a board again, named Players, third in the level-2 strip.
  *
  * LEVEL 2 IS TWO VERBS THEN TWO NOUNS. It was Lineup, Collection, Sets, Board
- * — four things you own or read. It is Compete, Collect, All Cards, Leaders:
+ * — four things you own or read. It is Compete, Collect, Players, Leaders:
  * what you are there to DO with your own team, then the two boards you go to
  * read about everybody else's.
  *
@@ -51,7 +51,7 @@
  * the page's action bar, and the wide-web rail renders WEB_NAV — a FLATTENING
  * of the three levels below, declared at the foot of this file. Values are
  * route paths, and two of them no longer match their labels: `/fantasy` is the
- * tab captioned Yap, and `/fantasy/players` is the board captioned All Cards.
+ * tab captioned Yap, and `/fantasy/players` is the board captioned Players.
  * Both declarations say why the routes were left alone.
  *
  * This file previously declared only the Collection segments while
@@ -68,7 +68,7 @@
  * One child of any parent that has several deliberately shares the parent's own
  * href. The nav needs an item for the landing page or there is no way back to
  * it, and the sidebar needs the parent row to stay a live target. Compete and
- * Collect both land on their first; All Cards lands on its second, and the note
+ * Collect both land on their first; Players lands on its second, and the note
  * there explains why being first was convention rather than mechanism.
  */
 import type { ActionIconName } from '@/components/shell/ActionBar';
@@ -175,7 +175,7 @@ export type NavTab = {
    * The tab's own sub-pages, for a tab that is one board rather than several.
    *
    * The same thing a section's `children` are and drawn by the same bar. NO TAB
-   * HAS ANY TODAY — All Cards was the one that did, and it took its three views
+   * HAS ANY TODAY — Players was the one that did, and it took its three views
    * back up to level 2 when it became a board again. The field stays because
    * `childrenOf` answering at both levels is what stops `SectionNav` needing to
    * know whether it is looking at a tab or a section, and a single-board
@@ -247,7 +247,7 @@ const COMPETE_VIEWS: NavChild[] = [
  * agree would mean landing on a search box — a page that shows you nothing
  * until you type.
  */
-const ALL_CARD_VIEWS: NavChild[] = [
+const PLAYER_VIEWS: NavChild[] = [
   /* Not `/fantasy/players/search`: it is a full-screen takeover living above
      the tab navigator, so its path is a root one. See `app/(app)/search.tsx`. */
   { href: '/search', label: 'Search', icon: 'search', takeover: true },
@@ -270,7 +270,7 @@ const ALL_CARD_VIEWS: NavChild[] = [
      the row it is actually in — SEARCH / TREND / TOP are three one-word ways to
      look at the same pool, and it was the only one of the three that needed two
      syllables to say so. The ROUTE stays `/fantasy/players/leaders`, for the
-     same reason `/fantasy/players` stayed under the All Cards label. */
+     same reason `/fantasy/players` kept its route through two label changes. */
   { href: '/fantasy/players/leaders', label: 'Top', icon: 'standings' },
 ];
 
@@ -305,7 +305,7 @@ export const FANTASY_SECTIONS: NavSection[] = [
     icon: 'collection',
     children: COLLECT_VIEWS,
   },
-  /* ALL CARDS, which was the Players TAB and is a board again.
+  /* PLAYERS, which was a bottom TAB for three days and is a board again.
    *
    * IT CAME BACK, and the argument that sent it down to the bottom bar was not
    * wrong so much as overtaken. That argument was: the pool of every player in
@@ -321,33 +321,49 @@ export const FANTASY_SECTIONS: NavSection[] = [
    * where all of that put you. It sat second for one commit, between Compete
    * and Collect, which split the two boards that are about YOUR team with one
    * that is about everybody's. The two pairs read better whole — your side of
-   * the game first, the rest of it after — and it puts All Cards next to
-   * Leaders, which is where the other two outward-looking boards belong.
+   * the game first, the rest of it after — and it puts Players next to Leaders,
+   * which is where the other two outward-looking boards belong.
    *
-   * "ALL CARDS" RATHER THAN "PLAYERS", and it is the honest name. Every row on
-   * these three views is a card template — what it costs to pull, what it has
-   * scored, what tier your copy of it is — and calling the board Players named
-   * the person on the front of the card rather than the thing you can own. It
-   * is also the only word here that tells a new reader this board and their
-   * Collection hold the same kind of object. The ROUTE stays `/fantasy/players`
-   * on purpose: every deep link, every `dismissTo` and the whole
-   * `components/players` tree still say player, and renaming a URL to match a
-   * label is a migration with no reader-facing gain. */
+   * "PLAYERS" RATHER THAN "ALL CARDS", which reverses the rename of 2026-08-24.
+   *
+   * The argument for All Cards was that every row on these three views is a
+   * card TEMPLATE — what it costs to pull, what it has scored, what tier your
+   * copy is — so Players named the person on the front of the card rather than
+   * the thing you can own. That is accurate and it is not what the word has to
+   * do here. This is a NAVIGATION LABEL, and the job of one is to tell a reader
+   * where they will land before they press it. Players does that in a word
+   * everyone already has; All Cards was a more precise name for a distinction
+   * the reader has not been given a reason to care about yet, and precision
+   * bought at the cost of recognition is a bad trade in a bar.
+   *
+   * It also settles a collision the strip had been working around. The board's
+   * own views are Search, Trend and Top — all three about players — under a
+   * heading that insisted they were about cards.
+   *
+   * ROUTE UNCHANGED, as it was through the last rename too: `/fantasy/players`
+   * is what every deep link, both `dismissTo` fallbacks and the whole
+   * `components/players` tree already say. The route now agrees with the label
+   * again, which is a small bonus rather than the reason.
+   *
+   * THE STRIP FITS, and this direction is the safe one. `20260824` measured the
+   * level-2 row at 320pt with four labels totalling 28 characters, and noted
+   * there was no room for more. ALL CARDS to PLAYERS gives two back — 30 down
+   * to 28, exactly the width the layout was measured against. */
   {
     href: '/fantasy/players',
-    label: 'All Cards',
+    label: 'Players',
     icon: 'players',
-    children: ALL_CARD_VIEWS,
+    children: PLAYER_VIEWS,
   },
   /* LEADERS, which was Leaderboard-shortened-to-Board. One word in both bars
      now, so the `tabLabel` that existed to keep "Leaderboard" from truncating
      to "Leaderboa…" at 13pt is gone with it.
 
-     IT OWNS THE WORD. All Cards had a sub-page called Leaders for one commit,
+     IT OWNS THE WORD. Players had a sub-page called Leaders for one commit,
      which put the same word in two bars one row apart pointing at two different
      rankings; that page is called Top now. This is the board that ranks
      MANAGERS, and it is the one people mean by "the leaderboard" — see the note
-     on `ALL_CARD_VIEWS` for why the rename went there rather than here.
+     on `PLAYER_VIEWS` for why the rename went there rather than here.
 
      It has no children, and it is the only section without any. It had two —
      STANDINGS and SCORING — and the strip they produced cost every phone screen
@@ -454,7 +470,7 @@ function allChildren(): NavChild[] {
  * the app's own file structure printed down the side of the window: to reach
  * Top you read "Fantasy", then "Players", then "Leaders" — three words to name
  * one board, two of which are not places you can be. (Those were the labels at
- * the time; the board is All Cards and the view is Top now.) `/fantasy` is a
+ * the time; the board is Players and the view is Top now.) `/fantasy` is a
  * redirect and `/fantasy/players` opens on Trend, so two of the rail's ranks
  * were labels pretending to be destinations.
  *
@@ -615,7 +631,7 @@ const WEB_NAV_SPEC: WebNavSpec[] = [
  * only row that resolves to a child, and the only row needing the verb set.
  *
  * PARENTS BEFORE CHILDREN, and the order is load-bearing: `/fantasy/players`
- * is both the All Cards SECTION and the href of its Trend child, and the rail
+ * is both the Players SECTION and the href of its Trend child, and the rail
  * row must be captioned with the board's name rather than the view's.
  */
 function resolveRow(key: string): { label: string; icon: WebNavIcon } {
@@ -715,7 +731,7 @@ export function webSectionOf(pathname: string): WebSection | null {
  *
  * That was a visible defect the moment the wide heading started deriving from
  * the route: opening Packs from the Players board re-titled the page behind the
- * dialog from "All Cards" to "Trend" and dropped its tab row, then put both back
+ * dialog from "Players" to "Trend" and dropped its tab row, then put both back
  * when you closed it. The rail is the opposite case and is correct as it is —
  * Packs IS a rail row, and it should light while its sheet is open. The two
  * genuinely want different answers, which is why this is a separate question
@@ -723,7 +739,7 @@ export function webSectionOf(pathname: string): WebSection | null {
  *
  * Two sources, and both are named because neither can be derived from the
  * other: the takeovers are declared in the tree above (`/packs` under two
- * sections, `/search` under All Cards), and the profile sheets are
+ * sections, `/search` under Players), and the profile sheets are
  * declared as `Stack.Screen`s in `(app)/_layout.tsx` and appear nowhere in this
  * file's tree. If a fourth sheet is added there, add it here.
  */

@@ -65,7 +65,7 @@ export function SectionFrame({
    *
    * A SECTION INSIDE YAP LEAVES THIS ALONE: `FantasyFrame` is already drawing
    * the masthead once for the whole tab, and a second one here would be two.
-   * Every section is inside Yap today, so NOTHING PASSES THIS — All Cards was
+   * Every section is inside Yap today, so NOTHING PASSES THIS — Players was
    * the one that did, while it was a bottom tab with no frame above it, and it
    * stopped when it came back down to level 2 on 2026-08-24.
    *

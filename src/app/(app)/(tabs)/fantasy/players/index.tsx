@@ -1,5 +1,5 @@
 /**
- * Who is heating up, and who has gone cold. The All Cards board lands here.
+ * Who is heating up, and who has gone cold. The Players board lands here.
  *
  * WHY THIS IS THE LANDING PAGE AND SEARCH IS NOT
  *
