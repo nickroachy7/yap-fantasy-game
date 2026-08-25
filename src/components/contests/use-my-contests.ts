@@ -37,9 +37,21 @@ export type MyContest = {
   filled: number;
   /** This contest's own distribution, shaped for `ContestCard`. */
   field: FieldWeek;
+  /**
+   * Hearts a loss here costs the run, and hearts a win heals.
+   *
+   * THE FREE CONTEST'S CARD IS THE ONLY PLACE ITS STAKE IS EVER DRAWN. The
+   * lobby list filters the free contest out — nobody chose it and nobody can
+   * leave it — so without this the game's main contest would be the one that
+   * could end a run without saying so anywhere.
+   */
+  heartsAtRisk: number;
+  heartsOnWin: number;
 };
 
 type Row = {
+  hearts_at_risk: number;
+  hearts_on_win: number;
   contest_id: string;
   code: string;
   kind: 'free' | 'lobby';
@@ -117,6 +129,8 @@ export function useMyContests(includeCode?: string): MyContestsState {
           ahead: num(r.ahead),
           result: (r.result as FieldWeek['result']) ?? null,
         },
+        heartsAtRisk: Number(r.hearts_at_risk ?? 0),
+        heartsOnWin: Number(r.hearts_on_win ?? 0),
       })),
     );
     return null;

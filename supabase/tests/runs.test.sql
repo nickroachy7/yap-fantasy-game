@@ -158,25 +158,33 @@ begin
     raise exception 'FAIL: an entry with hearts at risk did not carry the run';
   end if;
 
-  -- 4. THE FREE CONTEST CARRIES NO RUN. It risks nothing, so it belongs to no
-  --    run — which is what lets a dead player still have a game to open.
+  -- 4. THE FREE CONTEST IS THE RUN NOW (20260825270000). It stakes a heart like
+  --    any other, so its entry carries the run — the season record and the
+  --    run's health are the same thing.
   v_free := public.set_lineup(2026, 1::smallint, 95,
     jsonb_build_array(jsonb_build_object('slot','WR1','card_instance_id', ids[7])));
-  if (select run_id from public.lineups where id = v_free) is not null then
-    raise exception 'FAIL: a free-contest entry was attached to a run';
+  if (select run_id from public.lineups where id = v_free) is distinct from v_run.id then
+    raise exception 'FAIL: the free contest did not carry the run';
+  end if;
+  if (select hearts_at_risk from public.contests
+       where id = (select contest_id from public.lineups where id = v_free)) <> 1 then
+    raise exception 'FAIL: a free contest was created without its stake — check ensure_free_contest';
   end if;
 
-  -- 5. CASHING OUT IS LOCKED while a result the run is exposed to is pending.
-  --    This is the assertion the whole wipe rests on: without it the play on a
-  --    last heart is to sell the collection at full price and die holding gems.
+  -- 5. CASHING OUT IS LOCKED while a LOBBY bet is pending — a bet the player
+  --    chose to take. You cannot enter a contest with a heart on it and then
+  --    liquidate the collection out from under the result.
   begin
     perform public.sell_card(ids[6]);
-    raise exception 'FAIL: a card was sold while the run had hearts riding on a contest';
+    raise exception 'FAIL: a card was sold while a lobby contest held a heart';
   exception when sqlstate '55006' then null;
   end;
 
-  -- 6. And leaving lifts it, because the entry is gone. The escape hatch is
-  --    deliberate and closes at kickoff.
+  -- 6. And leaving the LOBBY contest lifts it, even though the free-contest
+  --    entry is still live and still staking a heart. That narrowing is forced:
+  --    the free contest is auto-entered and cannot be left, so counting it
+  --    would lock selling permanently — against a roster cap whose own refusal
+  --    tells the player to sell. See 20260825270000.
   perform public.leave_contest('test:median:95');
   perform public.sell_card(ids[6]);
   if (select sold_at from public.card_instances where id = ids[6]) is null then
@@ -286,6 +294,30 @@ begin
     raise exception 'FAIL: an unfinished week moved hearts';
   end if;
 
+  -- 9. A HEART IS RIDING UNTIL SETTLEMENT SAYS OTHERWISE, not until the sweep
+  --    does. `scored_at` is written by the gameday sweep as each lineup is
+  --    scored; hearts only move once every fixture in the week is final, which
+  --    on a real NFL week is days later. Reading exposure off `scored_at` meant
+  --    the masthead said nothing was at stake while the lobby row it came from
+  --    still advertised one.
+  --
+  --    Asserted here, with the week still in progress, because that is the
+  --    whole window under test. Three entries stake a heart: the free contest
+  --    and both lobby ones.
+  if (select coalesce(sum(hearts_at_risk), 0) from public.wagered_entries(a)) <> 3 then
+    raise exception 'FAIL: three entered heart contests should be three hearts riding, got %',
+      (select coalesce(sum(hearts_at_risk), 0) from public.wagered_entries(a));
+  end if;
+
+  --    The sweep runs mid-week. Every entry is scored and every heart is still
+  --    on the line, because nothing has settled them.
+  update public.lineups set scored_at = now()
+   where user_id = a and season = 2026 and season_type = 1 and week = 95;
+
+  if (select coalesce(sum(hearts_at_risk), 0) from public.wagered_entries(a)) <> 3 then
+    raise exception 'FAIL: hearts stopped riding when the sweep scored the lineup';
+  end if;
+
   update public.games set status_state = 'final' where season = 2026 and week = 95;
 
   -- 8. THE RESULTS THEMSELVES, now the week is over.
@@ -303,26 +335,6 @@ begin
     raise exception 'FAIL: first of five in a top-three should be a win, got %', coalesce(v_res,'null');
   end if;
 
-  -- 9. A HEART IS RIDING UNTIL SETTLEMENT SAYS OTHERWISE, not until the sweep
-  --    does. `scored_at` is written by the gameday sweep as each lineup is
-  --    scored; hearts only move once every fixture in the week is final, which
-  --    on a real NFL week is days later. Reading exposure off `scored_at` meant
-  --    the masthead said nothing was at stake while the lobby row it came from
-  --    still advertised one.
-  if (select coalesce(sum(hearts_at_risk), 0) from public.wagered_entries(a)) <> 2 then
-    raise exception 'FAIL: two entered heart contests should be two hearts riding, got %',
-      (select coalesce(sum(hearts_at_risk), 0) from public.wagered_entries(a));
-  end if;
-
-  --    The sweep runs. Both entries are scored, and both hearts are still on
-  --    the line, because nothing has settled them.
-  update public.lineups set scored_at = now()
-   where user_id = a and season = 2026 and season_type = 1 and week = 95;
-
-  if (select coalesce(sum(hearts_at_risk), 0) from public.wagered_entries(a)) <> 2 then
-    raise exception 'FAIL: hearts stopped riding when the sweep scored the lineup';
-  end if;
-
   -- 10. THE WEEK NETS OUT AS ONE DELTA. A loss and a healing win on the same
   --     slate cancel; if these were settled one at a time the answer would
   --     depend on which row was processed first.
@@ -335,11 +347,12 @@ begin
     raise exception 'FAIL: the win was not counted, wins = %', v_wins;
   end if;
 
-  --     And now that it has settled, nothing is riding on it any more — the
-  --     window closes on the result, which is the only thing that can move a
-  --     heart.
+  --     And nothing rides any more. The window closes on the result — or, for
+  --     an entry whose field was too small to have one, on the week itself.
+  --     Without that second clause a contest that can never produce a result
+  --     would ride forever, which is routine in a four-tester beta.
   if (select count(*) from public.wagered_entries(a)) <> 0 then
-    raise exception 'FAIL: a settled entry is still counted as riding';
+    raise exception 'FAIL: a finished week is still counted as riding';
   end if;
 
   -- 11. EXACTLY ONCE. Re-running settlement is routine on gameday, and a second
@@ -351,12 +364,15 @@ begin
     raise exception 'FAIL: settlement is not idempotent (hearts %, wins %)', v_after, v_wins;
   end if;
 
-  -- 12. THE FREE CONTEST NEVER REACHES A RUN, however it finished.
+  -- 12. A FIELD OF ONE HAS NO RESULT, whatever the contest stakes. This suite's
+  --     free contest has a single entrant, so it is the player's own median and
+  --     there is no side of it to be on — null, and no heart moves. It is the
+  --     same guard that stops a four-tester beta printing free wins.
   if exists (
     select 1 from public.run_contest_results rr
       join public.contests c on c.id = rr.contest_id
      where rr.user_id = a and c.kind = 'free') then
-    raise exception 'FAIL: a free-contest result was charged to a run';
+    raise exception 'FAIL: a one-entrant contest produced a result';
   end if;
 
   raise notice 'runs suite: settlement passed';

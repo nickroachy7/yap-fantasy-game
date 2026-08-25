@@ -46,6 +46,7 @@
  */
 import { StyleSheet, Text, View } from 'react-native';
 
+import { Heart } from '@/components/runs/Hearts';
 import { initialsOf } from '@/components/shell/AppHeader';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
@@ -224,6 +225,8 @@ export function ContestCard({
   field,
   record,
   standingLine,
+  heartsAtRisk = 0,
+  heartsOnWin = 0,
 }: {
   displayName: string;
   /** "Preseason · Week 3" — without the lock state, which the head rail carries. */
@@ -254,6 +257,17 @@ export function ContestCard({
    * cards"), which is the fact its owner actually needs while swiping past.
    */
   standingLine?: string;
+  /**
+   * What losing this contest costs the run, and what winning it heals.
+   *
+   * DRAWN HERE BECAUSE NOTHING ELSE DRAWS IT for the free contest: the lobby
+   * list filters that one out (nobody chose it, nobody can leave it), so this
+   * card is the only surface its stake appears on. Being auto-entered into
+   * something that can end a run is worse than choosing it blind — there is not
+   * even a tap to think twice about.
+   */
+  heartsAtRisk?: number;
+  heartsOnWin?: number;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -376,9 +390,27 @@ export function ContestCard({
           than in a tile because at 320pt a quarter-width tile rendered it as
           "3h …" — truncating the one thing on this card with a deadline. */}
       <View style={[styles.head, { borderColor: c.border }]}>
-        <Text numberOfLines={1} style={[Type.micro, { color: c.textSecondary }]}>
-          {weekLabel.toUpperCase()}
-        </Text>
+        <View style={styles.headLeft}>
+          <Text numberOfLines={1} style={[Type.micro, { color: c.textSecondary }]}>
+            {weekLabel.toUpperCase()}
+          </Text>
+          {/* THE STAKE, ON THE SAME RAIL AS THE DEADLINE, because they are the
+              same kind of fact: what this week is going to cost you and when.
+              A heart and a clock side by side is the whole proposition of the
+              card in two glyphs.
+
+              Only drawn when there is one. A "0 hearts" mark on a contest that
+              cannot end you would make the safe thing look like a lesser
+              version of the risky one rather than a different offer. */}
+          {heartsAtRisk > 0 ? (
+            <View style={styles.stake}>
+              <Heart size={9} state="safe" color={c.negative} />
+              <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
+                {heartsOnWin > 0 ? `${heartsAtRisk} · +${heartsOnWin}` : `${heartsAtRisk}`}
+              </Text>
+            </View>
+          ) : null}
+        </View>
         {final ? (
           <StatusChip label="Final" tone="positive" />
         ) : locked ? (
@@ -437,6 +469,10 @@ export function ContestCard({
 
 const styles = StyleSheet.create({
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.panel, overflow: 'hidden' },
+  /* Takes the room the chip and clock do not, so the week label truncates
+     before the stake does — a clipped heart reads as a rendering fault. */
+  headLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexShrink: 1 },
+  stake: { flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 0 },
   head: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1974,6 +1974,8 @@ export type Database = {
           final: boolean
           format_code: string
           format_name: string
+          hearts_at_risk: number
+          hearts_on_win: number
           high: number
           kind: Database["public"]["Enums"]["contest_kind"]
           lineup_id: string

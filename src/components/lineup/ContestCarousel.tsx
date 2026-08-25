@@ -200,6 +200,8 @@ function Card({
           ? undefined
           : `${contest.formatName} · ${contest.slotCount} cards`
       }
+      heartsAtRisk={contest.heartsAtRisk}
+      heartsOnWin={contest.heartsOnWin}
     />
   );
 
