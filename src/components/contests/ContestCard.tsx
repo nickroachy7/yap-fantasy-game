@@ -16,28 +16,74 @@
  *
  * So the card is ONE STACK and entering adds a band to the middle of it:
  *
- *     ┌────────────────────────────────┐
- *     │ name · stake        state      │   HEAD    — always
- *     │ format · slots                 │
- *     ├────────────────────────────────┤
- *     │ you · your score · the field   │   MIDDLE  — only once entered
- *     ├────────────────────────────────┤
- *     │ RISK            REWARD         │   TERMS   — always
- *     ├────────────────────────────────┤
- *     │ how it is won      pool · seats │   FOOT   — always
- *     └────────────────────────────────┘
+ *     ┌────────────────────────────────────┐
+ *     │ name                     1d 19h    │   HEAD    — always
+ *     │ format · slots · seats  NEXT LOCK  │
+ *     ├────────────────────────────────────┤
+ *     │ ▬▬▬▬▬▬▬░                           │   MIDDLE  — only once entered
+ *     │ handle · record      1 SLOT TO FILL│
+ *     ├────────────────────────────────────┤
+ *     │ how it is won                      │   TRADE   — always
+ *     │ what you put up  →  what you take  │
+ *     ├────────────────────────────────────┤
+ *     │ YOUR RUN ♥♥♥       3 MORE WINS …   │   FOOT    — only with a run
+ *     └────────────────────────────────────┘
  *
  * Nothing above or below the middle moves when it appears. That is the whole
- * design and the reason `ContestCard` takes the middle as a NODE rather than as
- * a variant flag: a variant invites the head and the foot to drift apart per
- * variant, which is exactly what happened last time.
+ * design and the reason the middle, the head's right column and the foot all
+ * arrive as NODES rather than as variant flags: a variant invites the bands to
+ * acquire per-variant conditions and drift apart, which is exactly what
+ * happened the first time these two surfaces were unified.
  *
- * THE TERMS STAY ON AN ENTERED CARD, and the gems are the debatable part —
- * they are spent, and an earlier version dropped them on the grounds that a
- * price already paid is not news. But the trade is not over until settlement:
- * the heart is still riding, the pool is still growing, and the reward is still
- * ahead of you. Showing three quarters of a live trade is worse than showing a
- * line about money that has moved.
+ * ---------------------------------------------------------------------------
+ * THE 2026-08-26 REWORK: FIVE BANDS OF EQUAL WEIGHT, THREE OF THEM AGREEING
+ * ---------------------------------------------------------------------------
+ *
+ * The card above worked, and then it was looked at rather than read. It stood
+ * roughly 230pt tall on a phone — three and a half lineup rows — to carry seven
+ * facts, three of which were the same fact. Everything wrong with it was one
+ * thing repeated: no rank, and no floor on the air between bands.
+ *
+ * 1. THE WIN CONDITION WAS THE STRING CHOSEN TO TRUNCATE. The head's second
+ *    line carried "Full Roster · 8 cards · Beat the median" beside a seat
+ *    count, under a title row that also held a countdown. Before lock — five
+ *    days of every seven — there was not room, and what fell off the end was
+ *    how the contest is WON. It leads the trade band now, at full width, where
+ *    it is the term every figure in the reward column is conditional on.
+ *
+ * 2. THE HERO WAS A DUPLICATE. Before kickoff the biggest thing on the card was
+ *    `7/8` at 22pt in warning gold — the same fact as the slot meter eight
+ *    points below it, and the same fact again as the "Starting lineup · 7/8
+ *    filled" heading under the card. Meanwhile the COUNTDOWN, the one figure on
+ *    the card that is both moving and actionable, sat at 13pt in a corner while
+ *    squeezing the line above. `Figure` ranks the slot by usefulness now.
+ *
+ * 3. THE STAKE WAS PRINTED TWICE, as a heart beside the name and again as
+ *    `RISK ♥ 1 heart` thirty points below. The head keeps the identity, the
+ *    trade keeps the terms.
+ *
+ * 4. AND IT WAS BULKY. Five bands, each with its own vertical padding, its own
+ *    micro label and its own internal gaps. The fix is not smaller type — the
+ *    scale was already right — it is fewer rows carrying more per row, at the
+ *    metrics the lineup rows underneath already use: a 16pt gutter, 2pt between
+ *    lines of one block, and a figure over a 9pt qualifier rather than a figure
+ *    over a reserved blank. Four things went:
+ *
+ *      the avatar     a 26pt circle of your own initials, on a card that can
+ *                     only ever be about you, driving the height of the whole
+ *                     middle band. The lineup rows below carry no avatar
+ *                     either; dropping it makes this MORE like the table it
+ *                     is the top of, not less.
+ *      LOWEST/HIGHEST two labels naming the two ends of a bar, which is what
+ *                     the two ends of a bar already say. The row they were on
+ *                     now carries the handle and the mark — both facts.
+ *      RISK/REWARD    two micro labels over two columns that an arrow between
+ *                     them says in one glyph and no line at all.
+ *      the state chip on the board only. `Final` and `Locked` are already on
+ *                     the masthead above, in the week's own context line, and
+ *                     the figure's qualifier says which of them applies.
+ *
+ *    ~230pt to ~160pt, with one more fact on it than before.
  *
  * ---------------------------------------------------------------------------
  * THE MIDDLE: THE FIELD IS NOT A PERSON
@@ -84,10 +130,8 @@
  */
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Heart } from '@/components/runs/Hearts';
-import { initialsOf } from '@/components/shell/AppHeader';
-import { StatusChip } from '@/components/ui/StatusChip';
-import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
+import { Heart, Hearts, type HeartSpan } from '@/components/runs/Hearts';
+import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import type { FieldWeek } from '@/components/lineup/field';
@@ -99,6 +143,7 @@ import {
   rewardLines,
   riskLines,
   seatsLine,
+  winLine,
   type ContestTerms,
   type TradeLine,
 } from './contest-model';
@@ -109,16 +154,64 @@ const DASH = '—';
 const fmt = (n: number | null | undefined): string =>
   n === null || n === undefined ? DASH : n.toFixed(1);
 
+/**
+ * The week's deadline, as the card needs it: when, and whether it has passed.
+ *
+ * A SHAPE RATHER THAN THREE PROPS, because it is one fact with three parts and
+ * every part is meaningless without the others. `now` travels with it so the
+ * countdown ticks off the CALLER's clock — the board already owns a `now` that
+ * drives the whole screen, and a second timer inside the card would drift
+ * against the lineup rows it sits above.
+ */
+export type Lock = { at: string | null; locked: boolean; now: number };
+
+/**
+ * What the card is sitting ON, which decides how light its fill is.
+ *
+ * ---------------------------------------------------------------------------
+ * THE BOARD'S CARD WAS A THIRD GREY ON A SCREEN THAT ONLY HAS ROOM FOR TWO
+ * ---------------------------------------------------------------------------
+ *
+ * On the lineup board the page is #000, the tab bar across the bottom is
+ * `surfaceSheet`, and this card was `surface` — one step lighter than the bar,
+ * for no reason a reader could name. Two pieces of furniture at the top and
+ * bottom of one screen, both raised off the same black, in two different
+ * greys: the card did not look wrong so much as slightly out of tune, which is
+ * the failure mode that survives review longest.
+ *
+ * It is not a matter of picking the darker value everywhere, and that is why
+ * this is a prop rather than an edit. The lobby draws these cards INSIDE a
+ * sheet, and a sheet is already `surfaceSheet` — a card at the same value there
+ * is an invisible card with a hairline round it, which is precisely the bug the
+ * token's own note in `theme.ts` warns about. The ramp has to keep stacking
+ * wherever the card lands:
+ *
+ *     on the page    #000 page  →  #0E1013 card, level with the tab bar
+ *     on a sheet     #0E1013 sheet  →  #17191E card, a step above it
+ *
+ * So the answer is a property of the SURFACE the card is placed on, which only
+ * the caller knows. `sheet` is the default because it is the conservative one:
+ * a caller that says nothing gets the fill every caller had before this
+ * existed.
+ */
+export type CardLevel = 'page' | 'sheet';
+
 /* ==================================================================== zones */
 
 /**
- * What this contest is, and what state it is in.
+ * WHO this contest is, and the one number that matters right now.
  *
- * TWO LINES, ALWAYS THE SAME TWO. The name and the stake on the first, what the
- * contest asks of your roster on the second, and the state on the right across
- * both. The board's card used to put a WEEK here instead of a name — which was
- * a redundancy twice over, since the screen above it already says the week and
- * the free contest's name IS the week ("Preseason Week 4").
+ * Two lines on the left reading down from most to least fixed — the name, then
+ * what it asks of your roster and how full it is — with the figure squared off
+ * against them on the right. That is the lineup row's own shape one rank up,
+ * and it is deliberate: this card is the top row of the table underneath it, so
+ * it should be built the way those rows are.
+ *
+ * NEITHER LINE CAN CLIP NOW. With `NEXT LOCK 1d 19h` set inline in this corner
+ * the head had about two thirds of the card for two lines of text, and line two
+ * carried three facts — so it truncated on every entered card before lock. The
+ * countdown is stacked over its own label in the figure column now, which is
+ * both larger and narrower, and the third fact has moved to the trade band.
  */
 function Head({
   name,
@@ -127,173 +220,85 @@ function Head({
 }: {
   name: string;
   terms: ContestTerms;
+  /** The head's right column: a figure on the board, a chip in the lobby. */
   state: React.ReactNode;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  return (
-    <View style={[styles.head, { borderColor: c.border }]}>
-      <View style={styles.headText}>
-        <View style={styles.headTitle}>
-          <Text numberOfLines={1} style={[Type.strong, { color: c.text }]}>
-            {name}
-          </Text>
-          {/* THE STAKE, ON THE SAME LINE AS THE NAME, because a heart is part
-              of what this contest IS. Drawn with the glyph rather than the word:
-              a red heart is a mark a reader stops on where a sentence is one
-              they skim.
+  const seats = seatsLine(terms);
+  const sub = [formatLine(terms, name), seats].filter(Boolean).join(' · ');
 
-              Only where there is one. A "0 hearts" mark on a contest that
-              cannot end you would make the safe thing look like a lesser
-              version of the risky one rather than a different offer. */}
-          {terms.heartsAtRisk > 0 ? (
-            <View style={styles.stake}>
-              <Heart size={9} state="safe" color={c.negative} />
-              <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
-                {terms.heartsOnWin > 0
-                  ? `${terms.heartsAtRisk} · +${terms.heartsOnWin}`
-                  : `${terms.heartsAtRisk}`}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-        <View style={styles.headSub}>
-          <Text numberOfLines={1} style={[Type.fine, styles.headSubMain, { color: c.textSecondary }]}>
-            {formatLine(terms)}
-          </Text>
-          {/* HOW FULL IT IS, on the right of its own line. `max_entrants` is
-              null on every contest that exists — a cap on a four-tester beta is
-              a way to discover the lobby is empty rather than full — so this
-              degrades to a bare count and says nothing at all at zero. */}
-          {seatsLine(terms) ? (
-            <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
-              {seatsLine(terms)}
-            </Text>
-          ) : null}
-        </View>
+  return (
+    <View style={[styles.band, styles.head, { borderColor: c.border }]}>
+      <View style={styles.headText}>
+        <Text numberOfLines={1} style={[Type.strong, { color: c.text }]}>
+          {name}
+        </Text>
+        {/* ONE STRING, NOT TWO ENDS OF A JUSTIFIED ROW. The seat count used to
+            be pushed to the right edge of this line, which put it under the
+            figure and read as a caption to it. Joined to the format it is what
+            it is: a third clause about what the contest is. */}
+        <Text numberOfLines={1} style={[Type.fine, { color: c.textSecondary }]}>
+          {sub}
+        </Text>
       </View>
       {state}
     </View>
   );
 }
 
-/** The countdown, or the chip that replaces it once there is nothing to count. */
-function ClockOrChip({
-  lockAt,
-  locked,
-  final,
-  now,
-}: {
-  lockAt: string | null;
-  locked: boolean;
-  final: boolean;
-  now: number;
-}) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-
-  if (final) return <StatusChip label="Final" tone="positive" />;
-  if (locked) return <StatusChip label="Locked" />;
-
-  /* The countdown runs to the NEXT player's kickoff, not to the week's first —
-     players lock one at a time now, so this is a deadline that arrives several
-     times and shortens the bench each time rather than ending the week. */
-  return (
-    <View style={styles.clock}>
-      <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
-        NEXT LOCK
-      </Text>
-      <Text numberOfLines={1} style={[Type.strong, NUMERIC, { color: c.text }]}>
-        {lockAt ? countdownLabel(new Date(lockAt).getTime() - now) : DASH}
-      </Text>
-    </View>
-  );
-}
-
 /**
- * THE TRADE: what you put up on the left, what you can take on the right.
- *
- * TWO COLUMNS RATHER THAN A SENTENCE, because it is a comparison and a reader
- * is making it. Strung along one line — "40 gems, 1 heart at risk, top 3 win,
- * pool 200" — the two halves interleave and the reader has to sort them before
- * they can weigh them. Side by side, the weighing is the reading.
- *
- * THE HEAL SITS IN THE REWARD COLUMN, NEVER BESIDE THE RISK. A contest that
- * takes a heart most weeks and gives one back when it lands is not a harsher
- * version of the even-money contest; it is the only place in the game hearts
- * come FROM. Printed next to the risk it reads as a discount on the damage.
- */
-function Trade({ terms, prize }: { terms: ContestTerms; prize: number | null }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-
-  return (
-    <View style={styles.trade}>
-      <TradeColumn label="RISK" lines={riskLines(terms)} />
-      <View style={[styles.tradeRule, { backgroundColor: c.border }]} />
-      <TradeColumn label="REWARD" lines={rewardLines(terms, prize)} />
-    </View>
-  );
-}
-
-function TradeColumn({ label, lines }: { label: string; lines: TradeLine[] }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  return (
-    <View style={styles.tradeCol}>
-      <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
-        {label}
-      </Text>
-      {lines.map((line) => (
-        <View key={line.text} style={styles.tradeLine}>
-          {line.heart ? <Heart size={10} state="safe" color={c.negative} /> : null}
-          <Text
-            numberOfLines={1}
-            style={[Type.body, { color: line.tone === 'positive' ? c.positive : c.text }]}>
-            {line.text}
-          </Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-/**
- * The one big number, and it is NOT always the score.
+ * The one big number — and which fact deserves to be it changes with the week.
  *
  * ---------------------------------------------------------------------------
- * AN EMPTY STATE IS NOT THE FULL STATE WITH THE NUMBERS PUNCHED OUT
+ * THE HERO WAS A DUPLICATE OF A DUPLICATE
  * ---------------------------------------------------------------------------
  *
- * For most of a week — and for the entire life of a beta week before Sunday —
- * this card had no score to show, so it drew a dash at hero size, `PROJ —`
- * under it, and an empty rail with three axis labels beneath that. Roughly
- * sixty per cent of the card was reserved space, and the largest thing on it
- * was an absence. It read as broken rather than as early, which is the state
- * most people meet FIRST.
+ * Before kickoff this drew `7/8` at 22pt in warning gold. That is the same fact
+ * as the slot meter below it, and the same fact a third time as the "Starting
+ * lineup · 7/8 filled" heading over the board under the card. It was the
+ * loudest thing on the screen and it was the thing the screen said most often —
+ * louder than 118.4, which is the number the card exists for.
  *
- * The fix is not a bigger dash or a friendlier caption. It is that before
- * kickoff the card is answering a DIFFERENT QUESTION, and it should ask it:
- * not "how am I doing", which has no answer yet, but "is my lineup ready and
- * when does it lock" — which is the only thing still in the reader's hands and
- * the only thing that can still be wrong.
+ * Meanwhile the countdown sat at 13pt in the corner of the head. Of everything
+ * the card knows before kickoff, the countdown is the only figure that is both
+ * MOVING and ACTIONABLE: it is the deadline the whole board is working
+ * against, and nothing else on the screen carries it.
  *
- * So the column shows slots filled until there is a score, then the score. Same
- * position, same type scale, so nothing jumps when it swaps.
+ * So the slot is ranked by usefulness rather than by fallback, and the order is
+ * the order the week happens in:
+ *
+ *   score      once anybody in the field has played — the card's real subject
+ *   countdown  while the roster can still be changed — the live deadline
+ *   filled     once neither is true: locked, unplayed, nothing to count to
+ *
+ * Same position and the same type scale in all three, so the swap at lock and
+ * the swap at kickoff are changes of MEANING rather than changes of layout.
+ *
+ * THE QUALIFIER UNDER IT IS ALWAYS THE MOST USEFUL ONE AVAILABLE, and it is
+ * never blank. It used to be a reserved empty line whenever a field was tied,
+ * held open so the card would not change height — a whole row of the card spent
+ * on nothing. Ranked instead: your place in the field where there is one, the
+ * week's state where there is not.
+ *
+ * 18pt, down from 22. The lineup rows below set a player's week at 15; a team
+ * total is one step up, not two, and at 22 the card's least interesting state
+ * was shouting over its most interesting one.
  *
  * `PROJ —` IS GONE FROM THE CARD. The provider sells no projections and never
  * will, so that slot was a permanent dash directly under the largest number on
  * the screen. In the lineup ROWS the column still earns its place — it is one
  * reserved cell across eight rows and it keeps them aligned — but here it was a
- * single dead line in the one spot the card had to say something true. It holds
- * the rank now, which is a fact that exists.
+ * single dead line in the one spot the card had to say something true.
  */
-function Figure({
+export function Figure({
   score,
   filled,
   slots,
   rank,
   entrants,
+  lock,
+  final = false,
 }: {
   /** The week's total, or null before anybody has played. */
   score: string | null;
@@ -302,40 +307,160 @@ function Figure({
   /** Null while the whole field is tied and a rank would be meaningless. */
   rank: number | null;
   entrants: number;
+  /** The deadline, while there is still one to count to. */
+  lock: Lock | null;
+  final?: boolean;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
   if (score !== null) {
     return (
-      <View style={styles.figureCol}>
-        <Text numberOfLines={1} style={[styles.figure, NUMERIC, { color: c.text }]}>
-          {score}
-        </Text>
-        {/* Reserved whether or not there is a rank, so the card does not change
-            height when the field spreads. */}
-        <Text numberOfLines={1} style={[Type.micro, NUMERIC, styles.figureSub, { color: c.textTertiary }]}>
-          {rank === null ? ' ' : `#${rank} OF ${entrants}`}
-        </Text>
-      </View>
+      <Stat
+        value={score}
+        label={rank !== null ? `#${rank} OF ${entrants}` : final ? 'FINAL' : 'LIVE'}
+        numericLabel={rank !== null}
+      />
     );
   }
 
-  /* A LINEUP SHORT OF ITS SLOTS IS A PROBLEM, and it is drawn as one. The
-     warning colour here is the same one the lobby uses on "5 of 8" — this is
-     the same fact about the same lineup and it must not look different
-     depending on which screen noticed it. */
+  /* THE COUNTDOWN RUNS TO THE NEXT PLAYER'S KICKOFF, not to the week's first.
+     Players lock one at a time now, so this is a deadline that arrives several
+     times and shortens the bench each time rather than ending the week — which
+     is why the label is NEXT LOCK and not simply LOCKS. */
+  if (lock !== null && !lock.locked && lock.at !== null) {
+    return (
+      <Stat value={countdownLabel(new Date(lock.at).getTime() - lock.now)} label="NEXT LOCK" />
+    );
+  }
+
+  /* NO SCORE AND NO DEADLINE. Usually that means locked and not yet kicked
+     off, so the count is the only thing the slot can hold — and here it has
+     earned the size, because a lineup short at lock is short for good. The
+     warning colour is the same one the lobby uses on "5 of 8": one fact about
+     one lineup, drawn one way wherever it is noticed.
+
+     The label does not assume the lock, because this branch also catches a
+     slate that has not published a kickoff yet. `LOCKED` where it is true, and
+     otherwise the same word the count has always carried. */
   const short = filled < slots;
   return (
-    <View style={styles.figureCol}>
+    <Stat
+      value={`${filled}/${slots}`}
+      label={lock?.locked ? 'LOCKED' : short ? 'TO FILL' : 'FILLED'}
+      tone={short ? c.warning : undefined}
+    />
+  );
+}
+
+/** A figure over its qualifier. The head's right column, in every state. */
+function Stat({
+  value,
+  label,
+  tone,
+  numericLabel = false,
+}: {
+  value: string;
+  label: string;
+  tone?: string;
+  numericLabel?: boolean;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  return (
+    <View style={styles.statCol}>
+      <Text numberOfLines={1} style={[styles.figure, NUMERIC, { color: tone ?? c.text }]}>
+        {value}
+      </Text>
       <Text
         numberOfLines={1}
-        style={[styles.figure, NUMERIC, { color: short ? c.warning : c.text }]}>
-        {filled}/{slots}
+        style={[Type.micro, numericLabel ? NUMERIC : null, { color: c.textTertiary }]}>
+        {label}
       </Text>
-      <Text numberOfLines={1} style={[Type.micro, styles.figureSub, { color: c.textTertiary }]}>
-        {short ? 'TO FILL' : 'FILLED'}
+    </View>
+  );
+}
+
+/**
+ * THE TRADE: what you put up on the left, what you can take on the right, and
+ * the condition on all of it across the top.
+ *
+ * TWO COLUMNS RATHER THAN A SENTENCE, because it is a comparison and a reader
+ * is making it. Strung along one line — "40 gems, 1 heart at risk, top 3 win,
+ * pool 200" — the two halves interleave and the reader has to sort them before
+ * they can weigh them. Side by side, the weighing is the reading.
+ *
+ * THE ARROW REPLACED TWO LABELS. `RISK` and `REWARD` sat as 9pt headers over
+ * the columns and a hairline ran between them, which cost a full line of the
+ * card to say what the direction of a trade already says. An arrow in the
+ * divider's place says it in one glyph, on the row the values are already on:
+ * left is what leaves, right is what arrives. The `+` on a heart gained does
+ * the rest.
+ *
+ * THE HEAL SITS IN THE REWARD COLUMN, NEVER BESIDE THE RISK. A contest that
+ * takes a heart most weeks and gives one back when it lands is not a harsher
+ * version of the even-money contest; it is the only place in the game hearts
+ * come FROM. Printed next to the risk it reads as a discount on the damage.
+ *
+ * THE TERMS STAY ON AN ENTERED CARD, and the gems are the debatable part — they
+ * are spent, and an earlier version dropped them on the grounds that a price
+ * already paid is not news. But the trade is not over until settlement: the
+ * heart is still riding, the pool is still growing, and the reward is still
+ * ahead of you. Showing three quarters of a live trade is worse than showing a
+ * line about money that has moved.
+ */
+function Trade({ terms, prize }: { terms: ContestTerms; prize: number | null }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
+  return (
+    <>
+      {/* HOW IT IS WON, LEADING THE BAND AND ON A LINE OF ITS OWN.
+ 
+          It was the tail of the head's format string and it was the half that
+          got cut off — see `formatLine`. This is where it belonged all along:
+          every figure in the reward column is CONDITIONAL on it, so a reader
+          weighing the two columns is already asking the question this sentence
+          answers, and reading it here costs no glance of its own.
+ 
+          At `strong`, which makes it the largest text in the band. That is the
+          right rank: "Top 3 of 6 win" and "Beat the median" are the same shape
+          of sentence describing offers that are nothing alike, and it is the
+          one line on the card a reader must not skim. */}
+      <Text numberOfLines={1} style={[Type.strong, { color: c.text }]}>
+        {winLine(terms)}
       </Text>
+      <View style={styles.trade}>
+        <TradeColumn lines={riskLines(terms)} />
+        <Text style={[Type.body, styles.arrow, { color: c.textTertiary }]}>→</Text>
+        <TradeColumn lines={rewardLines(terms, prize)} align="right" />
+      </View>
+    </>
+  );
+}
+
+function TradeColumn({ lines, align = 'left' }: { lines: TradeLine[]; align?: 'left' | 'right' }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  return (
+    <View style={[styles.tradeCol, align === 'right' && styles.tradeColRight]}>
+      {lines.map((line) => (
+        <View key={line.text} style={styles.tradeLine}>
+          {line.heart ? <Heart size={10} state="safe" color={c.negative} /> : null}
+          {/* TWO LINES ALLOWED, NEVER RESERVED. Every line here is two or three
+              words except "Gem pool, once entries start" — the state a paid
+              contest sits in until somebody enters it — which clipped to "Gem
+              pool, once entries s…" and turned a reward column into a shrug.
+              The columns are `flex: 1` beside each other and stretch to the
+              taller, so a wrap grows the card by a line rather than making the
+              two columns argue over width. */}
+          <Text
+            numberOfLines={2}
+            style={[Type.body, { color: line.tone === 'positive' ? c.positive : c.text }]}>
+            {line.text}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -352,6 +477,25 @@ function Figure({
  * card is filed. It is the same 8pt rail in the same place, so the swap at
  * kickoff is a change of meaning rather than a change of layout — and both
  * meanings are the same question, which is how far along this entry is.
+ *
+ * THE EMPTY SEGMENT IS A HOLE, NOT A DIMMER FILL, and that is a legibility fix
+ * rather than a preference. It was `backgroundElement` — #212225 against a
+ * #17191E card, ten steps of grey — so seven filled and one empty looked like
+ * eight filled at arm's length, and the meter was useless in exactly the state
+ * it exists for. At `background` it is the page's own black: a gap punched in
+ * the rail, which is what an unfilled slot IS.
+ *
+ * That is also why the filled segments stay at `textSecondary` rather than
+ * going white. Raising the fill was the other way to open the gap and it made
+ * the meter the brightest object on the card — eight solid white bars, in the
+ * state where the card has the least to say. Darkening the hole costs nothing
+ * anywhere else.
+ *
+ * The empty segment is NOT drawn in the warning colour, which was a third
+ * option. Gold here is within a few steps of `selectionAccent`, so a single
+ * gold bar in a row of grey ones reads as the one that is CHOSEN rather than
+ * the one that is missing — inverting figure and ground on the only graphic
+ * whose whole job is to be counted. The alarm goes in the words beside it.
  */
 function SlotMeter({ filled, slots }: { filled: number; slots: number }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -363,56 +507,10 @@ function SlotMeter({ filled, slots }: { filled: number; slots: number }) {
           key={i}
           style={[
             styles.meterSeg,
-            { backgroundColor: i < filled ? c.textSecondary : c.backgroundElement },
+            { backgroundColor: i < filled ? c.textSecondary : c.background },
           ]}
         />
       ))}
-    </View>
-  );
-}
-
-/**
- * The three labels under either rail, so both states read the same way.
- *
- * The middle one names the MARK — which is why its value belongs here rather
- * than in a column of its own, and why the margin sits beside it: the distance
- * to that line is the only thing on this card the reader is really asking
- * about, and it is stated where the line is.
- *
- * The label is the contest's own, not the word "median". See `markOf`.
- */
-function ScaleFoot({
-  markLabel,
-  mark,
-  margin,
-}: {
-  markLabel: string;
-  mark: string | null;
-  margin: number | null;
-}) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  return (
-    <View style={styles.scaleFoot}>
-      <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
-        LOWEST
-      </Text>
-      <View style={styles.footMiddle}>
-        <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
-          {mark === null ? markLabel : `${markLabel} ${mark}`}
-        </Text>
-        {margin === null ? null : (
-          <Text
-            numberOfLines={1}
-            style={[Type.micro, NUMERIC, { color: margin >= 0 ? c.positive : c.negative }]}>
-            {margin >= 0 ? '+' : '−'}
-            {Math.abs(margin).toFixed(1)}
-          </Text>
-        )}
-      </View>
-      <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
-        HIGHEST
-      </Text>
     </View>
   );
 }
@@ -477,48 +575,83 @@ function ScaleBar({
 /* ==================================================================== card */
 
 /**
- * The frame. Head, optional middle, terms, foot — in that order, always.
+ * The frame. Head, optional middle, trade, optional foot — in that order,
+ * always.
  *
- * The middle arrives as a NODE rather than as a `variant` flag on purpose. A
- * flag invites the head and the foot to acquire per-variant conditions, which
- * is precisely how the lobby and the board drifted into two layouts the first
- * time they were unified.
+ * The middle and the foot arrive as NODES rather than as `variant` flags on
+ * purpose. A flag invites the head and the trade to acquire per-variant
+ * conditions, which is precisely how the lobby and the board drifted into two
+ * layouts the first time they were unified.
  */
 export function ContestCard({
   name,
   terms,
   state,
   middle,
+  foot,
   prize = null,
+  level = 'sheet',
   onPress,
 }: {
   name: string;
   terms: ContestTerms;
-  /** The chip or the countdown. Both surfaces answer "what state is this in". */
+  /**
+   * The head's right column. A `StatusChip` in the lobby, where the question is
+   * "can I enter this"; a `Figure` on the board, where it is "how am I doing".
+   * Both are the same corner answering "what state is this in", which is why
+   * they are one slot and not two.
+   */
   state: React.ReactNode;
   /** Present exactly when there is an entry to show. */
   middle?: React.ReactNode;
+  /**
+   * A band under the trade, for what the entry is riding ON rather than what it
+   * is worth. Today that is exactly one thing: the run.
+   *
+   * ---------------------------------------------------------------------------
+   * THE RUN RACK WAS A SECOND CARD, AND TWO CARDS ARGUE
+   * ---------------------------------------------------------------------------
+   *
+   * It lived in a bordered panel of its own directly under this one, and its
+   * own note admitted the problem while solving half of it: it was kept one row
+   * tall so it would not read as a second card competing with the contest. But
+   * a bordered, filled, rounded panel eight points below a bordered, filled,
+   * rounded panel is a second card whatever its height — and this one had the
+   * strange property of being ABOUT the card above it. The heart it draws is
+   * the heart that card's risk column has just priced.
+   *
+   * As a band it is inside the object it describes, and it costs a hairline
+   * rather than a whole container.
+   *
+   * A NODE, LIKE `middle`, AND FOR THE SAME REASON. The lobby draws no run per
+   * card — it has one panel above the whole list, where it belongs, because
+   * there the run is what you are shopping WITH rather than what one contest is
+   * holding.
+   */
+  foot?: React.ReactNode;
   prize?: number | null;
+  /** What this card is sitting on. See `CardLevel`. */
+  level?: CardLevel;
   onPress?: () => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  const fill = level === 'page' ? c.surfaceSheet : c.surface;
 
   const body = (
     <>
       <Head name={name} terms={terms} state={state} />
       {middle}
-      <View style={styles.termsBody}>
+      <View style={[styles.band, foot ? { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: c.border } : null]}>
         <Trade terms={terms} prize={prize} />
       </View>
+      {foot}
     </>
   );
 
   if (!onPress) {
     return (
-      <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-        {body}
-      </View>
+      <View style={[styles.card, { backgroundColor: fill, borderColor: c.border }]}>{body}</View>
     );
   }
 
@@ -532,7 +665,7 @@ export function ContestCard({
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        { backgroundColor: c.surface, borderColor: c.border },
+        { backgroundColor: fill, borderColor: c.border },
         pressed && styles.pressed,
       ]}>
       {body}
@@ -541,12 +674,30 @@ export function ContestCard({
 }
 
 /**
- * The band entering inserts: your team, your number, and where it sits.
+ * The band entering inserts: where your week sits, and who it belongs to.
  *
- * IT IS THE TOP ROW OF THE SAME TABLE AS THE LINEUP — handle over a standing
- * line on the left, the week's figure on the right, which is the shape the rows
- * below it use, only larger because this is a team total rather than one
- * player's.
+ * TWO ROWS AND NOTHING ELSE — a rail, and one line of meta under it. That is
+ * the whole band now; it used to be an avatar, a handle, a record, a 22pt
+ * figure, a rail and three axis labels, in a block as tall as two lineup rows.
+ *
+ * WHAT WENT, AND WHY IT WAS SAFE:
+ *
+ *   THE AVATAR was a 26pt circle of your own initials on a card that can only
+ *   ever be about you — and it was what set the height of the row it was in.
+ *   The lineup rows below carry no avatar either, so losing it makes this more
+ *   like the table it is the top of, not less.
+ *
+ *   THE FIGURE moved to the head, where it shares a row with the contest's name
+ *   instead of owning one of its own. See `Figure`.
+ *
+ *   LOWEST AND HIGHEST were two labels naming the two ends of a bar. A bar's
+ *   ends are the range; that is what a bar is. The row they occupied carries
+ *   the handle and the mark instead — two facts where there were none.
+ *
+ * WHAT THE META ROW SAYS depends on which rail is above it, and both readings
+ * are the same question: how far is this from where it needs to be. Live, it is
+ * the line you are judged against and your distance from it. Before kickoff, it
+ * is how many slots are still empty.
  */
 export function Standing({
   manager,
@@ -576,88 +727,171 @@ export function Standing({
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const accent = TierColors[scheme].gold.accent;
 
-  /**
-   * HAS ANYBODY PLAYED YET? — not the same question as "has the sweep run",
-   * which is what this card used to ask and got wrong on screen.
-   *
-   * `score_week` stamps `scored_at` and writes `total_points = 0` whether or
-   * not a ball has been thrown, so keying off that put a FINAL chip and a
-   * confident "0.0" on a week that had not started. The honest test is the best
-   * score in the FIELD: if nobody has a point, nobody has played.
-   */
-  const played = field !== null && field.high > 0;
-  /* A field of one is its own low, mark and high — no range to place anybody
-     in, whatever anybody scored. */
-  const live = field !== null && field.entrants >= MIN_ENTRANTS && played;
-
+  const live = isLive(field);
   const mark = markOf(terms, { median: field?.median ?? 0, cut });
   const margin = live && myPoints !== null && mark.value !== null ? myPoints - mark.value : null;
-
-  /**
-   * The score is YOURS the moment one exists — gated on `played`, NOT on
-   * `live`. Tying it to `live` meant a week you had finished and scored 88.2 in
-   * showed nothing, because you happened to be the only manager in it. Only the
-   * COMPARISON needs a field.
-   */
-  const score = played ? fmt(myPoints) : null;
-
-  /**
-   * ALWAYS WITH THE POOL SIZE, never a bare "#1". The danger is a rank that is
-   * really a TIE ACROSS THE WHOLE FIELD: before kickoff every lineup sits on a
-   * stored nought and `rank()` hands EVERYONE first place. So the test is
-   * whether the field has spread — `high > low` — not whether anybody has
-   * played. A field of ONE is exempt: its rank is unambiguous and the `of 1`
-   * says everything about what it is worth.
-   */
-  const rankIsReal =
-    field !== null && field.myRank !== null && (field.entrants === 1 || field.high > field.low);
+  const left = Math.max(0, terms.slotCount - filled);
 
   return (
-    <View style={[styles.middle, { borderColor: c.border }]}>
-      <View style={styles.identity}>
-        <View style={[styles.avatar, { borderColor: accent }]}>
-          <Text style={[Type.label, { color: c.text }]}>{initialsOf(manager)}</Text>
-        </View>
-        <View style={styles.who}>
-          <Text numberOfLines={1} style={[styles.name, { color: c.text }]}>
-            {manager}
-          </Text>
-          {subtitle ? (
-            <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
-              {subtitle}
+    <View style={[styles.band, styles.middle, { borderColor: c.border }]}>
+      {live && field !== null ? (
+        <ScaleBar low={field.low} high={field.high} mark={mark.value} mine={myPoints} />
+      ) : (
+        <SlotMeter filled={filled} slots={terms.slotCount} />
+      )}
+      <View style={styles.meta}>
+        <Text numberOfLines={1} style={[Type.fine, styles.metaMain, { color: c.textSecondary }]}>
+          {[manager, subtitle].filter(Boolean).join(' · ')}
+        </Text>
+        {live ? (
+          <View style={styles.metaRight}>
+            <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
+              {mark.value === null ? mark.label : `${mark.label} ${fmt(mark.value)}`}
             </Text>
-          ) : null}
-        </View>
-        <Figure
-          score={score}
-          filled={filled}
-          slots={terms.slotCount}
-          rank={rankIsReal ? field.myRank : null}
-          entrants={field?.entrants ?? 0}
-        />
-      </View>
-
-      <View style={styles.scale}>
-        {live ? (
-          <ScaleBar low={field.low} high={field.high} mark={mark.value} mine={myPoints} />
+            {margin === null ? null : (
+              <Text
+                numberOfLines={1}
+                style={[Type.micro, NUMERIC, { color: margin >= 0 ? c.positive : c.negative }]}>
+                {margin >= 0 ? '+' : '−'}
+                {Math.abs(margin).toFixed(1)}
+              </Text>
+            )}
+          </View>
         ) : (
-          <SlotMeter filled={filled} slots={terms.slotCount} />
+          /* SAID AS A REMAINDER, NOT AS A RATIO. "1 slot to fill" is a job;
+             "7/8" is a score, and a reader who has to subtract before they know
+             what to do has been handed arithmetic instead of an instruction.
+             The remainder is also the number that shrinks to nothing, which is
+             the shape of a thing being finished.
+
+             THE DONE STATE IS QUIET AND STILL PRESENT. Dropping the line when
+             the lineup is full would mean the one state you want confirmed is
+             the one the card says nothing about, and silence is how a screen
+             reads as broken. */
+          <Text
+            numberOfLines={1}
+            style={[Type.micro, { color: left > 0 ? c.warning : c.textTertiary }]}>
+            {left > 0 ? `${left} SLOT${left === 1 ? '' : 'S'} TO FILL` : 'LINEUP FILED'}
+          </Text>
         )}
-        {/* THE AXIS LABELS EXIST ONLY WHERE THERE IS AN AXIS. They were drawn
-            over the empty rail too, on the argument that they teach the scale
-            before there is data in it. That was defensible against a
-            meaningless ghost rail and is simply false against a slot meter —
-            LOWEST and HIGHEST would be labelling nothing. */}
-        {live ? (
-          <ScaleFoot
-            markLabel={mark.label}
-            mark={mark.value !== null ? fmt(mark.value) : null}
-            margin={margin}
-          />
-        ) : null}
       </View>
+    </View>
+  );
+}
+
+/**
+ * IS THERE A DISTRIBUTION TO DRAW? — three conditions, and each one has been a
+ * bug on this card at some point.
+ *
+ * `score_week` stamps `scored_at` and writes `total_points = 0` whether or not
+ * a ball has been thrown, so keying off that put a FINAL chip and a confident
+ * "0.0" on a week that had not started. The honest test of "has anybody played"
+ * is the best score in the FIELD: if nobody has a point, nobody has played.
+ *
+ * And a field of ONE is its own low, mark and high — no range to place anybody
+ * in, whatever they scored.
+ */
+function isLive(field: FieldWeek | null): boolean {
+  return field !== null && field.entrants >= MIN_ENTRANTS && field.high > 0;
+}
+
+/**
+ * Your score for this contest, and whether it is really a rank — the two
+ * questions the head's `Figure` needs answered and cannot answer itself.
+ *
+ * IT LIVES HERE BECAUSE THE MIDDLE'S RULES DECIDE IT. The score is yours the
+ * moment one exists — gated on anybody having PLAYED, not on the field being
+ * wide enough to plot — because tying it to the distribution meant a week you
+ * had finished and scored 88.2 in showed nothing, on the grounds that you were
+ * the only manager in it. Only the COMPARISON needs a field.
+ *
+ * THE RANK IS ALWAYS WITH THE POOL SIZE, never a bare "#1", and it is withheld
+ * entirely when the whole field is tied: before kickoff every lineup sits on a
+ * stored nought and `rank()` hands EVERYONE first place. So the test is whether
+ * the field has SPREAD — `high > low` — not whether anybody has played. A field
+ * of one is exempt: its rank is unambiguous and the `of 1` says exactly what it
+ * is worth.
+ */
+export function figureOf(field: FieldWeek | null, myPoints: number | null) {
+  const played = field !== null && field.high > 0;
+  const rankIsReal =
+    field !== null && field.myRank !== null && (field.entrants === 1 || field.high > field.low);
+  return {
+    score: played ? fmt(myPoints) : null,
+    rank: rankIsReal ? field.myRank : null,
+    entrants: field?.entrants ?? 0,
+  };
+}
+
+/**
+ * The card's foot: the run this entry is riding on, and the pip it is holding.
+ *
+ * ---------------------------------------------------------------------------
+ * IT WAS A PANEL UNDER THE CARD, AND IT IS A BAND OF THE CARD
+ * ---------------------------------------------------------------------------
+ *
+ * The rack has moved twice. It started in the masthead, where it stated your
+ * hearts on Collection and Players — screens where a heart cannot be won or
+ * lost — beside a gem balance with nothing linking it to the contest actually
+ * risking one. It moved to a panel under the contest card, which fixed the
+ * adjacency and created a new problem: a bordered, filled, rounded panel eight
+ * points below a bordered, filled, rounded panel is a second card, and two
+ * cards on one screen argue about which one matters.
+ *
+ * Here it is neither. It is the last band of the card whose risk column has
+ * just priced the heart it draws — one hairline above it, the same gutter as
+ * every other band, no border and no fill of its own.
+ *
+ * THE PIP THIS CONTEST HOLDS COMES FORWARD as you swipe, which is the whole
+ * reason the rack belongs to a contest card at all rather than to the screen.
+ * The card says what it risks; this says WHICH heart, and what is left behind
+ * it. See `Hearts` for why the mapping can be made in the carousel and still be
+ * stable for the week.
+ *
+ * WHAT THE WORDS SAY IS WHAT THE PIPS CANNOT. The rack is already stating the
+ * stake in hearts, so "lose this and 2 remain" would be a sentence restating a
+ * graphic two points to its left. The next rung is the one fact on this screen
+ * nothing else carries, so it is the one that earns the line — and it is set as
+ * a count in the label voice with the consequence beside it rather than as one
+ * clause, because at 11pt on a shared row the half that says what you GET was
+ * the half that truncated. See `rungParts`.
+ */
+export function RunFoot({
+  hearts,
+  wagered,
+  rack,
+  focus,
+  rung,
+}: {
+  hearts: number;
+  wagered: number;
+  rack: number;
+  focus: HeartSpan | null;
+  rung: { lead: string; body: string } | null;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
+  return (
+    <View style={[styles.band, styles.foot]}>
+      <View style={styles.footMain}>
+        <Text style={[Type.micro, { color: c.textTertiary }]}>YOUR RUN</Text>
+        <Hearts hearts={hearts} wagered={wagered} rack={rack} focus={focus} size={13} rail />
+      </View>
+      {/* ONE TEXT WITH A SPAN INSIDE IT, not two Texts in a row — which is what
+          this was, and it truncated both halves on a phone: "3 MORE WI…" beside
+          "and a death keeps 1 c…". Two sibling Texts each get their own width
+          and each clip independently, so the row had no way to spend the space
+          where the words actually were. Nested, the count and the consequence
+          are one flow that wraps to a second line on a narrow card and stays on
+          one line on a wide one, and neither half can lose its ending. */}
+      {rung ? (
+        <Text numberOfLines={2} style={[Type.fine, styles.footRung, { color: c.textTertiary }]}>
+          <Text style={[Type.micro, { color: c.text }]}>{rung.lead}</Text>
+          {` ${rung.body}`}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -676,107 +910,84 @@ export function ContestTermsPanel({ terms }: { terms: ContestTerms }) {
   const c = Colors[scheme];
   return (
     <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-      <View style={styles.termsHead}>
+      <View style={[styles.band, styles.termsHead, { borderColor: c.border }]}>
         <Text numberOfLines={1} style={[Type.fine, { color: c.textSecondary }]}>
           {formatLine(terms)}
         </Text>
       </View>
-      <View style={styles.termsBody}>
+      <View style={styles.band}>
         <Trade terms={terms} prize={null} />
       </View>
     </View>
   );
 }
 
-/** The state chip a lobby card carries, and the clock an entered one does. */
-export { ClockOrChip };
-
 const styles = StyleSheet.create({
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.panel, overflow: 'hidden' },
   pressed: { opacity: 0.7 },
-  /* Takes the room the chip and clock do not, so the name truncates before the
-     stake does — a clipped heart reads as a rendering fault. */
-  headText: { flex: 1, minWidth: 0, gap: 1 },
-  /* Line two spans the card: what it asks on the left, how full it is on the
-     right. `flexShrink` on the left half only, so the seat count never wraps. */
-  headSub: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: Spacing.two },
-  headSubMain: { flexShrink: 1, minWidth: 0 },
-  headTitle: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexShrink: 1 },
-  stake: { flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 0 },
+
+  /**
+   * EVERY BAND, ONE GEOMETRY. The card used to set its padding per band —
+   * 12/7 on the head, 12/10 on the middle, 12/9 on the terms — three near-equal
+   * numbers that added roughly fifty points of air nobody had chosen.
+   *
+   * The gutter is `Spacing.three`, which is the lineup rows' own and the
+   * section headings' own: a card whose left edge is two points inside the
+   * board it heads reads as a mistake. The 2pt gap is the gap BETWEEN LINES OF
+   * ONE BLOCK, which is what a band is — the same 2 the lineup row stacks its
+   * three lines on.
+   */
+  band: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.two - 1, gap: 2 },
+
   head: {
     flexDirection: 'row',
-    /* TOP, not centre. The head is two lines and the state is one, so centring
-       parked the clock between them — level with the seat count on line two and
-       reading as part of it. Aligned to the top it sits on the name's line,
-       which is the line it belongs to. */
+    /* TOP, not centre. The head's left is two lines and its right is a figure
+       over a label; centring parked them against each other's middles. Aligned
+       to the top, the name and the figure sit on one line — which is the line
+       they belong to. */
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: Spacing.two,
-    paddingHorizontal: Spacing.two + 4,
-    paddingVertical: Spacing.two - 1,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  /* Label and value on one baseline, so the rail stays one line tall whether it
-     is showing a countdown or a chip. */
-  clock: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.one + 1 },
+  /* Takes the room the figure does not. `minWidth: 0` is what lets a long name
+     truncate instead of shoving the figure off the card. */
+  headText: { flex: 1, minWidth: 0, gap: 2 },
 
-  /* The band entering inserts. Ruled off top and bottom so that the head above
-     and the terms below are visibly the same rows they were without it. */
-  middle: {
-    paddingHorizontal: Spacing.two + 4,
-    paddingVertical: Spacing.two + 2,
-    gap: Spacing.two,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  termsBody: { paddingHorizontal: Spacing.two + 4, paddingVertical: Spacing.two + 1 },
-  termsHead: {
-    paddingHorizontal: Spacing.two + 4,
-    paddingVertical: Spacing.two - 1,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  /* Equal halves with a rule between them. `flex: 1` on both rather than a
+  /* Never shrinks: the head's text gives way instead. The width is fixed so
+     that a two-character countdown replacing a five-character score does not
+     drag the name beside it sideways once a minute in the last hour. */
+  statCol: { alignItems: 'flex-end', flexShrink: 0, minWidth: 72 },
+  /* 18, against the lineup rows' 15. One step up because this is a team total
+     rather than one player's — and it was 22, which is two steps and made the
+     card's least interesting state its loudest. */
+  figure: { fontSize: 18, lineHeight: 21, fontWeight: '800', letterSpacing: -0.4 },
+
+  middle: { borderBottomWidth: StyleSheet.hairlineWidth, gap: Spacing.one + 1 },
+  /* The handle on the left, the mark or the shortfall on the right. One row,
+     baseline-aligned, and the handle truncates before either. */
+  meta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
+  metaMain: { flexShrink: 1, minWidth: 0 },
+  metaRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1, flexShrink: 0 },
+
+  /* Equal halves with the arrow between them. `flex: 1` on both rather than a
      measured split, so a long reward line wraps inside its own column instead
      of pushing the risk column off the card. */
-  trade: { flexDirection: 'row', alignItems: 'stretch', gap: Spacing.three },
-  tradeCol: { flex: 1, minWidth: 0, gap: 3 },
+  trade: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  tradeCol: { flex: 1, minWidth: 0, gap: 2 },
+  tradeColRight: { alignItems: 'flex-end' },
   tradeLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1 },
-  /* A hairline, not a gap: the two columns are one comparison and the rule is
-     what says so. */
-  tradeRule: { width: StyleSheet.hairlineWidth },
+  /* Where the hairline used to be. It is the divider AND the label: it says
+     which way the trade runs, which is what RISK and REWARD were spending a
+     line of the card to say. */
+  arrow: { flexShrink: 0 },
 
-  /* ------------------------------------------------------------ board */
-  identity: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  /* Takes the row's spare width, which is what pushes the figure to the right
-     edge — no spacer and no `marginLeft: auto`. `minWidth: 0` is what lets a
-     long handle truncate instead of shoving the figure off the card. */
-  who: { flex: 1, minWidth: 0, gap: 1 },
-  avatar: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 1.5,
-    flexShrink: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  name: { fontSize: 14, fontWeight: '700', letterSpacing: -0.2 },
-  /* Never shrinks: the name beside it gives way instead. */
-  figureCol: { alignItems: 'flex-end', flexShrink: 0 },
-  /* 22, against the lineup rows' 15. Bigger because it is a team total rather
-     than one player's, small enough that the bar under it is still the thing
-     the card is about. */
-  figure: { fontSize: 22, lineHeight: 24, fontWeight: '800', letterSpacing: -0.5 },
-  /* Height reserved whether or not there is anything in it, so the card does
-     not grow by a line the moment a field spreads far enough to have ranks. */
-  figureSub: { height: 15, lineHeight: 15 },
-  footMiddle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one + 1,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  scale: { gap: Spacing.one },
+  /* Same 8pt height as the live track, so nothing shifts when the first score
+     lands and the meter becomes a distribution. The gap is what keeps it
+     reading as COUNTABLE — eight things you have or have not done — rather than
+     as a progress bar that happens to be segmented. */
+  meter: { flexDirection: 'row', gap: 3, height: 8 },
+  meterSeg: { flex: 1, borderRadius: 2 },
   /* `overflow: hidden` so the fill's square end is clipped to the track's
      radius rather than poking out of it at 100%. */
   track: { height: 8, borderRadius: 4, overflow: 'hidden', justifyContent: 'center' },
@@ -785,16 +996,17 @@ const styles = StyleSheet.create({
      mark's position sits entirely to the right of it, which at the top of the
      range would read as a threshold nobody could reach. */
   mark: { position: 'absolute', width: 2, top: 0, bottom: 0, marginLeft: -1 },
-  /* Same 8pt height as the live track, so nothing shifts when the first score
-     lands and the meter becomes a distribution. The gap is what keeps it
-     reading as COUNTABLE — eight things you have or have not done — rather than
-     as a progress bar that happens to be segmented. */
-  meter: { flexDirection: 'row', gap: 3, height: 8 },
-  meterSeg: { flex: 1, borderRadius: 2 },
-  scaleFoot: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.two,
-  },
+
+  termsHead: { borderBottomWidth: StyleSheet.hairlineWidth },
+
+  /* One row, ruled off above by the trade band's bottom border. It is a rail
+     rather than a section — the whole argument for folding it into the card was
+     that it should not look like one more thing of equal weight. */
+  foot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
+  /* The label and the rack are one reading and never separate; only the line on
+     the right may be pushed to the edge, and it truncates before they do. */
+  footMain: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexShrink: 0 },
+  /* Right-aligned so the second line, when there is one, hangs off the card's
+     right edge with the first rather than starting under the rack. */
+  footRung: { flexShrink: 1, minWidth: 0, textAlign: 'right' },
 });

@@ -22,7 +22,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionBar } from '@/components/shell/ActionBar';
 import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
-import { ClockOrChip, ContestCard, Standing } from '@/components/contests/ContestCard';
+import {
+  ContestCard,
+  Figure,
+  RunFoot,
+  Standing,
+  figureOf,
+  type CardLevel,
+  type Lock,
+} from '@/components/contests/ContestCard';
 import type { ContestTerms } from '@/components/contests/contest-model';
 import { ContestFieldList } from '@/components/contests/ContestFieldPanel';
 import type { FieldEntrant } from '@/components/contests/use-contest-field';
@@ -677,7 +685,7 @@ function Kit() {
 
           <Section
             title="Contest card"
-            note="ONE CARD. Head, terms and foot are the same rows in the same order everywhere — entering a contest INSERTS a middle band and moves nothing else, so it never changes shape on you. The first two here are lobby cards, with no middle. The rest are entered. Within the middle there are two states asking different questions: before kickoff there is no score, so the hero is slots filled and the rail is one segment per slot, with no axis labels because there is no axis; after, it is your score inside the whole field with the contest’s own line marked. The LAST card is the one that matters most — a top-three contest, where the median decides nothing and the mark is the CUT. 27.1 is above that field’s median and outside the places that pay, which is exactly the state the old card drew as winning."
+            note="ONE CARD. Head, trade and foot are the same rows in the same order everywhere — entering a contest INSERTS a middle band and moves nothing else, so it never changes shape on you. The first two here are lobby cards, with no middle; the rest are entered. THE HEAD’S RIGHT COLUMN is ranked by usefulness rather than by fallback: your score once anybody has played, the COUNTDOWN while the roster can still be changed — the only figure on the card that is both moving and actionable — and the filled count once it is locked and unplayed. HOW IT IS WON leads the trade band at full width; it used to be the tail of the head’s format line, and it was the string that got truncated on every entered card before lock. The arrow is the divider AND the label: left is what leaves, right is what arrives, which is what RISK and REWARD spent a line saying. The last four are the ones that matter — a top-three contest where the median decides nothing and the mark is the CUT (27.1 is above that field’s median and outside the places that pay, exactly the state the old card drew as winning); the locked-and-unplayed state, the only one where the slot count takes the figure back; and the same card carrying the RUN as its own foot band rather than as a second panel underneath it, drawn at both levels so the two fills can be compared — `page` sits level with the tab bar, `sheet` a step above the lobby it is drawn in."
           >
             <ContestCard
               name="WR Room"
@@ -687,7 +695,8 @@ function Kit() {
             />
             {/* No entries yet, so no pool yet — the state a four-tester week
                 spends most of its time in, and the one a placeholder would have
-                papered over. */}
+                papered over. The reward line is the only string on this card
+                long enough to wrap, which is why the columns allow two lines. */}
             <ContestCard
               name="Flex Three"
               terms={{ ...KIT_TERMS_MEDIAN, prizePool: 0, entrants: 0 }}
@@ -695,89 +704,100 @@ function Kit() {
               onPress={() => {}}
             />
 
-            {/* Entered. Same card, plus a middle. */}
-            <ContestCard
+            {/* Entered, open, one slot short — the state a week spends five of
+                its seven days in, and the one the old card handed to a 22pt
+                duplicate of the heading below it. */}
+            <KitEntered
               name="Preseason Week 3"
               terms={KIT_TERMS_FREE}
-              state={<ClockOrChip lockAt={DEMO_LOCK_SOON} locked={false} final={false} now={DEMO_NOW} />}
-              middle={
-                <Standing
-                  manager="nickroachy"
-                  subtitle="Season 1-1"
-                  terms={KIT_TERMS_FREE}
-                  myPoints={null}
-                  field={DEMO_FIELD_UNPLAYED}
-                  cut={null}
-                  filled={7}
-                />
-              }
+              subtitle="Season 1-1"
+              myPoints={null}
+              field={DEMO_FIELD_UNPLAYED}
+              filled={7}
+              lock={{ at: DEMO_LOCK_SOON, locked: false, now: DEMO_NOW }}
             />
-            <ContestCard
+            {/* Live, ahead of the median. */}
+            <KitEntered
               name="Preseason Week 3"
               terms={KIT_TERMS_FREE}
-              state={<ClockOrChip lockAt={DEMO_LOCK_PAST} locked final={false} now={DEMO_NOW} />}
-              middle={
-                <Standing
-                  manager="nickroachy"
-                  subtitle="Season 2-1"
-                  terms={KIT_TERMS_FREE}
-                  myPoints={118.4}
-                  field={DEMO_FIELD_AHEAD}
-                  cut={null}
-                  filled={8}
-                />
-              }
+              subtitle="Season 2-1"
+              myPoints={118.4}
+              field={DEMO_FIELD_AHEAD}
+              filled={8}
+              lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
             />
-            <ContestCard
+            {/* Final, behind it. */}
+            <KitEntered
               name="Preseason Week 2"
               terms={{ ...KIT_TERMS_FREE, entrants: DEMO_FIELD_BEHIND.entrants }}
-              state={<ClockOrChip lockAt={DEMO_LOCK_PAST} locked final now={DEMO_NOW} />}
-              middle={
-                <Standing
-                  manager="nickroachy"
-                  subtitle="Season 2-2-1"
-                  terms={{ ...KIT_TERMS_FREE, entrants: DEMO_FIELD_BEHIND.entrants }}
-                  myPoints={71.9}
-                  field={DEMO_FIELD_BEHIND}
-                  cut={null}
-                  filled={8}
-                />
-              }
+              subtitle="Season 2-2-1"
+              myPoints={71.9}
+              field={DEMO_FIELD_BEHIND}
+              filled={8}
+              final
+              lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
             />
             {/* A field of ONE: its own low, mark and high, so there is no range
                 to place anybody in and the rail stays a slot meter even though
                 there is a score. The rank is exempt from the tie rule — "#1 OF
                 1" is never in doubt and says exactly what it is worth. */}
-            <ContestCard
+            <KitEntered
               name="Preseason Week 1"
               terms={{ ...KIT_TERMS_FREE, entrants: DEMO_FIELD_ALONE.entrants }}
-              state={<ClockOrChip lockAt={DEMO_LOCK_SOON} locked={false} final now={DEMO_NOW} />}
-              middle={
-                <Standing
-                  manager="nickroachy"
-                  subtitle="Season 0-0"
-                  terms={{ ...KIT_TERMS_FREE, entrants: DEMO_FIELD_ALONE.entrants }}
-                  myPoints={88.2}
-                  field={DEMO_FIELD_ALONE}
-                  cut={null}
-                  filled={8}
-                />
-              }
+              subtitle="Season 0-0"
+              myPoints={88.2}
+              field={DEMO_FIELD_ALONE}
+              filled={8}
+              final
+              lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
             />
             {/* The cut, and a settled prize in place of the pool. */}
-            <ContestCard
+            <KitEntered
               name="WR Room"
               terms={KIT_TERMS_TOP_N}
-              state={<ClockOrChip lockAt={DEMO_LOCK_PAST} locked final now={DEMO_NOW} />}
+              myPoints={27.1}
+              field={DEMO_FIELD_CUT}
+              cut={38.4}
+              filled={3}
               prize={120}
-              middle={
-                <Standing
-                  manager="nickroachy"
-                  terms={KIT_TERMS_TOP_N}
-                  myPoints={27.1}
-                  field={DEMO_FIELD_CUT}
-                  cut={38.4}
-                  filled={3}
+              final
+              lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
+            />
+            {/* LOCKED AND UNPLAYED — the narrow third state of the figure slot:
+                no score yet, and no deadline left to count toward. The count
+                takes the slot back, and has earned the size here, because a
+                lineup short at lock is short for good. */}
+            <KitEntered
+              name="Preseason Week 4"
+              terms={KIT_TERMS_FREE}
+              subtitle="Season 1-1"
+              myPoints={null}
+              field={DEMO_FIELD_UNPLAYED}
+              filled={6}
+              lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
+            />
+            {/* THE FOOT: the run, inside the card whose risk column priced the
+                heart it draws. Three hearts, two riding on contests that have
+                not settled, one lost — and the gold tick marks the pip THIS
+                card is holding, which is what makes the rack a property of the
+                contest rather than of the screen. Drawn at `page` level, which
+                is the fill the board uses: the same grey as the tab bar. */}
+            <KitEntered
+              name="Preseason Week 4"
+              terms={KIT_TERMS_FREE}
+              subtitle="Season 1-0"
+              myPoints={null}
+              field={DEMO_FIELD_UNPLAYED}
+              filled={8}
+              level="page"
+              lock={{ at: DEMO_LOCK_SOON, locked: false, now: DEMO_NOW }}
+              foot={
+                <RunFoot
+                  hearts={3}
+                  wagered={2}
+                  rack={4}
+                  focus={{ start: 0, count: 1 }}
+                  rung={{ lead: '3 MORE WINS', body: 'and a death keeps 1 card' }}
                 />
               }
             />
@@ -1442,6 +1462,75 @@ function Section({
       <Text style={[Type.fine, { color: c.textTertiary }]}>{note}</Text>
       {children}
     </View>
+  );
+}
+
+/**
+ * An entered card, assembled the way the board assembles one.
+ *
+ * IT EXISTS SO THE GALLERY CANNOT DRIFT FROM THE BOARD. Every card in this
+ * section used to spell out its own `state` and `middle` by hand, which meant
+ * eight chances to demonstrate a card the app does not actually draw — and the
+ * gallery is the surface these states are reviewed on, so a wrong one here is
+ * worse than no example. This wires the same three pieces in the same order as
+ * `ContestCarousel`: `figureOf` reads the field, `Figure` takes the head's
+ * right column, `Standing` takes the middle.
+ */
+function KitEntered({
+  name,
+  terms,
+  subtitle,
+  myPoints,
+  field,
+  cut = null,
+  filled,
+  lock,
+  prize = null,
+  final = false,
+  level = 'sheet',
+  foot,
+}: {
+  name: string;
+  terms: ContestTerms;
+  subtitle?: string;
+  myPoints: number | null;
+  field: FieldWeek;
+  cut?: number | null;
+  filled: number;
+  lock: Lock;
+  prize?: number | null;
+  final?: boolean;
+  level?: CardLevel;
+  foot?: React.ReactNode;
+}) {
+  return (
+    <ContestCard
+      name={name}
+      terms={terms}
+      prize={prize}
+      level={level}
+      state={
+        <Figure
+          {...figureOf(field, myPoints)}
+          filled={filled}
+          slots={terms.slotCount}
+          lock={lock}
+          final={final}
+        />
+      }
+      middle={
+        <Standing
+          manager="nickroachy"
+          subtitle={subtitle}
+          terms={terms}
+          myPoints={myPoints}
+          field={field}
+          cut={cut}
+          filled={filled}
+        />
+      }
+      foot={foot}
+    />
   );
 }
 

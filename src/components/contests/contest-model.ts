@@ -127,18 +127,40 @@ export function seatsLine(t: ContestTerms): string | null {
 }
 
 /**
- * What the contest asks of your roster, and how it is decided — one line.
+ * What the contest asks of your ROSTER. Not how it is won — see `winLine`.
  *
- * THEY WERE TWO BANDS AND ARE NOW ONE LINE. The win condition had a ruled foot
- * of its own at the bottom of the card, which cost a whole band to carry four
- * words. It belongs with the format: both answer "what IS this contest", and a
- * reader takes them in the same glance.
+ * ---------------------------------------------------------------------------
+ * THE WIN CONDITION USED TO BE APPENDED HERE, AND IT GOT CUT OFF
+ * ---------------------------------------------------------------------------
+ *
+ * This returned "Full Roster · 8 cards · Beat the median" and the card printed
+ * it on a line it shared with the seat count, beside a two-line head with a
+ * countdown in it. There was not room. On every entered card before lock — the
+ * state a week spends five of its seven days in — it rendered as
+ *
+ *     Full Roster · 8 cards · Beat the med…   26…
+ *
+ * so the single most important term of a contest, the one that says what you
+ * have to DO, was the string chosen to be truncated. And it was not a width
+ * bug to be fixed with a smaller font: three facts of different rank were
+ * competing for one line because they had been joined into one string, and
+ * nothing downstream could tell which of them to protect.
+ *
+ * So they are separate now, and the card places them by rank: this stays in
+ * the head where it is scenery, and `winLine` leads the TRADE band, where it
+ * is the condition on everything in the reward column and cannot be clipped.
+ *
+ * THE FORMAT NAME IS DROPPED WHERE IT IS THE CONTEST'S OWN NAME. Every lobby
+ * contest is named after its format — "Flex Three · 3 cards", under a heading
+ * that already says Flex Three — so the first half of this line was a word the
+ * reader had just read. It survives on the free contest, which is called
+ * "Preseason Week 4" and really is a Full Roster.
  */
-export function formatLine(t: ContestTerms): string {
-  return [
-    `${t.formatName} · ${t.slotCount} card${t.slotCount === 1 ? '' : 's'}`,
-    winLine(t),
-  ].join(' · ');
+export function formatLine(t: ContestTerms, name?: string): string {
+  const cards = `${t.slotCount} card${t.slotCount === 1 ? '' : 's'}`;
+  const sameName =
+    name !== undefined && name.trim().toLowerCase() === t.formatName.trim().toLowerCase();
+  return sameName ? cards : `${t.formatName} · ${cards}`;
 }
 
 /* ------------------------------------------------------------ the trade */
