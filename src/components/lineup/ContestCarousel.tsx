@@ -62,6 +62,7 @@ import { ClockOrChip, ContestCard, Standing } from '@/components/contests/Contes
 import { termsOfEntry, type MyContest } from '@/components/contests/use-my-contests';
 import { recordLabel, type Record_ } from '@/components/lineup/field';
 import { Hearts } from '@/components/runs/Hearts';
+import { nextRungLine } from '@/components/runs/run';
 import { Colors, Radius, Spacing, Type, selectionAccent } from '@/constants/theme';
 import type { PlayerState } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -307,43 +308,61 @@ function Foot({
   const rack = run && !run.awaitingCarry ? run : null;
 
   /**
-   * WHICH PIP THIS CONTEST IS HOLDING.
+   * WHICH PIPS THIS CONTEST IS HOLDING.
    *
    * Nothing in the schema maps a heart to a contest — `run.wagered` is a count
-   * — so the mapping is made here and made consistently: `Hearts` draws safe
-   * pips first and wagered ones last, so the wagered block starts at
-   * `held - atRisk`, and the nth contest with a stake takes the nth pip of it.
-   * The count is the database's; only the order is ours, and it is stable
-   * because the carousel's order is.
+   * — so the mapping is made here and made consistently: `Hearts` draws wagered
+   * pips FIRST, so stakes fill from pip 0 rightward and contests take them in
+   * carousel order. The count is the database's; only the order is ours, and it
+   * is stable because the carousel's order is.
+   *
+   * The cursor walks every contest, including free ones, so a contest's span
+   * never depends on how many free contests precede it.
    *
    * Null on the free contest, which risks nothing, and on the lobby tile, which
-   * is not a contest at all. Null also when the run has not caught up with an
-   * entry yet — a stake with no wagered pip behind it gets no highlight rather
-   * than a borrowed one.
+   * is not a contest at all. Null also past `atRisk` — a stake with no wagered
+   * pip behind it gets no highlight rather than a borrowed one.
    */
-  const focus = (() => {
-    if (!rack) return null;
-    const current = contests[page];
-    if (!current || current.heartsAtRisk <= 0) return null;
+  const spans = (() => {
+    if (!rack) return [];
     const held = Math.max(0, rack.hearts);
     const atRisk = Math.min(Math.max(0, rack.wagered), held);
-    const rank = contests.slice(0, page).filter((ct) => ct.heartsAtRisk > 0).length;
-    return rank < atRisk ? held - atRisk + rank : null;
+    let cursor = 0;
+    return contests.map((ct) => {
+      const n = Math.max(0, ct.heartsAtRisk);
+      if (n <= 0) return null;
+      const start = cursor;
+      cursor += n;
+      if (start >= atRisk) return null;
+      return { start, count: Math.min(n, atRisk - start) };
+    });
   })();
+
+  const focus = spans[page] ?? null;
+
+  /**
+   * WHAT THE PIPS CANNOT SAY, and only that.
+   *
+   * `run.ts` states the rule this follows: the rack beside it is already saying
+   * the stake in hearts, so the words are for what a pip has no way to carry.
+   * "Lose this and 2 remain" did not qualify — a rack of three with one tick
+   * already says two are not on this contest, and a sentence restating a
+   * graphic two points below it is the loudest kind of clutter in a panel where
+   * every other string is a 9pt label.
+   *
+   * THE RECORD IS NOT IT EITHER — the card above already prints it, under the
+   * player's name, as "Season 1-0". The next rung is the one fact on this
+   * screen that nothing else carries, so it is the one that earns the line.
+   */
+  const rung = rack ? nextRungLine(rack) : null;
 
   return (
     <View style={styles.foot}>
-      {rack ? (
-        <Hearts
-          hearts={rack.hearts}
-          wagered={rack.wagered}
-          rack={rack.rack}
-          focus={focus}
-          size={14}
-        />
-      ) : (
-        <View />
-      )}
+      {/* THE PAGE MARKS ARE RULES, NOT DOTS, and they belong to the CARD. They
+          report position in the swipe, which is the carousel's business and not
+          the run's, so they stay pinned under the card rather than joining the
+          panel below. Rules rather than dots because the app's navigation
+          language is a word with a rule under it — see `FantasyTopNav`. */}
       <View style={styles.rules}>
         {Array.from({ length: pages }, (_, i) => (
           <View
@@ -352,6 +371,43 @@ function Foot({
           />
         ))}
       </View>
+
+      {/* ITS OWN SECTION, not a row floating on the page background.
+          The rack used to sit naked under the card, in a layout where every
+          other block is a bordered panel — so it read as something left over
+          rather than something placed. It takes the card's own surface, border
+          and radius, and its label takes the card's `micro` voice, which is the
+          whole reason it now looks like it belongs to the same app.
+
+          It stays ONE ROW TALL on purpose. A second full-height panel directly
+          under the contest card reads as two cards arguing about which one
+          matters, and the card is the one that matters. */}
+      {rack ? (
+        <View style={[styles.run, { backgroundColor: c.surface, borderColor: c.border }]}>
+          <View style={styles.runMain}>
+            <Text style={[Type.micro, { color: c.textTertiary }]}>YOUR RUN</Text>
+            <Hearts
+              hearts={rack.hearts}
+              wagered={rack.wagered}
+              rack={rack.rack}
+              focus={focus}
+              size={14}
+              rail
+            />
+          </View>
+          {/* Truncates rather than wraps: the panel is one row by design, and a
+              second line here would make it a second card competing with the
+              contest above it. */}
+          {rung ? (
+            <Text
+              style={[Type.fine, { color: c.textSecondary }]}
+              numberOfLines={1}
+            >
+              {rung}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -423,18 +479,24 @@ const styles = StyleSheet.create({
      The two ends sit on the card's own edges, inset by the 4 that keeps them
      off its border — the rack lines up with the card's left rule and the page
      marks with its right. */
-  foot: {
+  foot: { gap: Spacing.two, paddingTop: Spacing.two, paddingHorizontal: Spacing.one },
+  rules: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 5 },
+  /* The board strip's mark, at the size a page indicator can afford: 14 rather
+     than the width of a word, and the same 2pt rule and 1pt radius. */
+  rule: { width: 14, height: 2, borderRadius: 1 },
+  run: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.two,
-    paddingTop: Spacing.two,
-    paddingHorizontal: Spacing.one,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.panel,
   },
-  rules: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  /* The board strip's mark, at the size a page indicator can afford: 14 rather
-     than the width of a word, and the same 2pt rule and 1pt radius. */
-  rule: { width: 14, height: 2, borderRadius: 1 },
+  /* The label and the rack are one reading and never separate; only the meta
+     line may be pushed to the far edge, and it truncates before they do. */
+  runMain: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   /* Stretches to the tallest page — a horizontal row stretches its children by
      default — so the tile is the height of the card beside it and the foot
      below does not move as you swipe onto it. */

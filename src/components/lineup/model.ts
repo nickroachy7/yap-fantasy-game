@@ -356,10 +356,16 @@ export function countdownLabel(msRemaining: number): string {
  */
 export function lockCaption(lockAt: string | null, locked: boolean): string | undefined {
   if (locked) return 'Every player you hold has started. Nothing can be changed.';
-  if (!lockAt) return undefined;
-  const d = new Date(lockAt);
-  if (Number.isNaN(d.getTime())) return undefined;
-  return `Next player locks at ${d.toLocaleString()}`;
+  /* THE COUNTDOWN IS THE CARD'S, NOT OURS. This used to print
+     `Next player locks at 8/27/2026, 8:00:00 PM` directly beneath a contest card
+     already showing `NEXT LOCK  1d 19h` for the same instant — the same fact
+     twice, in two voices, one of them a full timestamp in a column of 9pt
+     labels. The card's countdown is the better of the two: it is relative, it
+     is in the card's own grammar, and it sits beside the contest it belongs to.
+
+     Only the LOCKED sentence survives, because nothing else says it. A card
+     shows a "Locked" chip, which reports the state but not the consequence. */
+  return undefined;
 }
 
 export function isEligible(card: LineupCard, cfg: SlotConfig): boolean {
