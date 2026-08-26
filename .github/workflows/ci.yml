@@ -132,3 +132,58 @@ jobs:
             --environment production \
             --platform ios \
             --non-interactive
+
+  # ── SHIP THE WEBSITE ─────────────────────────────────────────────────────
+  #
+  # The Vercel project was recreated from the CLI after the Aug 25 takedown,
+  # and a CLI-created project has NO GitHub integration — nothing on Vercel's
+  # side reacts to a push. Without this job, a green push ships the OTA update
+  # to phones while yapfantasy.com silently keeps serving the previous build.
+  #
+  # `needs: check` for the same reason `publish` has it: the site and the app
+  # ship together, and only when the suite is green.
+  #
+  # `.vercel/` is gitignored, so the runner has no project link. The CLI reads
+  # VERCEL_ORG_ID / VERCEL_PROJECT_ID from the environment instead. These are
+  # identifiers, not credentials — only the token is secret.
+  #
+  # This uploads source and builds ON Vercel, so the build picks up the
+  # EXPO_PUBLIC_* variables configured on the project's Production environment.
+  # Those are a THIRD home for env alongside .env.local and EAS: a var added to
+  # only the first two builds fine here and ships a site with no Supabase client.
+  deploy-web:
+    name: deploy website
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # Same reasoning as the EXPO_TOKEN guard above: fail in seconds with a
+      # message that says what to do, rather than an opaque auth error later.
+      - name: Require VERCEL_TOKEN
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::VERCEL_TOKEN secret is not set. Create one at"
+            echo "::error::https://vercel.com/account/settings/tokens and add it with"
+            echo "::error::gh secret set VERCEL_TOKEN"
+            exit 1
+          fi
+
+      - name: Deploy to production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: team_mwQiRIZNbSOvqOJJIDWuQriK
+          VERCEL_PROJECT_ID: prj_lcHZrKfnRGge5RkNi1Ib2ZeHk8op
+        run: npx --yes vercel@51 deploy --prod --yes --token "$VERCEL_TOKEN"
