@@ -140,6 +140,36 @@ export default function AppLayout() {
             it, spend, and put it down. It replaced `collection/shop`, which
             was a whole sub-page for a shelf of two rows — see there. */}
         <Stack.Screen name="packs" options={sheetOptions} />
+        {/* Opening a pack, which is NOT a sheet and is the one route here that
+            argues with the rule above.
+
+            A sheet is something you glance at over the app and put down. A pack
+            opening is five to fifty cards, a decision on each, and the most
+            repeated moment in the game — it is not something you do over the
+            app, it is the thing you are doing. In a sheet the card had to be
+            capped at 264pt to leave room for a title, a hero and a paragraph
+            describing it; here it takes the screen. See `pull.tsx`.
+
+            So it takes SEARCH's presentation, not the profiles': a full-screen
+            modal, which is the one that leaves nothing of the app visible
+            behind it. It is pushed over `/packs` rather than replacing it, so
+            the shelf is still mounted — it is what runs the `open_pack` loop
+            and publishes each pack as it lands — and closing lands you back on
+            the button you just pressed.
+
+            The duration and its `slide_from_bottom` are load-bearing for the
+            same documented reason as search: `animationDuration` applies only
+            to a named set of animations, and against the default it is silently
+            ignored in favour of iOS's own 500ms. 240 reads as a pack coming up
+            to meet you. */}
+        <Stack.Screen
+          name="pull"
+          options={{
+            presentation: Platform.OS === 'web' ? undefined : 'fullScreenModal',
+            animation: Platform.OS === 'web' ? 'fade' : 'slide_from_bottom',
+            animationDuration: 240,
+          }}
+        />
         {/* The contest lobby, which was a page beside the lineup under a
             two-item bar. It is the same kind of object as the three above —
             open it, enter something, put it down — and the bar it cost was two

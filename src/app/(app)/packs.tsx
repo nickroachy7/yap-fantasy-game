@@ -20,13 +20,23 @@
  * navigating you off Inventory, and closing puts you back on that page. No new
  * machinery: `takeover` already existed for exactly this shape.
  *
- * TWO STATES, ONE SHEET. The shelf, and then what you pulled — and the second
- * REPLACES the first rather than appending to it. See `PackReveal`.
+ * ONE STATE NOW: THE SHELF. What you pulled used to be the second half of this
+ * sheet — the same route, swapped in place for a deck of cards. It is its own
+ * page (`/pull`), for the reasons set out at the top of that file: a pack
+ * opening is the thing you are doing, not something you glance at over the
+ * thing you are doing, and in a sheet the card had to be capped at 264pt to
+ * leave room for a title, a hero and a paragraph describing it.
+ *
+ * THE SPENDING STAYED HERE, AND THAT IS DELIBERATE. `/pull` draws the ceremony
+ * and the deck; this screen still runs the `open_pack` loop and publishes each
+ * pack as it lands — see `pull-session`. A page that opened packs on mount is a
+ * page that opens packs when a browser tab is reloaded, and the button that
+ * spends gems has to be the thing that spends them.
  *
  * A BULK BUY IS STILL ONE PULL. Opening ten packs runs ten `open_pack` calls
- * and hands the reveal everything they dealt as a single deck, so the second
- * state means "what this press produced" rather than "what one pack produced".
- * See `open` for the loop and what it does when the fourth of ten is refused.
+ * and publishes everything they dealt as a single deck, so the pull page means
+ * "what this press produced" rather than "what one pack produced". See `open`
+ * for the loop and what it does when the fourth of ten is refused.
  *
  * THE TONE IS GOLD, which is the app's own: the gem, the rail's active marker,
  * the Open button. The frame's note asks that every sheet carry a colour rather
@@ -34,18 +44,11 @@
  * easy — the sheet is about the thing you spend.
  */
 import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { PackReveal } from '@/components/cards/PackReveal';
-import {
-  CoverageChip,
-  PackShelf,
-  countPositions,
-  type Pack,
-  type Pulled,
-} from '@/components/cards/PackShelf';
-import { usePullActions } from '@/components/cards/use-pull-actions';
+import { PackShelf, type Pack, type Pulled } from '@/components/cards/PackShelf';
+import { advancePull, beginPull, endPull, finishPull } from '@/components/cards/pull-session';
 import { invalidateCollection } from '@/components/collection/use-collection';
 import { invalidateSets } from '@/components/collection/use-sets';
 import { Gem } from '@/components/shell/AppHeader';
@@ -74,7 +77,6 @@ export default function PacksScreen() {
   const [openingCode, setOpeningCode] = useState<string | null>(null);
   /** How far through a bulk buy the open in flight is. Null for a single. */
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [pulled, setPulled] = useState<Pulled[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   /* This one reports its own failures rather than handing them to useLoader:
@@ -124,13 +126,14 @@ export default function PacksScreen() {
   // re-read after a pack is opened.
   const { refresh: reloadShelf } = useLoader(load);
 
-  /* WHAT YOU CAN DO WITH WHAT YOU PULLED, and every figure in it decided by the
-     server. It keys off the pull itself, so opening another pack drops the last
-     one's offers with it — see `usePullActions`. */
-  const pull = usePullActions(pulled);
-
   /**
-   * Open `count` of one pack, and show everything they dealt as one pull.
+   * Open `count` of one pack, and publish everything they deal to `/pull`.
+   *
+   * THE NAVIGATION HAPPENS FIRST, BEFORE A SINGLE RPC. A bulk buy of ten is ten
+   * sequential round trips, and a player who has just pressed a button should
+   * be watching a pack open during them rather than a button that has gone
+   * quiet. The session is begun, the page is pushed, and the loop below fills
+   * it in as it goes — see `pull-session`.
    *
    * ONE CALL PER PACK, SEQUENTIALLY. `open_pack` takes a code and mints exactly
    * one pack; there is no batch form of it, and adding one would be a migration
@@ -146,10 +149,16 @@ export default function PacksScreen() {
    * refuse the fifth. The overwhelmingly likely cause is that the gems ran out,
    * and firing six more doomed calls to prove it is six round trips of nothing.
    *
-   * PARTIAL SUCCESS IS SHOWN AND SAID. What was dealt goes to the reveal; the
-   * shortfall goes to the error notice above it, naming how many of how many
-   * landed. A bulk buy that opened three of ten and said only "opened" would be
-   * lying about seven, and the balance would be the evidence.
+   * PARTIAL SUCCESS IS SHOWN AND SAID. What was dealt goes to the pull page;
+   * the shortfall goes with it, naming how many of how many landed. A bulk buy
+   * that opened three of ten and said only "opened" would be lying about seven,
+   * and the balance would be the evidence.
+   *
+   * A VOLLEY THAT DEALT NOTHING COMES STRAIGHT BACK HERE. There is no ceremony
+   * to hold and no cards to show, and the refusal belongs under the button that
+   * caused it — beside the balance, which is the usual reason. `dismissTo`
+   * rather than `back`, so it pops the pull page whether or not anything else
+   * has been pushed since.
    *
    * THE CLIENT NEVER PRE-CHECKS THE BALANCE. The button is disabled below what
    * the total costs, which is a courtesy — the authority is `open_pack`, which
@@ -160,12 +169,19 @@ export default function PacksScreen() {
     async (code: string, count: number) => {
       // The shelf offers 1, 5 or 10; anything else is a caller bug, and a
       // clamp is cheaper than trusting one.
-      const packs = Math.max(1, Math.min(10, Math.floor(count) || 1));
+      // NAMED `runs` rather than `packs`, which is the shelf's own state one
+      // scope up and which this needs to read for the pack's name.
+      const runs = Math.max(1, Math.min(10, Math.floor(count) || 1));
 
       setOpeningCode(code);
-      setProgress(packs > 1 ? { done: 0, total: packs } : null);
+      setProgress(runs > 1 ? { done: 0, total: runs } : null);
       setError(null);
-      setPulled(null);
+
+      /* The ceremony names what is being opened, so it reads as a pack rather
+         than as a loading state. The shelf is the only thing that knows. */
+      const name = packs?.find((entry) => entry.code === code)?.name ?? 'Pack';
+      const nonce = beginPull(name, runs, silverAt);
+      router.push('/pull');
 
       const cards: Pulled[] = [];
       /* Counted here rather than inferred from `cards.length` afterwards: a
@@ -175,27 +191,32 @@ export default function PacksScreen() {
       let opened = 0;
       let refusal: string | null = null;
 
-      for (let i = 0; i < packs; i += 1) {
+      for (let i = 0; i < runs; i += 1) {
         // All RNG, gem math and minting happen inside this one call, server-side.
         const { data, error: err } = await supabase.rpc('open_pack', { p_pack_code: code });
         if (err) {
           refusal = err.message;
           break;
         }
-        cards.push(...((data ?? []) as Pulled[]));
+        const dealt = (data ?? []) as Pulled[];
+        cards.push(...dealt);
         opened += 1;
-        if (packs > 1) setProgress({ done: opened, total: packs });
+        if (runs > 1) setProgress({ done: opened, total: runs });
+        // The ceremony counts this in the moment it lands, rather than at the
+        // end of a volley it has been watching the whole way through.
+        advancePull(nonce, dealt);
       }
 
       if (opened === 0) {
-        // Left on the shelf, with the reason under it. Switching to the pull
-        // view with nothing to show would read as the pack having been empty.
+        // Back to the shelf, with the reason under the button. A pull page
+        // holding nothing would read as the pack having been empty.
+        endPull();
         setError(refusal);
+        router.dismissTo('/packs');
       } else {
         /* Named as a count of PACKS, not of cards: the player pressed "open 10"
            and the honest answer is how many of the ten happened. */
-        if (refusal) setError(`${opened} of ${packs} packs opened — ${refusal}`);
-        setPulled(cards);
+        finishPull(nonce, refusal ? `${opened} of ${runs} packs opened — ${refusal}` : null);
         /* THE COUNT MOVES BEFORE THE READ DOES. Ten packs is fifty cards, and
            on a roster near the cap that is the difference between "24 of 30"
            and a warning — news a player wants while looking at what they pulled,
@@ -216,7 +237,7 @@ export default function PacksScreen() {
       setOpeningCode(null);
       setProgress(null);
     },
-    [reloadShelf, refresh, applyCardDelta],
+    [reloadShelf, refresh, applyCardDelta, router, silverAt, packs],
   );
 
   /**
@@ -246,65 +267,27 @@ export default function PacksScreen() {
     else router.dismissTo('/fantasy/collect');
   }, [router]);
 
-  /* Dismiss FIRST, then navigate. A push out of a modal that is still up leaves
-     the sheet stacked over the page it sent you to, and the way out of that is
-     a back gesture the player has no reason to expect.
-
-     With no history there is nothing to dismiss, and pushing would stack a
-     second entry on a stack whose first entry is this sheet — so dismissTo,
-     which replaces the sheet outright rather than sliding a page under it. */
-  const seeInventory = useCallback(() => {
-    if (!router.canGoBack()) {
-      router.dismissTo('/fantasy/collect');
-      return;
-    }
-    router.back();
-    router.push('/fantasy/collect');
-  }, [router]);
-
-  const pulledPositions = useMemo(() => (pulled ? countPositions(pulled) : []), [pulled]);
-  const pulledTitle = pulled
-    ? pulled.length === 1
-      ? 'You pulled 1 card'
-      : `You pulled ${pulled.length} cards`
-    : undefined;
-
   return (
     <PlayerSheetFrame
       /* The hero below carries whichever of these is current at full size; the
          frame fades the small copy in once that has scrolled away. */
-      title={pulledTitle ?? 'Packs'}
-      subtitle={pulled ? undefined : `${gems.toLocaleString()} gems`}
+      title="Packs"
+      subtitle={`${gems.toLocaleString()} gems`}
       tone={gold}
       onClose={close}
       closeLabel="Close packs">
       <SheetToneBand tone={gold}>
-        {pulled ? (
-          <View style={styles.hero}>
-            <Text style={[Type.micro, { color: gold }]}>PULLED</Text>
-            <Text style={[Type.page, { color: c.text }]}>{pulledTitle}</Text>
-            {/* What arrived, by position — the same shape the pack promised. */}
-            <View style={styles.chipRow}>
-              {pulledPositions.map((entry) => (
-                <CoverageChip key={entry.position} entry={entry} />
-              ))}
-            </View>
+        <View style={styles.hero}>
+          <Text style={[Type.micro, { color: c.textTertiary }]}>YOUR BALANCE</Text>
+          <View style={styles.balance}>
+            <Gem size={16} color={gold} />
+            <Text style={[Type.page, NUMERIC, { color: c.text }]}>{gems.toLocaleString()}</Text>
           </View>
-        ) : (
-          <View style={styles.hero}>
-            <Text style={[Type.micro, { color: c.textTertiary }]}>YOUR BALANCE</Text>
-            <View style={styles.balance}>
-              <Gem size={16} color={gold} />
-              <Text style={[Type.page, NUMERIC, { color: c.text }]}>
-                {gems.toLocaleString()}
-              </Text>
-            </View>
-            <Text style={[Type.bodyRelaxed, styles.measure, { color: c.textSecondary }]}>
-              Cards arrive from packs. Every one starts at bronze and climbs a tier by scoring
-              fantasy points in your lineup.
-            </Text>
-          </View>
-        )}
+          <Text style={[Type.bodyRelaxed, styles.measure, { color: c.textSecondary }]}>
+            Cards arrive from packs. Every one starts at bronze and climbs a tier by scoring
+            fantasy points in your lineup.
+          </Text>
+        </View>
       </SheetToneBand>
 
       {error ? (
@@ -331,37 +314,15 @@ export default function PacksScreen() {
         </View>
       ) : null}
 
-      {pulled ? (
-        <PackReveal
-          /* A NEW PACK IS A NEW COMPONENT. The reveal holds the scroll
-             position, which cards have been turned over and which one is in
-             front of you — all of it belongs to one opening, and remounting
-             drops the lot in one go. See the note at the top of that file. */
-          key={pulled.map((p) => p.card_instance_id).join(',')}
-          pulled={pulled}
-          silverAt={silverAt}
-          actions={pull.actions}
-          loadingActions={pull.loading}
-          disposed={pull.disposed}
-          busy={pull.busy}
-          error={pull.error}
-          onDismissError={pull.clearError}
-          onSell={pull.sell}
-          onCommit={pull.commit}
-          onAgain={() => setPulled(null)}
-          onSeeInventory={seeInventory}
-        />
-      ) : (
-        <PackShelf
-          packs={packs}
-          dailyAvailable={dailyAvailable}
-          gems={gems}
-          openings={openings}
-          openingCode={openingCode}
-          progress={progress}
-          onOpen={(code, count) => void open(code, count)}
-        />
-      )}
+      <PackShelf
+        packs={packs}
+        dailyAvailable={dailyAvailable}
+        gems={gems}
+        openings={openings}
+        openingCode={openingCode}
+        progress={progress}
+        onOpen={(code, count) => void open(code, count)}
+      />
     </PlayerSheetFrame>
   );
 }
@@ -369,7 +330,6 @@ export default function PacksScreen() {
 const styles = StyleSheet.create({
   hero: { gap: Spacing.two, paddingBottom: Spacing.three },
   balance: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one + 2 },
   measure: { maxWidth: 560 },
   notice: {
     borderWidth: StyleSheet.hairlineWidth,

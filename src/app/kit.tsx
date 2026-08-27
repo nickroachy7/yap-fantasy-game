@@ -33,7 +33,7 @@ import type { FieldEntrant } from '@/components/contests/use-contest-field';
 import type { FieldWeek } from '@/components/lineup/field';
 import { BADGE_SIZE, BADGE_WIDTH, BenchRow, StarterRow } from '@/components/lineup/LineupRow';
 import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
-import { PlayerSheetFrame, SheetToneBand } from '@/components/players/PlayerSheetFrame';
+import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import type { LineupCard } from '@/components/lineup/model';
 import { PlayerRow } from '@/components/cards/PlayerRow';
 import type { DirectoryPlayer } from '@/components/cards/player-directory';
@@ -60,8 +60,12 @@ import { InventoryCard } from '@/components/collection/InventoryCard';
 import { RosterBar } from '@/components/collection/RosterBar';
 import { RosterCut } from '@/components/collection/RosterCut';
 import { CardExits } from '@/components/cards/CardExits';
-import { PackReveal } from '@/components/cards/PackReveal';
+import { PullDeck } from '@/components/cards/PullDeck';
+import { PullBar } from '@/components/cards/PullBar';
+import { planSweep } from '@/components/cards/pull-plan';
+import { useReveal } from '@/components/cards/use-reveal';
 import { PackShelf } from '@/components/cards/PackShelf';
+import type { CardActions } from '@/components/cards/card-actions';
 import type { Disposition } from '@/components/cards/use-pull-actions';
 import { GameRow } from '@/components/scores/GameRow';
 import { ScoreStrip } from '@/components/scores/ScoreStrip';
@@ -77,7 +81,7 @@ import { SegmentedControl } from '@/components/shell/SegmentedControl';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { POSITION_ORDER, POSITIONS } from '@/constants/positions';
-import { Colors, Spacing, TierColors, Type } from '@/constants/theme';
+import { Colors, Spacing, Type } from '@/constants/theme';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -1262,8 +1266,8 @@ function Kit() {
           </Section>
 
           <Section
-            title="Pack reveal"
-            note="Cards face down, turned over as they reach the middle, each carrying its own sell / add-to-set pair underneath it. Shown INSIDE the sheet, because that is the only place it appears and the deck runs to the sheet's edges by climbing back over its gutter — laid out inline it would prove nothing about that. The five cards are the five states that pair can be in: card 1 ordinary, card 2 commits a spare copy so the card stays yours, card 3 is in two sets so it opens the picker, card 4's slot is already filled, card 5 is in no set at all.">
+            title="Pack pull"
+            note="The pull page: a deck of cards face down, turned over as they reach the middle, each carrying its own sell / add-to-set pair underneath it — and one fixed bar at the bottom holding whatever the next thing to do is. Shown as a full-screen takeover, because that is what the route is. The five cards are the five states that pair can be in: card 1 ordinary, card 2 commits a spare copy so the card stays yours, card 3 is in two sets so it opens the picker, card 4's slot is already filled, card 5 is in no set at all. Press Reveal all to reach the bar's second state, which is the two whole-pack sweeps.">
             <View style={styles.row}>
               <Pressable
                 onPress={() => setPullOpen(true)}
@@ -1275,68 +1279,36 @@ function Kit() {
                 <Text style={[Type.strong, { color: c.text }]}>Open a pack</Text>
               </Pressable>
             </View>
-            {/* Same scaffold, and the same two caveats, as the player sheet
-                above: a plain Modal stands in for the route's own full-screen
-                container, and its animation is off because react-native-web
-                drives pointer-events from it. */}
+            {/* Same scaffold, and the same caveat, as the player sheet above: a
+                plain Modal stands in for the route's own full-screen container,
+                and its animation is off because react-native-web drives
+                pointer-events from it. */}
             <Modal
               visible={pullOpen}
-              transparent
               animationType="none"
               onRequestClose={() => setPullOpen(false)}>
-              <PlayerSheetFrame
-                title="You pulled 5 cards"
-                tone={TierColors[scheme].gold.accent}
+              <KitPull
+                actions={pullActions}
+                disposed={pullDisposed}
                 onClose={() => setPullOpen(false)}
-                closeLabel="Close packs">
-                {/* The hero the real screen puts above the deck, in miniature.
-                    Not decoration in a gallery: on a phone and on narrow web the
-                    frame FLOATS its chrome over the content, so whatever is
-                    first in the sheet sits under the ✕. Drop this and the
-                    deck's own counter row lands beneath the close button, which
-                    is a bug the gallery would be inventing rather than
-                    reporting. */}
-                <SheetToneBand tone={TierColors[scheme].gold.accent}>
-                  <View style={styles.pullHero}>
-                    <Text style={[Type.micro, { color: TierColors[scheme].gold.accent }]}>
-                      PULLED
-                    </Text>
-                    <Text style={[Type.page, { color: c.text }]}>You pulled 5 cards</Text>
-                  </View>
-                </SheetToneBand>
-                <PackReveal
-                  pulled={PULLED_FIXTURE}
-                  silverAt={200}
-                  actions={pullActions}
-                  loadingActions={false}
-                  disposed={pullDisposed}
-                  busy={null}
-                  error={null}
-                  onDismissError={() => {}}
-                  onSell={(id) => {
-                    setPullDisposed((held) => new Map(held).set(id, { kind: 'sold', gems: 8 }));
-                    spendPullCard(id);
-                  }}
-                  onCommit={(id, code) => {
-                    const was = pullActions.get(id);
-                    const burnedThisCopy = was?.burnsThisCopy ?? true;
-                    setPullDisposed((held) =>
-                      new Map(held).set(id, {
-                        kind: 'committed',
-                        setName: was?.sets.find((x) => x.code === code)?.name ?? code,
-                        gems: 4,
-                        burnedThisCopy,
-                      }),
-                    );
-                    if (burnedThisCopy) spendPullCard(id);
-                  }}
-                  onAgain={() => {
-                    setPullDisposed(new Map());
-                    setPullActions(PULL_ACTIONS_FIXTURE);
-                  }}
-                  onSeeInventory={() => setPullOpen(false)}
-                />
-              </PlayerSheetFrame>
+                onSell={(id) => {
+                  setPullDisposed((held) => new Map(held).set(id, { kind: 'sold', gems: 8 }));
+                  spendPullCard(id);
+                }}
+                onCommit={(id, code) => {
+                  const was = pullActions.get(id);
+                  const burnedThisCopy = was?.burnsThisCopy ?? true;
+                  setPullDisposed((held) =>
+                    new Map(held).set(id, {
+                      kind: 'committed',
+                      setName: was?.sets.find((x) => x.code === code)?.name ?? code,
+                      gems: 4,
+                      burnedThisCopy,
+                    }),
+                  );
+                  if (burnedThisCopy) spendPullCard(id);
+                }}
+              />
             </Modal>
           </Section>
 
@@ -1526,6 +1498,94 @@ function Kit() {
   );
 }
 
+/**
+ * The pull page, in the gallery.
+ *
+ * A COMPONENT rather than markup inside `Kit`, because the page's reveal state
+ * is a hook and the sweep plan is derived from it — the two things the bar
+ * exists to draw. Faking them with a `useState` in the gallery would prove the
+ * bar renders and nothing about whether it renders the right thing.
+ *
+ * The writes are the caller's, and they are the same lies the shelf fixture
+ * tells: a fixed price, and a card marked unheld afterwards.
+ */
+function KitPull({
+  actions,
+  disposed,
+  onClose,
+  onSell,
+  onCommit,
+}: {
+  actions: Map<string, CardActions>;
+  disposed: Map<string, Disposition>;
+  onClose: () => void;
+  onSell: (id: string) => void;
+  onCommit: (id: string, code: string) => void;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const reveal = useReveal(PULLED_FIXTURE);
+  const plan = planSweep(PULLED_FIXTURE, actions, disposed);
+  let earned = 0;
+  for (const d of disposed.values()) earned += d.gems;
+
+  return (
+    <View style={[styles.kitPullFill, { backgroundColor: c.background }]}>
+      <View style={styles.kitPullRail}>
+        <Pressable
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close the pull"
+          style={({ pressed }) => [
+            styles.kitPullClose,
+            { backgroundColor: c.backgroundElement },
+            pressed && { opacity: 0.6 },
+          ]}>
+          <Text style={[Type.section, { color: c.textSecondary }]}>×</Text>
+        </Pressable>
+      </View>
+      <ScrollView
+        style={styles.kitPullFill}
+        contentContainerStyle={styles.kitPullStage}
+        showsVerticalScrollIndicator={false}>
+        <PullDeck
+          pulled={PULLED_FIXTURE}
+          silverAt={200}
+          reveal={reveal}
+          actions={actions}
+          loadingActions={false}
+          disposed={disposed}
+          busy={null}
+          frozen={false}
+          error={null}
+          onDismissError={() => {}}
+          onSell={onSell}
+          onCommit={onCommit}
+          cardHeightCap={320}
+        />
+      </ScrollView>
+      <PullBar
+        total={PULLED_FIXTURE.length}
+        hidden={reveal.hidden}
+        cascading={reveal.cascading}
+        plan={plan}
+        planning={false}
+        sweep={null}
+        busy={false}
+        earned={earned}
+        onRevealNext={reveal.revealNext}
+        onRevealAll={reveal.revealAll}
+        /* Inert: the sweeps are two RPC volleys and there is no session behind
+           this page. The buttons and their confirms are the thing on show. */
+        onCommitAll={() => {}}
+        onSellAll={() => {}}
+        onAgain={onClose}
+        onInventory={onClose}
+      />
+    </View>
+  );
+}
+
 function Section({
   title,
   note,
@@ -1593,6 +1653,16 @@ function KitEntered({
 }
 
 const styles = StyleSheet.create({
+  kitPullFill: { flex: 1 },
+  kitPullRail: { paddingHorizontal: Spacing.three, paddingTop: Spacing.five, paddingBottom: Spacing.two },
+  kitPullClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kitPullStage: { flexGrow: 1, justifyContent: 'center', paddingVertical: Spacing.two },
   filterRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   filterChips: { flex: 1, minWidth: 0 },
   fill: { flex: 1 },

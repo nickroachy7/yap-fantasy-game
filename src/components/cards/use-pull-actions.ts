@@ -9,13 +9,14 @@
  * `set/[code]`, so clearing a pack meant leaving the sheet, finding each card in
  * an inventory that had just grown by eight, and acting on it there. The two
  * decisions are made AT the reveal — that is the moment you look at a card and
- * think "spare" — so the buttons belong there.
+ * think "spare" — so the buttons belong there. The bar's whole-pack sweeps are
+ * the same argument taken one step further; see `runSweep` and `pull-plan`.
  *
- * WHAT IS HERE AND WHAT IS NOT. This owns the reads and the writes; `PackReveal`
- * owns the pixels and knows nothing about supabase, which is the same split
- * `PackShelf` already has with the screen above it. It lives beside the
- * components rather than in the route because the pull is a component's worth
- * of state, and the route is already the longest file in the feature.
+ * WHAT IS HERE AND WHAT IS NOT. This owns the reads and the writes; `PullDeck`
+ * and `PullBar` own the pixels and know nothing about supabase, which is the
+ * same split `PackShelf` already has with the screen above it. It lives beside
+ * the components rather than in the route because the pull is a component's
+ * worth of state, and the route has enough of its own.
  *
  * EVERY FIGURE COMES FROM THE SERVER, read through `card-actions` — which is
  * its own module rather than part of this one because the card profile now
@@ -57,6 +58,7 @@ import { sellErrorMessage } from '@/components/players/sell';
 import { usePlayer } from '@/context/PlayerContext';
 import { supabase } from '@/lib/supabase';
 import { readCardActions, type CardActions } from './card-actions';
+import type { PlannedCommit, PlannedSell } from './pull-plan';
 import type { Pulled } from './PackShelf';
 
 /**
@@ -82,8 +84,20 @@ type PullState = {
   disposed: Map<string, Disposition>;
   loading: boolean;
   busy: string | null;
+  sweep: Sweeping | null;
   error: string | null;
 };
+
+/**
+ * A "do this to all of them" pass, while it is running.
+ *
+ * SEPARATE FROM `busy`, which names ONE card and is what a per-card button
+ * waits on. A sweep is not one card — it is a queue, and the thing that has to
+ * be disabled during it is every button on the screen including the other
+ * sweep. Folding the two into one field meant the bar could not tell "this card
+ * is selling" from "the pack is selling" and drew a spinner in the wrong place.
+ */
+export type Sweeping = { kind: 'commit' | 'sell'; done: number; total: number };
 
 const fresh = (key: string): PullState => ({
   key,
@@ -91,6 +105,7 @@ const fresh = (key: string): PullState => ({
   disposed: new Map(),
   loading: key !== '',
   busy: null,
+  sweep: null,
   error: null,
 });
 
@@ -103,11 +118,17 @@ export type PullActionsState = {
   disposed: Map<string, Disposition>;
   /** The card a write is in flight for, if any. Blocks every other button. */
   busy: string | null;
+  /** A whole-pack pass, while it runs. Blocks everything. */
+  sweep: Sweeping | null;
   /** The last refusal, in words a player can act on. */
   error: string | null;
   clearError: () => void;
   sell: (cardInstanceId: string) => void;
   commit: (cardInstanceId: string, setCode: string) => void;
+  /** Add every planned card to its set, one write at a time. */
+  commitAll: (plan: PlannedCommit[]) => void;
+  /** Sell every planned card, one write at a time. */
+  sellAll: (plan: PlannedSell[]) => void;
 };
 
 export function usePullActions(pulled: Pulled[] | null): PullActionsState {
@@ -185,7 +206,7 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
 
   const sell = useCallback(
     (cardInstanceId: string) => {
-      if (state.busy) return;
+      if (state.busy || state.sweep) return;
       const at = state.key;
       const value = state.actions.get(cardInstanceId)?.sellValue ?? 0;
       setState((held) => ({ ...held, busy: cardInstanceId, error: null }));
@@ -205,12 +226,12 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
         await settle(at, cardInstanceId);
       })();
     },
-    [state.busy, state.key, state.actions, foldInto, settle],
+    [state.busy, state.sweep, state.key, state.actions, foldInto, settle],
   );
 
   const commit = useCallback(
     (cardInstanceId: string, setCode: string) => {
-      if (state.busy) return;
+      if (state.busy || state.sweep) return;
       const at = state.key;
       const action = state.actions.get(cardInstanceId);
       const target = action?.sets.find((s) => s.code === setCode);
@@ -253,8 +274,134 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
         await settle(at, burnt);
       })();
     },
-    [state.busy, state.key, state.actions, foldInto, settle],
+    [state.busy, state.sweep, state.key, state.actions, foldInto, settle],
   );
+
+  /**
+   * Do one act to every card a plan names, one write at a time.
+   *
+   * SEQUENTIAL, AND NOT NEGOTIABLE. Both RPCs take the same wallet row lock, so
+   * fifty fired together queue on it anyway — and a failure in the middle of a
+   * pile of concurrent writes cannot be reported truthfully, because there is
+   * no "middle". This is the same shape as the open loop on the shelf and
+   * `claimAll` in `SetsPanel`, for the same reason.
+   *
+   * IT DOES NOT STOP AT A REFUSAL, and that is the difference from the open
+   * loop. There, every open is the same pack against the same balance, so
+   * whatever refused the fourth refuses the fifth. Here each write is a
+   * DIFFERENT card into a different slot: a set that filled up under us refuses
+   * that one card and has nothing to say about the next seven. Stopping would
+   * abandon work the player asked for on the strength of one card's bad luck.
+   * The refusals are counted and the last one is quoted.
+   *
+   * ONE TIDY-UP AT THE END, NOT ONE PER CARD. The single-card path re-reads
+   * `card_actions` and the wallet after every write, which is right when the
+   * player is about to press another button on the same screen. A fifty-card
+   * sweep doing that is fifty extra round trips to produce answers that are
+   * stale again one write later. The counts move optimistically as it goes
+   * (see `applyCardDelta`), and the truth lands once when it is over.
+   */
+  const runSweep = useCallback(
+    (kind: 'commit' | 'sell', items: (PlannedCommit | PlannedSell)[]) => {
+      if (state.busy || state.sweep || items.length === 0) return;
+      const at = state.key;
+      const held = state.actions;
+
+      setState((s) => ({ ...s, sweep: { kind, done: 0, total: items.length }, error: null }));
+
+      void (async () => {
+        const stamped = new Map<string, Disposition>();
+        /** Every copy the server actually took, so the inventory loses those. */
+        const burnt: string[] = [];
+        let refused = 0;
+        let lastRefusal: string | null = null;
+
+        for (const item of items) {
+          if (kind === 'sell') {
+            const sale = item as PlannedSell;
+            const { error } = await supabase.rpc('sell_card', {
+              p_card_instance_id: sale.cardInstanceId,
+            });
+            if (error) {
+              refused += 1;
+              lastRefusal = sellErrorMessage(error.message);
+            } else {
+              stamped.set(sale.cardInstanceId, { kind: 'sold', gems: sale.gems });
+              burnt.push(sale.cardInstanceId);
+            }
+          } else {
+            const add = item as PlannedCommit;
+            const action = held.get(add.cardInstanceId);
+            if (!action) {
+              refused += 1;
+            } else {
+              const { data, error } = await supabase.rpc('commit_card_to_set', {
+                p_set_code: add.setCode,
+                p_card_id: action.cardId,
+              });
+              if (error) {
+                refused += 1;
+                // Verbatim: every refusal this RPC raises is written for a player.
+                lastRefusal = error.message;
+              } else {
+                const answer = data as { paid?: number; card_instance_id?: string } | null;
+                stamped.set(add.cardInstanceId, {
+                  kind: 'committed',
+                  setName: add.setName,
+                  gems: num(answer?.paid),
+                  burnedThisCopy: !add.spare,
+                });
+                if (typeof answer?.card_instance_id === 'string') {
+                  burnt.push(answer.card_instance_id);
+                }
+              }
+            }
+          }
+
+          foldInto(at, (s) =>
+            s.sweep ? { ...s, sweep: { ...s.sweep, done: s.sweep.done + 1 } } : s,
+          );
+        }
+
+        /* THE STAMPS GO ON BEFORE THE TIDY-UP, so the deck shows what happened
+           the moment the last write lands rather than a round trip later. */
+        foldInto(at, (s) => ({
+          ...s,
+          disposed: new Map([...s.disposed, ...stamped]),
+        }));
+
+        if (burnt.length > 0) {
+          applyCardDelta(-burnt.length);
+          dropCards(burnt);
+        }
+        invalidateSets();
+
+        const summary =
+          refused === 0
+            ? null
+            : /* Counted as CARDS, because that is what the player pressed on.
+                 "3 of 8 added" plus the reason is the whole of what went wrong;
+                 naming eight separate refusals would bury it. */
+              `${items.length - refused} of ${items.length} ${
+                kind === 'sell' ? 'sold' : 'added'
+              }${lastRefusal ? ` — ${lastRefusal}` : '.'}`;
+
+        try {
+          const [, actions] = await Promise.all([refreshWallet(), readCardActions(at.split(','))]);
+          foldInto(at, (s) => ({ ...s, actions, sweep: null, error: summary }));
+        } catch {
+          /* The writes already happened. A tidy-up that throws must not leave
+             the sweep flag set, or every button on the page stays disabled with
+             nothing on screen explaining why. */
+          foldInto(at, (s) => ({ ...s, sweep: null, error: summary }));
+        }
+      })();
+    },
+    [state.busy, state.sweep, state.key, state.actions, foldInto, applyCardDelta, refreshWallet],
+  );
+
+  const commitAll = useCallback((plan: PlannedCommit[]) => runSweep('commit', plan), [runSweep]);
+  const sellAll = useCallback((plan: PlannedSell[]) => runSweep('sell', plan), [runSweep]);
 
   const clearError = useCallback(() => {
     setState((held) => (held.error === null ? held : { ...held, error: null }));
@@ -269,9 +416,12 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
     loading: live.loading,
     disposed: live.disposed,
     busy: live.busy,
+    sweep: live.sweep,
     error: live.error,
     clearError,
     sell,
     commit,
+    commitAll,
+    sellAll,
   };
 }

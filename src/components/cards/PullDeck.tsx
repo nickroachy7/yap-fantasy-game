@@ -1,15 +1,16 @@
 /**
- * What a pack deals you, turned over one card at a time.
+ * The deck: what a pack dealt you, turned over one card at a time.
  *
- * WHAT THIS REPLACED, AND WHY THE GRID HAD TO GO
+ * WHAT THIS WAS, AND WHAT MOVED OUT OF IT
  *
- * `PullResult` drew every pulled card at once in a wrapping grid, staggered by
- * 55ms so they landed in sequence. Its own note called that "the beta's version
- * of the moment, not the finished one", and named the two things wrong with it:
- * the cards arrive as a finished table, and there is nothing to do with them.
- * This is the finished one.
+ * `PackReveal`, which was the whole of the pull — the counter row, the deck,
+ * the two exits under each card, a paragraph of guidance and the way out —
+ * drawn inside the packs SHEET. The pull is its own page now (`app/(app)/pull`),
+ * so everything that was chrome went to the page and everything that was the
+ * deck stayed here. What is left is exactly one idea: cards, face down, that
+ * you move through.
  *
- * THREE IDEAS, AND THEY ARE THE WHOLE FILE
+ * The three ideas the deck has always been built on are unchanged:
  *
  *   ONE CARD AT A TIME. The deck runs left to right and snaps, so exactly one
  *   card is in front of you. Cards start face down and turn over as they reach
@@ -17,26 +18,24 @@
  *   reviewing something already dealt. A grid can only ever show you a result;
  *   a deck you move through has a next card in it.
  *
- *   THE CARD IS BIG. `detail`, the 320pt size the card profile uses, against
- *   the grid's 168. Eight cards you scroll past one at a time can each be four
- *   times the area of eight cards laid out at once, and the pull is the one
- *   moment in this app that is purely about looking at a card.
+ *   THE CARD IS BIG. It is the one moment in this app that is purely about
+ *   looking at a card, and on a page rather than in a sheet there is finally
+ *   room to say so — the page hands down a height budget and the card takes as
+ *   much of it as it can. See `cardHeightCap`.
  *
  *   THE DECISION IS MADE HERE, AND ON THE CARD. Most of a pack is duplicates,
- *   and until now the only thing the reveal let you do was look at them —
- *   selling lived on `card/[id]`, committing lived on `set/[code]`, so clearing
- *   a pack meant leaving the sheet and finding eight cards in an inventory that
- *   had just grown by eight. Both exits are on the card now, priced by the
- *   server. See `use-pull-actions`.
+ *   and the two things worth doing with a spare — sell it, or burn it into a
+ *   set — are attached to the card they are about, inside its own slide. One
+ *   shared panel under the deck was the first version: the buttons then belong
+ *   to the carousel rather than to the card, so "sell this" is a claim about a
+ *   selection you have to trust the panel got right, and swiping fast puts your
+ *   thumb on a button that is mid-swap. Under the card there is nothing to get
+ *   wrong.
  *
- *   EACH CARD CARRIES ITS OWN PAIR, inside its own slide. The first version put
- *   ONE panel under the deck and pointed it at whichever card was in front of
- *   you, which is fewer pixels and the wrong object: the buttons then belong to
- *   the carousel rather than to the card, so "sell this" is a claim about a
- *   selection you have to trust the panel got right. Swipe fast and the panel
- *   is mid-swap while your thumb is already on the button. Under the card there
- *   is nothing to get wrong — what you press is attached to what you are
- *   looking at, and it travels with it.
+ * WHOSE STATE IS WHOSE. The deck owns the ScrollView, the measurement and the
+ * turn; `useReveal` owns which cards are face up and which one is in front of
+ * you, because the page's bar needs both. The deck reports where it came to
+ * rest and acts on `seek`; it never decides.
  *
  * WHY THE FLIP IS 2D
  *
@@ -48,20 +47,8 @@
  * `transform` origins and backface culling differently enough that "it works on
  * my simulator" is not evidence. The 2D version has no backface to cull and
  * nothing to get wrong.
- *
- * A NEW PACK IS A NEW DECK, and it says so by remounting: the screen gives this
- * component a `key` made of the pull's card ids, so opening another pack
- * discards the scroll position, the turned-over set and the focused index in one
- * go rather than resetting five pieces of state in an effect and rendering the
- * new pack once against the old one's answers.
- *
- * NOTHING IS EVER STUCK FACE DOWN. Cards turn over when they reach the middle,
- * on tap, and all at once from `Reveal all` — because the ceremony is a gift
- * and a gift you cannot decline is a chore. The last of these is also the
- * accessibility answer: reaching a card by swipe is not a thing every player
- * can do.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -94,7 +81,6 @@ import {
   Colors,
   NUMERIC,
   Radius,
-  SheetDialogWidth,
   Spacing,
   TierColors,
   Type,
@@ -105,6 +91,7 @@ import { PlayerCard, type PlayerCardModel } from './PlayerCard';
 import { SetPickRow } from './SetPickRow';
 import type { Pulled } from './PackShelf';
 import type { CardActions } from './card-actions';
+import type { Reveal } from './use-reveal';
 import type { Disposition } from './use-pull-actions';
 
 /** Every card is minted at the floor tier; only lineup starts move it. */
@@ -114,27 +101,30 @@ const NEXT_TIER_LABEL = 'SILVER';
 /**
  * How wide the card in front of you is.
  *
- * SMALLER THAN `detail`'s OWN 320, which is what this started at. At 320 on a
- * phone the card plus its two buttons filled the sheet and the pack read as one
- * card you happened to be able to scroll away from — the neighbours were a
- * sliver each, so nothing on screen said there were four more. 264 keeps the
- * card the biggest thing in the sheet without it being the only thing.
+ * THE CEILING WENT UP WHEN THE SHEET WENT AWAY. In a sheet the card had a
+ * counter row, a hero and a paragraph competing with it and 264 was as much as
+ * it could take without becoming the only thing on screen. On a page whose only
+ * subject is the card there is nothing to compete with, so the cap is the
+ * card's own drawn size — `detail` is 320 — and the real limit is whichever of
+ * the two axes runs out first. See `cardHeightCap`.
  *
- * THE PEEK IS THE OTHER HALF OF THAT SAME DECISION. It is the strip either side
+ * THE PEEK IS THE OTHER HALF OF THE DECISION. It is the strip either side
  * showing the edges of the cards next to this one, and it is what says there IS
- * a deck without a caption saying so. Widening it from 88 to 116 buys back more
- * than the card gives up: you now see enough of the neighbour to read its frame
- * and the top of its own buttons.
+ * a deck without a caption saying so.
  *
- * The floor stops a 320pt-wide device squeezing the card to nothing. On a 375pt
- * phone this resolves to 259, on a 412 to the full 264.
+ * The floor stops a 320pt-wide device squeezing the card to nothing.
  */
-const CARD_MAX = 264;
-const CARD_MIN = 220;
-const PEEK = 116;
+const CARD_MAX = 340;
+const CARD_MIN = 200;
+const PEEK = 104;
 
 /** The turn. Long enough to read as a card being turned, short enough to sit through eight. */
 const FLIP_MS = 420;
+
+/** The lift that says which card you are looking at. See `RevealSlot`. */
+const FOCUS_MS = 220;
+const ASIDE_SCALE = 0.9;
+const ASIDE_OPACITY = 0.5;
 
 /**
  * How far a card fades once it has been spent.
@@ -152,9 +142,8 @@ const SPENT_OPACITY = 0.42;
  * emits `scroll-snap-type: none`, so the deck free-scrolled in a browser and
  * came to rest between two cards — which on a surface whose whole premise is
  * "one card in front of you" is the difference between a deck and a shelf.
- * Mobile web is a real target here, not a degraded one (see the note in
- * `PlayerSheetFrame` about the deployed site being the kickoff insurance), so
- * the CSS is written directly.
+ * Mobile web is a real target here, not a degraded one, so the CSS is written
+ * directly.
  *
  * Same shim shape as `gradient()`: a cast, because these are real CSS
  * properties that React Native's style type has no name for. Native keeps
@@ -165,53 +154,56 @@ const WEB_SNAP: ViewStyle | null =
 const WEB_SNAP_CHILD: ViewStyle | null =
   Platform.OS === 'web' ? ({ scrollSnapAlign: 'center' } as ViewStyle) : null;
 
-/**
- * How long the first card waits before turning itself over.
- *
- * Not zero. A card that is already face up when the sheet finishes opening was
- * never face down, and the whole point of the back is that you see it first.
- */
-const FIRST_REVEAL_MS = 260;
-
 /* ---- the deck ---------------------------------------------------------- */
 
-export function PackReveal({
+export function PullDeck({
   pulled,
   silverAt,
+  reveal,
   actions,
   loadingActions,
   disposed,
   busy,
+  frozen,
   error,
   onDismissError,
   onSell,
   onCommit,
-  onAgain,
-  onSeeInventory,
+  cardHeightCap,
 }: {
   pulled: Pulled[];
   /** Career FP the next tier starts at, read from `tier_thresholds`. */
   silverAt: number;
+  /** Which cards are face up, and which one is in front of you. */
+  reveal: Reveal;
   /** What each card can be turned into, keyed by card_instance_id. */
   actions: Map<string, CardActions>;
   loadingActions: boolean;
   disposed: Map<string, Disposition>;
   /** The card a write is in flight for. Blocks every button on every card. */
   busy: string | null;
+  /** A whole-pack sweep is running. Every per-card button waits for it. */
+  frozen: boolean;
   error: string | null;
   onDismissError: () => void;
   onSell: (cardInstanceId: string) => void;
   onCommit: (cardInstanceId: string, setCode: string) => void;
-  onAgain: () => void;
-  onSeeInventory: () => void;
+  /**
+   * The tallest the card may be drawn, handed down by the page.
+   *
+   * THE PAGE OWNS THE HEIGHT and the deck owns the width, because only the page
+   * knows what else is on screen — a bar at the bottom, a rail at the top, and
+   * a safe area at both ends. The card is square (`artAspect` is 1), so a
+   * height budget is a width budget, and the card takes whichever of the two
+   * is smaller. Without this the card sized itself off the window and the
+   * bottom of it went under the bar on a short phone.
+   */
+  cardHeightCap: number;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
   const gold = TierColors[scheme].gold.accent;
 
   const [measured, setMeasured] = useState(0);
-  const [focus, setFocus] = useState(0);
-  const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
   const scroller = useRef<ScrollView>(null);
 
   /**
@@ -226,56 +218,53 @@ export function PackReveal({
    * `__reactLayoutHandler` on the node, which in a real build of this app
    * attaches the handler and then never fires it. The symptom was every card
    * pinned at `CARD_MIN` in a 404pt box, with the deck's gutter at the 16pt
-   * floor instead of the 44 that centres it. Calling the handler by hand from
-   * the console laid it out correctly, which is what proved where the fault was.
+   * floor instead of the value that centres it. Calling the handler by hand
+   * from the console laid it out correctly, which is what proved where the
+   * fault was.
    *
-   * The derivation is exact rather than a guess. This only ever renders inside
-   * `PlayerSheetFrame`, which is full-bleed on a phone and on narrow web and a
-   * dialog capped at `SheetDialogWidth` on wide web — so the box is the window
-   * or the cap, whichever is smaller, and the bleed below cancels the frame's
-   * own gutter. `onLayout` still refines it when it does fire, which is what
-   * keeps this honest if the frame's own width ever stops being either of those.
+   * The window is the honest fallback here: the pull page is full-bleed on
+   * every platform, so the deck's box IS the window until something says
+   * otherwise. `onLayout` still refines it when it fires, which is what keeps
+   * this right inside the centred column on a wide browser.
    */
   const { width: windowWidth } = useWindowDimensions();
-  const viewport = measured || Math.min(windowWidth, SheetDialogWidth);
+  const viewport = measured || windowWidth;
 
-  const card = Math.max(CARD_MIN, Math.min(CARD_MAX, viewport - PEEK));
+  const card = Math.max(CARD_MIN, Math.min(CARD_MAX, viewport - PEEK, cardHeightCap));
   /* The snap step. Cards are one gap apart, so the interval is the card plus
      the gap and the side inset is whatever is left over — which is what puts
      each card in the middle of the box rather than at its left edge. */
   const step = card + Spacing.three;
   const inset = Math.max(Spacing.three, (viewport - card) / 2);
 
-  const reveal = useCallback((id: string) => {
-    setRevealed((held) => (held.has(id) ? held : new Set(held).add(id)));
-  }, []);
-
-  /* THE FIRST CARD DEALS ITSELF. Everything after it is dealt by the player
-     scrolling to it — see `onScroll` — but something has to start, and a deck
-     that sits entirely face down until you touch it reads as having failed to
-     load rather than as waiting for you. */
-  useEffect(() => {
-    const first = pulled[0]?.card_instance_id;
-    if (!first) return;
-    const t = setTimeout(() => reveal(first), FIRST_REVEAL_MS);
-    return () => clearTimeout(t);
-  }, [pulled, reveal]);
+  const { focusAt, seek } = reveal;
 
   /**
    * Where a programmatic scroll is headed, while it is still getting there.
    *
-   * THE PANEL MUST NOT FOLLOW AN ANIMATION IT ALREADY KNOWS THE END OF. Pressing
-   * the pip for card 3 starts a smooth scroll that passes over cards 1 and 2 on
-   * the way, and every frame of it arrives here as a scroll event with a
-   * different index — so the panel underneath flicked through two other players
-   * before settling, and on the way it turned both of their cards over. Which
-   * card you are looking at is decided by whoever moved the deck; this ref is
-   * how a press keeps that decision until its own scroll catches up.
+   * THE FOCUS MUST NOT FOLLOW AN ANIMATION IT ALREADY KNOWS THE END OF.
+   * Pressing the pip for card 3 starts a smooth scroll that passes over cards 1
+   * and 2 on the way, and every frame of it arrives here as a scroll event with
+   * a different index — so the deck flicked through two other players before
+   * settling, and on the way it turned both of their cards over. Which card you
+   * are looking at is decided by whoever moved the deck; this ref is how a
+   * press keeps that decision until its own scroll catches up.
    *
    * A ref rather than state on purpose: it changes on frames that must not
    * render, and it is read only from inside the handler that clears it.
    */
   const heading = useRef<number | null>(null);
+
+  /* The one place the deck is moved by something other than a finger. `seek`
+     carries a token as well as an index so that asking for the same card twice
+     — the reader having swiped away in between — is a fresh instruction. */
+  const seekToken = useRef(0);
+  useEffect(() => {
+    if (!seek || seek.token === seekToken.current) return;
+    seekToken.current = seek.token;
+    heading.current = seek.index;
+    scroller.current?.scrollTo({ x: seek.index * step, animated: true });
+  }, [seek, step]);
 
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -289,11 +278,9 @@ export function PackReveal({
         heading.current = null;
       }
 
-      setFocus(at);
-      const id = pulled[at]?.card_instance_id;
-      if (id) reveal(id);
+      focusAt(at);
     },
-    [step, pulled, reveal],
+    [step, pulled.length, focusAt],
   );
 
   /* WHEREVER IT ACTUALLY STOPPED WINS, and this is the release valve for the
@@ -310,37 +297,6 @@ export function PackReveal({
     [onScroll],
   );
 
-  const revealAll = useCallback(() => {
-    setRevealed(new Set(pulled.map((p) => p.card_instance_id)));
-  }, [pulled]);
-
-  const goTo = useCallback(
-    (i: number) => {
-      /* The focus moves HERE, not in the scroll handler this animation will
-         eventually reach. Pressing a pip is a statement about which card you
-         want in front of you, and leaving it to `onScroll` meant the panel
-         underneath went on describing the old card for the length of a smooth
-         scroll — or forever, on any platform that resolves an animated
-         `scrollTo` without emitting scroll events. */
-      setFocus(i);
-      heading.current = i;
-      scroller.current?.scrollTo({ x: i * step, animated: true });
-      const id = pulled[i]?.card_instance_id;
-      if (id) reveal(id);
-    },
-    [step, pulled, reveal],
-  );
-
-  const allRevealed = revealed.size >= pulled.length;
-  /* What this pack has paid out so far. Only drawn once something has been
-     spent, because "+0 gems" on an untouched pack reads as a reward that
-     failed to arrive. */
-  const earned = useMemo(() => {
-    let total = 0;
-    for (const d of disposed.values()) total += d.gems;
-    return total;
-  }, [disposed]);
-
   const toModel = (p: Pulled): PlayerCardModel => ({
     playerName: p.player_name ?? 'Unknown player',
     positionAbbreviation: p.position_abbreviation,
@@ -354,175 +310,79 @@ export function PackReveal({
   });
 
   return (
-    <>
-      {/* ---- the counter, and the way out of the ceremony ---------------- */}
-      <View style={styles.deckHead}>
-        <View style={styles.pips}>
-          {pulled.map((p, i) => (
-            <Pressable
-              key={p.card_instance_id}
-              onPress={() => goTo(i)}
-              accessibilityRole="button"
-              accessibilityLabel={`Card ${i + 1} of ${pulled.length}`}
-              accessibilityState={{ selected: i === focus }}
-              hitSlop={6}
-              style={styles.pipTap}>
-              <View
-                style={[
-                  styles.pip,
-                  {
-                    backgroundColor: i === focus ? gold : c.borderStrong,
-                    // A card already turned over is filled; one still face down
-                    // is an outline, so the row doubles as "how much is left".
-                    opacity: revealed.has(p.card_instance_id) || i === focus ? 1 : 0.45,
-                  },
-                ]}
-              />
-            </Pressable>
-          ))}
-        </View>
-
-        {allRevealed ? (
-          <Text style={[Type.fine, NUMERIC, { color: c.textTertiary }]}>
-            {`${focus + 1} of ${pulled.length}`}
-          </Text>
-        ) : (
-          /* A CHIP RATHER THAN A BARE LABEL. This is the whole of the "I do
-             not want the ceremony today" escape hatch, and as 10pt gold type
-             with nothing around it it read as a heading for the pip row beside
-             it. Bordered in the same gold, it reads as the one thing up here
-             you can press. */
-          <Pressable
-            onPress={revealAll}
-            accessibilityRole="button"
-            accessibilityLabel="Turn over every card in this pack"
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.revealAll,
-              { borderColor: gold },
-              pressed && styles.pressed,
-            ]}>
-            <Text style={[Type.label, { color: gold }]}>REVEAL ALL</Text>
-          </Pressable>
-        )}
-      </View>
-
-      {/* ---- the deck ---------------------------------------------------- */}
-      {/* Bled back out to the sheet's edges. The scroll content is inset
-          `Spacing.three` each side by the frame, and a deck that stopped there
-          would put its peeking neighbour behind a margin — the card either side
-          has to run to the edge of the screen or it does not read as a deck. */}
-      <View style={styles.bleed}>
-        <ScrollView
-          ref={scroller}
-          horizontal
-          onLayout={(e: LayoutChangeEvent) => setMeasured(e.nativeEvent.layout.width)}
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={step}
-          decelerationRate="fast"
-          style={WEB_SNAP}
-          /* NO `disableIntervalMomentum`, and its absence is the point.
-             That prop clamps every gesture to the NEXT card however hard it was
-             thrown, which made an eight-card pack eight deliberate swipes with
-             no way to go faster — the flick you use to skim is the flick you use
-             to step, and the deck ignored the difference. Without it a gentle
-             swipe still lands on the neighbour (that is what `snapToInterval`
-             and `decelerationRate="fast"` are for) and a hard one carries
-             through several, revealing each as it passes the middle. */
-          onScroll={onScroll}
-          onScrollBeginDrag={() => {
-            heading.current = null;
+    <ScrollView
+      ref={scroller}
+      horizontal
+      onLayout={(e: LayoutChangeEvent) => setMeasured(e.nativeEvent.layout.width)}
+      showsHorizontalScrollIndicator={false}
+      snapToInterval={step}
+      decelerationRate="fast"
+      /* SIZED BY ITS CONTENT, NOT BY ITS PARENT. A ScrollView's default style
+         is `flex: 1`, so inside the page's centring column the deck grew to
+         fill the whole stage and then laid its cards out at the top of it —
+         which read as a card stuck under the rail with half a screen of black
+         below it. Growing is the parent's job here; the deck is exactly as tall
+         as the tallest slide in it. */
+      style={[styles.strip, WEB_SNAP]}
+      /* NO `disableIntervalMomentum`, and its absence is the point.
+         That prop clamps every gesture to the NEXT card however hard it was
+         thrown, which made an eight-card pack eight deliberate swipes with no
+         way to go faster — the flick you use to skim is the flick you use to
+         step, and the deck ignored the difference. Without it a gentle swipe
+         still lands on the neighbour (that is what `snapToInterval` and
+         `decelerationRate="fast"` are for) and a hard one carries through
+         several, revealing each as it passes the middle. */
+      onScroll={onScroll}
+      onScrollBeginDrag={() => {
+        heading.current = null;
+      }}
+      onMomentumScrollEnd={settle}
+      onScrollEndDrag={settle}
+      scrollEventThrottle={16}
+      contentContainerStyle={[styles.deck, { paddingHorizontal: inset }]}
+      {...horizontalStrip}>
+      {pulled.map((p, i) => (
+        <RevealSlot
+          key={p.card_instance_id}
+          width={card}
+          tone={gold}
+          revealed={reveal.revealed.has(p.card_instance_id)}
+          focused={i === reveal.focus}
+          index={i}
+          count={pulled.length}
+          spent={
+            // A card that has left the collection is drawn back, not gone: the
+            // deck must not resize itself under a scrolling thumb.
+            !!disposed.get(p.card_instance_id) &&
+            actions.get(p.card_instance_id)?.held === false
+          }
+          onReveal={() => {
+            reveal.reveal(p.card_instance_id);
+            if (i !== reveal.focus) reveal.goTo(i);
           }}
-          onMomentumScrollEnd={settle}
-          onScrollEndDrag={settle}
-          scrollEventThrottle={16}
-          contentContainerStyle={[styles.deck, { paddingHorizontal: inset }]}
-          {...horizontalStrip}>
-          {pulled.map((p, i) => (
-            <RevealSlot
-              key={p.card_instance_id}
-              width={card}
-              tone={gold}
-              revealed={revealed.has(p.card_instance_id)}
-              index={i}
-              count={pulled.length}
-              spent={
-                // A card that has left the collection is drawn back, not gone:
-                // the deck must not resize itself under a scrolling thumb.
-                !!disposed.get(p.card_instance_id) &&
-                actions.get(p.card_instance_id)?.held === false
-              }
-              onReveal={() => {
-                reveal(p.card_instance_id);
-                if (i !== focus) goTo(i);
-              }}
-              actions={(turned) => (
-                <CardActionPanel
-                  player={p.player_name ?? 'This card'}
-                  revealed={turned}
-                  action={actions.get(p.card_instance_id)}
-                  loading={loadingActions}
-                  became={disposed.get(p.card_instance_id)}
-                  busy={busy === p.card_instance_id}
-                  /* Every button on every card waits on a write in flight —
-                     both RPCs move the one wallet, so a second one decided
-                     against a balance that is about to change is the shape of a
-                     double-spend. */
-                  locked={busy !== null && busy !== p.card_instance_id}
-                  error={busy === p.card_instance_id ? error : null}
-                  onDismissError={onDismissError}
-                  onSell={() => onSell(p.card_instance_id)}
-                  onCommit={(code) => onCommit(p.card_instance_id, code)}
-                />
-              )}>
-              <PlayerCard model={toModel(p)} size="detail" fixedWidth={false} />
-            </RevealSlot>
-          ))}
-        </ScrollView>
-      </View>
-
-      <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
-        New cards start at bronze. Start them in a lineup to earn their way up — or spend the
-        spares here.
-      </Text>
-
-      {/* ---- and out ----------------------------------------------------- */}
-      <View style={styles.afterRow}>
-        <Pressable
-          onPress={onSeeInventory}
-          accessibilityRole="button"
-          accessibilityLabel="See these cards in your inventory"
-          style={({ pressed }) => [
-            styles.after,
-            { backgroundColor: c.text },
-            pressed && styles.pressed,
-          ]}>
-          <Text style={[Type.strong, { color: c.background }]}>See in Inventory</Text>
-        </Pressable>
-        <Pressable
-          onPress={onAgain}
-          accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.after,
-            { backgroundColor: c.backgroundElement },
-            pressed && styles.pressed,
-          ]}>
-          <Text style={[Type.strong, { color: c.text }]}>Open another</Text>
-        </Pressable>
-
-        {earned > 0 ? (
-          <View
-            accessible
-            accessibilityRole="text"
-            accessibilityLabel={`${earned} gems earned from this pack`}
-            style={styles.earned}>
-            <Gem size={11} color={gold} />
-            <Text style={[Type.strong, NUMERIC, { color: c.text }]}>{`+${earned}`}</Text>
-            <Text style={[Type.fine, { color: c.textTertiary }]}>from this pack</Text>
-          </View>
-        ) : null}
-      </View>
-    </>
+          actions={(turned) => (
+            <CardActionPanel
+              player={p.player_name ?? 'This card'}
+              revealed={turned}
+              action={actions.get(p.card_instance_id)}
+              loading={loadingActions}
+              became={disposed.get(p.card_instance_id)}
+              busy={busy === p.card_instance_id}
+              /* Every button on every card waits on a write in flight — both
+                 RPCs move the one wallet, so a second one decided against a
+                 balance that is about to change is the shape of a
+                 double-spend. */
+              locked={frozen || (busy !== null && busy !== p.card_instance_id)}
+              error={busy === p.card_instance_id ? error : null}
+              onDismissError={onDismissError}
+              onSell={() => onSell(p.card_instance_id)}
+              onCommit={(code) => onCommit(p.card_instance_id, code)}
+            />
+          )}>
+          <PlayerCard model={toModel(p)} size="detail" fixedWidth={false} />
+        </RevealSlot>
+      ))}
+    </ScrollView>
   );
 }
 
@@ -533,20 +393,23 @@ export function PackReveal({
  *
  * THE FACE IS IN FLOW AND THE BACK IS OVER IT, which is what makes the slot the
  * right height without anybody measuring a card: the face lays out normally and
- * establishes the box, and the back is an `absoluteFill` over it. Doing it the
- * other way round would need a height in points here, and the card's height is
- * `artAspect` times a width this component computes at runtime.
+ * establishes the box, and the back is an `absoluteFill` over it.
  *
  * SO THE FACE IS ALWAYS MOUNTED, including while it is face down and invisible.
  * That is a screen reader announcing the player's name on a card the sighted
- * player has not turned over yet — hence `accessibilityElementsHidden` and its
- * Android counterpart while it is down, which is the same pair `Modal` uses to
- * hide what is behind it.
+ * player has not turned over yet — hence `aria-hidden` while it is down.
+ *
+ * THE NEIGHBOURS SIT BACK. The focused slot is drawn at full size and the ones
+ * either side at `ASIDE_SCALE`, faded. It is the cheapest possible version of
+ * depth and it does the one job the peek alone could not: it says the card in
+ * the middle is the one the buttons underneath belong to. Scale is a transform,
+ * so it changes nothing about the layout and cannot move the snap points.
  */
 function RevealSlot({
   width,
   tone,
   revealed,
+  focused,
   spent,
   index,
   count,
@@ -557,6 +420,8 @@ function RevealSlot({
   width: number;
   tone: string;
   revealed: boolean;
+  /** This is the card in front of you. */
+  focused: boolean;
   /** The copy has left the collection — sold, or burnt into a set. */
   spent: boolean;
   index: number;
@@ -573,17 +438,16 @@ function RevealSlot({
   children: React.ReactNode;
 }) {
   const flip = useSharedValue(revealed ? 1 : 0);
+  const lift = useSharedValue(focused ? 1 : 0);
 
   /**
    * The turn is FINISHED, which is a different moment from "the turn started".
    *
    * `revealed` flips the instant the card reaches the middle of the deck, and
    * the turn takes `FLIP_MS` after that. Hanging the panel off `revealed` put
-   * "Add to a set · 2" and a priced sell button directly beneath a card still
-   * showing its back and the words TAP TO REVEAL — pressable, for four hundred
-   * milliseconds, on a card the player had not seen. That was survivable when
-   * one shared panel sat below the whole deck; with the buttons under the card
-   * they belong to it is simply wrong.
+   * a priced sell button directly beneath a card still showing its back and the
+   * words TAP TO REVEAL — pressable, for four hundred milliseconds, on a card
+   * the player had not seen.
    *
    * Set from the timing's own completion callback rather than a parallel
    * timeout, so it cannot drift from the animation it is reporting on, and it
@@ -602,6 +466,18 @@ function RevealSlot({
       },
     );
   }, [revealed, flip]);
+
+  useEffect(() => {
+    lift.value = withTiming(focused ? 1 : 0, {
+      duration: FOCUS_MS,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [focused, lift]);
+
+  const liftStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(lift.value, [0, 1], [ASIDE_OPACITY, 1]),
+    transform: [{ scale: interpolate(lift.value, [0, 1], [ASIDE_SCALE, 1]) }],
+  }));
 
   /* Both halves read the same 0..1. The back owns the first half of it and the
      face the second, so the face is at zero width for exactly as long as the
@@ -626,7 +502,7 @@ function RevealSlot({
           not flip with it — it belongs to the card but it is not printed on it,
           and a set picker that shrank to nothing edge-on would read as the UI
           breaking rather than as a card turning over. */}
-      <View>
+      <Animated.View style={liftStyle}>
         {/* `aria-hidden` rather than the platform pair it stands for. React
             Native maps it to `accessibilityElementsHidden` on iOS and
             `importantForAccessibility` on Android, and react-native-web emits
@@ -648,7 +524,7 @@ function RevealSlot({
           aria-hidden={revealed}>
           <CardBack tone={tone} index={index} count={count} onPress={onReveal} />
         </Animated.View>
-      </View>
+      </Animated.View>
 
       {actions(turned)}
     </View>
@@ -663,47 +539,50 @@ function RevealSlot({
  * would leak which card it is before it is turned. Every back in the deck is
  * identical on purpose.
  */
-function CardBack({
+export function CardBack({
   tone,
   index,
   count,
   onPress,
 }: {
   tone: string;
-  index: number;
-  count: number;
-  onPress: () => void;
+  index?: number;
+  count?: number;
+  onPress?: () => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
+  const label =
+    index === undefined || count === undefined
+      ? 'A pack, unopened.'
+      : `Card ${index + 1} of ${count}, face down. Turn it over.`;
+
   return (
     <Pressable
       onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`Card ${index + 1} of ${count}, face down. Turn it over.`}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : 'image'}
+      accessibilityLabel={label}
       style={({ pressed }) => [
         styles.back,
         { backgroundColor: c.surfaceSunken, borderColor: tone },
         pressed && styles.pressed,
       ]}>
-      {/* Four bars, well off centre, in the sheet's own gold at a whisper. A
+      {/* Four bars, well off centre, in the page's own gold at a whisper. A
           plain field behind the mark reads as a placeholder that failed to
           load; this reads as printing. */}
       <View style={[StyleSheet.absoluteFill, styles.inert]}>
         {[0, 1, 2, 3].map((i) => (
           <View
             key={i}
-            style={[
-              styles.backBar,
-              { backgroundColor: rgba(tone, 0.1), top: `${14 + i * 22}%` },
-            ]}
+            style={[styles.backBar, { backgroundColor: rgba(tone, 0.1), top: `${14 + i * 22}%` }]}
           />
         ))}
       </View>
 
       <YapMark height={44} color={tone} ink={c.surfaceSunken} />
-      <Text style={[Type.micro, { color: c.textTertiary }]}>TAP TO REVEAL</Text>
+      {onPress ? <Text style={[Type.micro, { color: c.textTertiary }]}>TAP TO REVEAL</Text> : null}
     </Pressable>
   );
 }
@@ -714,10 +593,6 @@ type Stage = 'idle' | 'picking' | 'selling';
 
 /**
  * Sell it, or put it in a set — for the one card this panel sits under.
- *
- * Named for the panel rather than for the data: `CardActions` is now the type
- * of what `card_actions` returns, and the two living in one file under one name
- * is a rename waiting to go wrong.
  *
  * ONE PANEL PER CARD, DRAWN UNDER IT, INSIDE ITS SLIDE. It is as wide as the
  * card and no wider, which is what makes the buttons a column rather than a
@@ -735,7 +610,7 @@ type Stage = 'idle' | 'picking' | 'selling';
  * through this panel: `Quick sell` becomes a priced confirm, `Add to set`
  * becomes the list of sets that can take it. Nothing destructive happens on a
  * first press, which is the property that actually matters on a surface you
- * scroll with your thumb.
+ * scroll with your thumb. The bar's whole-pack sweeps are staged the same way.
  */
 function CardActionPanel({
   player,
@@ -756,7 +631,7 @@ function CardActionPanel({
   loading: boolean;
   became: Disposition | undefined;
   busy: boolean;
-  /** Another card is mid-write. Everything here waits for it. */
+  /** Another card is mid-write, or the whole pack is. Everything here waits. */
   locked: boolean;
   error: string | null;
   onDismissError: () => void;
@@ -781,13 +656,7 @@ function CardActionPanel({
   /* A face-down card is not a card you have seen, and a button under it would
      be asking you to sell something you have not looked at. */
   if (!revealed) {
-    return (
-      <View style={styles.panel}>
-        <Text style={[Type.fine, { color: c.textTertiary }]}>
-          Turn the card over to sell it or add it to a set.
-        </Text>
-      </View>
-    );
+    return <View style={styles.panel} />;
   }
 
   if (loading && !action) {
@@ -933,22 +802,19 @@ function CardActionPanel({
                 /**
                  * THE PRICE IS ITS OWN ELEMENT, not the tail of the sentence,
                  * and the reason is what an ellipsis eats first. As one string,
-                 * `Add to Washington Commanders · 4` overruns a 257pt card and
+                 * `Add to Washington Commanders · 4` overruns the card and
                  * `numberOfLines={1}` takes the END of it — so the longest club
                  * names in the league lost the gem figure and the button read
                  * `Add to Washington Comm…`. The one number on it, gone, on
                  * exactly the sets where the label is least readable.
-                 *
-                 * Split, the name shrinks and the figure cannot: same shape as
-                 * the sell button beside it.
                  */
                 <>
                   <Text numberOfLines={1} style={[Type.strong, styles.grow, { color: '#17130A' }]}>
                     {commitable.length === 1
                       ? `Add to ${commitable[0].name}`
                       : /* THE COUNT IS IN THE SENTENCE, not floated to the
-                           right like the price is. Two reasons. Every set here
-                           is priced separately — `pays` follows each set's own
+                           right like the price is. Every set here is priced
+                           separately — `pays` follows each set's own
                            `commit_payout_pct` — so there is no single figure
                            this button could print, and a bare `2` in the slot
                            where the other state prints gems reads as two gems.
@@ -993,9 +859,7 @@ function CardActionPanel({
                 <>
                   <Text style={[Type.strong, { color: c.text }]}>Quick sell</Text>
                   <Gem size={10} color={gold} />
-                  <Text style={[Type.strong, NUMERIC, { color: c.text }]}>
-                    {action.sellValue}
-                  </Text>
+                  <Text style={[Type.strong, NUMERIC, { color: c.text }]}>{action.sellValue}</Text>
                 </>
               )}
             </Pressable>
@@ -1044,27 +908,7 @@ function CardActionPanel({
 }
 
 const styles = StyleSheet.create({
-  deckHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.two,
-    minHeight: 20,
-  },
-  pips: { flexDirection: 'row', alignItems: 'center' },
-  pipTap: { paddingVertical: Spacing.one, paddingHorizontal: 3 },
-  pip: { width: 18, height: 3, borderRadius: 2 },
-  revealAll: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.chip,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one + 1,
-  },
-
-  /* The frame insets its scroll content `Spacing.three` each side; the deck
-     climbs back out over both so the neighbouring card reaches the screen edge.
-     See `SheetToneBand`, which does the same thing for the same reason. */
-  bleed: { marginHorizontal: -Spacing.three },
+  strip: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto' },
   deck: { gap: Spacing.three, alignItems: 'flex-start' },
   /* The card and its own panel are one column. `flex-start` on the deck above
      lets each slide be its own height, so opening a set picker on one card
@@ -1084,15 +928,13 @@ const styles = StyleSheet.create({
   inert: { pointerEvents: 'none' },
 
   /* Held to a floor so the deck does not resize under a thumb as cards turn
-     over: a face-down card's one-line hint and a revealed card's two buttons
-     have to occupy about the same block, or scrolling the deck would make the
-     whole sheet jump every time a card landed. */
-  panel: { gap: Spacing.two, minHeight: 108, paddingTop: Spacing.one },
+     over: a face-down card's empty panel and a revealed card's two buttons have
+     to occupy about the same block, or scrolling the deck would make the page
+     jump every time a card landed. */
+  panel: { gap: Spacing.two, minHeight: 104, paddingTop: Spacing.one },
   panelCentred: { alignItems: 'center' },
   stageBlock: { gap: Spacing.two },
-  stamp: {
-    gap: Spacing.half,
-  },
+  stamp: { gap: Spacing.half },
   stampText: { maxWidth: 560 },
   refusal: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -1101,11 +943,11 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one + 2,
   },
 
-  /* A COLUMN, because the panel is now as wide as the card above it rather
-     than as wide as the sheet. "Add to Tennessee Titans · 4" beside "Quick sell
-     8" measures past 287pt on a phone, so a row either ellipsised the set's
-     name — the one word on the button worth reading — or wrapped into a ragged
-     two lines that did not line up with the card's edges. */
+  /* A COLUMN, because the panel is as wide as the card above it rather than as
+     wide as the page. "Add to Tennessee Titans · 4" beside "Quick sell 8"
+     measures past 287pt on a phone, so a row either ellipsised the set's name —
+     the one word on the button worth reading — or wrapped into a ragged two
+     lines that did not line up with the card's edges. */
   buttonRow: { gap: Spacing.two },
   /* The one pair that IS a row: two short words that fit side by side at any
      card width, and reading "Keep it" above "Sell for 8" would make the safe
@@ -1132,18 +974,6 @@ const styles = StyleSheet.create({
     gap: Spacing.one + 2,
     borderWidth: StyleSheet.hairlineWidth,
   },
-
-
-  afterRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.two },
-  after: {
-    borderRadius: Radius.chip,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 2,
-    minHeight: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  earned: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1 },
 
   measure: { maxWidth: 560 },
   dim: { opacity: 0.55 },
