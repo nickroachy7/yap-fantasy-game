@@ -208,7 +208,7 @@ export function SetsStrip({ stats, action }: { stats: SetsSummary; action?: Reac
     },
   ];
 
-  return <SummaryStrip cells={cells} action={action} />;
+  return <SummaryStrip cells={cells} />;
 }
 
 /**

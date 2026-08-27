@@ -9,7 +9,6 @@
 import type { PlayerCardModel } from '@/components/cards';
 import { TierOrder, type CardTier } from '@/constants/theme';
 import type { Database } from '@/lib/database.types';
-import { injuryWeight } from '@/lib/injury';
 
 /** Exactly the columns the screen selects, straight off the generated types. */
 export type CollectionViewRow = Pick<
@@ -81,8 +80,6 @@ export type Position = (typeof PositionOrder)[number];
 
 export type PositionFilter = 'ALL' | Position;
 export type TierFilter = 'ALL' | CardTier;
-/** Whether cards their designation rules out this week are shown at all. */
-export type AvailabilityFilter = 'ALL' | 'AVAILABLE';
 export type SortKey = 'fp' | 'tier' | 'starts' | 'name' | 'recent';
 export type SortDir = 'asc' | 'desc';
 
@@ -195,20 +192,6 @@ export function matchesTier(c: CollectionCard, filter: TierFilter): boolean {
   return filter === 'ALL' || c.tier === filter;
 }
 
-/**
- * "Blocking" is the only weight that hides a card, and it comes from
- * `injuryWeight()` rather than a status list written here — Questionable is the
- * most common designation in the feed, and filtering it out would silently
- * empty a lot of people's grids.
- */
-export function isAvailable(c: CollectionCard): boolean {
-  return injuryWeight(c.injuryStatus) !== 'blocking';
-}
-
-export function matchesAvailability(c: CollectionCard, filter: AvailabilityFilter): boolean {
-  return filter === 'ALL' || isAvailable(c);
-}
-
 /** Lower-cased once by the caller, so a keystroke does not re-lower every row. */
 export function matchesQuery(c: CollectionCard, needle: string): boolean {
   if (!needle) return true;
@@ -270,10 +253,6 @@ export type CollectionStats = {
   players: number;
   duplicates: number;
   teams: number;
-  /** Designation rules them out this week. */
-  unavailable: number;
-  /** Designation makes them a question mark — Questionable, DTD, limited. */
-  uncertain: number;
   /** What the whole collection would fetch if every copy were sold. */
   sellValue: number;
   /**
@@ -297,8 +276,6 @@ export type CollectionStats = {
 export function summarise(cards: CollectionCard[]): CollectionStats {
   const players = new Set<string>();
   const teams = new Set<string>();
-  let unavailable = 0;
-  let uncertain = 0;
   let sellValue = 0;
   /* Seeded from `TierOrder` rather than filled as tiers are met, so every tier
      has a key whether or not the collection contains one. See the field. */
@@ -309,9 +286,6 @@ export function summarise(cards: CollectionCard[]): CollectionStats {
     if (c.team) teams.add(c.team);
     sellValue += c.sellValue;
     if (c.tier) byTier[c.tier] += 1;
-    const weight = injuryWeight(c.injuryStatus);
-    if (weight === 'blocking') unavailable += 1;
-    else if (weight === 'advisory') uncertain += 1;
   }
 
   return {
@@ -319,8 +293,6 @@ export function summarise(cards: CollectionCard[]): CollectionStats {
     players: players.size,
     duplicates: cards.length - players.size,
     teams: teams.size,
-    unavailable,
-    uncertain,
     sellValue,
     byTier,
   };

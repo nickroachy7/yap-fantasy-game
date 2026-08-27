@@ -1,55 +1,93 @@
 /**
- * The section bar above a page gets out of the way while you read down it.
+ * ONE STRIP collapses while you read down a page: the statement of what you
+ * own, at the top of the collection and the sets board.
  *
- * THE PROBLEM IS ARITHMETIC. On a 375×812 phone the masthead is ~52pt, the
- * board strip another ~40, and a section's action bar another ~56 — a third of
- * the screen spent on navigation before the first row of the thing you came to
- * look at.
+ * WHAT IS ALLOWED TO GO, AND WHY IT IS ONLY THIS. A phone spends its first
+ * third on chrome — a ~52pt masthead, a ~40pt board strip, a ~56pt section bar,
+ * and on these two pages another ~50 on a summary. All of it was on the table
+ * at one point and only the summary survived the argument:
  *
- * ONLY THE THIRD OF THOSE COLLAPSES. The masthead and the board strip stay
- * where they are (see `FantasyFrame`): they carry the way out of the board and
- * the gem balance, and a reader deep in a list should not have to scroll back
- * up to find either. The section bar is different — it names the page you are
- * already on among two or three peers, which is worth its 56pt on arrival and
- * worth none of it once you are twenty rows in.
+ *   the masthead carries the way out and the gem balance;
+ *   the board strip is how you leave the board;
+ *   the section bar names the page among its peers AND is the control you use
+ *     to move between them — Collection and Sets are one press apart, and a
+ *     bar that leaves is a press you have to scroll to get back;
+ *   the chips, the search and the mode switch are controls you just pressed.
  *
- * IT LEAVES ON A GESTURE AND RETURNS AT THE TOP, and the asymmetry is the whole
- * design. Going is direction-driven: a short push up the page — the thing you
- * are doing anyway — and it is gone. Coming back is POSITION-driven: it returns
- * when you reach the top of the list, and at no other moment.
+ * A summary is the one thing up there that answers nothing you can ask it. It
+ * is worth its height on arrival and none of it twenty rows in, and nothing
+ * about the page stops working while it is gone. So it is the only thing that
+ * moves, and everything above and below it holds still.
  *
- * A reveal on the upward gesture was tried first and is what this replaced. The
- * trouble is that scrolling back up is not a request for navigation — it is
- * re-reading, correcting an overshoot, chasing a row that went past — and every
- * one of those threw the rows down the screen mid-sentence to make room for a
- * bar nobody had asked for. Raising the threshold only moved the line; it did
- * not change what was being guessed at. The top of the list, on the other hand,
- * is unambiguous: you have finished with the rows, and the bar is what is there
- * when you arrive.
+ * A LONGER VERSION OF THIS COLLAPSED THE SECTION BAR TOO, and it is worth
+ * saying why it was wrong rather than only that it went. Two things travelling
+ * meant the whole page frame moved, so every list under the bar had to reserve
+ * a strip for it, empty states had to be pushed clear of it by hand, and pages
+ * that merely happened to sit under a section — a sheet, the search modal —
+ * had to be taught not to. The pack button was the tell: it lived in the
+ * summary, so a collapse took the shop with it. Moving the button up into the
+ * bar and leaving the bar alone answers all of it at once.
  *
- * ONE PROGRESS VALUE, HELD ABOVE THE NAVIGATORS. `SectionFrame` is remounted
- * whenever you move between sections and its bar is redrawn, so the state
- * saying whether the bar is up or down cannot live inside it.
+ * ---------------------------------------------------------------------------
+ * THE MODEL: THE STRIP AND THE PAGE UNDER IT SLIDE AS ONE BLOCK
+ * ---------------------------------------------------------------------------
  *
- * IT MOVES, IT DOES NOT SHRINK. `CollapsingSection` slides the bar and the
- * pages under it as one block, on a transform, and never touches layout while
- * it does. The first version animated the bar's box instead and was unusable
- * for it — the whole argument is there.
+ * The strip sits in flow above the page's list, exactly where it reads. The two
+ * are wrapped in a block one strip TALLER than the frame — `flex: 1` against a
+ * negative bottom margin — so sliding that block up by exactly a strip lands
+ * the list flush against the top of the frame with its bottom edge back on the
+ * screen edge. The frame clips what leaves the top, which is the strip.
+ *
+ * IT IS A THRESHOLD AND A TIMING, NOT A TRACK. Push the page past the strip's
+ * own height and it goes, in 180ms; return to the top of the list and it comes
+ * back. Nothing is proportional to anything.
+ *
+ * A VERSION THAT TRACKED THE SCROLL POINT-FOR-POINT came in between, and it is
+ * worth saying why it went. It drew the strip OVER a matching pad of empty
+ * content at the top of the list, so the two scrolled away together and nothing
+ * ever moved faster than the finger. That is the better motion when a lot of
+ * chrome is travelling — but it can only be smooth, because a header that snaps
+ * ahead of the content it is covering leaves a band of bare page behind it. Once
+ * the section bar, the chips and the search stopped collapsing there was only a
+ * ~50pt strip left in motion, and 50pt of smooth is slower than the same 50pt
+ * gone. Snappy won, so the tracking had to go with it.
+ *
+ * NOTHING CHANGES LAYOUT WHILE IT MOVES, which predates all of this. The first
+ * version collapsed by animating the box — a negative top margin, so the box
+ * shrank and everything below rose into the space. It was correct and it was
+ * unusable: a margin is a LAYOUT property, so every frame re-laid out the
+ * frame, which changed the height of the list container, which fired the list's
+ * `onLayout`, which made `VirtualizedList` re-measure and re-render — a dozen
+ * times over the slide. The frames were dropped and what reached the screen was
+ * the start and the end. It appeared to SNAP, on iOS Safari worst of all, and
+ * no easing could have fixed it because the frames in between were never drawn.
+ * So the whole slide is one transform on a shared value, and the negative
+ * margin that makes room for it is set once from state.
+ *
+ * THE COST IS AT REST: a strip's height of the page hangs below the screen
+ * while the strip is up. It costs nothing visually — the visible area is what
+ * it always was — but a list must add that much to the BOTTOM of its content or
+ * its last row sits in a strip nobody can scroll to.
+ *
+ * ONE PROGRESS VALUE, HELD ABOVE THE NAVIGATORS, because a page is remounted
+ * whenever you move between sections and the value has to outlive that.
  *
  * PLAIN JS SCROLL EVENTS, NOT `useAnimatedScrollHandler`. A Reanimated handler
  * only runs on the UI thread if it is attached to an `Animated.*` component,
  * which would mean converting every list in the app — and `Animated.FlatList`
  * on web is a different code path from the one the carousel already had to be
- * taught about (see `ContestCarousel`). What this handler does per event is
- * two subtractions and a compare, and it decides ONE thing: whether the bar is
- * up or down. The slide itself never touches JS again — it is a timing on a
- * shared value, so it plays at frame rate however busy the JS thread is, which
- * is the property that makes a threshold worth having instead of tracking the
- * finger. Wiring a list is one spread — see `useChromeScroll`.
+ * taught about (see `ContestCarousel`). Wiring a list is one spread — see
+ * `useChromeScroll`.
  *
- * NARROW ONLY. On wide web the rail is the navigation and `SectionNav` draws
- * nothing at all; both halves of this file no-op there rather than making every
- * caller ask.
+ * WHICH IS WHY THE THRESHOLD IS WORTH HAVING. What the handler does per event
+ * is a compare, and it decides ONE thing: whether the strip is up or down. The
+ * slide itself never touches JS again — it is a timing on a shared value, so it
+ * plays at frame rate however busy the JS thread is, which a grid of cards
+ * being virtualised very much is.
+ *
+ * NARROW ONLY. On wide web the rail is the navigation and the vertical budget
+ * is not the problem it is on a phone; every part of this file no-ops there
+ * rather than making each caller ask.
  */
 import { usePathname } from 'expo-router';
 import {
@@ -65,7 +103,6 @@ import {
 import {
   StyleSheet,
   View,
-  type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
@@ -80,47 +117,50 @@ import Animated, {
 import { useIsWide } from '@/components/shell/useResponsive';
 
 /**
- * How far you must push the page up before the bar goes.
+ * How far past the strip you must be before it goes.
  *
- * Far enough that reading is never mistaken for a request, short enough that
- * the request is over before you think about it. There is no matching number
- * for the other direction: nothing brings the bar back except the top of the
- * list — see `TOP_ZONE`.
+ * Measured from the strip's OWN height rather than from zero, which is what
+ * makes the rule statable: the strip leaves once you have scrolled past where
+ * it was. Earlier than that and it vanishes while still half on screen, which
+ * reads as a flinch; much later and you are staring at a summary you finished
+ * with two rows ago.
+ *
+ * It is also the safety. Collapsing makes the page taller, and on a barely
+ * scrollable list that can remove the very scroll that brings the strip back —
+ * so the trigger sits at a point from which there is always a strip's worth of
+ * scrolling-up available to reach the top again.
  */
-const HIDE_TRAVEL = 28;
+const PAST_STRIP = 8;
 
 /**
- * No hiding until there is this much scrolled past, and it is a SAFETY rather
- * than a taste: collapsing the bar makes the page taller, which on a barely
- * scrollable list can remove the very scroll that would bring the bar back.
- * Past 72pt there is always at least 72pt of scrolling-up available, so the top
- * of the list — the only thing that restores the bar — is always reachable.
- */
-const HIDE_AFTER = 72;
-
-/**
- * Inside this much of the top the bar is on, whatever the finger did.
+ * Inside this much of the top the strip is down, whatever else is true.
  *
  * THIS IS THE ONLY WAY BACK, so it is deliberately generous about what counts
  * as the top: an offset that settles a point or two shy of zero, an iOS bounce
  * passing through it, a list whose first row is a hair taller than it measured.
- * Missing the top by 3pt and leaving the reader with no bar and no way to ask
+ * Missing the top by 3pt and leaving the reader with no strip and no way to ask
  * for one is a far worse failure than showing it 8pt early.
  */
 const TOP_ZONE = 8;
 
-
 type Collapse = {
-  /** 0 = bar fully drawn, 1 = fully collapsed. Read by every block. */
+  /** 0 = strip fully drawn, 1 = fully collapsed. Read by the block. */
   progress: SharedValue<number>;
   /** The scroll handler shared by whichever list is on screen. */
   onScroll: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
-  /** Put the bar back immediately, no animation. Used on navigation. */
+  /** Put the strip back immediately, no animation. Used on navigation. */
   reset: () => void;
-  /** The measured height of the bar on screen, once it has one. */
-  inset: number;
-  /** Announced by the section that drew the bar. */
-  setInset: (h: number) => void;
+  /**
+   * The height of the page's retracting strip, where it has one.
+   *
+   * The trigger is stated in terms of it — see `PAST_STRIP` — so the handler
+   * needs the number even though the slide itself does not.
+   *
+   * Zero on every page without a strip, which is why `CollapsingHeader` clears
+   * it on the way out: a page with nothing to collapse must not inherit the
+   * last page's height and start collapsing something that is not there.
+   */
+  setTravel: (h: number) => void;
 };
 
 const CollapseContext = createContext<Collapse | null>(null);
@@ -128,34 +168,37 @@ const CollapseContext = createContext<Collapse | null>(null);
 /**
  * Mounted once, above every tab — see `(app)/_layout`.
  *
- * It has to be above the navigators rather than inside a screen for the same
- * reason the bar itself is drawn by a frame: the value has to outlive a
- * `replace` between two pages, or moving between them would tear down the state
- * that says whether the bar is up or down.
+ * It has to be above the navigators rather than inside a screen, or moving
+ * between two pages would tear down the state that says where the strip is.
  */
 export function ChromeCollapseProvider({ children }: { children: ReactNode }) {
   const progress = useSharedValue(0);
-  /* JS-side, because the handler that reads them is JS-side. A ref rather than
-     state throughout: none of this should render anything, it only decides when
-     to start an animation. */
-  const lastY = useRef(0);
-  const travel = useRef(0);
-  const hidden = useRef(false);
-  /* Published so a page can leave room for it — see `useChromeInset`. State
-     rather than a ref because it is read during render, and a shared value
-     because the slide itself is read on the UI thread; the two are set from the
-     same measurement. */
-  const [inset, setInset] = useState(0);
+  const [travelPx, setTravel] = useState(0);
 
   /**
-   * The one place the progress value is written.
+   * The strip's height, as the scroll handler needs to read it.
+   *
+   * A ref as well as the state it mirrors, because the handler has to read it
+   * without being rebuilt — a handler that changed identity on every
+   * measurement would be a new prop on every list that spreads it.
+   */
+  const travel = useRef(0);
+  useEffect(() => {
+    travel.current = Math.max(0, travelPx);
+  }, [travelPx]);
+
+  /* Whether the strip is up, JS-side, so an unchanged decision costs a compare
+     rather than a fresh animation every scroll event. */
+  const hidden = useRef(false);
+
+  /**
+   * THE ONE PLACE PROGRESS IS WRITTEN, and it stays one place for a rule rather
+   * than for tidiness: a shared value may only be assigned from inside a single
+   * hook closure, and `react-hooks/immutability` (rightly) reads a second one
+   * as reaching into something another hook already captured.
    *
    * `now` skips the animation, which is what a navigation wants — a new page
-   * should not be watching the last page's bars slide back down. It is a
-   * parameter rather than a second callback because a shared value may only be
-   * assigned from inside a single hook closure; two of them and
-   * `react-hooks/immutability` (rightly) reads the second as reaching into
-   * something another hook already captured.
+   * should not be watching the last page's strip slide back down.
    */
   const settle = useCallback((next: boolean, now = false) => {
     if (hidden.current === next && !now) return;
@@ -163,56 +206,41 @@ export function ChromeCollapseProvider({ children }: { children: ReactNode }) {
     const to = next ? 1 : 0;
     progress.value = now
       ? to
-      : /* Out-cubic, and longer than it needs to be to travel 56pt: the bar
-           should read as getting out of the way rather than as being switched
-           off, and the ease-out is what puts the deceleration at the end where
-           the eye follows it. Cheap to lengthen now that the whole slide is a
-           transform — see `CollapsingSection`. */
-        withTiming(to, { duration: next ? 260 : 240, easing: Easing.out(Easing.cubic) });
+      : /* 180 out, 200 back, out-cubic. Short enough to read as getting out of
+           the way rather than as an animation you watch — this is ~50pt of
+           travel, and anything slower is a strip you are waiting on. The way
+           back is the slower of the two because it PUSHES the rows down, and
+           motion that takes space needs longer to be followed than motion that
+           gives it up. */
+        withTiming(to, { duration: next ? 180 : 200, easing: Easing.out(Easing.cubic) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const reset = useCallback(() => {
-    lastY.current = 0;
-    travel.current = 0;
-    settle(false, true);
-  }, [settle]);
+  const reset = useCallback(() => settle(false, true), [settle]);
 
+  /**
+   * Two positions and nothing else: past the strip it is up, at the top it is
+   * down. No direction, no accumulator, no travel to store — which is what
+   * makes it predictable to use and cheap enough to run at every event.
+   */
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const d = travel.current;
+      if (d <= 0) return;
       const y = e.nativeEvent.contentOffset.y;
-      const dy = y - lastY.current;
-      lastY.current = y;
-
-      /* At the top the bar belongs to the page again, and the accumulator
-         starts clean — otherwise a long drag down, then a bounce back to zero,
-         would leave enough stored travel to re-hide on the next pixel. */
-      if (y <= TOP_ZONE) {
-        travel.current = 0;
-        settle(false);
-        return;
-      }
-
-      if (dy === 0) return;
-      // A flip in direction restarts the count; only sustained travel counts.
-      if (dy > 0 !== travel.current > 0) travel.current = 0;
-      travel.current += dy;
-
-      /* One direction only. Upward travel still resets the accumulator above —
-         so a drag back up costs a fresh 28pt before the bar can go again — but
-         it never brings the bar back; the top of the list does that. */
-      if (travel.current > HIDE_TRAVEL && y > HIDE_AFTER) settle(true);
+      if (y <= TOP_ZONE) settle(false);
+      else if (y > d + PAST_STRIP) settle(true);
     },
     [settle],
   );
 
-  /* Rebuilt only when the measured bar height changes, which is once per
-     section. Everything else in here is stable for the life of the provider — a
-     shared value, two callbacks with no dependencies, a state setter — and
-     `progress` is deliberately not listed: passing it to a hook is what
+  /* `progress` is deliberately not in the deps: passing it to a hook is what
      `react-hooks/immutability` reads as "do not assign to this". */
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const value = useMemo<Collapse>(() => ({ progress, onScroll, reset, inset, setInset }), [inset]);
+  const value = useMemo<Collapse>(
+    () => ({ progress, onScroll, reset, setTravel }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onScroll, reset],
+  );
 
   return (
     <CollapseContext.Provider value={value}>
@@ -226,11 +254,11 @@ export function ChromeCollapseProvider({ children }: { children: ReactNode }) {
 }
 
 /**
- * Every page arrives with its bar drawn.
+ * Every page arrives with its strip drawn.
  *
- * Without this a list left scrolled with the bar up would hand the next screen
- * a collapsed one it had no way to ask for — the new page starts at offset
- * zero, so nothing would ever scroll up to bring it back.
+ * Without this a list left scrolled would hand the next page a collapsed strip
+ * it had no way to ask for — the new page starts at offset zero, so nothing
+ * would ever scroll up to bring it back.
  */
 function ResetOnRoute({ reset }: { reset: () => void }) {
   const pathname = usePathname();
@@ -251,10 +279,11 @@ function useCollapse(): Collapse | null {
  *
  * VERTICAL PAGE SCROLLS ONLY. A horizontal strip — the contest carousel, the
  * chip rows, the score ticker — reports offsets on the other axis and would
- * collapse the bar as you swiped sideways.
+ * collapse the strip as you swiped sideways.
  *
- * Returns nothing on wide web, so a component shared by both layouts can spread
- * it unconditionally.
+ * Harmless on a page with no collapsing header: `travel` is zero there and the
+ * handler returns on its first line. Returns nothing at all on wide web, so a
+ * component shared by both layouts can spread it unconditionally.
  */
 export function useChromeScroll(): {
   onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
@@ -263,201 +292,79 @@ export function useChromeScroll(): {
   const collapse = useCollapse();
   const wide = useIsWide();
   if (wide || !collapse) return NO_SCROLL;
-  /* 32ms rather than 16: the handler decides a direction, not a position, and
-     halving the event rate halves the bridge traffic for a decision that cannot
-     be felt at either rate. */
-  return { onScroll: collapse.onScroll, scrollEventThrottle: 32 };
+  return { onScroll: collapse.onScroll, scrollEventThrottle: 16 };
 }
 
 const NO_SCROLL = {};
 
 /**
- * How much room the bar takes at the top of the page, once it has been
- * measured. Zero where there is no bar.
+ * A page's strip, and everything under it, sliding as ONE BLOCK.
  *
- * A page uses it to add that much to the BOTTOM of its scroll content, and the
- * reason is `CollapsingSection`: the sliding block is one bar-height taller
- * than the frame, so at rest its last bar-height sits below the screen edge.
- * Content that reaches into that strip is fine on a list long enough to scroll
- * — it comes up as you scroll and the bar leaves — but a page whose content
- * ends just inside it would have no scroll to give and no way to show it. The
- * extra padding guarantees the scroll exists.
+ * WHAT LEAVES AND WHAT STAYS IS `retract`, and it is a height rather than a
+ * choice of children: the block slides up by exactly that, so whatever sits in
+ * its first `retract` points goes off the top and everything below it lands
+ * flush against the top of the frame. Put the part that may leave first, and
+ * pass its measured height.
  *
- * Lists that already pad by `useTabBarInset` clear it several times over and
- * need nothing.
+ * MEASURE IT GENEROUSLY. A height rounded DOWN leaves the bottom edge of the
+ * strip — a 1.5pt border — showing as a hairline under the controls, which is
+ * exactly the bleed this went through two rounds of. Callers ceil.
+ *
+ * A LIST INSIDE THIS MUST ADD `retract` TO THE BOTTOM of its content padding.
+ * The block is a strip taller than the frame, so at rest its last strip's worth
+ * hangs below the screen edge; a list whose content ends inside that strip has
+ * nothing to scroll and no way to show it. Anything that must stay pinned to
+ * the bottom of the screen — a selection bar — belongs OUTSIDE this block.
+ *
+ * Narrow only. On wide web the children are returned in flow as they came,
+ * which is what that layout wants anyway — nothing collapses there.
  */
-export function useChromeInset(): number {
-  const collapse = useCollapse();
-  const wide = useIsWide();
-  return wide || !collapse ? 0 : collapse.inset;
-}
-
-/**
- * A section: its bar, and the pages under it, sliding as ONE BLOCK.
- *
- * NOTHING HERE CHANGES LAYOUT WHILE IT MOVES, and that is the whole design.
- *
- * The first version of this collapsed the bar by animating its box — a negative
- * top margin, so the box shrank and everything below rose into the space. It
- * was correct and it was unusable: a margin is a LAYOUT property, so every
- * frame of the slide re-laid out the frame, which changed the height of the
- * list container below it, which fired the list's `onLayout`, which made
- * `VirtualizedList` re-measure and re-render — a dozen times over the slide. The
- * frames were dropped and what reached the screen was the start and the end.
- * The bar appeared to SNAP, on iOS Safari worst of all, and no easing or
- * duration could have fixed it because the frames in between were never drawn.
- *
- * So the bar and the pages are one `transform` now. The block is a
- * bar-height TALLER than the frame — `flex: 1` against a negative bottom margin
- * — so sliding it up by exactly that much lands the pages flush against the top
- * of the frame with their bottom edge back on the screen edge. The frame clips
- * what leaves the top. Nothing measures, nothing re-renders, and the slide runs
- * entirely on the UI thread whatever the JS thread is doing.
- *
- * THE COST IS AT REST, and it is the one thing to know about this component: a
- * bar-height of the page hangs below the screen while the bar is up. It costs
- * nothing visually — the visible area is exactly what it always was — but a
- * page must not lay content into that strip without leaving a way to scroll to
- * it. See `useChromeInset`.
- *
- * Wide draws neither part of this: `SectionNav` renders nothing there, so the
- * pages are returned as they came.
- */
-export function CollapsingSection({
-  /** The section's bar. */
-  bar,
-  /** The section's navigator. */
+export function CollapsingHeader({
+  /** Height of the part that may leave — the top of `children`. */
+  retract,
   children,
 }: {
-  bar: ReactNode;
+  retract: number;
   children: ReactNode;
 }) {
   const collapse = useCollapse();
   const wide = useIsWide();
-  const height = useSharedValue(0);
-  /* The same number twice: on the UI thread for the slide, in React for the
-     negative margin that makes room for it. The margin must NOT be animated —
-     it is layout, and a layout prop written every frame is the exact mistake
-     this component exists to undo — so it goes through state and settles once. */
-  const [barHeight, setBarHeight] = useState(0);
-  const publish = collapse?.setInset;
-
-  const onLayout = useCallback(
-    (e: LayoutChangeEvent) => {
-      const h = Math.round(e.nativeEvent.layout.height);
-      if (h <= 0) return;
-      height.value = h;
-      setBarHeight((prev) => (prev === h ? prev : h));
-      publish?.(h);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [publish],
-  );
-
   const progress = collapse?.progress;
+
+  /* ANNOUNCED, because the trigger is stated in terms of this height — see
+     `PAST_STRIP`. Cleared on the way out, and that is the half that matters:
+     this strip belongs to one page, and a page without one must not inherit the
+     last page's height. */
+  const publish = collapse?.setTravel;
+  useEffect(() => {
+    if (!publish) return;
+    publish(wide ? 0 : retract);
+    return () => publish(0);
+  }, [publish, wide, retract]);
+
   const slide = useAnimatedStyle(() => ({
-    transform: [{ translateY: -height.value * (progress?.value ?? 0) }],
+    transform: [{ translateY: -retract * (progress?.value ?? 0) }],
   }));
 
-  if (wide || !collapse)
-    return (
-      <>
-        {bar}
-        {children}
-      </>
-    );
+  if (wide || !collapse) return <>{children}</>;
 
+  /* Rendered whether or not `retract` has landed yet. Branching on the
+     measurement would swap this subtree for a bare fragment on the first frame
+     and back again on the second, and the child here is a virtualised grid — a
+     remount it can see no reason for. */
   return (
     <View style={styles.clip}>
-      <Animated.View style={[styles.block, { marginBottom: -barHeight }, slide]}>
-        {/* THE MEASUREMENT IS ON A PLAIN VIEW, not on the animated one around
-            it. Reanimated's wrapper does not forward `onLayout` on web —
-            verified in the shell gallery, where the callback simply never
-            fired and the bar sat at its full height with the slide running
-            against a height of zero. A plain `View` measures everywhere. */}
-        <View onLayout={onLayout}>{bar}</View>
-        <View style={styles.pages}>{children}</View>
+      <Animated.View style={[styles.block, { marginBottom: -retract }, slide]}>
+        {children}
       </Animated.View>
     </View>
   );
 }
 
-/**
- * A PAGE's own header block, leaving on the same push as the section bar.
- *
- * `CollapsingSection` gets the CHROME out of the way. This gets the top of the
- * page out of the way, and it exists because the two together are the arithmetic
- * problem: the inventory pins a summary strip above its grid, so a phone spent
- * the section bar's ~56pt AND the strip's ~50 on every screen of scrolling
- * before the first card.
- *
- * WHAT GOES IN IT IS A STATEMENT, NEVER A CONTROL. The rule the collection
- * screen was already written to — a control you just pressed must not leave —
- * does not change here; it decides what may be passed in. The summary says what
- * you own and answers nothing you can ask it, so it is worth its height on
- * arrival and none of it twenty rows in. The chips, the search and the mode
- * switch below it stay on screen, and they stay because they are BELOW the
- * `by` line rather than because anything special is done for them: the block
- * moves as one, so only the first `by` points of it ever leave.
- *
- * `by` IS MEASURED BY THE CALLER, which is the one awkward part of the API and
- * is deliberate. The alternative is measuring in here and handing the number
- * back down through a render prop, and the caller needs the number anyway —
- * see the note below on the bottom padding — so it would be the same value
- * travelling in a circle.
- *
- * THE MECHANISM IS `CollapsingSection`'s, and its long note is the argument for
- * all of it: one transform, no layout touched while it moves, the block a `by`
- * TALLER than the frame so sliding it up by exactly that much lands its bottom
- * edge back on the frame's. The cost is the same too — at rest, `by` points of
- * the page hang below the screen — so a list inside this must add `by` to the
- * BOTTOM of its content padding, exactly as `useChromeInset` asks pages to do
- * for the bar. Anything that must stay pinned to the bottom of the screen, a
- * selection bar or a toolbar, belongs OUTSIDE this block.
- *
- * Narrow only, like everything else in this file: on wide web the children are
- * returned as they came.
- */
-export function CollapsingBlock({
-  /** How far it slides — the measured height of the part that may leave. */
-  by,
-  /** The header and everything under it, sliding as one. */
-  children,
-}: {
-  by: number;
-  children: ReactNode;
-}) {
-  const collapse = useCollapse();
-  const wide = useIsWide();
-  const progress = collapse?.progress;
-
-  /* `by` is captured from JS rather than mirrored into a shared value, which is
-     what `CollapsingSection` needs and this does not: there the height arrives
-     in an `onLayout` and must reach the UI thread without a render, here it is
-     already state by the time it gets here. The worklet is rebuilt when it
-     changes — once, when the header is first measured. */
-  const slide = useAnimatedStyle(() => ({
-    transform: [{ translateY: -by * (progress?.value ?? 0) }],
-  }));
-
-  if (wide || !collapse) return <>{children}</>;
-
-  /* Rendered whether or not `by` has landed yet. Branching on the measurement
-     would swap this subtree for a bare fragment on the first frame and back
-     again on the second, and the child here is a virtualised grid — a remount
-     it can see no reason for. */
-  return (
-    <View style={styles.clip}>
-      <Animated.View style={[styles.block, { marginBottom: -by }, slide]}>{children}</Animated.View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  /* The frame. It clips because the block slides past its top edge, and a bar
-     drawn over the board strip above would be worse than one that is gone. */
+  /* The frame. It clips because the block slides past its top edge, and a strip
+     drawn over the section bar above would be worse than one that is gone. */
   clip: { flex: 1, overflow: 'hidden' },
-  /* One bar taller than the frame — see the component. */
+  /* One strip taller than the frame — see the component. */
   block: { flex: 1 },
-  pages: { flex: 1 },
 });

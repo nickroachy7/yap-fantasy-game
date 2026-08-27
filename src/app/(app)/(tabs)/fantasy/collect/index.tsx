@@ -16,7 +16,7 @@
  * the block itself for the line between what may leave and what may not.
  */
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -39,19 +39,16 @@ import { CollectionSummary } from '@/components/collection/CollectionSummary';
 import { RosterBar } from '@/components/collection/RosterBar';
 import { useRoster } from '@/components/collection/use-roster';
 import { useBulk } from '@/components/collection/use-bulk';
-import { PacksButton } from '@/components/shell/PacksButton';
 import { EmptyCollection, EmptyFilterResult } from '@/components/collection/EmptyInventory';
 import { InventoryCard } from '@/components/collection/InventoryCard';
 import {
   SortDefaultDir,
   countByTier,
-  matchesAvailability,
   matchesPosition,
   matchesQuery,
   matchesTier,
   sortCards,
   summarise,
-  type AvailabilityFilter,
   type CollectionCard,
   type SortDir,
   type SortKey,
@@ -61,7 +58,7 @@ import { useCollection } from '@/components/collection/use-collection';
 import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
 import { SearchField } from '@/components/ui/Controls';
 import { ToggleButton } from '@/components/ui/MenuButton';
-import { CollapsingBlock, useChromeScroll } from '@/components/shell/collapse';
+import { CollapsingHeader, useChromeScroll } from '@/components/shell/collapse';
 import { Screen } from '@/components/shell/Screen';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
@@ -77,9 +74,8 @@ let starterOffered = false;
 const GUTTER = Spacing.three;
 const GAP = Spacing.two + 4;
 /**
- * Clearance under the last row of cards, before the collapsing block's own is
- * added to it — see the grid's `contentContainerStyle`. It was the whole of
- * that padding while nothing hung below the screen.
+ * Clearance under the last row of cards, before the strip's own is added to it
+ * — see the grid's `contentContainerStyle`.
  */
 const LIST_TAIL = Spacing.six;
 /**
@@ -145,20 +141,26 @@ export default function InventoryScreen() {
   );
 
   /**
-   * How far the summary slides when the page is pushed up — see
-   * `CollapsingBlock`, which does the sliding.
+   * How far the summary travels before it has gone — see `CollapsingHeader`.
    *
-   * ROUNDED AND COMPARED BEFORE IT IS SET, because `onLayout` fires on every
-   * pass that touches the box and a sub-pixel difference between two of them
-   * would be a state change, a re-render and a rebuilt worklet for a distance
-   * nobody can see. The strip is one fixed row, so in practice this settles
-   * once and never moves again.
+   * CEILED, NOT ROUNDED, and that is a bug fix rather than a preference. A
+   * strip measuring 50.33 rounded to 50, so the travel stopped a third of a
+   * point short and what stayed on screen was the strip's own 1.5pt bottom
+   * border, clipped to a hairline above the chips. Rounding up can only
+   * over-travel, and over-travelling by a fraction of a point is invisible —
+   * the header simply parks that much higher.
+   *
+   * COMPARED BEFORE IT IS SET, because `onLayout` fires on every pass that
+   * touches the box and a sub-pixel difference between two of them would be a
+   * state change, a re-render and a rebuilt worklet for a distance nobody can
+   * see. The strip is one fixed row, so in practice this settles once.
    */
   const [summaryHeight, setSummaryHeight] = useState(0);
   const rememberSummary = useCallback((height: number) => {
-    const h = Math.round(height);
+    const h = Math.ceil(height);
     if (h > 0) setSummaryHeight((prev) => (prev === h ? prev : h));
   }, []);
+
 
   const { cards, error, loading, refreshing, refresh } = useCollection();
   const { cardCount, refresh: refreshPlayer } = usePlayer();
@@ -166,7 +168,6 @@ export default function InventoryScreen() {
   const [query, setQuery] = useState('');
   const [position, setPosition] = useState<PosFilter>('ALL');
   const [tier, setTier] = useState<TierFilter>('ALL');
-  const [availability, setAvailability] = useState<AvailabilityFilter>('ALL');
   const [sort, setSort] = useState<SortKey>('fp');
   const [dir, setDir] = useState<SortDir>(SortDefaultDir.fp);
 
@@ -238,8 +239,8 @@ export default function InventoryScreen() {
    * every facet counts against, so typing a team name reflows the tier and
    * position counts to that team.                                          */
   const pool = useMemo(
-    () => all.filter((card) => matchesQuery(card, needle) && matchesAvailability(card, availability)),
-    [all, needle, availability],
+    () => all.filter((card) => matchesQuery(card, needle)),
+    [all, needle],
   );
   const forTierCounts = useMemo(
     () => pool.filter((card) => matchesPosition(card, position)),
@@ -258,12 +259,11 @@ export default function InventoryScreen() {
   );
 
   const filtered =
-    position !== 'ALL' || tier !== 'ALL' || availability !== 'ALL' || needle.length > 0;
+    position !== 'ALL' || tier !== 'ALL' || needle.length > 0;
 
   const clearFilters = useCallback(() => {
     setPosition('ALL');
     setTier('ALL');
-    setAvailability('ALL');
     setQuery('');
   }, []);
 
@@ -298,28 +298,85 @@ export default function InventoryScreen() {
 
   const bulk = useBulk(clearSelection);
 
-  const toggleCard = useCallback((id: string) => {
-    setSelected((held) => {
-      const next = new Set(held);
-      if (next.has(id)) next.delete(id);
-      // The ceiling is the SERVER's — both bulk functions refuse past 64 — so
-      // the tick simply does not take rather than the run failing later. The
-      // bar says the number when it is reached.
-      else if (next.size < SELECTION_MAX) next.add(id);
-      return next;
-    });
-  }, []);
+  /**
+   * HOW THE MODE WAS OPENED, because it decides how it closes.
+   *
+   * A mode opened by HOLDING a card was opened *about that card*: untick it and
+   * the mode has nothing left to be about, so emptying the selection closes it
+   * and one tap undoes the hold. A mode opened by the BUTTON starts empty by
+   * definition — closing it at zero would make the button unpressable.
+   *
+   * A ref rather than state: nothing renders differently for it, and it is read
+   * inside the tick handler that sets the selection.
+   */
+  const heldOpen = useRef(false);
+
+  const toggleCard = useCallback(
+    (id: string) => {
+      /* THE LAST TICK TAKES THE MODE WITH IT — see `heldOpen`. Decided out here
+         from the CURRENT selection rather than inside the updater below: an
+         updater has to be pure, and React may run it more than once. */
+      const emptying = selected.size === 1 && selected.has(id);
+
+      setSelected((held) => {
+        const next = new Set(held);
+        if (next.has(id)) next.delete(id);
+        // The ceiling is the SERVER's — both bulk functions refuse past 64 — so
+        // the tick simply does not take rather than the run failing later. The
+        // bar says the number when it is reached.
+        else if (next.size < SELECTION_MAX) next.add(id);
+        return next;
+      });
+
+      if (emptying && heldOpen.current) {
+        heldOpen.current = false;
+        setSelecting(false);
+      }
+    },
+    [selected],
+  );
 
   /* Leaving the mode drops the selection with it. A set of ticks you cannot see
      is a set of ticks that will surprise somebody the next time the mode opens.
      Blocked mid-run: the ids are what the call in flight is about. */
   const toggleSelecting = useCallback(() => {
     if (bulk.busy) return;
+    /* Pressed the button, so the mode is the button's however it was opened —
+       an empty selection is a state it is allowed to sit in. See `heldOpen`. */
+    heldOpen.current = false;
     setSelecting((on) => {
       if (on) setSelected(new Set());
       return !on;
     });
   }, [bulk.busy]);
+
+  /**
+   * HOLDING A CARD OPENS THE MODE, with that card already ticked.
+   *
+   * The button on the toolbar opens an EMPTY mode, which is the right thing
+   * when you know you are about to pick several and have not decided which.
+   * It is the wrong thing in the far more common case: you are looking at a
+   * card, you want it and three others gone, and the button makes you leave
+   * the card, press, come back and find it again. The hold is the same
+   * gesture every phone photo library uses for exactly this, and it arrives
+   * where the intent already is.
+   *
+   * NOT A TOGGLE. Holding a card while the mode is already open does nothing
+   * here — the cell's ordinary press is the toggle by then, and a hold that
+   * also toggled would fire on the way to a tap that had already fired.
+   *
+   * The bulk guard is `toggleSelecting`'s, for its reason: the ids are what a
+   * call in flight is about, so the mode cannot be opened out from under one.
+   */
+  const holdCard = useCallback(
+    (id: string) => () => {
+      if (selecting || bulk.busy) return;
+      heldOpen.current = true;
+      setSelecting(true);
+      setSelected(new Set([id]));
+    },
+    [selecting, bulk.busy],
+  );
 
   /**
    * A player who owns nothing gets the packs sheet opened FOR them, once.
@@ -397,117 +454,129 @@ export default function InventoryScreen() {
           </ScrollView>
         ) : listWidth === 0 ? null : (
           <>
-            {/* EVERYTHING DOWN TO THE GRID MOVES AS ONE BLOCK, and only the
-                summary at the top of it is allowed to leave — see
-                `CollapsingBlock`. The selection bar is deliberately outside it:
-                it is pinned to the bottom of the screen, and the block hangs a
-                summary's height below that while the strip is up. */}
-            <CollapsingBlock by={summaryHeight}>
-              {/* WHAT YOU OWN, ABOVE WHAT NARROWS IT. The summary is a
-                  statement about the whole collection and the row below it is
-                  the set of controls that cut the collection down, so it reads
-                  in that order: here is everything, now here is how to sieve
-                  it. It sat under the controls, inside the list, for as long as
-                  it was one more thing scrolling past the top of the grid.
+            {/* THE STRIP AND THE GRID SLIDE AS ONE BLOCK, and only the strip
+                clears the top of it — see `CollapsingHeader`. Scroll past the
+                strip's own height and it goes; return to the top of the grid
+                and it comes back.
 
-                  IT IS PINNED, AND IT COLLAPSES. Pinned is what the move out of
-                  the list cost: anything above the toolbar is outside the
-                  FlatList, so its ~50pt were spent on every screen of scrolling
-                  instead of being reclaimed after the first — on a 375×812
-                  phone, with the section bar above it, a third of the screen
-                  gone before the first card. So it leaves on the same push that
-                  takes the section bar, and returns at the top of the grid with
-                  it. It can go where the controls cannot for the reason
-                  `CollapsingBlock` sets out: it answers nothing you can ask it,
-                  so it is not a control you just pressed.
+                ONLY THE SUMMARY LEAVES, and it is the order that makes it so:
+                the block travels exactly `summaryHeight`, so the chips and the
+                controls under it land flush against the top of the page rather
+                than following it off. */}
+            <CollapsingHeader retract={summaryHeight}>
+              <View>
+                {/* WHAT YOU OWN, ABOVE WHAT NARROWS IT. The summary is a
+                    statement about the whole collection and the row below it is
+                    the set of controls that cut the collection down, so it
+                    reads in that order: here is everything, now here is how to
+                    sieve it.
 
-                  MEASURED RATHER THAN ASSUMED. The strip is ONE ROW at any cell
-                  count — see `CollectionSummary`, where equal columns are what
-                  guarantee it cannot grow a second — but the roster bar below
-                  it is conditional, and the slide is over the summary alone, so
-                  the number has to come from the box that actually leaves. */}
-              <View
-                style={styles.summary}
-                onLayout={(e) => rememberSummary(e.nativeEvent.layout.height)}>
-                <CollectionSummary stats={stats} action={<PacksButton />} />
-              </View>
+                    IT IS THE PART THAT LEAVES, and the order is what makes it
+                    so — the block travels exactly this box, which takes it off
+                    the top and lands everything below it flush. It can go where
+                    the controls cannot for the reason `CollapsingHeader` sets
+                    out: it answers nothing you can ask it, so it is not a
+                    control you just pressed.
 
-              {/* Only once it is actionable — and it does NOT collapse, being
-                  below the line the block slides by. A cap warning that got out
-                  of the way of the cards it is a warning about would be reading
-                  the room backwards. See RosterBar's own header for where the
-                  always-visible count lives instead. */}
-              {roster && (roster.isNear || roster.isOver) ? (
-                <View style={styles.summary}>
-                  <RosterBar roster={roster} />
+                    MEASURED RATHER THAN ASSUMED. The strip is ONE ROW at any
+                    cell count — see `CollectionSummary`, where equal columns
+                    are what guarantee it cannot grow a second — but the roster
+                    bar below it is conditional, and the travel is over the
+                    summary alone, so the number has to come from the box that
+                    actually leaves.
+
+                    THE GAP UNDER THE SECTION BAR IS NOT IN IT: `Screen` puts
+                    that padding on the box this block sits inside, so it stays
+                    put and the chips end up the same 14pt under the nav whether
+                    the strip is there or not. */}
+                <View
+                  style={styles.summary}
+                  onLayout={(e) => rememberSummary(e.nativeEvent.layout.height)}>
+                  <CollectionSummary stats={stats} />
                 </View>
-              ) : null}
 
-              {/* ONE ROW, and it is the Players boards' row: the shared
-                  position chips on the left, the page's own controls on the
-                  right. Both are filters over the same grid, and side by side
-                  they read as the two of them rather than as three bands of
-                  chrome before the first card. See `CollectionFilters`.
+                {/* Only once it is actionable — and it does NOT collapse, being
+                    below where the stack stops travelling. A cap warning that got out
+                    of the way of the cards it is a warning about would be reading
+                    the room backwards. See RosterBar's own header for where the
+                    always-visible count lives instead. */}
+                {roster && (roster.isNear || roster.isOver) ? (
+                  <View style={styles.summary}>
+                    <RosterBar roster={roster} />
+                  </View>
+                ) : null}
 
-                  The chips take the room that is left and SCROLL — `ChipRow` is
-                  a horizontal ScrollView — while the buttons keep their size at
-                  every width. Which is why the buttons are the side pinned and
-                  the chips are the side that gives: a round button cannot be
-                  narrowed, where chips you can push are merely narrower. Same
-                  reasoning, same numbers, as the trend board. */}
-              <View style={styles.toolbar}>
-                <View style={styles.chips}>
-                  <PositionFilter value={position} onChange={setPosition} />
-                </View>
-                {/* The mode switch, on the controls' own row and in their own
-                    language — a round `ToggleButton`, lit while the mode is on,
-                    exactly like Search beside it. */}
-                <ToggleButton
-                  icon="select"
-                  label={selecting ? 'Stop selecting cards' : 'Select several cards'}
-                  on={selecting}
-                  onPress={toggleSelecting}
-                />
-                <InventoryControls
-                  searchable={searchable}
-                  searchOpen={showSearch}
-                  onToggleSearch={() => setShowSearch((v) => !v)}
-                  searching={needle.length > 0}
-                  tier={tier}
-                  onTier={setTier}
-                  tierTotal={forTierCounts.length}
-                  tierCounts={tierCounts}
-                  sort={sort}
-                  dir={dir}
-                  onSort={pressSort}
-                  availability={availability}
-                  onAvailability={setAvailability}
-                />
-              </View>
+                {/* ONE ROW, and it is the Players boards' row: the shared
+                    position chips on the left, the page's own controls on the
+                    right. Both are filters over the same grid, and side by side
+                    they read as the two of them rather than as three bands of
+                    chrome before the first card. See `CollectionFilters`.
 
-              {/* Pinned OUTSIDE the list, and it has to be: a TextInput in a
-                  `ListHeaderComponent` is remounted on every keystroke and loses
-                  focus after one character. */}
-              {searchable && showSearch ? (
-                <View style={styles.searchRow}>
-                  <SearchField
-                    value={query}
-                    onChange={setQuery}
-                    placeholder="Search name, team or position"
-                    hint={`${total} OWNED`}
-                    accessibilityLabel="Search your collection"
-                    autoFocus
+                    The chips take the room that is left and SCROLL — `ChipRow` is
+                    a horizontal ScrollView — while the buttons keep their size at
+                    every width. Which is why the buttons are the side pinned and
+                    the chips are the side that gives: a round button cannot be
+                    narrowed, where chips you can push are merely narrower. Same
+                    reasoning, same numbers, as the trend board. */}
+                <View style={styles.toolbar}>
+                  <View style={styles.chips}>
+                    <PositionFilter value={position} onChange={setPosition} />
+                  </View>
+                  <InventoryControls
+                    searchable={searchable}
+                    searchOpen={showSearch}
+                    onToggleSearch={() => setShowSearch((v) => !v)}
+                    searching={needle.length > 0}
+                    tier={tier}
+                    onTier={setTier}
+                    tierTotal={forTierCounts.length}
+                    tierCounts={tierCounts}
+                    sort={sort}
+                    dir={dir}
+                    onSort={pressSort}
+                  />
+                  {/* LAST ON THE ROW, and it is the odd one out that earns the
+                      end: everything to its left NARROWS what you are looking
+                      at, where this changes what a tap on a card DOES. Sitting
+                      among the filters it read as another one of them. It keeps
+                      their language — a round `ToggleButton`, lit while the
+                      mode is on — because it is still a control on their row.
+
+                      A hold on any card opens the same mode with that card
+                      already picked, which is the shortcut this button is the
+                      long way round of. See `holdCard`. */}
+                  <ToggleButton
+                    icon="select"
+                    label={selecting ? 'Stop selecting cards' : 'Select several cards'}
+                    on={selecting}
+                    onPress={toggleSelecting}
                   />
                 </View>
-              ) : null}
+
+                {/* Pinned OUTSIDE the list, and it has to be: a TextInput in a
+                    `ListHeaderComponent` is remounted on every keystroke and loses
+                    focus after one character. */}
+                {searchable && showSearch ? (
+                  <View style={styles.searchRow}>
+                    <SearchField
+                      value={query}
+                      onChange={setQuery}
+                      placeholder="Search name, team or position"
+                      hint={`${total} OWNED`}
+                      accessibilityLabel="Search your collection"
+                      autoFocus
+                    />
+                  </View>
+                ) : null}
+
+              </View>
 
               <FlatList
-                /* The grid is the page's scroll, so it is what tells the
-                   Collection/Sets bar above to slide up while you read down it.
-                   Everything else stays: the masthead and the board strip are
-                   pinned, and the summary and filters belong to this page rather
-                   than to the chrome — a control you just pressed must not
-                   leave. See `collapse.tsx`. */
+                /* The grid is the page's scroll, so it is what decides whether
+                   the strip above it is up or down. Everything else on the
+                   screen holds still — the masthead, the board strip, the
+                   section bar and every control on this page. See
+                   `collapse.tsx`. */
                 {...chromeScroll}
                 // numColumns cannot change on a live list, so a width change that
                 // changes the column count remounts it. Holding the first render
@@ -518,13 +587,14 @@ export default function InventoryScreen() {
                 keyExtractor={(card) => card.id}
                 numColumns={columns}
                 columnWrapperStyle={styles.row}
-                /* THE BLOCK HANGS A SUMMARY BELOW THE SCREEN while the strip
-                   is up — `CollapsingBlock`'s one cost — so the last row of
-                   cards needs that much clearance under it or it would sit in
-                   the strip nobody can scroll to. Padding at the END of the
-                   content, never the top: the strip is still in flow above the
-                   grid and still supplies the gap over it. */
-                contentContainerStyle={[styles.list, { paddingBottom: LIST_TAIL + summaryHeight }]}
+                /* CLEARANCE FOR THE STRIP'S WORTH OF PAGE THAT HANGS BELOW THE
+                   SCREEN while the strip is up — `CollapsingHeader`'s one cost.
+                   At the END of the content, never the top: the strip is in flow
+                   above the grid and supplies the gap over it itself. */
+                contentContainerStyle={[
+                  styles.list,
+                  { paddingBottom: LIST_TAIL + summaryHeight },
+                ]}
                 initialNumToRender={columns * 4}
                 maxToRenderPerBatch={columns * 4}
                 windowSize={7}
@@ -549,15 +619,7 @@ export default function InventoryScreen() {
                      of cards. Dropping the wrapper with the line would close that
                      gap and reopen it the moment a chip was pressed. */
                   <View style={styles.header}>
-                    <ResultLine
-                      shown={visible.length}
-                      total={all.length}
-                      // Counted over the whole collection, not the filtered pool:
-                      // once they are hidden the pool contains none of them, and
-                      // a chip that says "hide 0" cannot be pressed back off.
-                      unavailable={stats.unavailable}
-                      availability={availability}
-                    />
+                    <ResultLine shown={visible.length} total={all.length} />
                   </View>
                 }
                 ListEmptyComponent={<EmptyFilterResult onClear={clearFilters} hasFilters={filtered} />}
@@ -569,10 +631,11 @@ export default function InventoryScreen() {
                     selecting={selecting}
                     selected={selected.has(item.id)}
                     onPress={selecting ? () => toggleCard(item.id) : openCard(item)}
+                    onLongPress={holdCard(item.id)}
                   />
                 )}
               />
-            </CollapsingBlock>
+            </CollapsingHeader>
 
             {/* PINNED UNDER THE GRID, not pushed into it. The bar appears the
                 moment the mode opens rather than on the first tick, so the grid
@@ -580,9 +643,9 @@ export default function InventoryScreen() {
                 and it sits outside the FlatList for the same reason the summary
                 does: anything inside it scrolls away from the action it
                 describes. OUTSIDE THE COLLAPSING BLOCK, too, which is the
-                stronger constraint: that block hangs a summary's height below
-                the screen while the strip is up, and a bar that went with it
-                would be pinned to an edge nobody can see. */}
+                stronger constraint: that block hangs a strip's height below the
+                screen while the strip is up, and a bar that went with it would
+                be pinned to an edge nobody can see. */}
             {selecting ? (
               <BulkBar
                 count={selected.size}
@@ -630,8 +693,8 @@ const styles = StyleSheet.create({
      is left. */
   chips: { flex: 1, minWidth: 0 },
   searchRow: { paddingHorizontal: GUTTER, paddingBottom: Spacing.two },
-  /* `paddingBottom` is not here: it is the one number on this screen that
-     depends on a measurement — see the grid's `contentContainerStyle`. */
+  /* `paddingBottom` is not here: it depends on a measurement — see the grid's
+     `contentContainerStyle`. */
   list: { paddingHorizontal: GUTTER, gap: GAP },
   row: { gap: GAP },
   /* The gutter the list's own content padding used to give it, now that it

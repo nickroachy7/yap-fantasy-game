@@ -21,7 +21,7 @@
  * directory, so the shared component cannot carry one. The tier chips inside
  * the sheet keep theirs, where there is room for them.
  *
- * WHY A SHEET RATHER THAN MORE ROWS. Tier, sort, availability and search are
+ * WHY A SHEET RATHER THAN MORE ROWS. Tier, sort and search are
  * four controls used occasionally on a screen whose whole job is showing cards.
  * As rows they cost a third of a phone screen permanently; behind a button they
  * cost 28pt, and the button says how many of them are on. Nothing is hidden
@@ -55,7 +55,6 @@ import { MenuButton, MenuHeading, MenuItem, ToggleButton } from '@/components/ui
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   SORT_OPTIONS,
-  type AvailabilityFilter,
   type SortDir,
   type SortKey,
   type TierFilter,
@@ -141,8 +140,6 @@ export function InventoryControls({
   sort,
   dir,
   onSort,
-  availability,
-  onAvailability,
 }: {
   /** False for a small collection, where the facets alone find anything. */
   searchable: boolean;
@@ -157,8 +154,6 @@ export function InventoryControls({
   sort: SortKey;
   dir: SortDir;
   onSort: (key: SortKey) => void;
-  availability: AvailabilityFilter;
-  onAvailability: (next: AvailabilityFilter) => void;
 }) {
   const scheme = useScheme();
 
@@ -236,16 +231,6 @@ export function InventoryControls({
           </>
         )}
       </MenuButton>
-
-      <ToggleButton
-        icon="available"
-        // "Available" is ambiguous on a screen that also has lineups, and this
-        // filter has nothing to do with them: `isAvailable` is
-        // `injuryWeight(...) !== 'blocking'`. The spoken label says so outright.
-        label="Available only. Hides players ruled out by injury."
-        on={availability === 'AVAILABLE'}
-        onPress={() => onAvailability(availability === 'ALL' ? 'AVAILABLE' : 'ALL')}
-      />
     </View>
   );
 }
@@ -264,37 +249,20 @@ export function InventoryControls({
  * read "33 cards" — a fact `CollectionSummary` prints two rows above it, in a
  * cell labelled CARDS. One number, twice, eight points apart.
  *
- * The test covers the hidden count too, and not by accident: hiding anything
- * makes `shown` smaller than `total`, so `shown === total` already implies
- * nothing was hidden. There is no state where the second line has something to
- * say and the first does not.
- *
  * This is the component doing what its name says rather than a special case.
  * It reports what the FILTERS did; the summary reports what you own. When the
  * filters have done nothing, there is nothing here to report — and a line that
  * only appears once a filter is on is also how a reader learns the two are
  * connected.
  *
- * THAT SECOND LINE USED TO SAY THE WRONG THING. It read "4 in lineups hidden",
- * which described a filter this screen does not have: `unavailable` counts
- * cards whose player carries a BLOCKING designation — see `isAvailable`, which
- * is `injuryWeight(...) !== 'blocking'` and never looks at a lineup. Someone
- * reading it would have concluded their starters were being hidden from their
- * own collection.
+ * IT USED TO CARRY A SECOND LINE, "N ruled out, hidden", belonging to an
+ * availability filter that is gone — the round button that drove it said
+ * nothing a player could act on, and nobody worked out what it was for. With
+ * no filter to hide anything on injury grounds there is no hidden count to
+ * report, so the line went with the button.
  */
-export function ResultLine({
-  shown,
-  total,
-  unavailable,
-  availability,
-}: {
-  shown: number;
-  total: number;
-  unavailable: number;
-  availability: AvailabilityFilter;
-}) {
+export function ResultLine({ shown, total }: { shown: number; total: number }) {
   const c = Colors[useScheme()];
-  const hiding = availability === 'AVAILABLE';
 
   /* Nothing narrowed, nothing to say — see the header. Before the wrapper, so
      the caller's spacing is all that is left behind. */
@@ -305,11 +273,6 @@ export function ResultLine({
       <Text numberOfLines={1} style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
         {`${shown} of ${total} cards`}
       </Text>
-      {hiding && unavailable > 0 ? (
-        <Text numberOfLines={1} style={[Type.fine, NUMERIC, { color: c.textTertiary }]}>
-          {`${unavailable} ruled out, hidden`}
-        </Text>
-      ) : null}
     </View>
   );
 }

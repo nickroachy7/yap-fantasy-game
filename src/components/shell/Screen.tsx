@@ -9,7 +9,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppHeader } from '@/components/shell/AppHeader';
-import { useChromeInset, useChromeScroll } from '@/components/shell/collapse';
+import { useChromeScroll } from '@/components/shell/collapse';
 import { useFrame } from '@/components/shell/frame';
 import { isOverlayPath, webSectionOf } from '@/components/shell/sections';
 import { useIsWide } from '@/components/shell/useResponsive';
@@ -138,11 +138,6 @@ export function Screen({
   const frame = useFrame();
   const flush = frame.nav && !isWide;
   const chromeScroll = useChromeScroll();
-  /* Room at the END of the scroll for the strip of page that hangs below the
-     screen while the section bar is up — see `useChromeInset`. On the bottom,
-     not the top: the bar is still in flow above this page and still supplies
-     the gap over the content. */
-  const chromeInset = useChromeInset();
 
   /* Null on a page that is a page in its own right, and on every phone: the
      narrow build still navigates these with the action bar and has no heading
@@ -191,7 +186,7 @@ export function Screen({
       contentContainerStyle={[
         styles.content,
         flush && styles.flushTop,
-        { maxWidth, paddingBottom: Spacing.three + chromeInset },
+        { maxWidth, paddingBottom: Spacing.three },
       ]}
       /* This page's scroll is what tells the section bar above to get out of
          the way. Nothing on wide, where there is no such bar — see

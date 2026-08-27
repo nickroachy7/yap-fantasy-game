@@ -47,7 +47,6 @@
 import type { ReactNode } from 'react';
 
 import { AppHeader } from '@/components/shell/AppHeader';
-import { CollapsingSection } from '@/components/shell/collapse';
 import { FrameProvider } from '@/components/shell/frame';
 import { SectionNav } from '@/components/shell/SectionNav';
 import { childrenOf } from '@/components/shell/sections';
@@ -56,6 +55,7 @@ import { useIsWide } from '@/components/shell/useResponsive';
 export function SectionFrame({
   section,
   masthead = false,
+  action,
   children,
 }: {
   /** e.g. `/fantasy/collect`. The section whose sub-pages the nav lists. */
@@ -79,6 +79,14 @@ export function SectionFrame({
    * navigation, and this bar sits directly above the control you just pressed.
    */
   masthead?: boolean;
+  /**
+   * A control pinned to the right of the sub-page tabs. See `SectionNav`.
+   *
+   * The SECTION's rather than the page's, deliberately: Collect's two pages
+   * both want the Packs button in the same place, and a button drawn by each of
+   * them is a button that blinks on every flip between them.
+   */
+  action?: ReactNode;
   /** The section's navigator. */
   children: ReactNode;
 }) {
@@ -86,9 +94,7 @@ export function SectionFrame({
   /* CLAIMED ONLY IF THERE IS ONE, and the test is the same one `SectionNav`
      makes: a section with no children draws no bar. `nav` tells the page below
      "something above me has already put a bar on top of you, so do not add your
-     own gap" — and Collection and Sets have no children now (Packs moved onto
-     their summary strip), so asserting it left both pages pressed up against
-     the top nav's hairline with nothing between them. */
+     own gap". */
   const nav = !wide && childrenOf(section).length > 0;
 
   return (
@@ -98,40 +104,24 @@ export function SectionFrame({
        would tell every page in the section there was no header the day this
        frame is used somewhere without one. */
     <FrameProvider value={masthead ? { header: !wide, nav } : { nav }}>
-      {/* The nav and the navigator are ONE SLIDING BLOCK, and that is what
-          `CollapsingSection` is for: the bar leaves by moving, not by shrinking,
-          and the pages move with it so the space it was taking becomes theirs.
-          Both halves have to be inside the same component because a transform
-          on the bar alone would leave a hole where it used to be — see
-          `collapse.tsx`. No background: the frame above already painted the
-          page, and a second opaque layer here is a full-screen overdraw on
-          every section. */}
-      <CollapsingSection
-        bar={
-          <>
-            {/* Above the nav, and only when asked. Wide draws neither: the rail
-                is the navigation there and `WebHeader` is the masthead.
+      {/* Above the nav, and only when asked. Wide draws neither: the rail is
+          the navigation there and `WebHeader` is the masthead. */}
+      {masthead && !wide ? <AppHeader attached /> : null}
+      {/* Renders nothing on wide — it decides that itself, see there.
 
-                INSIDE THE SLIDING BLOCK, so a frame that does draw one takes it
-                with the bar rather than leaving a masthead hanging over a
-                collapsed section. */}
-            {masthead && !wide ? <AppHeader attached /> : null}
-            {/* Renders nothing on wide — it decides that itself, see there.
+          IT DOES NOT MOVE, and it used to. Scrolling a page down slid it up out
+          of the way, which cost more than it bought: the bar is how you get
+          between Collection and Sets, so a bar that leaves is a press you have
+          to scroll to get back, and everything under it had to be taught to
+          reserve the room it would vacate. The one thing on these pages worth
+          collapsing is the summary strip the page draws itself — see
+          `collapse.tsx`, which is now about that alone.
 
-                IT IS THE ONE PIECE OF CHROME THAT MOVES. Scrolling a page down
-                slides it up out of the way and returning to the top brings it
-                back, while the masthead and the board strip above stay put —
-                see `collapse.tsx` for why this bar is the one that can afford
-                to go.
-
-                The nav's own padding travels with it, which is the point — a
-                collapsed bar must leave NO gap behind, and the padding is part
-                of the bar (see `SectionNav`, which owns all four sides). */}
-            <SectionNav section={section} />
-          </>
-        }>
-        {children}
-      </CollapsingSection>
+          `action` is the section's own control, pinned to the right of the
+          tabs. Collect passes the Packs button, which used to live on the
+          summary strip and would have collapsed with it. */}
+      <SectionNav section={section} action={action} />
+      {children}
     </FrameProvider>
   );
 }

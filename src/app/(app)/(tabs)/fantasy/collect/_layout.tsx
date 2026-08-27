@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 
+import { PacksButton } from '@/components/shell/PacksButton';
 import { SectionFrame } from '@/components/shell/SectionFrame';
 
 /**
@@ -22,13 +23,20 @@ import { SectionFrame } from '@/components/shell/SectionFrame';
  * pair is no longer Inventory-and-Sets-as-peers with a redirect in front of
  * them: Collection IS the index, and Sets is the page beside it.
  *
- * The frame also carries the Packs button, and for the reason it always did:
- * chrome rendered above the navigator survives a navigation, so opening Packs
- * and closing it again does not rebuild the bar you pressed.
+ * THE FRAME CARRIES THE PACKS BUTTON, beside the two tabs, and it is back here
+ * after a spell on each page's summary strip. Two reasons, and the second is
+ * the one that moved it:
+ *
+ *   chrome rendered above the navigator survives a navigation, so opening Packs
+ *     and closing it again does not rebuild the bar you pressed — and drawn by
+ *     each page instead, the button blinks on every flip between them;
+ *   the summary strip COLLAPSES as you scroll (see `collapse.tsx`), and the way
+ *     out to the shop is not a statement about your collection. It must not
+ *     leave with one.
  */
 export default function CollectLayout() {
   return (
-    <SectionFrame section="/fantasy/collect">
+    <SectionFrame section="/fantasy/collect" action={<PacksButton />}>
       <Stack screenOptions={{ headerShown: false, animation: 'none' }} />
     </SectionFrame>
   );

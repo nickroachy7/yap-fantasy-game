@@ -49,7 +49,6 @@
  * it at the same height as the inventory's, which is pinned above ITS list for
  * the same reason; see the note at the render.
  */
-import type { ReactNode } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -61,7 +60,7 @@ import {
   View,
 } from 'react-native';
 
-import { useChromeScroll } from '@/components/shell/collapse';
+import { CollapsingHeader, useChromeScroll } from '@/components/shell/collapse';
 import { useTabBarInset } from '@/components/shell/useResponsive';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
@@ -81,7 +80,6 @@ import { useSets } from './use-sets';
 export function SetsPanel({
   onOpenSet,
   onBackToInventory,
-  action,
 }: {
   onOpenSet: (code: string) => void;
   onBackToInventory: () => void;
@@ -93,7 +91,6 @@ export function SetsPanel({
    * arrives as a prop, which is what keeps the panel drawable from `/gallery`
    * with no router under it.
    */
-  action?: ReactNode;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -101,6 +98,19 @@ export function SetsPanel({
   /* This list is the page's scroll, so it is the one that tells the section
      bar above to get out of the way. See `collapse.tsx`. */
   const chromeScroll = useChromeScroll();
+  /**
+   * How far the strip travels before it has gone — see `CollapsingHeader`.
+   *
+   * CEILED, NOT ROUNDED. A strip measuring 50.33 rounded to 50 stopped a third
+   * of a point short, and what stayed on screen was its own 1.5pt bottom
+   * border, clipped to a hairline under the filters. Over-travelling by a
+   * fraction is invisible.
+   */
+  const [stripHeight, setStripHeight] = useState(0);
+  const rememberStrip = useCallback((h: number) => {
+    const n = Math.ceil(h);
+    if (n > 0) setStripHeight((prev) => (prev === n ? prev : n));
+  }, []);
   // Single source of truth for the balance: the header reads the same value, so
   // a claim has to refresh THAT rather than keep a second copy here.
   const { refresh: refreshPlayer } = usePlayer();
@@ -255,118 +265,129 @@ export function SetsPanel({
 
   return (
     <View style={styles.fill}>
-      {/* PINNED, AND AT THE INVENTORY'S HEIGHT. The two tabs draw the same
-          `SummaryStrip` in the same place, and until this it was neither: the
-          strip lived inside the scroll — so it slid away, where the inventory's
-          does not — and it sat 24pt under the section nav against the
-          inventory's 8, because this panel wrapped everything in a 16pt
-          `padding` and the nav already leaves 8 of its own below it.
+      {/* THE STRIP AND THE BOARD UNDER IT SLIDE AS ONE BLOCK — see
+          `CollapsingHeader`. Scroll past the strip and it goes; return to
+          the top and it comes back. `retract` is the strip alone, so the
+          filters and the claim bar under it land flush rather than
+          following it off the top. */}
+      <CollapsingHeader retract={stripHeight}>
+        {/* AT THE INVENTORY'S HEIGHT, AND IT COLLAPSES LIKE THE INVENTORY'S. The
+            two tabs draw the same `SummaryStrip` in the same place, and it has to
+            behave the same way on both — otherwise flipping between them is a
+            step down half a line and a different answer to "does this move".
 
-          The gap is the nav's 8 now, on both, and the two strips line up when
-          you flip between the tabs rather than stepping down half a line.
+            THE STRIP IS THE ONLY PART THAT LEAVES. It is a statement — how many
+            sets, how many claimed, how much is waiting — and answers nothing you
+            can ask it. The filters below it and the claim-all bar below those are
+            controls and stay: the block travels exactly the strip, so they land
+            flush against the top of the page. See `CollapsingHeader`.
 
-          Only when there ARE sets: the empty state below is a whole-page
-          message and a summary of nothing above it would be four noughts
-          explaining themselves. */}
-      {all.length > 0 ? (
-        <View style={styles.strip}>
-          <SetsStrip stats={summary} action={action} />
-          {/* WHAT YOU HAVE, ABOVE WHAT NARROWS IT — the inventory's order, for
-              the inventory's reason: here is the whole board, now here is how
-              to sieve it. Pinned with the strip rather than scrolling with the
-              list, again as the inventory does, so the control that decides
-              what you are looking at cannot leave the screen you are
-              looking at. */}
-          <SetsFilters sets={all} filter={filter} onFilter={setFilter} />
-          {/* PINNED WITH THE STRIP, not scrolled with the list, and only when
-              there is something in it. It is the one control on this page that
-              acts on sets you may not be looking at, so it must not be possible
-              to scroll past it — and an empty version of it would be a button
-              offering nothing. */}
-          {ready.length > 0 ? (
-            <ClaimAllBar
-              count={ready.length}
-              gems={summary.gemsWaiting}
-              busy={claimingAll}
-              onPress={() => void claimAll()}
-            />
-          ) : null}
-        </View>
-      ) : null}
+            Only when there ARE sets: the empty state below is a whole-page
+            message and a summary of nothing above it would be four noughts
+            explaining themselves. */}
+        {all.length > 0 ? (
+          <View style={styles.strip}>
+            <View onLayout={(e) => rememberStrip(e.nativeEvent.layout.height)}>
+              <SetsStrip stats={summary} />
+            </View>
+            {/* WHAT YOU HAVE, ABOVE WHAT NARROWS IT — the inventory's order, for
+                the inventory's reason: here is the whole board, now here is how
+                to sieve it. It does NOT go with the strip: the control that
+                decides what you are looking at cannot leave the screen you are
+                looking at. */}
+            <SetsFilters sets={all} filter={filter} onFilter={setFilter} />
+            {/* STAYS TOO, and only when there is something in it. It is the one control on this page that
+                acts on sets you may not be looking at, so it must not be possible
+                to scroll past it — and an empty version of it would be a button
+                offering nothing. */}
+            {ready.length > 0 ? (
+              <ClaimAllBar
+                count={ready.length}
+                gems={summary.gemsWaiting}
+                busy={claimingAll}
+                onPress={() => void claimAll()}
+              />
+            ) : null}
+          </View>
+        ) : null}
 
-      <ScrollView
-        {...chromeScroll}
-        style={styles.fill}
-        contentContainerStyle={[
-          styles.content,
-          /* The strip owns the gap under the nav now, so the scroll starts
-             flush — except with no strip above it, where this is the only thing
-             holding the empty state off the nav. */
-          all.length === 0 && styles.contentTop,
-          { paddingBottom: tabInset + Spacing.four },
-        ]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-      {all.length === 0 ? (
-        /* No sets AT ALL is a season with no card pool behind it — a fresh
-           database, or a season whose cards have not synced. That is not the
-           same thing as owning none of them, and it does not offer the Shop,
-           because buying a pack would not produce a set to collect. */
-        <EmptyState
-          title="No sets this season"
-          body="Sets are built from the season's card pool, and there is no pool here yet."
-          actionLabel="Back to Inventory"
-          onAction={onBackToInventory}
-        />
-      ) : (
-        <>
-          {claimed ? (
-            <View style={[styles.notice, { borderColor: c.positive, backgroundColor: c.surface }]}>
-              <Text style={[Type.micro, { color: c.positive }]}>CLAIMED</Text>
-              <Text style={[Type.body, { color: c.text }]}>
-                {`${claimed.name} — ${claimed.gems.toLocaleString()} gems added to your balance.`}
+        <ScrollView
+          {...chromeScroll}
+          style={styles.fill}
+          contentContainerStyle={[
+            styles.content,
+            /* The strip owns the gap under the nav now, so the scroll starts
+               flush — except with no strip above it, where this is the only thing
+               holding the empty state off the nav. */
+            all.length === 0 && styles.contentTop,
+            /* THE LAST TERM IS CLEARANCE for the strip's worth of page that
+               hangs below the screen while the strip is up — `CollapsingHeader`'s
+               one cost. Zero on a board with no strip to collapse. */
+            { paddingBottom: tabInset + Spacing.four + stripHeight },
+          ]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+        {all.length === 0 ? (
+          /* No sets AT ALL is a season with no card pool behind it — a fresh
+             database, or a season whose cards have not synced. That is not the
+             same thing as owning none of them, and it does not offer the Shop,
+             because buying a pack would not produce a set to collect. */
+          <EmptyState
+            title="No sets this season"
+            body="Sets are built from the season's card pool, and there is no pool here yet."
+            actionLabel="Back to Inventory"
+            onAction={onBackToInventory}
+          />
+        ) : (
+          <>
+            {claimed ? (
+              <View style={[styles.notice, { borderColor: c.positive, backgroundColor: c.surface }]}>
+                <Text style={[Type.micro, { color: c.positive }]}>CLAIMED</Text>
+                <Text style={[Type.body, { color: c.text }]}>
+                  {`${claimed.name} — ${claimed.gems.toLocaleString()} gems added to your balance.`}
+                </Text>
+              </View>
+            ) : null}
+
+            {claimError ? (
+              <View style={[styles.notice, { borderColor: c.negative, backgroundColor: c.surface }]}>
+                <Text style={[Type.micro, { color: c.negative }]}>THAT DID NOT WORK</Text>
+                <Text style={[Type.body, { color: c.text }]}>{claimError}</Text>
+              </View>
+            ) : null}
+
+            {shown.length === 0 ? (
+              /* A FILTER THAT FOUND NOTHING IS NOT AN EMPTY SEASON, and the two
+                 must not read alike: the message above is about there being no
+                 card pool at all, and this is about the four chips overhead. It
+                 names the chip so the way out is obvious. */
+              <Text style={[Type.body, styles.centredText, { color: c.textTertiary }]}>
+                {filter === 'READY'
+                  ? 'No sets have a reward waiting. Add cards to a set to reach the next one.'
+                  : filter === 'CAN_ADD'
+                    ? 'None of your cards fit an open slot right now. Open a pack, or check back after a game.'
+                    : 'You have not finished a set yet.'}
               </Text>
-            </View>
-          ) : null}
+            ) : (
+              <SetsList
+                sets={shown}
+                claimingCode={claiming}
+                onOpenSet={onOpenSet}
+                onClaim={(set) => void claim(set)}
+              />
+            )}
 
-          {claimError ? (
-            <View style={[styles.notice, { borderColor: c.negative, backgroundColor: c.surface }]}>
-              <Text style={[Type.micro, { color: c.negative }]}>THAT DID NOT WORK</Text>
-              <Text style={[Type.body, { color: c.text }]}>{claimError}</Text>
-            </View>
-          ) : null}
-
-          {shown.length === 0 ? (
-            /* A FILTER THAT FOUND NOTHING IS NOT AN EMPTY SEASON, and the two
-               must not read alike: the message above is about there being no
-               card pool at all, and this is about the four chips overhead. It
-               names the chip so the way out is obvious. */
-            <Text style={[Type.body, styles.centredText, { color: c.textTertiary }]}>
-              {filter === 'READY'
-                ? 'No sets have a reward waiting. Add cards to a set to reach the next one.'
-                : filter === 'CAN_ADD'
-                  ? 'None of your cards fit an open slot right now. Open a pack, or check back after a game.'
-                  : 'You have not finished a set yet.'}
+            {shown.length === 0 ? null : (
+            <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
+              Open a set to add cards to it. A card you add is burnt — it leaves your collection for
+              good and cannot be started again — and pays back part of what it would have sold for.
+              Packs are still drawn from the whole season pool, so which sets you can fill is a matter
+              of what you happen to pull.
             </Text>
-          ) : (
-            <SetsList
-              sets={shown}
-              claimingCode={claiming}
-              onOpenSet={onOpenSet}
-              onClaim={(set) => void claim(set)}
-            />
+            )}
+            </>
           )}
-
-          {shown.length === 0 ? null : (
-          <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
-            Open a set to add cards to it. A card you add is burnt — it leaves your collection for
-            good and cannot be started again — and pays back part of what it would have sold for.
-            Packs are still drawn from the whole season pool, so which sets you can fill is a matter
-            of what you happen to pull.
-          </Text>
-          )}
-          </>
-        )}
-      </ScrollView>
+        </ScrollView>
+      </CollapsingHeader>
     </View>
   );
 }

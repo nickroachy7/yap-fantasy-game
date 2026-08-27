@@ -39,6 +39,7 @@ export function InventoryCard({
   selecting,
   selected,
   onPress,
+  onLongPress,
 }: {
   card: CollectionCard;
   /** Exact column width, so rows align and the last row does not stretch. */
@@ -51,6 +52,12 @@ export function InventoryCard({
   selecting?: boolean;
   selected?: boolean;
   onPress?: () => void;
+  /**
+   * A HOLD on the cell. Passed straight through to the card, like `onPress`:
+   * what a hold means is the screen's to decide, and on the grid it is how the
+   * mode is opened without going to find the button for it.
+   */
+  onLongPress?: () => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -62,6 +69,7 @@ export function InventoryCard({
         size="compact"
         fixedWidth={false}
         onPress={onPress}
+        onLongPress={onLongPress}
         /**
          * THE FRAME CARRIES THE SELECTION, not a border drawn around the cell.
          * The card's frame is its tier — see `PlayerCard` — and overriding it

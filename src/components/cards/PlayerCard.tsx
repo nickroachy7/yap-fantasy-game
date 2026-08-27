@@ -363,6 +363,16 @@ export type PlayerCardProps = {
   model: PlayerCardModel;
   size?: CardSize;
   onPress?: () => void;
+  /**
+   * OPTIONAL. A press that is HELD. The card does nothing with it beyond
+   * passing it to the `Pressable`, which is the point: a hold means something
+   * different on every screen that wants one — on the collection grid it opens
+   * multi-select — and none of those meanings belong to a card.
+   *
+   * A card with only a hold and no tap is still pressable, so both are checked
+   * before falling back to the unpressable branch below.
+   */
+  onLongPress?: () => void;
   style?: ViewStyle;
   /** Set false to let the card fill its container instead of a fixed width. */
   fixedWidth?: boolean;
@@ -509,6 +519,7 @@ export function PlayerCard({
   model,
   size = 'grid',
   onPress,
+  onLongPress,
   style,
   fixedWidth = true,
   footer,
@@ -980,7 +991,7 @@ export function PlayerCard({
     </View>
   );
 
-  if (!onPress) {
+  if (!onPress && !onLongPress) {
     return (
       <View accessible accessibilityRole="text" accessibilityLabel={a11yLabel}>
         {body}
@@ -991,6 +1002,13 @@ export function PlayerCard({
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
+      /* The default is 500ms, which reads as a card that did not respond. 320
+         is past the longest ordinary tap — a scroll that starts as a stationary
+         finger is the case this must not steal, and a flick is off the cell
+         well inside 300 — while landing close enough to the touch to feel like
+         the card answering rather than a timer expiring. */
+      delayLongPress={320}
       accessibilityRole="button"
       accessibilityLabel={a11yLabel}
       style={({ pressed }) => [pressed && styles.pressed]}>

@@ -59,7 +59,7 @@
  * `flushTop` for the second.
  */
 import { usePathname, useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ActionBar, type Action } from '@/components/shell/ActionBar';
@@ -67,7 +67,24 @@ import { childrenOf } from '@/components/shell/sections';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Spacing } from '@/constants/theme';
 
-export function SectionNav({ section }: { /** e.g. `/fantasy/collect`. */ section: string }) {
+export function SectionNav({
+  section,
+  action,
+}: {
+  /** e.g. `/fantasy/collect`. */
+  section: string;
+  /**
+   * A control pinned to the RIGHT of the tabs, where the section has one.
+   *
+   * Collect's Packs button is the only one today, and where it moved FROM is
+   * the argument for the slot existing: it sat on the summary strip, which is
+   * the one piece of chrome on those pages that collapses as you scroll. The
+   * way out to the shop is not a statement about your collection and must not
+   * leave with one. Up here it is beside the two tabs, which is the row that
+   * already means "where in this board am I going".
+   */
+  action?: ReactNode;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const wide = useIsWide();
@@ -107,7 +124,16 @@ export function SectionNav({ section }: { /** e.g. `/fantasy/collect`. */ sectio
 
   return (
     <View style={styles.wrap}>
-      <ActionBar actions={actions} wide={wide} />
+      {/* The tabs take the room that is left and the action keeps its size, for
+          the reason every row in this app that mixes the two gives: a round
+          button cannot be narrowed, where labels you can push are merely
+          narrower. */}
+      <View style={styles.row}>
+        <View style={styles.tabs}>
+          <ActionBar actions={actions} wide={wide} />
+        </View>
+        {action}
+      </View>
     </View>
   );
 }
@@ -127,4 +153,10 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 0,
   },
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  /* `minWidth: 0` is load-bearing wherever a scrolling row shares a line with a
+     fixed control: without it the bar reports its full content width as its
+     minimum and pushes the button off the row instead of scrolling inside what
+     is left. */
+  tabs: { flex: 1, minWidth: 0 },
 });
