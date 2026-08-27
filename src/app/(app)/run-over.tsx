@@ -67,7 +67,7 @@ export default function RunOverScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
-  const { run, refresh } = usePlayer();
+  const { run, refresh, applyCardDelta } = usePlayer();
   const { cards, loading } = useLostCards();
 
   const [keep, setKeep] = useState<string[]>([]);
@@ -120,6 +120,10 @@ export default function RunOverScreen() {
        so it has to be dropped rather than refreshed around — see the note on
        `invalidateCollection`. The player context reloads hearts and the wallet,
        both of which the new run resets. */
+    /* A carry RESTORES copies, so this is the one delta that goes up outside a
+       pack. `keep` is what the claim asked for and the call has just succeeded,
+       so it is also what landed. See `applyCardDelta`. */
+    applyCardDelta(keep.length);
     invalidateCollection();
     await refresh();
     setBusy(false);
@@ -129,7 +133,7 @@ export default function RunOverScreen() {
        free contest in front of them with the carousel's last card offering the
        lobby one swipe away. */
     router.replace('/fantasy/compete');
-  }, [keep, refresh, router]);
+  }, [keep, refresh, applyCardDelta, router]);
 
   /* Nothing to answer. Reachable by deep link, by a back button after claiming,
      and by two devices open at once — all of which end up here rather than at a

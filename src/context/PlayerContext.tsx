@@ -15,9 +15,32 @@
  * chrome rather than from the lobby: the run has to exist before anything can
  * price itself against it, and the alternative — creating one at entry — means
  * a player cannot see what they are risking until after they have risked it.
+ *
+ * ---------------------------------------------------------------------------
+ * THE ROSTER IS HERE TOO, AND IT REPLACED A SECOND COUNT OF THE SAME ROWS
+ * ---------------------------------------------------------------------------
+ *
+ * `cardCount` used to be its own `count(*) where is_held` from this file, and
+ * the cap warning was a separate `useRoster()` hook that re-read `roster_status`
+ * ON FOCUS and nowhere else. Two reads of one number, refreshed on two
+ * different schedules — and the schedules were the bug. Selling six cards
+ * refreshes this context, so the header's count moved; nothing touched the
+ * hook, so the bar under it went on saying "36/30 — commit or sell 6" over a
+ * collection of thirty until you left the tab and came back.
+ *
+ * `roster_status()` returns the count AND the cap facts in one call, so this
+ * reads that instead and `cardCount` is `roster.held`. One number, one read,
+ * one refresh — and every path that already calls `refresh()` after minting or
+ * destroying a card (packs, the bulk bar, the card profile, the set checklist,
+ * the carry claim) now updates the warning for free, because they were all
+ * updating the balance beside it already.
+ *
+ * `applyCardDelta` is what makes it INSTANT rather than merely correct; see
+ * there.
  */
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
+import { parseRoster, recountRoster, type RosterStatus } from '@/components/recap/recap';
 import { parseRun, type Run } from '@/components/runs/run';
 import { useAuth } from '@/context/AuthContext';
 import { useLoader, type Load } from '@/hooks/use-loader';
@@ -26,7 +49,16 @@ import { supabase } from '@/lib/supabase';
 export type PlayerState = {
   gems: number;
   displayName: string;
+  /** Held cards. The same figure as `roster.held`, kept for the header. */
   cardCount: number;
+  /**
+   * Held cards against the cap, straight from `roster_status()`.
+   *
+   * Null only before the first load. Drawn by `RosterBar` on the collection
+   * grid and on the lineup, and read by the lineup to decide whether a pick can
+   * be taken at all — see `LineupEditor`.
+   */
+  roster: RosterStatus | null;
   /**
    * The live run, or the dead one still owed a carry. Null only before the
    * first load — every signed-in player has one, because reading it makes one.
@@ -36,6 +68,29 @@ export type PlayerState = {
   error: string | null;
   /** Call after anything that spends or earns gems, or moves a heart. */
   refresh: () => Promise<void>;
+  /**
+   * Move the held-card count NOW, by this many, without waiting for a read.
+   *
+   * WHY IT EXISTS. A sale is two round trips before the screen can be right:
+   * `sell_cards` returns, then `refresh()` re-reads. For the half-second in
+   * between the header still shows the old total and — far more visibly — the
+   * roster bar still says "6 over the limit, commit or sell 6" to somebody who
+   * has just sold six. The action looks like it did not work.
+   *
+   * The server has already SAID how many it took, in the same answer that
+   * proves the sale happened, so there is nothing to guess: apply it, then let
+   * the `refresh()` that every one of these paths already awaits overwrite it
+   * with the count of record. See `recountRoster` for why an echo is allowed to
+   * exist and what stops it becoming an authority.
+   *
+   * CALL IT WITH WHAT THE SERVER REPORTED, never with what was asked for. A
+   * bulk sale of twelve that skipped four moved the roster by eight, and
+   * `sell_cards` hands back the eight.
+   *
+   * A no-op before the first load: with no roster there is nothing to adjust
+   * and the read on its way will be right anyway.
+   */
+  applyCardDelta: (n: number) => void;
 };
 
 /**
@@ -50,7 +105,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
   const [gems, setGems] = useState(0);
   const [displayName, setDisplayName] = useState('player');
-  const [cardCount, setCardCount] = useState(0);
+  const [roster, setRoster] = useState<RosterStatus | null>(null);
   const [run, setRun] = useState<Run | null>(null);
 
   const load = useCallback<Load>(
@@ -85,27 +140,29 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
        * fact, so a comment claiming it for a batch is a claim about tables it
        * has not checked.
        */
-      const [profile, balance, cards, runRow] = await Promise.all([
+      const [profile, balance, rosterRow, runRow] = await Promise.all([
         supabase.from('profiles').select('display_name').eq('id', session.user.id).single(),
         supabase.from('gem_balances').select('balance').single(),
-        /* `is_held`, not every row this user has ever had. A sold copy is still
-           their row and a committed one is too, so an unfiltered count made the
-           header's card total drift upward every time somebody cleared a
-           duplicate — and committing a card to a set would have made it drift
-           faster. The generated column is the same predicate `my_collection`
-           filters on, so the two cannot disagree. */
-        supabase
-          .from('card_instances')
-          .select('id', { count: 'exact', head: true })
-          .eq('is_held', true),
+        /* THE COUNT AND THE CAP IN ONE CALL. This was a `count(*)` on
+           `card_instances where is_held` and the cap facts were a second read
+           from a hook of their own — see the note at the top of this file for
+           what having two of them cost.
+
+           `is_held` is still the predicate; it is `roster_status()` applying it
+           now. A sold copy is still your row and a committed one is too, so an
+           unfiltered count made the header's total drift upward every time
+           somebody cleared a duplicate. The generated column is the same one
+           `my_collection` filters on, so the grid and the header cannot
+           disagree about how many cards you have. */
+        supabase.rpc('roster_status'),
         supabase.rpc('my_run'),
       ]);
       if (!live()) return;
-      const failure = profile.error ?? balance.error ?? cards.error ?? runRow.error;
+      const failure = profile.error ?? balance.error ?? rosterRow.error ?? runRow.error;
       if (failure) return failure.message;
       setDisplayName(profile.data?.display_name ?? 'player');
       setGems(balance.data?.balance ?? 0);
-      setCardCount(cards.count ?? 0);
+      setRoster(parseRoster(rosterRow.data));
       setRun(parseRun(runRow.data));
     },
     [session],
@@ -113,12 +170,31 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const { loading, error, refresh } = useLoader(load);
 
+  /* The optimistic move. See `applyCardDelta` on `PlayerState` for why it is
+     allowed, and `recountRoster` for what stops it becoming an authority — the
+     whole of the arithmetic lives there, beside `parseRoster`, so this and the
+     server cannot come to disagree about what "near the cap" means. */
+  const applyCardDelta = useCallback((n: number) => {
+    if (n === 0) return;
+    setRoster((held) => (held ? recountRoster(held, held.held + n) : held));
+  }, []);
+
   const value = useMemo<PlayerState>(
     // Without a session there is nothing to read and nothing true to show, so
     // this stays loading — the header draws an em dash rather than a confident
     // balance of zero, which is what it did before the read was extracted.
-    () => ({ gems, displayName, cardCount, run, loading: loading || !session, error, refresh }),
-    [gems, displayName, cardCount, run, loading, error, refresh, session],
+    () => ({
+      gems,
+      displayName,
+      cardCount: roster?.held ?? 0,
+      roster,
+      run,
+      loading: loading || !session,
+      error,
+      refresh,
+      applyCardDelta,
+    }),
+    [gems, displayName, roster, run, loading, error, refresh, applyCardDelta, session],
   );
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;

@@ -64,7 +64,7 @@ export default function PacksScreen() {
 
   // Single source of truth for the balance: the header reads the same value, so
   // fetching it separately here is how the two drift apart.
-  const { gems, refresh } = usePlayer();
+  const { gems, refresh, applyCardDelta } = usePlayer();
 
   const [packs, setPacks] = useState<Pack[] | null>(null);
   const [dailyAvailable, setDailyAvailable] = useState<boolean | null>(null);
@@ -196,6 +196,12 @@ export default function PacksScreen() {
            and the honest answer is how many of the ten happened. */
         if (refusal) setError(`${opened} of ${packs} packs opened — ${refusal}`);
         setPulled(cards);
+        /* THE COUNT MOVES BEFORE THE READ DOES. Ten packs is fifty cards, and
+           on a roster near the cap that is the difference between "24 of 30"
+           and a warning — news a player wants while looking at what they pulled,
+           not a round trip later. `refresh()` below is still the count of
+           record. See `applyCardDelta`. */
+        applyCardDelta(cards.length);
         // The cards this just minted are in the collection now, and the
         // inventory holds it for the session — so the held copy is wrong until
         // it is dropped. See `invalidateCollection`.
@@ -210,7 +216,7 @@ export default function PacksScreen() {
       setOpeningCode(null);
       setProgress(null);
     },
-    [reloadShelf, refresh],
+    [reloadShelf, refresh, applyCardDelta],
   );
 
   /**

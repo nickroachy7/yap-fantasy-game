@@ -33,10 +33,13 @@
  * the conservative answer. A week scored early is still a week you have not
  * played.
  *
- * REFETCHED ON FOCUS, like `useRoster` beside it and for the same reason: the
- * set moves whenever a lineup is edited, which happens on another screen
- * entirely. A value cached for the session would be stale in exactly the
- * situation this exists to catch — set a lineup, come back, sell the man in it.
+ * REFETCHED ON FOCUS, and focus is the right trigger for THIS one where it was
+ * the wrong trigger for the roster count. The set only moves when a lineup is
+ * edited, which happens on another screen and therefore always costs a focus
+ * change on the way back — unlike the held-card count, which moves under your
+ * thumb on this very screen and now lives in `PlayerContext` for that reason.
+ * A value cached for the session would be stale in exactly the situation this
+ * exists to catch: set a lineup, come back, sell the man in it.
  *
  * A FAILED READ RETURNS AN EMPTY SET rather than throwing, which is the
  * permissive direction and is deliberate. The grid is correct without this; it

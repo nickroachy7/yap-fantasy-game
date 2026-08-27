@@ -52,7 +52,6 @@ import {
 } from 'react-native';
 
 import { RosterBar } from '@/components/collection/RosterBar';
-import { useRoster } from '@/components/collection/use-roster';
 import { BenchBoard } from '@/components/lineup/BenchBoard';
 import { ContestCarousel } from '@/components/lineup/ContestCarousel';
 import { useMyContests } from '@/components/contests/use-my-contests';
@@ -233,7 +232,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
     reload,
     reloadLineup,
   } = useLineupData(contestCode);
-  const { displayName, run } = usePlayer();
+  const { displayName, run, roster } = usePlayer();
 
   /**
    * Edits are an overlay on the saved lineup rather than a copy of it. Copying
@@ -394,10 +393,12 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
    * player in it is the identical lie in the opposite direction. Nothing on
    * this board moves until the roster is legal. See `clearPick`.
    *
-   * `useRoster` re-reads on focus, which is what makes the block clear itself:
-   * commit or sell the excess on the Collection tab, come back, and the count
-   * is under the cap and the picks go through. */
-  const roster = useRoster();
+   * IT CLEARS ITSELF THE MOMENT THE ROSTER IS LEGAL, because the count is the
+   * one in `PlayerContext` — the same value the header's card total is drawn
+   * from, refreshed by every path that mints or destroys a card and moved
+   * optimistically by the ones that know how many. Commit or sell the excess on
+   * the Collection tab and this board is editable before you have finished
+   * navigating back to it. */
   const overCap = roster?.isOver === true;
   /**
    * What a refused pick says, and it is SHORT on purpose.

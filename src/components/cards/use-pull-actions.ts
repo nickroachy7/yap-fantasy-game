@@ -111,7 +111,7 @@ export type PullActionsState = {
 };
 
 export function usePullActions(pulled: Pulled[] | null): PullActionsState {
-  const { refresh: refreshWallet } = usePlayer();
+  const { refresh: refreshWallet, applyCardDelta } = usePlayer();
 
   const key = pulled?.map((p) => p.card_instance_id).join(',') ?? '';
   const [state, setState] = useState<PullState>(() => fresh(key));
@@ -155,6 +155,13 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
    */
   const settle = useCallback(
     async (at: string) => {
+      /* ONE COPY, ALWAYS, whichever act it was. A sale takes the copy in hand;
+         a commit takes the least valuable copy you hold, which may be a
+         different one — but it is exactly one either way, so the held count
+         moves by one either way. It moves NOW rather than when the read below
+         lands, so the header and the roster warning agree with the card that
+         has just been stamped. See `applyCardDelta`. */
+      applyCardDelta(-1);
       invalidateCollection();
       invalidateSets();
       try {
@@ -170,7 +177,7 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
         foldInto(at, (held) => ({ ...held, busy: null }));
       }
     },
-    [refreshWallet, foldInto],
+    [applyCardDelta, refreshWallet, foldInto],
   );
 
   const sell = useCallback(

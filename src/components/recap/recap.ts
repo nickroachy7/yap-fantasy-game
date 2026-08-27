@@ -101,6 +101,40 @@ export function parseRoster(raw: unknown): RosterStatus | null {
   };
 }
 
+/**
+ * The same roster, recounted at a different held-card total.
+ *
+ * WHY A CLIENT EVER RECOMPUTES A SERVER FIGURE. Selling six cards moves the
+ * count the instant the RPC returns, and the read that proves it is a second
+ * round trip behind that. Waiting for it means the bar goes on saying "6 over
+ * the limit — commit or sell 6" over a collection that no longer is, which
+ * reads as the sale not having worked.
+ *
+ * SO IT IS AN ECHO, NOT AN AUTHORITY, and the distinction is the whole of why
+ * this is allowed to exist. Nothing acts on it: the cap gate is `set_lineup`'s
+ * and refuses on its own count whatever this says. It is overwritten by the
+ * next `roster_status()` — which every caller of this is already awaiting when
+ * it calls it — so a wrong guess survives for one round trip and then is gone.
+ *
+ * IT MIRRORS `roster_status()` LINE FOR LINE (20260824200700), and it has to:
+ * `over_by` is a floored difference, `is_near` is a closed interval that stops
+ * AT the cap rather than past it, and getting either subtly wrong would show a
+ * different bar for one beat every time a card moved. `cap` and `warn_at` are
+ * carried over untouched — they are configuration, and nothing the player does
+ * moves them.
+ */
+export function recountRoster(roster: RosterStatus, held: number): RosterStatus {
+  const next = Math.max(0, held);
+  return {
+    ...roster,
+    held: next,
+    overBy: Math.max(0, next - roster.cap),
+    isOver: next > roster.cap,
+    isNear: next >= roster.warnAt && next <= roster.cap,
+    remaining: Math.max(0, roster.cap - next),
+  };
+}
+
 export function parseRecap(raw: unknown): Recap | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;

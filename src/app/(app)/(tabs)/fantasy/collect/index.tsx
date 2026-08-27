@@ -48,7 +48,6 @@ import { BulkBar } from '@/components/collection/BulkBar';
 import { SELECTION_MAX, sellTotal } from '@/components/collection/bulk';
 import { CollectionSummary } from '@/components/collection/CollectionSummary';
 import { RosterBar } from '@/components/collection/RosterBar';
-import { useRoster } from '@/components/collection/use-roster';
 import { useStarters } from '@/components/collection/use-starters';
 import { useBulk } from '@/components/collection/use-bulk';
 import { EmptyCollection, EmptyFilterResult } from '@/components/collection/EmptyInventory';
@@ -162,7 +161,11 @@ export default function InventoryScreen() {
 
 
   const { cards, error, loading, refreshing, refresh } = useCollection();
-  const { cardCount, refresh: refreshPlayer } = usePlayer();
+  /* The roster comes off the SAME context as the header's count, which is what
+     makes it move the instant a sale lands rather than on the next focus — see
+     `PlayerContext`. It used to be a hook of its own that re-read on focus and
+     on nothing else. */
+  const { cardCount, roster, refresh: refreshPlayer } = usePlayer();
 
   const [query, setQuery] = useState('');
   const [position, setPosition] = useState<PosFilter>('ALL');
@@ -221,10 +224,6 @@ export default function InventoryScreen() {
 
   const all = useMemo(() => cards ?? [], [cards]);
   const stats = useMemo(() => summarise(all), [all]);
-  // Re-read on focus rather than derived from `all`: the cap counts held cards
-  // server-side, and this screen's list is the same set of rows only until a
-  // commit or a sale on another screen moves one of them.
-  const roster = useRoster();
   /* The copies you are STARTING this week. They cannot be ticked — see
      `use-starters` for why a commit is the dangerous half of that. */
   const starters = useStarters();

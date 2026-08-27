@@ -78,7 +78,7 @@ export default function CardDetailScreen() {
   const router = useRouter();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const { refresh: refreshWallet } = usePlayer();
+  const { refresh: refreshWallet, applyCardDelta } = usePlayer();
 
   const [card, setCard] = useState<CardProfile | null>(null);
   const [tab, setTab] = useState<ProfileTab>('card');
@@ -154,6 +154,9 @@ export default function CardDetailScreen() {
         p_card_instance_id: card.card.id,
       });
       if (err) throw new Error(sellErrorMessage(err.message));
+      // One fewer card, said now rather than after the read — see
+      // `applyCardDelta`. The header is on screen behind this sheet.
+      applyCardDelta(-1);
       // This copy is gone from the collection, which the inventory holds for
       // the session — drop it or the grid still shows the card you just sold.
       invalidateCollection();
@@ -170,7 +173,7 @@ export default function CardDetailScreen() {
     } finally {
       setBusy(false);
     }
-  }, [card, refreshWallet, dismiss]);
+  }, [card, refreshWallet, applyCardDelta, dismiss]);
 
   /**
    * Put this card into a set.
@@ -201,6 +204,9 @@ export default function CardDetailScreen() {
          exists to translate. */
       if (err) throw new Error(err.message);
 
+      /* Exactly one copy burnt — not necessarily this one, see `burnsThisCopy`
+         above, but always one. */
+      applyCardDelta(-1);
       // A copy left the collection and a set moved, and both are held for the
       // session. Missing either shows a card that is no longer there.
       invalidateCollection();
@@ -218,7 +224,7 @@ export default function CardDetailScreen() {
     } finally {
       setBusy(false);
     }
-  }, [card, pendingSet, refreshWallet, reload]);
+  }, [card, pendingSet, refreshWallet, applyCardDelta, reload]);
 
   const body = () => {
     if (loading || !id) {

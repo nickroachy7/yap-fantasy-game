@@ -55,7 +55,7 @@ export type BulkState = {
 };
 
 export function useBulk(onDone: () => void): BulkState {
-  const { refresh: refreshWallet } = usePlayer();
+  const { refresh: refreshWallet, applyCardDelta } = usePlayer();
 
   const [stage, setStage] = useState<BulkStage>('idle');
   const [busy, setBusy] = useState(false);
@@ -97,13 +97,26 @@ export function useBulk(onDone: () => void): BulkState {
     [busy],
   );
 
-  /** The four things every completed run has to put back. */
-  const settle = useCallback(async () => {
-    invalidateCollection();
-    invalidateSets();
-    await refreshWallet();
-    onDone();
-  }, [refreshWallet, onDone]);
+  /**
+   * The four things every completed run has to put back, plus the count.
+   *
+   * `left` is how many copies the run took OUT of the collection, as the server
+   * reported it — never as the selection asked for it. It moves the header's
+   * total and the roster warning on the same frame the result line appears,
+   * rather than a round trip later while the bar still tells somebody who has
+   * just sold six that they are six over. `refreshWallet()` immediately after
+   * is the count of record. See `applyCardDelta`.
+   */
+  const settle = useCallback(
+    async (left: number) => {
+      applyCardDelta(-left);
+      invalidateCollection();
+      invalidateSets();
+      await refreshWallet();
+      onDone();
+    },
+    [applyCardDelta, refreshWallet, onDone],
+  );
 
   const runSell = useCallback(
     (selected: CollectionCard[]) => {
@@ -134,7 +147,9 @@ export function useBulk(onDone: () => void): BulkState {
             gems: r.paid ?? 0,
             firstReason: firstRefusal(r.refusals),
           });
-          await settle();
+          // What SOLD, not what was ticked: a selection of twelve that skipped
+          // four moved the roster by eight.
+          await settle(r.sold ?? 0);
         } catch (e) {
           setError(e instanceof Error ? e.message : 'The sale could not be completed.');
         } finally {
@@ -185,7 +200,10 @@ export function useBulk(onDone: () => void): BulkState {
         }
 
         setResult({ kind: 'added', done: added, skipped, gems: paid, firstReason: reason });
-        await settle();
+        /* One copy burns per card added — `commit_cards_to_set` takes the least
+           valuable copy you hold for each, which may not be the one ticked, but
+           is always exactly one. */
+        await settle(added);
         /* AND THEN THE REST. The add has taken everything a set would have; what
            is left is what the player ticked and nothing can use. The plan is
            kept rather than cleared because it is the only record of which
@@ -243,7 +261,7 @@ export function useBulk(onDone: () => void): BulkState {
           gems: r.paid ?? 0,
           firstReason: firstRefusal(r.refusals),
         });
-        await settle();
+        await settle(r.sold ?? 0);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'The sale could not be completed.');
       } finally {

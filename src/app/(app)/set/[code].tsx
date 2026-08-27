@@ -79,7 +79,7 @@ export default function SetChecklistScreen() {
   const router = useRouter();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const { refresh: refreshPlayer } = usePlayer();
+  const { refresh: refreshPlayer, applyCardDelta } = usePlayer();
 
   const { sets, reload } = useSets();
   const set = useMemo<CardSet | null>(
@@ -278,6 +278,11 @@ export default function SetChecklistScreen() {
        count), and the collection (cards are gone from it). The wallet moved
        too, which is the header's. Missing any one of them shows a card that no
        longer exists. */
+    /* One copy burnt per card added, and `added` is the server's own count —
+       a batch of six that filled four slots took four cards. Applied before
+       the reads below so the header and the roster warning move with the
+       result line. See `applyCardDelta`. */
+    applyCardDelta(-(result.added ?? 0));
     invalidateCollection();
     /* `reloadMembers` re-runs the lineup read as well, which matters here: a
        commit that freed a slot has changed who is starting, and the warning
@@ -301,7 +306,7 @@ export default function SetChecklistScreen() {
     setQuick(null);
     setSubmitting(false);
     setConfirming(false);
-  }, [set, confirmPlan, reloadMembers, reload, refreshPlayer]);
+  }, [set, confirmPlan, reloadMembers, reload, refreshPlayer, applyCardDelta]);
 
   /* Guarded for the same reason as `packs` and `search`: `back()` on an empty
      stack does nothing, so a checklist opened from a link or a refreshed tab

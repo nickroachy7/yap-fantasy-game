@@ -98,6 +98,10 @@ const FIXTURE_PLAYER: PlayerState = {
   gems: 1240,
   displayName: 'nickroachy',
   cardCount: 14,
+  /* Under the warning line, so the chrome draws its calm state. `RosterBar`'s
+     own three volumes are exercised in the kit, where a fixture can be set to
+     each of them without the rest of the shell moving with it. */
+  roster: { held: 14, cap: 30, warnAt: 24, overBy: 0, isOver: false, isNear: false, remaining: 16 },
   /* Two hearts held against a rack of three, one of the two already riding on
      this week's slate, and one win off the next carry rung. Picked to exercise
      ALL THREE heart states at once — safe, wagered and broken — because a full
@@ -122,6 +126,7 @@ const FIXTURE_PLAYER: PlayerState = {
   loading: false,
   error: null,
   refresh: async () => {},
+  applyCardDelta: () => {},
 };
 
 /**
