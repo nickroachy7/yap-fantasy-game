@@ -1,5 +1,6 @@
 /**
- * The bar under the deck: the two speeds, then the two sweeps, then the way on.
+ * The bar under the deck: the two speeds, the two sweeps, and — always — the
+ * way on.
  *
  * WHY THERE IS A BAR AT ALL
  *
@@ -7,8 +8,9 @@
  * chip sat in a counter row above the deck, the exits sat under each card, the
  * "open another" pair sat at the bottom of a scrolling sheet, so it was below
  * the fold on a phone. Nothing was where a thumb is. The bar is one fixed strip
- * at the bottom of the page that always holds THE thing to do next, and what
- * that is changes exactly three times:
+ * at the bottom of the page, and it is two rows.
+ *
+ * THE TOP ROW IS THE PHASE, and it changes twice:
  *
  *   1. CARDS STILL FACE DOWN — reveal, at two speeds. `Reveal` turns over the
  *      one in front of you and stops; `Reveal all` cascades through the rest.
@@ -19,7 +21,27 @@
  *      to sets one at a time is eight presses of the same decision; this is one.
  *      See `pull-plan` for what each button will actually do.
  *
- *   3. NOTHING LEFT TO DECIDE — where to go: another pack, or the inventory.
+ * Once there is nothing left to reveal and nothing left to sweep, the row is
+ * gone. It is the only part of the bar that ever is.
+ *
+ * THE BOTTOM ROW IS THE WAY ON, AND IT IS ALWAYS THERE. This is a fix, not a
+ * layout preference. The way on used to appear only in the state where the
+ * pack had nothing left to decide — so a player who simply wanted to KEEP what
+ * they pulled, which is the whole point of pulling, had no forward exit at all.
+ * The only thing on screen that would move them was the ✕, which is a
+ * dismissal: it reads as backing out of the pack rather than as being finished
+ * with it, and it is chrome rather than an answer to the question the page is
+ * asking. Keeping your cards is an outcome, and an outcome gets a button.
+ *
+ * SO THE TWO ROWS NEVER TRADE PLACES. The phase row can empty out; the way on
+ * stays exactly where a thumb last found it. What changes is emphasis — once
+ * there is no sweep competing for it, `Continue to inventory` is filled rather
+ * than outlined, because by then it IS the next thing to do. Two filled buttons
+ * at once would be two primaries, which is none.
+ *
+ * A CONFIRM TAKES THE WHOLE BAR, both rows. A question with a way out of the
+ * page still on screen beside it is a question you can leave half-answered
+ * while a sweep is one tap from firing.
  *
  * A SWEEP CONFIRMS IN PLACE. Pressing `Add 6 to sets` does not fire six writes;
  * it turns the bar into a sentence naming exactly what is about to happen and a
@@ -95,8 +117,13 @@ export function PullBar({
       : asking;
 
   const locked = busy || sweep !== null;
+  const canCommit = plan.commits.length > 0;
+  const canSell = plan.sells.length > 0;
+  /* Nothing to turn over and nothing to sweep. The pack is dealt with, however
+     the player dealt with it — including by deciding to keep the lot. */
+  const settled = hidden === 0 && !canCommit && !canSell;
 
-  /* ---- a sweep is running -------------------------------------------- */
+  /* ---- a confirm, or a sweep, takes the whole bar ---------------------- */
   if (sweep) {
     return (
       <Frame earned={earned}>
@@ -110,7 +137,6 @@ export function PullBar({
     );
   }
 
-  /* ---- confirming a sweep --------------------------------------------- */
   if (question === 'commit') {
     const spares = plan.commits.filter((x) => x.spare).length;
     return (
@@ -122,7 +148,12 @@ export function PullBar({
             : ''}
         </Text>
         <View style={styles.row}>
-          <Button label="Not now" onPress={() => setAsking(null)} tone={c.backgroundElement} ink={c.text} />
+          <Button
+            label="Not now"
+            onPress={() => setAsking(null)}
+            tone={c.backgroundElement}
+            ink={c.text}
+          />
           <Button
             label={`Add ${plan.commits.length}`}
             gems={plan.commitGems}
@@ -146,7 +177,12 @@ export function PullBar({
           {`Sells ${count(plan.sells.length, 'card')} for ${plan.sellGems} gems. Selling is permanent — a future copy starts again at bronze. No card a set can still use is in this.`}
         </Text>
         <View style={styles.row}>
-          <Button label="Keep them" onPress={() => setAsking(null)} tone={c.backgroundElement} ink={c.text} />
+          <Button
+            label="Keep them"
+            onPress={() => setAsking(null)}
+            tone={c.backgroundElement}
+            ink={c.text}
+          />
           <Button
             label={`Sell ${plan.sells.length}`}
             gems={plan.sellGems}
@@ -163,10 +199,10 @@ export function PullBar({
     );
   }
 
-  /* ---- cards still face down ------------------------------------------ */
-  if (hidden > 0) {
-    return (
-      <Frame earned={earned}>
+  /* ---- the ordinary bar: the phase, then the way on -------------------- */
+  return (
+    <Frame earned={earned}>
+      {hidden > 0 ? (
         <View style={styles.row}>
           <Button
             label="Reveal all"
@@ -186,17 +222,7 @@ export function PullBar({
             a11y="Turn over the next card"
           />
         </View>
-      </Frame>
-    );
-  }
-
-  /* ---- everything turned over, and something to sweep ------------------ */
-  const canCommit = plan.commits.length > 0;
-  const canSell = plan.sells.length > 0;
-
-  if (canCommit || canSell) {
-    return (
-      <Frame earned={earned}>
+      ) : canCommit || canSell ? (
         <View style={styles.row}>
           {canCommit ? (
             <Button
@@ -226,29 +252,43 @@ export function PullBar({
             />
           ) : null}
         </View>
-        {/* The one line that stops "Sell 4" reading as "sell the pack". */}
-        {canCommit && canSell ? (
-          <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
-            Selling leaves out every card a set can still use.
-          </Text>
-        ) : null}
-      </Frame>
-    );
-  }
+      ) : null}
 
-  /* ---- nothing left to decide ----------------------------------------- */
-  return (
-    <Frame earned={earned}>
+      {/* The one line that stops "Sell 4" reading as "sell the pack". */}
+      {hidden === 0 && canCommit && canSell ? (
+        <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
+          Selling leaves out every card a set can still use.
+        </Text>
+      ) : null}
+
+      {/* ---- the way on, in every state ---------------------------------- */}
       <View style={styles.row}>
         <Button
-          label="See in inventory"
-          onPress={onInventory}
-          tone={c.backgroundElement}
+          label="Open another"
+          onPress={onAgain}
+          tone="transparent"
           ink={c.text}
+          border={c.border}
+          disabled={locked}
+          a11y="Go back to the packs and open another"
         />
-        <Button label="Open another" onPress={onAgain} tone={c.text} ink={c.background} grow />
+        <Button
+          /* NAMED FOR WHAT IT DOES TO THE PACK, not for where it goes. "See in
+             inventory" is a link; "Continue" is the answer to a page that has
+             asked you what to do with eight cards — and for a player who has
+             decided to keep them it is the only true answer on the bar. */
+          label="Continue to inventory"
+          onPress={onInventory}
+          tone={settled ? c.text : 'transparent'}
+          ink={settled ? c.background : c.text}
+          border={settled ? undefined : c.border}
+          grow
+          disabled={locked}
+          a11y="Keep these cards and go to your inventory"
+        />
       </View>
-      {planning ? (
+
+      {planning && hidden === 0 ? (
         <Text style={[Type.fine, { color: c.textTertiary }]}>Checking what your sets need…</Text>
       ) : null}
     </Frame>
