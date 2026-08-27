@@ -382,6 +382,77 @@ export function CollapsingSection({
   );
 }
 
+/**
+ * A PAGE's own header block, leaving on the same push as the section bar.
+ *
+ * `CollapsingSection` gets the CHROME out of the way. This gets the top of the
+ * page out of the way, and it exists because the two together are the arithmetic
+ * problem: the inventory pins a summary strip above its grid, so a phone spent
+ * the section bar's ~56pt AND the strip's ~50 on every screen of scrolling
+ * before the first card.
+ *
+ * WHAT GOES IN IT IS A STATEMENT, NEVER A CONTROL. The rule the collection
+ * screen was already written to — a control you just pressed must not leave —
+ * does not change here; it decides what may be passed in. The summary says what
+ * you own and answers nothing you can ask it, so it is worth its height on
+ * arrival and none of it twenty rows in. The chips, the search and the mode
+ * switch below it stay on screen, and they stay because they are BELOW the
+ * `by` line rather than because anything special is done for them: the block
+ * moves as one, so only the first `by` points of it ever leave.
+ *
+ * `by` IS MEASURED BY THE CALLER, which is the one awkward part of the API and
+ * is deliberate. The alternative is measuring in here and handing the number
+ * back down through a render prop, and the caller needs the number anyway —
+ * see the note below on the bottom padding — so it would be the same value
+ * travelling in a circle.
+ *
+ * THE MECHANISM IS `CollapsingSection`'s, and its long note is the argument for
+ * all of it: one transform, no layout touched while it moves, the block a `by`
+ * TALLER than the frame so sliding it up by exactly that much lands its bottom
+ * edge back on the frame's. The cost is the same too — at rest, `by` points of
+ * the page hang below the screen — so a list inside this must add `by` to the
+ * BOTTOM of its content padding, exactly as `useChromeInset` asks pages to do
+ * for the bar. Anything that must stay pinned to the bottom of the screen, a
+ * selection bar or a toolbar, belongs OUTSIDE this block.
+ *
+ * Narrow only, like everything else in this file: on wide web the children are
+ * returned as they came.
+ */
+export function CollapsingBlock({
+  /** How far it slides — the measured height of the part that may leave. */
+  by,
+  /** The header and everything under it, sliding as one. */
+  children,
+}: {
+  by: number;
+  children: ReactNode;
+}) {
+  const collapse = useCollapse();
+  const wide = useIsWide();
+  const progress = collapse?.progress;
+
+  /* `by` is captured from JS rather than mirrored into a shared value, which is
+     what `CollapsingSection` needs and this does not: there the height arrives
+     in an `onLayout` and must reach the UI thread without a render, here it is
+     already state by the time it gets here. The worklet is rebuilt when it
+     changes — once, when the header is first measured. */
+  const slide = useAnimatedStyle(() => ({
+    transform: [{ translateY: -by * (progress?.value ?? 0) }],
+  }));
+
+  if (wide || !collapse) return <>{children}</>;
+
+  /* Rendered whether or not `by` has landed yet. Branching on the measurement
+     would swap this subtree for a bare fragment on the first frame and back
+     again on the second, and the child here is a virtualised grid — a remount
+     it can see no reason for. */
+  return (
+    <View style={styles.clip}>
+      <Animated.View style={[styles.block, { marginBottom: -by }, slide]}>{children}</Animated.View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   /* The frame. It clips because the block slides past its top edge, and a bar
      drawn over the board strip above would be worse than one that is gone. */
