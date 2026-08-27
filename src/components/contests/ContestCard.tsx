@@ -7,14 +7,14 @@
  * ---------------------------------------------------------------------------
  *
  *     ┌──────────────────────────────────────────────┐
- *     │ Flex Three                  NEXT LOCK 7h 13m │  HEAD    55pt
+ *     │ Flex Three                  NEXT LOCK 7h 13m │  HEAD    51pt
  *     │ TO WIN Beat the median            12 entries │
  *     ├──────────────────────────────────────────────┤
- *     │ YOU · 3RD OF 12          COMMUNITY     +22.2 │  SCORE   70pt
+ *     │ YOU · 3RD OF 12          COMMUNITY     +22.2 │  SCORE   57pt
  *     │ 118.4                                   96.2 │
  *     │ ▬▬▬▬▬▬▬▬▬▬▬▬▬|▬▬▬▬▬▬▬                       │
  *     ├──────────────────────────────────────────────┤
- *     │ RISK                    │ REWARD             │  TRADE   62pt
+ *     │ RISK                    │ REWARD             │  TRADE   56pt
  *     │ 40 gems                 │ Share of 20 gems   │
  *     │ ♥ 1 heart               │                    │
  *     └──────────────────────────────────────────────┘
@@ -133,12 +133,33 @@ const fmt = (n: number | null | undefined): string =>
  * with it — which is the point, and why they are constants rather than padding
  * that happens to add up.
  *
- * Each is its rows' line heights plus `Spacing.two - 1` of air top and bottom
- * (14 in total), which is the gutter the lineup rows underneath already use:
+ * Each is its rows' line heights plus `BAND_PAD` top and bottom:
  *
- *   HEAD   20 name + 4 + 17 objective                       = 41 + 14 = 55
- *   SCORE  12 names + 2 + 24 totals + 6 + 12 slot          = 56 + 14 = 70
- *   TRADE  12 label + 2 + 16 + 2 + 16 two reserved lines    = 48 + 14 = 62
+ *   HEAD   20 name  + 4 + 17 objective                      = 41 + 10 = 51
+ *   SCORE  12 names + 2 + 21 totals + 4 + 8 rail            = 47 + 10 = 57
+ *   TRADE  12 label + 2 + 15 + 2 + 15 two reserved lines    = 46 + 10 = 56
+ *
+ * ---------------------------------------------------------------------------
+ * IT WAS 189 AND IT IS 164, WHICH IS THE SAME CARD WITH LESS AIR IN IT
+ * ---------------------------------------------------------------------------
+ *
+ * A lineup row underneath is 62pt. At 189 the card was three of them tall to
+ * carry eleven short facts, and it read as bulky because it WAS: forty-two of
+ * those points were band padding, twelve were a slot sized for a sentence it
+ * did not need, and the trade set its values one step LARGER than the win
+ * condition above them — a card whose least urgent band had its loudest body
+ * type. Nothing was removed to get to 164. Four things were resized:
+ *
+ *   the padding    7 a side to 5, across all three bands. Six edges at two
+ *                  points each is twelve of the twenty-five.
+ *   the slot       12 back to the rail's own 8 — see `SLOT_H`.
+ *   the hero       20/24 to 18/21, which is where it was before the scoreboard
+ *                  needed two of them and is still one step above the lineup
+ *                  rows' 15pt player total.
+ *   the trade      `body` to `fine`, correcting a rank inversion as well as
+ *                  saving two points: the win condition is the line on this
+ *                  card that must not be skimmed, and it was set smaller than
+ *                  "40 gems".
  *
  * THE HEAD'S TWO ROWS SIT ON `Spacing.one` RATHER THAN THE 2 THE OTHER BANDS
  * USE. Two points is the gap between LINES OF ONE BLOCK, which is what the
@@ -155,9 +176,9 @@ const fmt = (n: number | null | undefined): string =>
  * under the countdown, where it joins the other fact about the contest's
  * CLOCK — how long you have, and whether enough people have turned up.
  */
-const HEAD_H = 55;
-const SCORE_H = 70;
-const TRADE_H = 62;
+const HEAD_H = 51;
+const SCORE_H = 57;
+const TRADE_H = 56;
 
 /**
  * How many rows each trade column reserves, filled or not.
@@ -192,19 +213,36 @@ const TRADE_H = 62;
  */
 const TRADE_LINES = 2;
 
+/**
+ * The air inside every band, top and bottom.
+ *
+ * ONE CONSTANT BECAUSE IT IS ONE DECISION. It was `Spacing.two - 1` written out
+ * three times, which is how a card ends up with three near-equal paddings
+ * nobody chose. At 5 the bands are tight against their hairlines and the card
+ * is a third shorter than a stack of lineup rows carrying the same amount of
+ * text — which is the right relationship, since the card is a summary of the
+ * board and not another row of it.
+ */
+const BAND_PAD = Spacing.one + 1;
+
 /** The scoring band's hero. One step above the lineup rows' 15pt player total. */
-const FIGURE_SIZE = 20;
-const FIGURE_LINE = 24;
+const FIGURE_SIZE = 18;
+const FIGURE_LINE = 21;
 
 /**
- * The graphic under the scoreboard, and it is a SLOT rather than a rail.
+ * The graphic under the scoreboard.
  *
- * 12pt, not the rail's 8, because the same strip has to be able to hold a line
- * of 9pt type — that is what the states with nothing to plot put in it. The
- * rail and the tug-of-war centre themselves inside it, so switching between a
- * graphic and a sentence changes what the band SAYS and never what it measures.
+ * 8pt — the rail's own height, and back down from the 12 it briefly took to
+ * hold a line of type. That line said `NO SCORES YET` under a dimmed 0–0 and
+ * `NOT ENTERED` on a card whose head is showing an ENTER chip, which is to say
+ * it spent four points of every card restating what the two totals and the
+ * head had already said. What is left in those states is an empty rail, which
+ * is honest — the scale is there and nothing is on it yet — and the one case
+ * that really did need words keeps them where they belong: a contest with
+ * nobody else in it names its opponent `NO FIELD YET`, in the column whose job
+ * is to say who you are playing.
  */
-const SLOT_H = 12;
+const SLOT_H = 8;
 
 /* ================================================================== types */
 
@@ -490,12 +528,11 @@ function Tag({ label, color }: { label: string; color: string }) {
  *                     does not, which is why it survived the rewrite.
  *   duel, played      a tug-of-war from level. A distribution of two people is
  *                     not a distribution.
- *   nothing yet       a line of words, and there are three reasons rather than
- *                     one: `NO SCORES YET` under a 0–0 says why the noughts are
- *                     there, `NOT ENTERED` says it in the lobby, and `NO FIELD
- *                     YET` covers a week that HAS been played in a contest with
- *                     nobody else in it. Running those together is what put
- *                     "no scores yet" on a settled card showing 88.2.
+ *   nothing yet       an empty rail. The scale is drawn in every state, so the
+ *                     first score arrives ON it. A week played in a contest
+ *                     with nobody else in it says `NO FIELD YET` in the
+ *                     opponent's own column — that one needs words, because a
+ *                     real total against a dash is otherwise unexplained.
  *
  * IT DOES NOT REPEAT THE COUNTDOWN. The obvious pregame line is "first kickoff
  * in 6h 20m" and the head is already saying that, forty points above, in larger
@@ -561,15 +598,21 @@ function Score({
       : 'YOU';
 
   /**
-   * WHY THE SLOT HAS NO GRAPHIC, in the fewest words that are still true — and
-   * they are three different reasons, which the first draft of this band ran
-   * together under "NO SCORES YET". That line appeared on a FINAL card showing
-   * a real 88.2, because the contest had one entrant and therefore no
-   * distribution: the band was reporting that nothing had happened on a week
-   * that had finished.
+   * NOBODY TO PLAY IS SAID IN THE OPPONENT'S OWN COLUMN, not under the rail.
+   *
+   * A week that HAS been played in a contest with one entrant has a real total
+   * and no one to measure it against — `opponentOf` would hand back your own
+   * median, which drew a settled 88.2 as a tie against yourself. The honest
+   * answer is that there is no opponent, and the place to say so is the column
+   * whose entire job is naming one.
+   *
+   * The other two states this used to caption are not captioned at all now.
+   * `NO SCORES YET` sat under a dimmed 0–0 on a card whose head was counting
+   * down to the lock, and `NOT ENTERED` sat under two dashes on a card whose
+   * head was showing an ENTER chip; both were the card saying a thing twice,
+   * which is the failure mode it has had at every size.
    */
-  const why =
-    entry === null ? 'NOT ENTERED' : !played ? 'NO SCORES YET' : 'NO FIELD YET';
+  const theirName = played && !comparable ? 'NO FIELD YET' : them.label;
 
   /* The median of an unplayed field is a stored nought, not a threshold — and
      the median of a field of one is you. Neither is an opponent. */
@@ -598,7 +641,7 @@ function Score({
         <Side name={myName} value={mine} muted={!played} />
         <Side
           align="right"
-          name={them.label}
+          name={theirName}
           value={theirs}
           muted={!played}
           after={
@@ -614,10 +657,11 @@ function Score({
         />
       </View>
       <View style={styles.slot}>
+        {/* AN EMPTY RAIL RATHER THAN A CAPTION where there is nothing to plot.
+            The scale is drawn in every state, so the first score appears ON it
+            rather than pushing the trade band down to make room for it. */}
         {!comparable || field === null ? (
-          <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
-            {why}
-          </Text>
+          <View style={[styles.track, { backgroundColor: c.backgroundElement }]} />
         ) : them.shape === 'duel' ? (
           <TugBar mine={entry?.myPoints ?? 0} theirs={theirTotal ?? 0} />
         ) : (
@@ -804,10 +848,15 @@ function TradeColumn({ label, lines }: { label: string; lines: TradeLine[] }) {
       {shown.map((line) => (
         <View key={line.text} style={styles.tradeLine}>
           {line.heart ? <Heart size={10} state="free" color={c.negative} /> : null}
+          {/* `fine`, NOT `body`, AND THAT IS A RANK FIX BEFORE IT IS A SIZE
+              ONE. The win condition in the head is the line on this card a
+              reader must not skim, and it is set at `fine`; the trade's values
+              were a step LARGER, so the least urgent band had the loudest body
+              type on the card. */}
           <Text
             numberOfLines={1}
             style={[
-              Type.body,
+              Type.fine,
               styles.tradeText,
               { color: line.tone === 'positive' ? c.positive : c.text },
             ]}>
@@ -1015,7 +1064,7 @@ const styles = StyleSheet.create({
    */
   band: {
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two - 1,
+    paddingVertical: BAND_PAD,
     gap: 2,
     justifyContent: 'center',
   },
@@ -1058,7 +1107,7 @@ const styles = StyleSheet.create({
   lockRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1, flexShrink: 0 },
   lockValue: { fontWeight: '700' },
 
-  score: { height: SCORE_H, borderBottomWidth: StyleSheet.hairlineWidth, gap: Spacing.one + 2 },
+  score: { height: SCORE_H, borderBottomWidth: StyleSheet.hairlineWidth, gap: Spacing.one },
   scoreRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1104,7 +1153,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.one + 1,
-    height: Type.body.lineHeight,
+    height: Type.fine.lineHeight,
   },
   tradeText: { flexShrink: 1, minWidth: 0 },
 
