@@ -38,6 +38,7 @@ export function InventoryCard({
   width,
   selecting,
   selected,
+  blocked,
   onPress,
   onLongPress,
 }: {
@@ -51,6 +52,22 @@ export function InventoryCard({
    */
   selecting?: boolean;
   selected?: boolean;
+  /**
+   * This copy cannot go into a selection — it is standing in a lineup.
+   *
+   * DRAWN, NOT WITHHELD. The cell stays in the grid at full size and keeps its
+   * face; what changes is that it is dimmed and wears STARTING. A collection
+   * that hid your eight best cards the moment you opened multi-select would be
+   * answering "where did my lineup go" instead of "which of these am I
+   * selling", and the eight are exactly the ones a reader is looking for to
+   * check they are not about to sell them.
+   *
+   * ONLY MEANINGFUL WHILE `selecting`. Outside the mode nothing about the cell
+   * is blocked: the press opens the card's profile, which a starter has as much
+   * right to as anything else. The screen passes false there rather than this
+   * file deciding, for the same reason the tick is the screen's.
+   */
+  blocked?: boolean;
   onPress?: () => void;
   /**
    * A HOLD on the cell. Passed straight through to the card, like `onPress`:
@@ -63,7 +80,15 @@ export function InventoryCard({
   const c = Colors[scheme];
 
   return (
-    <View style={{ width }}>
+    /* The hint rides on the WRAPPER rather than on the card: `PlayerCard` builds
+       its own label out of the model and takes no a11y props, and a reader that
+       met "in your lineup" only on the bar at the bottom of the screen would
+       reach it long after the card it is about. */
+    <View
+      style={[{ width }, blocked && styles.blocked]}
+      accessibilityHint={
+        blocked ? 'In your lineup — cannot be sold or added to a set' : undefined
+      }>
       <PlayerCard
         model={toCardModel(card)}
         size="compact"
@@ -105,7 +130,11 @@ export function InventoryCard({
         overlay={
           selecting ? (
             <View style={styles.marks}>
-              {selecting ? (
+              {/* NO EMPTY CIRCLE ON A BLOCKED CELL. The circle is an invitation
+                  — it is the thing you press to tick — and offering one over a
+                  card that cannot be ticked is the cell contradicting itself.
+                  The STARTING pill below takes its place. */}
+              {blocked ? null : (
                 <View
                   style={[
                     styles.tick,
@@ -120,13 +149,29 @@ export function InventoryCard({
                     <Text style={[Type.label, styles.mark, { color: c.background }]}>✓</Text>
                   ) : null}
                 </View>
+              )}
+
+              {/* STARTING, in the warning tone rather than the negative one.
+                  Nothing is wrong and nothing has been refused yet — the card
+                  is doing the most valuable thing a card can do. It is the one
+                  mark here that replaces the tick rather than sitting beside
+                  it, so it takes the tick's prominence. */}
+              {blocked ? (
+                <Text
+                  style={[
+                    Type.micro,
+                    styles.pill,
+                    { backgroundColor: c.warning, color: c.background },
+                  ]}>
+                  STARTING
+                </Text>
               ) : null}
 
               {/* IN SET, NOT "UNAVAILABLE", and the wording is the whole point.
                   This copy is still yours and still sellable; what is gone is
                   the slot. Drawn in the positive tone because it is something
                   the player ACHIEVED and has forgotten, not a refusal. */}
-              {card.inSet ? (
+              {card.inSet && !blocked ? (
                 <Text
                   style={[
                     Type.micro,
@@ -145,6 +190,9 @@ export function InventoryCard({
 }
 
 const styles = StyleSheet.create({
+  /* Enough to read as "not for this", not so much that the face stops being
+     legible — the reader is scanning for these cards, not past them. */
+  blocked: { opacity: 0.5 },
   /* The overlay slot lands low in the picture and clear of the nameplate — see
      `PlayerCard.overlay` for why the centre of the square is the one place a
      mark cannot go. Centred, so one mark alone is not off to a side. */

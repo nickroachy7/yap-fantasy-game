@@ -1383,14 +1383,15 @@ function Kit() {
 
           <Section
             title="Inventory cell"
-            note="The grid cell in every state multi-select can put it in. The first is AT REST and carries no marks at all — the same card, out of the mode. IN SET means a copy of that PLAYER is already committed; this copy is still yours and still sellable, which is why it is the positive tone rather than a grey-out. It appears only while you are choosing, because that is the only time it is news.">
+            note="The grid cell in every state multi-select can put it in. The first is AT REST and carries no marks at all — the same card, out of the mode. IN SET means a copy of that PLAYER is already committed; this copy is still yours and still sellable, which is why it is the positive tone rather than a grey-out. STARTING is the one refusal: the copy is in a lineup you have not played, so it can be neither sold nor burnt into a set — it takes the tick's place rather than sitting beside it, because a circle you cannot press is a cell contradicting itself. All of them appear only while you are choosing, because that is the only time any of it is news.">
             <View style={styles.row}>
               {[
-                { label: 'at rest', card: OWNED_CARDS[1], selecting: false, selected: false },
-                { label: 'pickable', card: OWNED_CARDS[0], selecting: true, selected: false },
-                { label: 'pickable, in a set', card: OWNED_CARDS[1], selecting: true, selected: false },
-                { label: 'picked', card: OWNED_CARDS[0], selecting: true, selected: true },
-                { label: 'picked, in a set', card: OWNED_CARDS[1], selecting: true, selected: true },
+                { label: 'at rest', card: OWNED_CARDS[1], selecting: false, selected: false, blocked: false },
+                { label: 'pickable', card: OWNED_CARDS[0], selecting: true, selected: false, blocked: false },
+                { label: 'pickable, in a set', card: OWNED_CARDS[1], selecting: true, selected: false, blocked: false },
+                { label: 'picked', card: OWNED_CARDS[0], selecting: true, selected: true, blocked: false },
+                { label: 'picked, in a set', card: OWNED_CARDS[1], selecting: true, selected: true, blocked: false },
+                { label: 'starting', card: OWNED_CARDS[0], selecting: true, selected: false, blocked: true },
               ].map((s2, i) => (
                 <View key={i} style={styles.iconCell}>
                   <InventoryCard
@@ -1398,6 +1399,7 @@ function Kit() {
                     width={106}
                     selecting={s2.selecting}
                     selected={s2.selected}
+                    blocked={s2.blocked}
                   />
                   <Text style={[Type.micro, { color: c.textTertiary }]}>
                     {s2.label.toUpperCase()}
@@ -1434,6 +1436,9 @@ function Kit() {
               stage={bulkStage}
               busy={false}
               error={null}
+              /* The refused tap, shown so the amber line is reachable here
+                 without a lineup behind the page. See `BulkBar.notice`. */
+              notice="Cards in your lineup cannot be sold or added to sets. Bench them first."
               result={
                 bulkCount === 0
                   ? {

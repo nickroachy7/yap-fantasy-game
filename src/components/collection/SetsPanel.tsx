@@ -63,7 +63,6 @@ import {
   View,
 } from 'react-native';
 
-import { useTabBarInset } from '@/components/shell/useResponsive';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
@@ -96,7 +95,6 @@ export function SetsPanel({
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const tabInset = useTabBarInset();
   // Single source of truth for the balance: the header reads the same value, so
   // a claim has to refresh THAT rather than keep a second copy here.
   const { refresh: refreshPlayer } = usePlayer();
@@ -287,7 +285,7 @@ export function SetsPanel({
              flush — except with no chips above it, where this is the only thing
              holding the empty state off the nav. */
           all.length === 0 && styles.contentTop,
-          { paddingBottom: tabInset + Spacing.four },
+          styles.contentTail,
         ]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {/* FIRST IN THE SCROLL, above the notices and the rows, which is the
@@ -373,6 +371,9 @@ const styles = StyleSheet.create({
      now, and the strip is inside the scroll. */
   strip: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two, gap: Spacing.two },
   content: { paddingHorizontal: Spacing.three, gap: Spacing.three },
+  /* Clearance under the last set, and NOT a tab bar's worth of it — the scene
+     already ends where the bar begins. See the inventory grid's `LIST_TAIL`. */
+  contentTail: { paddingBottom: Spacing.four },
   contentTop: { paddingTop: Spacing.three },
   centred: {
     flex: 1,

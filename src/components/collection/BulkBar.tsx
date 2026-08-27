@@ -70,6 +70,7 @@ export function BulkBar({
   stage,
   busy,
   error,
+  notice,
   result,
   onSell,
   onAdd,
@@ -90,6 +91,17 @@ export function BulkBar({
   stage: BulkStage;
   busy: boolean;
   error: string | null;
+  /**
+   * Why the last tap did not tick anything.
+   *
+   * SEPARATE FROM `error`, which is a run that failed. This is a press that
+   * never became a run — a card in your lineup, which cannot be sold and must
+   * not be burnt out of the slot it is standing in. Different news, different
+   * tone: `error` is red because something went wrong, this is amber because
+   * nothing did and the reader simply asked for something the rules do not
+   * allow.
+   */
+  notice: string | null;
   result: BulkResult | null;
   onSell: () => void;
   onAdd: () => void;
@@ -134,6 +146,15 @@ export function BulkBar({
         {error ? (
           <View style={[styles.result, { borderColor: c.negative }]}>
             <Text style={[Type.fine, { color: c.text }]}>{error}</Text>
+          </View>
+        ) : null}
+
+        {/* UNDER a failure rather than instead of one: a run that broke is the
+            more urgent of the two, and a refused tap is still worth saying
+            while the reader looks at the cell that refused it. */}
+        {notice ? (
+          <View style={[styles.result, { borderColor: c.warning }]}>
+            <Text style={[Type.fine, { color: c.text }]}>{notice}</Text>
           </View>
         ) : null}
 

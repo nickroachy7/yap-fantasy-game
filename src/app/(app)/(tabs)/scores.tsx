@@ -39,7 +39,7 @@ import {
 } from '@/components/scores/scoreboard';
 import { slateKey, useSeasonSchedule, useWeekLeaders, type Slate } from '@/components/scores/use-scores';
 import { Screen } from '@/components/shell/Screen';
-import { useIsWide, useTabBarInset } from '@/components/shell/useResponsive';
+import { useIsWide } from '@/components/shell/useResponsive';
 import { DropdownChip, type DropdownOption } from '@/components/ui/DropdownChip';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
@@ -68,7 +68,6 @@ export default function ScoresScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const wide = useIsWide();
-  const tabInset = useTabBarInset();
 
   /* The season and the opening week come from the database rather than the
      clock: `current_slate()` already encodes what "now" means for this game
@@ -328,8 +327,6 @@ export default function ScoresScreen() {
         <View style={wide ? styles.scheduleCol : undefined}>{schedule}</View>
         <View style={wide ? styles.leadersCol : undefined}>{leadersPanel}</View>
       </View>
-
-      <View style={{ height: tabInset }} />
     </Screen>
   );
 }

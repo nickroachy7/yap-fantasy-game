@@ -129,11 +129,15 @@ export default function TabsLayout() {
                      square shadow of the bar they were rounded off. */
                   elevation: 0,
                   /* The height is imposed rather than left to the navigator's
-                     default, which is the whole reason `useTabBarInset()` can
-                     promise screens an exact number to reserve. Content sits
-                     in TabBarContentHeight; the safe area is padding beneath
-                     it, so the bar's background still runs to the bottom of
-                     the screen instead of floating above the home indicator. */
+                     default, so the bar is the same object on every device.
+                     Content sits in TabBarContentHeight; the safe area is
+                     padding beneath it, so the bar's background still runs to
+                     the bottom of the screen instead of floating above the home
+                     indicator.
+
+                     SCREENS DO NOT RESERVE THIS. The bar is a sibling of the
+                     scene rather than a layer over it, so a page already ends
+                     where the bar starts — see `TabBarContentHeight`. */
                   height: TabBarContentHeight + insets.bottom,
                   paddingBottom: insets.bottom,
                   paddingTop: 6,

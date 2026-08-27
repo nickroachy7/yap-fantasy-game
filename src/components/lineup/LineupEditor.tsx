@@ -51,6 +51,8 @@ import {
   View,
 } from 'react-native';
 
+import { RosterBar } from '@/components/collection/RosterBar';
+import { useRoster } from '@/components/collection/use-roster';
 import { BenchBoard } from '@/components/lineup/BenchBoard';
 import { ContestCarousel } from '@/components/lineup/ContestCarousel';
 import { useMyContests } from '@/components/contests/use-my-contests';
@@ -364,6 +366,49 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
    */
   const needsEntry = Boolean(contest?.unentered && contest.entryFeeGems > 0);
 
+  /**
+   * OVER THE ROSTER CAP, which is the one refusal that is about none of the
+   * cards on this board.
+   *
+   * `set_lineup` checks the cap FIRST, before eligibility, before the lock,
+   * before anything — see 20260824200700 and the copy of it in the contest
+   * spine — and refuses the whole submission while you hold more than the cap.
+   * So on an over-cap roster every pick on this screen is a guaranteed server
+   * error, and the board used to take them anyway: the row filled with the
+   * player, the autosave fired, the call was refused, and what the reader was
+   * left with was a lineup that showed somebody it had not saved.
+   *
+   * That is the worst of the three possible failures. A row you cannot fill is
+   * honest, a row that fills and says it did not save is survivable, and a row
+   * that fills and looks saved is a player who finds out on Sunday.
+   *
+   * SO THE PICK IS REFUSED AT THE SOURCE — see `setPick`. Nothing is written,
+   * so nothing is drawn, so there is no state to reconcile when the read comes
+   * back. The bar above the boards carries the count and the remedy the whole
+   * time, so it is a wall you can see rather than one you walk into.
+   *
+   * CLEARING A SLOT IS REFUSED TOO, which is not obvious and is the same bug
+   * wearing the other hat. The cap gate is raised before the slots are even
+   * looked at, so `set_lineup` refuses an emptier lineup exactly as flatly as a
+   * fuller one — and a row drawn empty against a server that still has the
+   * player in it is the identical lie in the opposite direction. Nothing on
+   * this board moves until the roster is legal. See `clearPick`.
+   *
+   * `useRoster` re-reads on focus, which is what makes the block clear itself:
+   * commit or sell the excess on the Collection tab, come back, and the count
+   * is under the cap and the picks go through. */
+  const roster = useRoster();
+  const overCap = roster?.isOver === true;
+  /**
+   * What a refused pick says, and it is SHORT on purpose.
+   *
+   * The bar below carries the count, the cap and the remedy already. Repeating
+   * all three here would put two versions of the same paragraph on screen at
+   * once — this one only has to answer "why did nothing happen", and point at
+   * the thing that answers the rest.
+   */
+  const capMessage = 'Your roster is over the limit, so this lineup cannot be changed yet.';
+
   const unavailableIds = useMemo(() => {
     const out = new Set(lockedIds);
     for (const id of elsewhere.keys()) out.add(id);
@@ -512,19 +557,42 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
 
   /* Both of these clear the failure state as well as the error text: a new
      choice is a new thing to try, and it deserves an attempt of its own. */
-  const setPick = useCallback((slot: string, cardId: string) => {
-    setEdits((e) => ({ ...e, [slot]: cardId }));
-    setSwap(null);
-    setSubmitError(null);
-    setBlocked(false);
-  }, []);
+  const setPick = useCallback(
+    (slot: string, cardId: string) => {
+      /* THE ROW IS NOT FILLED. See `overCap` — the server refuses the whole
+         submission, so drawing the player in the slot would be the board
+         claiming a lineup it does not have. The sheet closes either way, so
+         the reader is returned to the board with the reason on it rather than
+         left in a picker that appears to have ignored them. */
+      if (overCap) {
+        setSwap(null);
+        setSubmitError(capMessage);
+        return;
+      }
+      setEdits((e) => ({ ...e, [slot]: cardId }));
+      setSwap(null);
+      setSubmitError(null);
+      setBlocked(false);
+    },
+    [overCap, capMessage],
+  );
 
-  const clearPick = useCallback((slot: string) => {
-    setEdits((e) => ({ ...e, [slot]: null }));
-    setSwap(null);
-    setSubmitError(null);
-    setBlocked(false);
-  }, []);
+  const clearPick = useCallback(
+    (slot: string) => {
+      // The cap gate fires before the slots are read, so emptying a row is
+      // refused as flatly as filling one. See `overCap`.
+      if (overCap) {
+        setSwap(null);
+        setSubmitError(capMessage);
+        return;
+      }
+      setEdits((e) => ({ ...e, [slot]: null }));
+      setSwap(null);
+      setSubmitError(null);
+      setBlocked(false);
+    },
+    [overCap, capMessage],
+  );
 
   // Stable identities so the memoised boards below are not defeated by a new
   // arrow function on every countdown tick.
@@ -962,6 +1030,17 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
   /** Everything under the card. */
   const boards = (
     <>
+      {/* THE WALL, WHERE IT CAN BE SEEN. Over the cap nothing on this board can
+          be changed — see `overCap` — so the reason sits above the slots rather
+          than arriving as a refusal after a pick. The same bar the Collection
+          grid uses, so the count and the remedy are worded once.
+
+          Only when it is BLOCKING. `RosterBar` also draws a calm "24 of 30" and
+          a "6 slots left", and neither is this screen's business: the lineup is
+          where you find out the cap has stopped you, not where you watch it
+          approach. */}
+      {overCap ? <RosterBar roster={roster} /> : null}
+
       {/* ONE CAPTION, AND WHICH ONE DEPENDS ON WHETHER THE WEEK HAS STARTED.
  
           Before kickoff the useful fact is the deadline. Once the week is in

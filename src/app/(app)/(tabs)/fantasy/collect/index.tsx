@@ -49,6 +49,7 @@ import { SELECTION_MAX, sellTotal } from '@/components/collection/bulk';
 import { CollectionSummary } from '@/components/collection/CollectionSummary';
 import { RosterBar } from '@/components/collection/RosterBar';
 import { useRoster } from '@/components/collection/use-roster';
+import { useStarters } from '@/components/collection/use-starters';
 import { useBulk } from '@/components/collection/use-bulk';
 import { EmptyCollection, EmptyFilterResult } from '@/components/collection/EmptyInventory';
 import { InventoryCard } from '@/components/collection/InventoryCard';
@@ -83,8 +84,21 @@ let starterOffered = false;
 
 const GUTTER = Spacing.three;
 const GAP = Spacing.two + 4;
-/** Clearance under the last row of cards. */
-const LIST_TAIL = Spacing.six;
+/**
+ * Clearance under the last row of a full-height list.
+ *
+ * IT DOES NOT INCLUDE THE TAB BAR, and it used to. Every list on the app added
+ * `useTabBarInset()` — 54pt of bar plus the home indicator's 34 — on the belief
+ * that the bar floats over the page. It does not: `BottomTabView` renders the
+ * scene and the bar as SIBLINGS in a column, and the bar is only positioned
+ * absolutely when it is hidden, so the scene already ends where the bar begins.
+ * What that inset bought was ~88pt of black between the last row and the bar on
+ * every scrolling screen in the app.
+ *
+ * So the tail is just a tail now: enough that the last row is not jammed
+ * against the bar, and nothing more.
+ */
+const LIST_TAIL = Spacing.four;
 /**
  * Below this the card's nameplate stops working: the position and club are
  * pushed to opposite corners under a centred name, and at much under 100pt
@@ -211,6 +225,22 @@ export default function InventoryScreen() {
   // server-side, and this screen's list is the same set of rows only until a
   // commit or a sale on another screen moves one of them.
   const roster = useRoster();
+  /* The copies you are STARTING this week. They cannot be ticked — see
+     `use-starters` for why a commit is the dangerous half of that. */
+  const starters = useStarters();
+  /**
+   * Why the last blocked tap did nothing, shown on the selection bar.
+   *
+   * ON THE BAR RATHER THAN ON THE CELL, because a 100pt square already carries
+   * a tick, a tier, a nameplate and sometimes an IN SET pill, and the sentence
+   * is longer than any of them. The cell says THAT it is blocked — it is dimmed
+   * and marked STARTING; this says why, once, in the one place on the screen
+   * that is about the selection.
+   *
+   * Cleared by the next successful tick, so it is about the tap you just made
+   * rather than a state the bar sits in.
+   */
+  const [blockedNote, setBlockedNote] = useState<string | null>(null);
 
   // Hiding the field must also drop whatever was typed into it, or a collection
   // that shrinks past the threshold filters itself by an invisible control.
@@ -272,12 +302,25 @@ export default function InventoryScreen() {
   }, [refresh, refreshPlayer]);
 
   /* Resolved against the CURRENT rows, so a card that has just been sold out
-     from under the selection simply is not in here any more. */
+     from under the selection simply is not in here any more.
+
+     STARTERS ARE FILTERED HERE AS WELL AS AT THE TICK, and the second guard is
+     not belt and braces: the tick refuses what `starters` held AT THE TIME, and
+     that set is re-read on focus — so a card ticked on Monday and started on
+     Tuesday is in `selected` and must not reach either action. Filtering at the
+     point the payload is built is the only place that catches it. */
   const selectedCards = useMemo(
-    () => all.filter((card) => selected.has(card.id)),
-    [all, selected],
+    () => all.filter((card) => selected.has(card.id) && !starters.has(card.id)),
+    [all, selected, starters],
   );
   const selectedGems = useMemo(() => sellTotal(selectedCards), [selectedCards]);
+
+  /* Everything a CELL draws differently from one render to the next, in one
+     object, because `extraData` is compared by identity and a fresh literal
+     would redraw every row on every render. Both halves matter: the ticks
+     change on a tap, and which cells are blocked changes when a lineup is
+     edited on another tab. */
+  const cellState = useMemo(() => ({ selected, starters }), [selected, starters]);
 
   const clearSelection = useCallback(() => setSelected(new Set()), []);
 
@@ -298,6 +341,16 @@ export default function InventoryScreen() {
 
   const toggleCard = useCallback(
     (id: string) => {
+      /* A CARD YOU ARE STARTING CANNOT BE PICKED. Selling one is refused by the
+         server and committing one would burn it out of the lineup it is
+         standing in — see `use-starters`. The tap says so rather than doing
+         nothing, because a cell that ignores a press reads as a broken cell. */
+      if (starters.has(id)) {
+        setBlockedNote('Cards in your lineup cannot be sold or added to sets. Bench them first.');
+        return;
+      }
+      setBlockedNote(null);
+
       /* THE LAST TICK TAKES THE MODE WITH IT — see `heldOpen`. Decided out here
          from the CURRENT selection rather than inside the updater below: an
          updater has to be pure, and React may run it more than once. */
@@ -318,7 +371,7 @@ export default function InventoryScreen() {
         setSelecting(false);
       }
     },
-    [selected],
+    [selected, starters],
   );
 
   /* Leaving the mode drops the selection with it. A set of ticks you cannot see
@@ -329,6 +382,7 @@ export default function InventoryScreen() {
     /* Pressed the button, so the mode is the button's however it was opened —
        an empty selection is a state it is allowed to sit in. See `heldOpen`. */
     heldOpen.current = false;
+    setBlockedNote(null);
     setSelecting((on) => {
       if (on) setSelected(new Set());
       return !on;
@@ -352,15 +406,25 @@ export default function InventoryScreen() {
    *
    * The bulk guard is `toggleSelecting`'s, for its reason: the ids are what a
    * call in flight is about, so the mode cannot be opened out from under one.
+   *
+   * A STARTER OPENS THE MODE WITH NOTHING TICKED rather than refusing to open
+   * it. The hold is a request for the mode, and the card it was made on is
+   * merely the obvious first pick; denying the whole gesture over one
+   * ineligible card would leave the reader holding a cell that does nothing at
+   * all. The mode opens, the cell is drawn blocked, and the bar says why.
    */
   const holdCard = useCallback(
     (id: string) => () => {
       if (selecting || bulk.busy) return;
-      heldOpen.current = true;
+      const blocked = starters.has(id);
+      heldOpen.current = !blocked;
       setSelecting(true);
-      setSelected(new Set([id]));
+      setSelected(blocked ? new Set() : new Set([id]));
+      setBlockedNote(
+        blocked ? 'Cards in your lineup cannot be sold or added to sets. Bench them first.' : null,
+      );
     },
-    [selecting, bulk.busy],
+    [selecting, bulk.busy, starters],
   );
 
   /**
@@ -577,13 +641,16 @@ export default function InventoryScreen() {
                 </View>
               }
               ListEmptyComponent={<EmptyFilterResult onClear={clearFilters} hasFilters={filtered} />}
-              extraData={selecting ? selected : null}
+              extraData={selecting ? cellState : null}
               renderItem={({ item }) => (
                 <InventoryCard
                   card={item}
                   width={itemWidth}
                   selecting={selecting}
                   selected={selected.has(item.id)}
+                  /* Only inside the mode. Outside it a starter is an ordinary
+                     cell that opens its own profile. */
+                  blocked={selecting && starters.has(item.id)}
                   onPress={selecting ? () => toggleCard(item.id) : openCard(item)}
                   onLongPress={holdCard(item.id)}
                 />
@@ -605,6 +672,7 @@ export default function InventoryScreen() {
                 stage={bulk.stage}
                 busy={bulk.busy}
                 error={bulk.error}
+                notice={blockedNote}
                 result={bulk.result}
                 onSell={bulk.askSell}
                 onAdd={() => bulk.askAdd(selectedCards)}

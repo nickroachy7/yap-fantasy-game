@@ -18,7 +18,6 @@
  */
 import { FlatList, StyleSheet } from 'react-native';
 
-import { useTabBarInset } from '@/components/shell/useResponsive';
 import { Spacing } from '@/constants/theme';
 
 import { PLAYER_ROW_HEIGHT, PlayerRow, type RowFigure } from './PlayerRow';
@@ -44,7 +43,6 @@ export function PlayerList({
   refreshing?: boolean;
   onRefresh?: () => void;
 }) {
-  const tabInset = useTabBarInset();
 
   return (
     <FlatList
@@ -70,7 +68,7 @@ export function PlayerList({
       refreshing={refreshing}
       onRefresh={onRefresh}
       style={styles.fill}
-      contentContainerStyle={{ paddingBottom: tabInset + Spacing.four }}
+      contentContainerStyle={styles.list}
     />
   );
 }
@@ -85,4 +83,7 @@ const getItemLayout = (_data: ArrayLike<ListedPlayer> | null | undefined, index:
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  /* Clearance under the last row, and NOT a tab bar's worth of it: the scene
+     already ends where the bar begins. See the inventory's `LIST_TAIL`. */
+  list: { paddingBottom: Spacing.four },
 });

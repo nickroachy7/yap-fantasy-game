@@ -247,18 +247,18 @@ export const Spacing = {
  * Height of the bottom tab bar's CONTENT, excluding the safe-area inset.
  *
  * This is not a measurement of react-navigation's default bar — it is a height
- * we impose on it (see `(app)/(tabs)/_layout.tsx`), which is what makes it safe for
- * screens to reserve exactly this much tail room. The number it replaced was a
- * guess per platform, `{ ios: 50, android: 80 }`, and it was wrong in three
- * ways at once: it had no web value, so on a narrow browser — where the bar is
- * very much visible — every screen padded its tail by nothing and the last row
- * sat underneath it; it ignored the safe-area inset, so on a device with a home
- * indicator it fell ~34pt short; and it was applied on wide web too, where
- * there is no bar at all.
+ * we impose on it; see `(app)/(tabs)/_layout.tsx`, which adds the safe area to
+ * it so the bar's fill runs to the bottom of the screen.
  *
  * 54 fits a 24pt icon over a 10pt label with breathing room either side.
- * Do not read this directly for padding — use `useTabBarInset()`, which knows
- * about the safe area and about the bar not existing on wide web.
+ *
+ * NO SCREEN SHOULD RESERVE THIS AS TAIL ROOM, and for a while every list in the
+ * app did — via a `useTabBarInset()` that added this to the home indicator's
+ * 34. The premise was wrong: `BottomTabView` renders the scene and the bar as
+ * SIBLINGS in a column and only positions the bar absolutely when it is
+ * HIDDEN, so a scrolling screen already ends exactly where the bar begins.
+ * Reserving it again put ~88pt of black under every list in the app. A tail is
+ * a tail; this number is the bar's business alone.
  */
 export const TabBarContentHeight = 54;
 

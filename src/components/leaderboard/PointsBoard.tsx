@@ -25,7 +25,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
-import { useTabBarInset } from '@/components/shell/useResponsive';
 import { MenuButton, MenuHeading, MenuItem } from '@/components/ui/MenuButton';
 import { DASH } from '@/components/ui/DataTable';
 import { Colors, Spacing, Type, type CardTier } from '@/constants/theme';
@@ -86,7 +85,6 @@ export function PointsBoard({
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const tabInset = useTabBarInset();
 
   const [entries, setEntries] = useState<Entry[] | null>(null);
   /** Null means "not fetched yet", which is not the same as "no scored weeks". */
@@ -318,7 +316,7 @@ export function PointsBoard({
         }}
         extraData={listExtra}
         keyExtractor={(r) => r.key}
-        contentContainerStyle={[styles.list, { paddingBottom: tabInset + Spacing.four }]}
+        contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -472,7 +470,10 @@ const styles = StyleSheet.create({
   /* Vertically tighter at the top than it was: the frame directly above
      already spaces the list off the chrome, so a third gap here read as a
      hole between the pinned block and the rows it belongs to. */
-  list: { paddingTop: Spacing.one, paddingBottom: Spacing.three },
+  /* `paddingBottom` is the whole tail now. It used to be overridden at the
+     call site with a tab bar's height added on top, which reserved ~88pt for a
+     bar the scene already sits above — see the inventory's `LIST_TAIL`. */
+  list: { paddingTop: Spacing.one, paddingBottom: Spacing.four },
   centred: {
     flex: 1,
     alignItems: 'center',

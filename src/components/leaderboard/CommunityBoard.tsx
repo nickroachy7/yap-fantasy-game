@@ -30,7 +30,6 @@ import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } f
 
 import { POS_FILTERS, type PosFilter } from '@/components/cards/PositionFilter';
 import { MenuButton, MenuHeading, MenuItem } from '@/components/ui/MenuButton';
-import { useTabBarInset } from '@/components/shell/useResponsive';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -78,7 +77,6 @@ export function CommunityBoard({
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const tabInset = useTabBarInset();
   const list = useRef<FlatList<BoardRowModel>>(null);
 
   const [position, setPosition] = useState<PosFilter>('ALL');
@@ -233,7 +231,7 @@ export function CommunityBoard({
         // The signed-in reader's tint and the column set are both outside `rows`.
         extraData={meId}
         keyExtractor={(row) => row.key}
-        contentContainerStyle={[styles.list, { paddingBottom: tabInset + Spacing.four }]}
+        contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -288,7 +286,10 @@ const styles = StyleSheet.create({
   /* Vertically tighter at the top than it was: the frame directly above
      already spaces the list off the chrome, so a third gap here read as a
      hole between the pinned block and the rows it belongs to. */
-  list: { paddingTop: Spacing.one, paddingBottom: Spacing.three },
+  /* `paddingBottom` is the whole tail now. It used to be overridden at the
+     call site with a tab bar's height added on top, which reserved ~88pt for a
+     bar the scene already sits above — see the inventory's `LIST_TAIL`. */
+  list: { paddingTop: Spacing.one, paddingBottom: Spacing.four },
   centred: { flex: 1, justifyContent: 'center', padding: Spacing.four },
   empty: {
     gap: Spacing.one,
