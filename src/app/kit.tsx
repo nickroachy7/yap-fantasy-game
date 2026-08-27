@@ -60,6 +60,8 @@ import {
 } from '@/components/dev/fixtures';
 import { BulkBar, type BulkStage } from '@/components/collection/BulkBar';
 import { InventoryCard } from '@/components/collection/InventoryCard';
+import { RosterBar } from '@/components/collection/RosterBar';
+import { RosterCut } from '@/components/collection/RosterCut';
 import { CardExits } from '@/components/cards/CardExits';
 import { PackReveal } from '@/components/cards/PackReveal';
 import { PackShelf } from '@/components/cards/PackShelf';
@@ -1407,6 +1409,19 @@ function Kit() {
                 </View>
               ))}
             </View>
+          </Section>
+
+          <Section
+            title="Roster bar and the cut"
+            note="Three volumes and a line. Under the warning mark the bar just prints the count; near the cap it counts the slots left; over it, it says outright what to do — the one state where a remedy beats a fact. The dashed line is the same news drawn across the GRID: it sits after the thirtieth row in whatever order the cards are in, so everything below it is over the limit. It appears only over the cap, and never under a filter, where the thirtieth card on screen is not the thirtieth card you hold.">
+            <Panel>
+              <View style={styles.summaryPad}>
+                <RosterBar roster={{ held: 14, cap: 30, warnAt: 24, overBy: 0, isOver: false, isNear: false, remaining: 16 }} />
+                <RosterBar roster={{ held: 28, cap: 30, warnAt: 24, overBy: 0, isOver: false, isNear: true, remaining: 2 }} />
+                <RosterBar roster={{ held: 36, cap: 30, warnAt: 24, overBy: 6, isOver: true, isNear: false, remaining: 0 }} />
+                <RosterCut cap={30} />
+              </View>
+            </Panel>
           </Section>
 
           <Section

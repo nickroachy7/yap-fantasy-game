@@ -51,7 +51,7 @@ import {
   type CardTier,
 } from '@/constants/theme';
 import { Chip, ChipRow } from '@/components/ui/Chip';
-import { MenuButton, MenuHeading, MenuItem, ToggleButton } from '@/components/ui/MenuButton';
+import { MenuButton, MenuHeading, MenuItem } from '@/components/ui/MenuButton';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   SORT_OPTIONS,
@@ -109,30 +109,31 @@ export function TierFilterRow({
 }
 
 /**
- * The inventory's controls that are not the position chips: four round buttons
+ * The inventory's controls that are not the position chips: two round buttons
  * at the end of the row, where the trend board puts its up/down switch.
  *
- * FOUR BUTTONS, NOT ONE. Folding all four behind a single "FILTERS" button
- * would buy back another 100pt of the row, and it is the wrong trade: one
- * button for four unrelated jobs can only be labelled with the generic word, so
- * nothing on the row would say what is available, and the count of what is
- * applied would have to be inferred from a badge. Each filter wears its own
- * glyph instead, and the two that hold a choice drop a menu directly beneath
- * themselves — see `MenuButton`.
+ * A BUTTON EACH, NOT ONE "FILTERS" BUTTON. Folding them together would buy back
+ * another 50pt of the row, and it is the wrong trade: one button for two
+ * unrelated jobs can only be labelled with the generic word, so nothing on the
+ * row would say what is available, and the count of what is applied would have
+ * to be inferred from a badge. Each filter wears its own glyph and drops a menu
+ * directly beneath itself — see `MenuButton`.
  *
- * THE GLYPHS ARE THE ACTION BAR'S, not new ones. `search`, `tiers`, `sort` and
- * `available` are four of the eleven that set already draws, and they were
- * drawn for exactly these four facets back when they were chips in that bar.
+ * THE GLYPHS ARE THE ACTION BAR'S, not new ones. `tiers` and `sort` are two of
+ * the eleven that set already draws, and they were drawn for exactly these
+ * facets back when they were chips in that bar.
  *
- * SEARCH AND AVAILABLE OPEN NOTHING. Available is on or off, and search reveals
- * the field pinned below the row — a `TextInput` inside a menu that closes on
- * an outside press is a field you cannot scroll away from or tap beside.
+ * THERE WAS A SEARCH BUTTON, AND IT IS GONE. It toggled a `TextInput` pinned
+ * below this row — pinned rather than in a menu, because a field inside
+ * something that closes on an outside press is a field you cannot tap beside.
+ * All of that was machinery for a question a collection does not raise: the cap
+ * is thirty cards, position and tier between them cut that to a handful, and
+ * the grid is three or four screens end to end at its largest. Searching a
+ * shelf you can see all of is a control that exists because the component
+ * existed. The app-wide search (`/search`) is untouched — that one is over
+ * every player in the league, where the question is real.
  */
 export function InventoryControls({
-  searchable,
-  searchOpen,
-  onToggleSearch,
-  searching,
   tier,
   onTier,
   tierTotal,
@@ -141,12 +142,6 @@ export function InventoryControls({
   dir,
   onSort,
 }: {
-  /** False for a small collection, where the facets alone find anything. */
-  searchable: boolean;
-  searchOpen: boolean;
-  onToggleSearch: () => void;
-  /** True when something has actually been typed, so the button reads as on. */
-  searching: boolean;
   tier: TierFilter;
   onTier: (next: TierFilter) => void;
   tierTotal: number;
@@ -159,15 +154,6 @@ export function InventoryControls({
 
   return (
     <View style={styles.controls}>
-      {searchable ? (
-        <ToggleButton
-          icon="search"
-          label="Search your collection"
-          on={searchOpen || searching}
-          onPress={onToggleSearch}
-        />
-      ) : null}
-
       <MenuButton icon="tiers" label="Tier" active={tier !== 'ALL'}>
         {(close) => (
           <>

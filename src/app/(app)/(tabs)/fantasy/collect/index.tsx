@@ -4,12 +4,16 @@
  * Virtualised from the first render: a collection has no upper bound, so
  * mapping over an array here would be a cliff rather than a slowdown.
  *
- * THE CONTROLS ARE OUTSIDE THE GRID; THE SUMMARY IS INSIDE IT. The chips, the
- * controls and the search field are siblings of the FlatList rather than its
- * header, and the search field is the one that had no choice: a TextInput used
- * as a `ListHeaderComponent` is remounted on every keystroke and loses focus
- * after one character. The rest followed it out so that a control could not
- * scroll away from the thing it controls.
+ * THE CONTROLS ARE OUTSIDE THE GRID; THE SUMMARY IS INSIDE IT. The chips and
+ * the two round buttons are siblings of the FlatList rather than its header, so
+ * that a control cannot scroll away from the thing it controls.
+ *
+ * THERE IS NO SEARCH FIELD ANY MORE, and it was the reason the controls first
+ * moved out here: a `TextInput` used as a `ListHeaderComponent` is remounted on
+ * every keystroke and loses focus after one character. The field is gone
+ * because the question is — the roster caps at thirty, position and tier cut
+ * that to a handful, and a shelf you can see all of does not need searching.
+ * See `InventoryControls`. The rest stayed out here on their own merits.
  *
  * THE SUMMARY WENT THE OTHER WAY, and that is the change this note is about.
  * It used to sit ABOVE the controls and collapse on a push up the page — a
@@ -30,6 +34,11 @@
  * the same kind of object — a statement about the collection, not a control
  * over it — and the two figures belong together: the strip counts what you
  * hold, the bar says what holding that many costs you. See the render.
+ *
+ * AND WHEN THE CAP IS BROKEN, A LINE ACROSS THE GRID AT IT. The bar says how
+ * many you are over; the line says WHICH, in the order you are looking at them.
+ * See `cutId` for the three conditions it insists on before drawing, and
+ * `RosterCut` for what it is claiming.
  */
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -53,6 +62,7 @@ import { BulkBar } from '@/components/collection/BulkBar';
 import { SELECTION_MAX, sellTotal } from '@/components/collection/bulk';
 import { CollectionSummary } from '@/components/collection/CollectionSummary';
 import { RosterBar } from '@/components/collection/RosterBar';
+import { RosterCut } from '@/components/collection/RosterCut';
 import { useStarters } from '@/components/collection/use-starters';
 import { useBulk } from '@/components/collection/use-bulk';
 import { EmptyCollection, EmptyFilterResult } from '@/components/collection/EmptyInventory';
@@ -61,7 +71,6 @@ import {
   SortDefaultDir,
   countByTier,
   matchesPosition,
-  matchesQuery,
   matchesTier,
   sortCards,
   summarise,
@@ -72,7 +81,6 @@ import {
 } from '@/components/collection/types';
 import { useCollection } from '@/components/collection/use-collection';
 import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
-import { SearchField } from '@/components/ui/Controls';
 import { ToggleButton } from '@/components/ui/MenuButton';
 import { Screen } from '@/components/shell/Screen';
 import { Colors, Spacing, Type } from '@/constants/theme';
@@ -117,13 +125,6 @@ const MIN_COLUMNS = 3;
  * size.
  */
 const MAX_COLUMNS = 7;
-/**
- * Below this a collection fits on a screen or two and the facets alone find
- * anything, so a search field is a permanent 40pt tax on the answer to a
- * question nobody has. A starter pack is 8 cards; this is roughly three packs.
- */
-const SEARCH_FROM = 24;
-
 /**
  * The last width this grid was laid out at, and the window width it was
  * measured under. Module scope on purpose: it has to outlive the screen, which
@@ -203,18 +204,11 @@ export default function InventoryScreen() {
      on nothing else. */
   const { cardCount, roster, refresh: refreshPlayer } = usePlayer();
 
-  const [query, setQuery] = useState('');
   const [position, setPosition] = useState<PosFilter>('ALL');
   const [tier, setTier] = useState<TierFilter>('ALL');
   const [sort, setSort] = useState<SortKey>('fp');
   const [dir, setDir] = useState<SortDir>(SortDefaultDir.fp);
 
-  /* ONE flag, where there were three. `showTiers` and `showSort` each revealed
-     a row of chips, so the grid began at four different heights depending on
-     which you had left open; both are menus now and cost nothing when shut.
-     Search keeps its row, because a `TextInput` in a menu that closes on an
-     outside press is a field you cannot tap beside. */
-  const [showSearch, setShowSearch] = useState(false);
 
   /**
    * MULTI-SELECT, and it is a MODE rather than a long-press.
@@ -277,44 +271,86 @@ export default function InventoryScreen() {
    */
   const [blockedNote, setBlockedNote] = useState<string | null>(null);
 
-  // Hiding the field must also drop whatever was typed into it, or a collection
-  // that shrinks past the threshold filters itself by an invisible control.
-  const searchable = all.length >= SEARCH_FROM;
-  const needle = searchable ? query.trim().toLowerCase() : '';
-
   /* ---- faceting ------------------------------------------------------ *
    * Each row's counts are computed with its OWN filter lifted, which is what
-   * makes the numbers mean "how many would I get if I pressed this". The
-   * search and availability filters are NOT lifted: they narrow the pool that
-   * every facet counts against, so typing a team name reflows the tier and
-   * position counts to that team.                                          */
-  const pool = useMemo(
-    () => all.filter((card) => matchesQuery(card, needle)),
-    [all, needle],
-  );
+   * makes the numbers mean "how many would I get if I pressed this". There are
+   * two facets left, so the tier counts are taken over whatever the position
+   * chips have left and vice versa.                                        */
   const forTierCounts = useMemo(
-    () => pool.filter((card) => matchesPosition(card, position)),
-    [pool, position],
+    () => all.filter((card) => matchesPosition(card, position)),
+    [all, position],
   );
   const tierCounts = useMemo(() => countByTier(forTierCounts), [forTierCounts]);
 
   const visible = useMemo(
     () =>
       sortCards(
-        pool.filter((card) => matchesPosition(card, position) && matchesTier(card, tier)),
+        all.filter((card) => matchesPosition(card, position) && matchesTier(card, tier)),
         sort,
         dir,
       ),
-    [pool, position, tier, sort, dir],
+    [all, position, tier, sort, dir],
   );
 
-  const filtered =
-    position !== 'ALL' || tier !== 'ALL' || needle.length > 0;
+  const filtered = position !== 'ALL' || tier !== 'ALL';
+
+  /**
+   * The copy the roster cap falls on, or null when there is no line to draw.
+   *
+   * THREE CONDITIONS, AND EACH ONE IS THE LINE REFUSING TO LIE:
+   *
+   *   OVER THE CAP. Under it every card you hold is on the right side of the
+   *     line, so there is nothing to divide. Same threshold the roster bar uses
+   *     to turn red, from the same figure, so the two cannot disagree about
+   *     whether there is a problem.
+   *
+   *   NOTHING FILTERED. The thirtieth QB on screen is not the thirtieth card
+   *     you hold. Under a filter the count the line is drawn from is a count of
+   *     a subset, and the line would be pointing at nothing.
+   *
+   *   MORE CARDS THAN THE CAP ON SCREEN. Belt and braces against the two above
+   *     drifting apart — `roster.held` is the server's count and `visible` is
+   *     the rows that have arrived, and for one render after a refresh they can
+   *     be different numbers.
+   *
+   * It is an ID rather than an index because the separator is handed the ROW it
+   * follows and not the position of it — see the grid's `ItemSeparatorComponent`.
+   */
+  const cutId = useMemo(() => {
+    if (!roster?.isOver || filtered) return null;
+    if (visible.length <= roster.cap) return null;
+    return visible[roster.cap - 1]?.id ?? null;
+  }, [roster, filtered, visible]);
+
+  /**
+   * The separator, built only when there is a cut to draw.
+   *
+   * `undefined` otherwise, so a grid with nothing to divide renders no
+   * separator component at all rather than one that returns null between every
+   * pair of rows.
+   *
+   * AFTER THE ROW HOLDING THE CAP'S CARD, which is exactly the guarantee worth
+   * having: everything below the line is past the limit. On a phone it is also
+   * exact — three columns into thirty is ten whole rows — and on a wider window
+   * the straddling row sits above, so the line never claims a card is over when
+   * it is not.
+   */
+  const cut = useMemo(() => {
+    const cap = roster?.cap;
+    if (!cutId || !cap) return undefined;
+    return function Cut({ leadingItem }: { leadingItem?: CollectionCard | CollectionCard[] }) {
+      // One row per virtualised item once `numColumns > 1`, so what arrives here
+      // is the array. The single-card form is handled for safety, not for a case
+      // this screen can reach — `columns` has a floor of three.
+      const row = Array.isArray(leadingItem) ? leadingItem : leadingItem ? [leadingItem] : [];
+      if (!row.some((card) => card.id === cutId)) return null;
+      return <RosterCut cap={cap} />;
+    };
+  }, [cutId, roster?.cap]);
 
   const clearFilters = useCallback(() => {
     setPosition('ALL');
     setTier('ALL');
-    setQuery('');
   }, []);
 
   // Changing the key resets the direction to that key's natural one. Carrying
@@ -561,10 +597,6 @@ export default function InventoryScreen() {
                   <PositionFilter value={position} onChange={setPosition} />
                 </View>
                 <InventoryControls
-                  searchable={searchable}
-                  searchOpen={showSearch}
-                  onToggleSearch={() => setShowSearch((v) => !v)}
-                  searching={needle.length > 0}
                   tier={tier}
                   onTier={setTier}
                   tierTotal={forTierCounts.length}
@@ -591,22 +623,6 @@ export default function InventoryScreen() {
                 />
               </View>
 
-              {/* Pinned OUTSIDE the list, and it has to be: a TextInput in a
-                  `ListHeaderComponent` is remounted on every keystroke and loses
-                  focus after one character. */}
-              {searchable && showSearch ? (
-                <View style={styles.searchRow}>
-                  <SearchField
-                    value={query}
-                    onChange={setQuery}
-                    placeholder="Search name, team or position"
-                    hint={`${total} OWNED`}
-                    accessibilityLabel="Search your collection"
-                    autoFocus
-                  />
-                </View>
-              ) : null}
-
             </View>
 
             <FlatList
@@ -620,6 +636,8 @@ export default function InventoryScreen() {
               numColumns={columns}
               columnWrapperStyle={styles.row}
               contentContainerStyle={styles.list}
+              /* The roster line, drawn after one particular row. See `cut`. */
+              ItemSeparatorComponent={cut}
               initialNumToRender={columns * 4}
               maxToRenderPerBatch={columns * 4}
               windowSize={7}
@@ -749,7 +767,6 @@ const styles = StyleSheet.create({
      minimum and pushes the buttons off the row instead of scrolling inside what
      is left. */
   chips: { flex: 1, minWidth: 0 },
-  searchRow: { paddingHorizontal: GUTTER, paddingBottom: Spacing.two },
   list: { paddingHorizontal: GUTTER, paddingBottom: LIST_TAIL, gap: GAP },
   row: { gap: GAP },
   /* NO horizontal padding on the header boxes: they are inside the list, and

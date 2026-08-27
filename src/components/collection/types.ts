@@ -192,16 +192,6 @@ export function matchesTier(c: CollectionCard, filter: TierFilter): boolean {
   return filter === 'ALL' || c.tier === filter;
 }
 
-/** Lower-cased once by the caller, so a keystroke does not re-lower every row. */
-export function matchesQuery(c: CollectionCard, needle: string): boolean {
-  if (!needle) return true;
-
-  return (
-    c.playerName.toLowerCase().includes(needle) ||
-    (c.team?.toLowerCase().includes(needle) ?? false) ||
-    (c.position?.toLowerCase().includes(needle) ?? false)
-  );
-}
 
 const byName = (a: CollectionCard, b: CollectionCard) =>
   a.playerName.localeCompare(b.playerName) || a.id.localeCompare(b.id);
