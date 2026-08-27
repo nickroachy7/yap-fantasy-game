@@ -31,7 +31,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { readCardActions, type CardActionSet, type CardActions } from '@/components/cards/card-actions';
 import { CardExits } from '@/components/cards/CardExits';
 import { PlayerAvatar } from '@/components/cards/PlayerAvatar';
-import { invalidateCollection } from '@/components/collection/use-collection';
+import { dropCards } from '@/components/collection/use-collection';
 import { invalidateSets } from '@/components/collection/use-sets';
 import { CardStanding } from '@/components/players/CardStanding';
 import { CommunityPanel } from '@/components/players/CommunityPanel';
@@ -157,9 +157,11 @@ export default function CardDetailScreen() {
       // One fewer card, said now rather than after the read — see
       // `applyCardDelta`. The header is on screen behind this sheet.
       applyCardDelta(-1);
-      // This copy is gone from the collection, which the inventory holds for
-      // the session — drop it or the grid still shows the card you just sold.
-      invalidateCollection();
+      /* This copy is gone from the collection, which the inventory holds for
+         the session — so the row goes with it rather than waiting for the grid
+         to be re-read, or the card you just sold is still in it when this sheet
+         closes. A sale always takes the copy that was pressed. */
+      dropCards([card.card.id]);
       // And it may have been the card holding a set over its bar, which the
       // Sets page holds for the session too. See `invalidateSets`.
       invalidateSets();
@@ -195,7 +197,7 @@ export default function CardDetailScreen() {
     setBusy(true);
     setCommitError(null);
     try {
-      const { error: err } = await supabase.rpc('commit_card_to_set', {
+      const { data, error: err } = await supabase.rpc('commit_card_to_set', {
         p_set_code: pendingSet.code,
         p_card_id: card.card.cardId,
       });
@@ -205,11 +207,11 @@ export default function CardDetailScreen() {
       if (err) throw new Error(err.message);
 
       /* Exactly one copy burnt — not necessarily this one, see `burnsThisCopy`
-         above, but always one. */
+         above, but always one. WHICH one is read back rather than assumed, so
+         the grid behind this sheet loses the copy that actually went. */
       applyCardDelta(-1);
-      // A copy left the collection and a set moved, and both are held for the
-      // session. Missing either shows a card that is no longer there.
-      invalidateCollection();
+      const burnt = (data as { card_instance_id?: string } | null)?.card_instance_id;
+      dropCards(typeof burnt === 'string' ? [burnt] : []);
       invalidateSets();
       await refreshWallet();
       setPendingSet(null);

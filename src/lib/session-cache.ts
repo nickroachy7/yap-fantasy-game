@@ -38,9 +38,10 @@ export type SessionCache<K extends string, V> = {
   /** Forget one key, or the whole cache. The next read goes to the network. */
   invalidate: (key?: K) => void;
   /**
-   * A number that changes whenever `key` is invalidated, and never otherwise.
+   * A number that changes whenever `key` is invalidated OR patched, and never
+   * otherwise.
    *
-   * This exists because dropping a cached value does NOT reach a screen that is
+   * This exists because changing a cached value does NOT reach a screen that is
    * already mounted, and in a tab navigator most screens are. A mounted hook
    * holds its rows in its own state; invalidating the cache leaves that state
    * exactly where it was. So a screen needs a way to ask "has anything happened
@@ -49,9 +50,48 @@ export type SessionCache<K extends string, V> = {
    * what a `reload()` from another screen does) looks identical to one that was
    * never touched.
    *
+   * IT COUNTS PATCHES TOO, which is not about the focus check — subscribers are
+   * told about those directly — but about the OTHER thing this number is for:
+   * a read that started before the change must not be allowed to write its
+   * answer afterwards. Compare it either side of an await and discard the
+   * answer if it moved. `read` does exactly that internally; a caller holding
+   * its own copy of the value should do the same.
+   *
    * Monotonic, so a comparison is always safe.
    */
   version: (key: K) => number;
+  /**
+   * Rewrite a settled value in place, and tell every subscriber.
+   *
+   * NOT AN INVALIDATION, and the difference is the whole reason this exists.
+   * Invalidating says "what I hold is no longer trustworthy, read it again";
+   * this says "I know exactly what changed, and the value I hold is still the
+   * best answer available". Selling six cards is the second of those: the
+   * server names the six copies it took in the same answer that proves the sale
+   * happened, so the held rows minus those six are correct — and correct NOW,
+   * rather than a round trip from now.
+   *
+   * A NO-OP WHEN NOTHING IS SETTLED. There is no value to rewrite and the read
+   * on its way will be right anyway, so a patch against an empty cache is not
+   * an error and must not manufacture one.
+   *
+   * The version is deliberately NOT bumped: nothing was invalidated, so a
+   * screen that catches up on focus by comparing versions has nothing to catch
+   * up on. Subscribers are told directly instead — see `subscribe`.
+   */
+  patch: (key: K, fn: (value: V) => V) => void;
+  /**
+   * Be told when a key is patched.
+   *
+   * WHY A SUBSCRIPTION AND NOT THE VERSION COUNTER. The counter answers "have I
+   * missed anything" on the way BACK IN, which is the right shape for an
+   * invalidation — those happen on another screen by definition. A patch
+   * happens under the reader's thumb, on the screen they are looking at, and
+   * there is no way back in to ask on. It has to push.
+   *
+   * Returns its own unsubscribe.
+   */
+  subscribe: (fn: (key: K) => void) => () => void;
 };
 
 export function sessionCache<K extends string, V>(
@@ -61,15 +101,32 @@ export function sessionCache<K extends string, V>(
   const settled = new Map<string, V>();
   /** Per-key invalidation counts, plus a whole-cache one. Both only rise. */
   const bumps = new Map<string, number>();
+  const listeners = new Set<(key: K) => void>();
   let epoch = 0;
 
   return {
     read(key) {
       const held = inFlight.get(key);
       if (held) return held;
+      /**
+       * The version this read STARTED at.
+       *
+       * A read that is overtaken must not store its answer. Selling six cards
+       * while a refresh is in the air used to end with the refresh landing
+       * second and writing the pre-sale rows back over the patched ones — the
+       * six cards reappearing in the grid a moment after they left it, from a
+       * request that was correct when it was sent and stale by the time it
+       * arrived. Dropping it from `inFlight` is not enough, because the promise
+       * goes on resolving into its own `then`.
+       *
+       * The value is still RETURNED to whoever asked, because they may want it
+       * for something other than the cache; it simply stops being the cached
+       * answer. See `version`, which callers should compare the same way.
+       */
+      const startedAt = epoch + (bumps.get(key) ?? 0);
       const attempt = fetch(key).then(
         (value) => {
-          settled.set(key, value);
+          if (epoch + (bumps.get(key) ?? 0) === startedAt) settled.set(key, value);
           return value;
         },
         (err) => {
@@ -96,6 +153,22 @@ export function sessionCache<K extends string, V>(
     },
     version(key) {
       return epoch + (bumps.get(key) ?? 0);
+    },
+    patch(key, fn) {
+      if (!settled.has(key)) return;
+      const next = fn(settled.get(key) as V);
+      /* Bumped BEFORE the value is stored, so a read already in the air is
+         overtaken by it and cannot write the pre-patch rows back. See `read`. */
+      bumps.set(key, (bumps.get(key) ?? 0) + 1);
+      settled.set(key, next);
+      inFlight.delete(key);
+      for (const fire of listeners) fire(key);
+    },
+    subscribe(fn) {
+      listeners.add(fn);
+      return () => {
+        listeners.delete(fn);
+      };
     },
   };
 }

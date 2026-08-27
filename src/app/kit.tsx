@@ -1438,7 +1438,7 @@ function Kit() {
               error={null}
               /* The refused tap, shown so the amber line is reachable here
                  without a lineup behind the page. See `BulkBar.notice`. */
-              notice="Cards in your lineup cannot be sold or added to sets. Bench them first."
+              notice="Drew Allar cannot be selected — that copy is in a lineup you have not played yet. Bench it first to sell it or add it to a set."
               result={
                 bulkCount === 0
                   ? {

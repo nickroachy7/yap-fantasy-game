@@ -51,7 +51,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 
-import { invalidateCollection } from '@/components/collection/use-collection';
+import { dropCards } from '@/components/collection/use-collection';
 import { invalidateSets } from '@/components/collection/use-sets';
 import { sellErrorMessage } from '@/components/players/sell';
 import { usePlayer } from '@/context/PlayerContext';
@@ -154,15 +154,18 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
    * is why this re-reads `card_actions` rather than patching the map in place.
    */
   const settle = useCallback(
-    async (at: string) => {
+    async (at: string, gone: string | null) => {
       /* ONE COPY, ALWAYS, whichever act it was. A sale takes the copy in hand;
          a commit takes the least valuable copy you hold, which may be a
-         different one — but it is exactly one either way, so the held count
-         moves by one either way. It moves NOW rather than when the read below
-         lands, so the header and the roster warning agree with the card that
-         has just been stamped. See `applyCardDelta`. */
+         different one — but it is exactly one either way.
+
+         `gone` is WHICH one, as the server named it, so the inventory loses the
+         right row rather than the pressed one. Both move now rather than when
+         the read below lands, so the header, the roster warning and the grid
+         behind this sheet agree with the card that has just been stamped. See
+         `applyCardDelta` and `dropCards`. */
       applyCardDelta(-1);
-      invalidateCollection();
+      dropCards(gone ? [gone] : []);
       invalidateSets();
       try {
         const [, actions] = await Promise.all([refreshWallet(), readCardActions(at.split(','))]);
@@ -197,7 +200,9 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
           ...held,
           disposed: new Map(held.disposed).set(cardInstanceId, { kind: 'sold', gems: value }),
         }));
-        await settle(at);
+        // A sale always takes the copy that was pressed, so there is nothing to
+        // read back — unlike the commit below.
+        await settle(at, cardInstanceId);
       })();
     },
     [state.busy, state.key, state.actions, foldInto, settle],
@@ -229,7 +234,13 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
         /* The gems the server actually paid, not the figure the button
            advertised. They agree today and the SQL suite asserts it; reading it
            back is what keeps that true if the payout rule ever moves. */
-        const paid = num((data as { paid?: number } | null)?.paid);
+        const answer = data as { paid?: number; card_instance_id?: string } | null;
+        const paid = num(answer?.paid);
+        /* WHICH COPY BURNT, read back rather than assumed. `commit_card_to_set`
+           takes the least valuable copy you hold, which on a player you own
+           twice is not the card in front of you — and the inventory behind this
+           sheet has to lose that one. */
+        const burnt = typeof answer?.card_instance_id === 'string' ? answer.card_instance_id : null;
         foldInto(at, (held) => ({
           ...held,
           disposed: new Map(held.disposed).set(cardInstanceId, {
@@ -239,7 +250,7 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
             burnedThisCopy: action.burnsThisCopy,
           }),
         }));
-        await settle(at);
+        await settle(at, burnt);
       })();
     },
     [state.busy, state.key, state.actions, foldInto, settle],

@@ -32,7 +32,7 @@ import { supabase } from '@/lib/supabase';
 import { planCommits, type CommitPlan } from './bulk';
 import type { BulkResult, BulkStage } from './BulkBar';
 import type { CollectionCard } from './types';
-import { invalidateCollection } from './use-collection';
+import { dropCards } from './use-collection';
 import { invalidateSets } from './use-sets';
 
 export type BulkState = {
@@ -98,19 +98,25 @@ export function useBulk(onDone: () => void): BulkState {
   );
 
   /**
-   * The four things every completed run has to put back, plus the count.
+   * The four things every completed run has to put back, plus the two the
+   * player can see immediately.
    *
-   * `left` is how many copies the run took OUT of the collection, as the server
-   * reported it — never as the selection asked for it. It moves the header's
-   * total and the roster warning on the same frame the result line appears,
-   * rather than a round trip later while the bar still tells somebody who has
-   * just sold six that they are six over. `refreshWallet()` immediately after
-   * is the count of record. See `applyCardDelta`.
+   * `gone` is the copies the run actually took, BY ID and as the server named
+   * them — never the selection as it was ticked. A sale skips what its rules
+   * refuse and a commit burns the least valuable copy you hold rather than the
+   * one that was pressed, so the two lists come apart in both directions.
+   *
+   * Those ids do two jobs at once and both are about the same half second: the
+   * rows leave the grid (`dropCards`) and the held count moves (`applyCardDelta`)
+   * on the frame the result line appears, rather than a round trip later — with
+   * the sold cards still sitting in the grid and the roster bar still telling
+   * somebody who has just sold six that they are six over. `refreshWallet()`
+   * immediately after is the record; these are the echo.
    */
   const settle = useCallback(
-    async (left: number) => {
-      applyCardDelta(-left);
-      invalidateCollection();
+    async (gone: string[]) => {
+      applyCardDelta(-gone.length);
+      dropCards(gone);
       invalidateSets();
       await refreshWallet();
       onDone();
@@ -135,6 +141,7 @@ export function useBulk(onDone: () => void): BulkState {
             sold?: number;
             skipped?: number;
             paid?: number;
+            cards?: { card_instance_id?: string }[];
             refusals?: { reason?: string }[];
           };
           setStage('idle');
@@ -148,8 +155,8 @@ export function useBulk(onDone: () => void): BulkState {
             firstReason: firstRefusal(r.refusals),
           });
           // What SOLD, not what was ticked: a selection of twelve that skipped
-          // four moved the roster by eight.
-          await settle(r.sold ?? 0);
+          // four took eight copies, and `cards` is those eight.
+          await settle(soldIds(r.cards));
         } catch (e) {
           setError(e instanceof Error ? e.message : 'The sale could not be completed.');
         } finally {
@@ -170,6 +177,11 @@ export function useBulk(onDone: () => void): BulkState {
       let skipped = 0;
       let paid = 0;
       let reason: string | null = null;
+      /* The copies that actually burnt, across every leg. NOT `leg.cardIds`,
+         which are printed-card ids and name the player rather than the copy —
+         and not the ticked instance either, since the commit takes the cheapest
+         copy you hold. Only the server can say. */
+      const burnt: string[] = [];
 
       try {
         for (const leg of plan.legs) {
@@ -191,19 +203,18 @@ export function useBulk(onDone: () => void): BulkState {
             added?: number;
             skipped?: number;
             paid?: number;
+            cards?: { card_instance_id?: string }[];
             refusals?: { reason?: string }[];
           };
           added += r.added ?? 0;
           skipped += r.skipped ?? 0;
           paid += r.paid ?? 0;
+          burnt.push(...soldIds(r.cards));
           reason = reason ?? firstRefusal(r.refusals);
         }
 
         setResult({ kind: 'added', done: added, skipped, gems: paid, firstReason: reason });
-        /* One copy burns per card added — `commit_cards_to_set` takes the least
-           valuable copy you hold for each, which may not be the one ticked, but
-           is always exactly one. */
-        await settle(added);
+        await settle(burnt);
         /* AND THEN THE REST. The add has taken everything a set would have; what
            is left is what the player ticked and nothing can use. The plan is
            kept rather than cleared because it is the only record of which
@@ -250,6 +261,7 @@ export function useBulk(onDone: () => void): BulkState {
           sold?: number;
           skipped?: number;
           paid?: number;
+          cards?: { card_instance_id?: string }[];
           refusals?: { reason?: string }[];
         };
         setStage('idle');
@@ -261,7 +273,7 @@ export function useBulk(onDone: () => void): BulkState {
           gems: r.paid ?? 0,
           firstReason: firstRefusal(r.refusals),
         });
-        await settle(r.sold ?? 0);
+        await settle(soldIds(r.cards));
       } catch (e) {
         setError(e instanceof Error ? e.message : 'The sale could not be completed.');
       } finally {
@@ -294,6 +306,19 @@ export function useBulk(onDone: () => void): BulkState {
     cancel,
     dismissResult,
   };
+}
+
+/**
+ * The copy ids out of a bulk answer's `cards` array.
+ *
+ * `sell_cards` and `commit_cards_to_set` both return one object per copy that
+ * went, each carrying `card_instance_id` — this is the same shape read the same
+ * way for both, which is deliberate: the two functions are written as twins
+ * (see `sell_cards`' own note) and a client that read them differently would be
+ * the place they came apart.
+ */
+function soldIds(cards: { card_instance_id?: string }[] | undefined): string[] {
+  return (cards ?? []).map((c) => c.card_instance_id).filter((id): id is string => !!id);
 }
 
 /** The first reason the server gave, if it gave one. Shown verbatim. */

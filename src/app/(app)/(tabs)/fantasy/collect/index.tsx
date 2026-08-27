@@ -25,6 +25,11 @@
  * first, then the scroll — and the first thing in the scroll is what you own.
  *
  * The controls still do not move. They are the things you just pressed.
+ *
+ * THE ROSTER WARNING FOLLOWED IT IN, and sits directly under the strip. It is
+ * the same kind of object — a statement about the collection, not a control
+ * over it — and the two figures belong together: the strip counts what you
+ * hold, the bar says what holding that many costs you. See the render.
  */
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -128,6 +133,37 @@ let lastMeasured: { window: number; list: number } | null = null;
 
 function measuredWidthFor(windowWidth: number): number {
   return lastMeasured && lastMeasured.window === windowWidth ? lastMeasured.list : 0;
+}
+
+/**
+ * What the bar says when a starter is pressed in multi-select.
+ *
+ * IT NAMES THE CARD, and that is the whole of what changed about it. The first
+ * version was a rule — "Cards in your lineup cannot be sold or added to sets" —
+ * which is true, general, and answers a question nobody asked: the reader
+ * pressed ONE card and wants to know what happened to THAT press. A rule
+ * floating over a grid of thirty reads as a policy notice, and leaves them to
+ * work out which of the thirty it is about.
+ *
+ * SO IT IS THREE CLAUSES IN THE ORDER SOMEBODY WOULD ASK THEM. What did not
+ * happen (this card was not selected), why (it is in a lineup you have not
+ * played), and what to do about it (bench it). The rule is still in there — it
+ * is the second clause — but it arrives as the reason for a specific refusal
+ * rather than as a sign on the wall.
+ *
+ * "A LINEUP YOU HAVE NOT PLAYED YET" rather than "this week's lineup", because
+ * a card can be standing in a contest's lineup as well as the free one, and
+ * because the predicate behind this is `lineup_slots` joined on `scored_at is
+ * null` — which is exactly "not played yet" and is not exactly "this week".
+ * See `use-starters`.
+ *
+ * THE NAME IS OPTIONAL because the lookup is against the rows currently loaded
+ * and a press can in principle land on a card the grid has since replaced. The
+ * sentence still has to work, so it falls back to naming the card as a card.
+ */
+function cannotSelect(playerName: string | undefined): string {
+  const who = playerName ?? 'That card';
+  return `${who} cannot be selected — that copy is in a lineup you have not played yet. Bench it first to sell it or add it to a set.`;
 }
 
 export default function InventoryScreen() {
@@ -345,7 +381,7 @@ export default function InventoryScreen() {
          standing in — see `use-starters`. The tap says so rather than doing
          nothing, because a cell that ignores a press reads as a broken cell. */
       if (starters.has(id)) {
-        setBlockedNote('Cards in your lineup cannot be sold or added to sets. Bench them first.');
+        setBlockedNote(cannotSelect(all.find((card) => card.id === id)?.playerName));
         return;
       }
       setBlockedNote(null);
@@ -370,7 +406,7 @@ export default function InventoryScreen() {
         setSelecting(false);
       }
     },
-    [selected, starters],
+    [selected, starters, all],
   );
 
   /* Leaving the mode drops the selection with it. A set of ticks you cannot see
@@ -420,10 +456,10 @@ export default function InventoryScreen() {
       setSelecting(true);
       setSelected(blocked ? new Set() : new Set([id]));
       setBlockedNote(
-        blocked ? 'Cards in your lineup cannot be sold or added to sets. Bench them first.' : null,
+        blocked ? cannotSelect(all.find((card) => card.id === id)?.playerName) : null,
       );
     },
-    [selecting, bulk.busy, starters],
+    [selecting, bulk.busy, starters, all],
   );
 
   /**
@@ -502,24 +538,12 @@ export default function InventoryScreen() {
           </ScrollView>
         ) : listWidth === 0 ? null : (
           <>
-            {/* THE CONTROLS ARE THE WHOLE OF WHAT IS PINNED, and the summary
-                is no longer among them — it is the first thing in the scroll
-                below. See the note at the top of this file for why it moved.
-
-                The roster warning stays up here with them. It is the one
-                thing on this page that is neither a statement about the
-                collection nor a control over it: it is a cap you are about to
-                hit, and a warning you can scroll away from is a warning about
-                cards you are scrolling through. */}
+            {/* THE CONTROLS ARE THE WHOLE OF WHAT IS PINNED. The summary and
+                the roster bar are both statements about the collection, and
+                both sit at the top of the scroll below — see the note at the
+                top of this file for why a statement belongs with the rows it is
+                about rather than over the chips that cut them down. */}
             <View>
-              {/* Only once it is actionable. See RosterBar's own header for
-                  where the always-visible count lives instead. */}
-              {roster && (roster.isNear || roster.isOver) ? (
-                <View style={styles.summary}>
-                  <RosterBar roster={roster} />
-                </View>
-              ) : null}
-
               {/* ONE ROW, and it is the Players boards' row: the shared
                   position chips on the left, the page's own controls on the
                   right. Both are filters over the same grid, and side by side
@@ -634,6 +658,23 @@ export default function InventoryScreen() {
                   <View style={styles.headerStrip}>
                     <CollectionSummary stats={stats} />
                   </View>
+                  {/* DIRECTLY UNDER THE STATS, which is where it reads: the
+                      strip counts what you hold and this says what holding that
+                      many costs you. Above the strip it was a warning with no
+                      figures near it; pinned above the chips it was a band of
+                      chrome between the section bar and the controls. Here the
+                      two numbers that belong together — CARDS and 28/30 — are
+                      one glance apart.
+
+                      Only once it is ACTIONABLE. `RosterBar` has a calm state
+                      that prints the count and nothing else, and the strip above
+                      already does that; drawing both would be the same figure
+                      twice. See RosterBar's own header. */}
+                  {roster && (roster.isNear || roster.isOver) ? (
+                    // Unwrapped: the bar carries its own 8pt below it, and a
+                    // `headerStrip` around it would double the gap.
+                    <RosterBar roster={roster} />
+                  ) : null}
                   <View style={styles.header}>
                     <ResultLine shown={visible.length} total={all.length} />
                   </View>
@@ -711,12 +752,8 @@ const styles = StyleSheet.create({
   searchRow: { paddingHorizontal: GUTTER, paddingBottom: Spacing.two },
   list: { paddingHorizontal: GUTTER, paddingBottom: LIST_TAIL, gap: GAP },
   row: { gap: GAP },
-  /* The roster warning, which is the only thing left OUTSIDE the list that
-     needs the gutter for itself. Same GUTTER as the toolbar below it, so the
-     bar's frame and the chips line up on one left edge. */
-  summary: { paddingHorizontal: GUTTER, paddingBottom: Spacing.two },
-  /* NO horizontal padding on these two: they are inside the list now, and the
-     content container already carries the gutter. Adding it again here is a
+  /* NO horizontal padding on the header boxes: they are inside the list, and
+     the content container already carries the gutter. Adding it again is a
      double indent that only shows up once the strip is drawn against the cards
      under it — which was the whole point of moving it in. */
   headerStrip: { paddingBottom: Spacing.two },

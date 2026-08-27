@@ -26,18 +26,25 @@
  *
  * The other session caches in this app hold things the client cannot change:
  * the fixture list, the season schedule, the card directory. This one is
- * different. A collection is MUTABLE, and it is mutable by exactly two actions
- * — opening a pack mints cards into it, selling removes one — so the cache is
- * only safe because both of them call `invalidateCollection()` and the next
- * read goes back to the network. Anything that comes to mutate `my_collection`
- * in future must do the same, which is why the setter is exported next to the
+ * different. A collection is MUTABLE — packs mint cards into it, selling and
+ * committing take them out — so the cache is only safe because every one of
+ * those paths tells it so. Anything that comes to mutate `my_collection` in
+ * future must do the same, which is why both setters are exported next to the
  * reader rather than hidden inside the hook.
+ *
+ * TWO SETTERS, AND WHICH ONE DEPENDS ON WHETHER YOU KNOW WHAT CHANGED.
+ * `invalidateCollection()` is the honest shrug — something is different, read
+ * it again — and it is what a pack opening uses, because the rows it minted are
+ * not in the answer it got back. `dropCards(ids)` is for the other case, where
+ * the server has named exactly which copies went: it takes those rows out on
+ * the spot and invalidates behind itself. See its own note for why the
+ * difference is worth a second function.
  *
  * Pull-to-refresh also invalidates, because a refresh the user ASKED for that
  * returns a cached answer is not a refresh.
  */
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { sessionCache } from '@/lib/session-cache';
@@ -100,6 +107,49 @@ export function invalidateCollection(): void {
 }
 
 /**
+ * Take these copies out of the grid NOW, before anything is re-read.
+ *
+ * WHY INVALIDATING WAS NOT ENOUGH, and it is the same shape of bug the roster
+ * count had. `invalidateCollection()` drops the cached rows and a screen picks
+ * that up ON FOCUS — which works for the packs sheet and the card profile,
+ * because closing them is a focus change. It does nothing at all for the bulk
+ * bar, which acts on the collection screen itself and never leaves it. So
+ * selling twelve cards left all twelve sitting in the grid, tick marks gone,
+ * looking exactly like a sale that had not happened, until the tab was left and
+ * returned to.
+ *
+ * CALL IT WITH THE IDS THE SERVER NAMED, never with the ids that were asked
+ * for. `sell_cards` and `commit_cards_to_set` both hand back a `cards` array of
+ * what actually went, and the two lists are not the same: a sale skips what its
+ * rules refuse, and a commit takes the least valuable copy you hold rather than
+ * the one that was ticked — so a player with three of somebody may well have
+ * pressed one copy and burnt another. Dropping the pressed one would leave the
+ * grid wrong in both directions at once.
+ *
+ * IT IS AN ECHO, NOT AN AUTHORITY, exactly like `applyCardDelta` beside it: the
+ * rows are patched, the cache is dropped, and the next real read is still the
+ * collection of record. What this buys is the half second in between, which is
+ * the half second the player is looking at.
+ *
+ * IT INVALIDATES TOO, so it REPLACES `invalidateCollection()` at a call site
+ * rather than sitting beside one. That is not tidiness: a patch can only
+ * rewrite a value the cache still holds, so `invalidateCollection()` first and
+ * `dropCards()` second is a silent no-op and the rows linger exactly as they
+ * did before. Folding the two together is the only version of this that cannot
+ * be wired up in the wrong order.
+ */
+export function dropCards(ids: string[]): void {
+  if (ids.length > 0) {
+    const gone = new Set(ids);
+    collection.patch('mine', (rows) => rows.filter((row) => !gone.has(row.id)));
+  }
+  /* Subscribers have already taken the patched rows into their own state, so
+     dropping the cache here costs them nothing and buys the guarantee every
+     other mutation path relies on: the next read is a real one. */
+  collection.invalidate();
+}
+
+/**
  * How many times the collection has been invalidated — "have the cards changed
  * since I last looked".
  *
@@ -137,6 +187,13 @@ export function useCollection(): CollectionState {
     try {
       const rows = await collection.read('mine');
       if (!live()) return;
+      /* OVERTAKEN, so the answer is dropped rather than drawn. A sale that
+         landed while this read was in the air has already taken its rows out of
+         the cache and pushed them into this state — writing the pre-sale rows
+         over them now would put the sold cards back on screen for as long as it
+         takes something else to correct it. `seen.current` is deliberately left
+         where it was, so the focus check reads this as a read still owed. */
+      if (collection.version('mine') !== at) return;
       seen.current = at;
       setCards(rows);
     } catch (e) {
@@ -171,6 +228,26 @@ export function useCollection(): CollectionState {
     useCallback(() => {
       if (cards !== null && seen.current !== collection.version('mine')) void refresh();
     }, [cards, refresh]),
+  );
+
+  /**
+   * AND CATCH UP WITHOUT LEAVING, which focus cannot do.
+   *
+   * `dropCards` rewrites the held rows under a screen that is looking at them —
+   * the bulk bar sells from this very grid — so there is no focus change to
+   * hang the update on. The cache pushes instead. See `SessionCache.subscribe`.
+   *
+   * `peek` rather than a value handed to the listener, so this cannot be the
+   * thing that decides what the rows are: the cache is still the one copy, and
+   * a patch that landed between two renders is picked up whole.
+   */
+  useEffect(
+    () =>
+      collection.subscribe(() => {
+        const rows = collection.peek('mine');
+        if (rows) setCards(rows);
+      }),
+    [],
   );
 
   /* Pull-to-refresh must reach the server. It is also the user's own escape

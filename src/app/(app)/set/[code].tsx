@@ -58,7 +58,7 @@ import {
   setTone,
   type CardSet,
 } from '@/components/collection/sets';
-import { invalidateCollection } from '@/components/collection/use-collection';
+import { dropCards } from '@/components/collection/use-collection';
 import { invalidateSets, useSets } from '@/components/collection/use-sets';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -265,6 +265,7 @@ export default function SetChecklistScreen() {
       skipped?: number;
       paid?: number;
       lineup_freed?: number;
+      cards?: { card_instance_id?: string }[];
     };
     setAdded({
       added: result.added ?? 0,
@@ -278,12 +279,17 @@ export default function SetChecklistScreen() {
        count), and the collection (cards are gone from it). The wallet moved
        too, which is the header's. Missing any one of them shows a card that no
        longer exists. */
-    /* One copy burnt per card added, and `added` is the server's own count —
-       a batch of six that filled four slots took four cards. Applied before
-       the reads below so the header and the roster warning move with the
-       result line. See `applyCardDelta`. */
-    applyCardDelta(-(result.added ?? 0));
-    invalidateCollection();
+    /* One copy burnt per card added, and the server names each of them — a
+       batch of six that filled four slots took four copies, and not
+       necessarily the four that were ticked, since a commit takes the cheapest
+       copy you hold. Applied before the reads below so the header, the roster
+       warning and the grid all move with the result line. See `applyCardDelta`
+       and `dropCards`. */
+    const burnt = (result.cards ?? [])
+      .map((c) => c.card_instance_id)
+      .filter((id): id is string => !!id);
+    applyCardDelta(-burnt.length);
+    dropCards(burnt);
     /* `reloadMembers` re-runs the lineup read as well, which matters here: a
        commit that freed a slot has changed who is starting, and the warning
        must not go on naming a player who is no longer on the field. */
