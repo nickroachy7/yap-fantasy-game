@@ -171,29 +171,47 @@ begin
     raise exception 'FAIL: a free contest was created without its stake — check ensure_free_contest';
   end if;
 
-  -- 5. CASHING OUT IS LOCKED while a LOBBY bet is pending — a bet the player
-  --    chose to take. You cannot enter a contest with a heart on it and then
-  --    liquidate the collection out from under the result.
-  begin
-    perform public.sell_card(ids[6]);
-    raise exception 'FAIL: a card was sold while a lobby contest held a heart';
-  exception when sqlstate '55006' then null;
-  end;
-
-  -- 6. And leaving the LOBBY contest lifts it, even though the free-contest
-  --    entry is still live and still staking a heart. That narrowing is forced:
-  --    the free contest is auto-entered and cannot be left, so counting it
-  --    would lock selling permanently — against a roster cap whose own refusal
-  --    tells the player to sell. See 20260825270000.
-  perform public.leave_contest('test:median:95');
+  -- 5. ENTERING A CONTEST DOES NOT LOCK THE COLLECTION (20260826050000). A copy
+  --    that is not starting anywhere sells at full price while a lobby entry
+  --    AND the free contest both have hearts riding on them. The escrow this
+  --    replaces refused every sale in that state, which — with the free contest
+  --    auto-entered and unleaveable — put quick sell out of reach for most of
+  --    the week the moment a second contest was entered.
   perform public.sell_card(ids[6]);
   if (select sold_at from public.card_instances where id = ids[6]) is null then
-    raise exception 'FAIL: leaving the contest did not lift the sell lock';
+    raise exception 'FAIL: a card that was not starting could not be sold mid-week';
   end if;
   --    A sale is not a wipe, and the card profile has to be able to tell them
   --    apart.
   if (select wiped_at from public.card_instances where id = ids[6]) is not null then
     raise exception 'FAIL: an ordinary sale set wiped_at';
+  end if;
+
+  -- 6. WHAT IS LOCKED IS THE STARTER, and only its own copy. ids[1] is in the
+  --    lobby entry, ids[7] in the free one — and the free one is the reason the
+  --    refusal has to be per-card rather than per-run: it cannot be left, so a
+  --    rule that read it as "your collection is frozen" would never lift.
+  begin
+    perform public.sell_card(ids[1]);
+    raise exception 'FAIL: a starter was sold out of an unscored lineup';
+  exception when sqlstate '55006' then null;
+  end;
+  begin
+    perform public.sell_card(ids[7]);
+    raise exception 'FAIL: a starter in the free contest was sold';
+  exception when sqlstate '55006' then null;
+  end;
+
+  -- 7. LEAVING TAKES THE ENTRY AND ITS SLOTS WITH IT, so a card that was
+  --    starting there is an ordinary card again. Re-entered immediately below,
+  --    which the settlement assertions need.
+  perform public.leave_contest('test:median:95');
+  if exists (
+    select 1 from public.lineup_slots ls
+      join public.lineups l on l.id = ls.lineup_id
+     where ls.card_instance_id = ids[1] and l.scored_at is null
+  ) then
+    raise exception 'FAIL: leaving the contest left its starter in an unscored lineup';
   end if;
 
   -- Re-enter for the settlement assertions below.
@@ -215,7 +233,7 @@ begin
     raise exception 'FAIL: the second entry did not carry the same run';
   end if;
 
-  raise notice 'runs suite: entry and escrow passed';
+  raise notice 'runs suite: entry and the sell rules passed';
 end $$;
 
 reset role;
