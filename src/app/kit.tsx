@@ -25,7 +25,6 @@ import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
 import {
   ContestCard,
   Figure,
-  RunFoot,
   Standing,
   figureOf,
   type CardLevel,
@@ -42,6 +41,7 @@ import type { LineupCard } from '@/components/lineup/model';
 import { PlayerRow } from '@/components/cards/PlayerRow';
 import type { DirectoryPlayer } from '@/components/cards/player-directory';
 import { CollectionSummary } from '@/components/collection/CollectionSummary';
+import { Hearts } from '@/components/runs/Hearts';
 import { SearchField, SortChips } from '@/components/ui/Controls';
 import { summarise } from '@/components/collection/types';
 import {
@@ -497,6 +497,14 @@ const DIRECTORY_ROWS: { player: DirectoryPlayer; fixture?: string }[] = [
 
 /** Every lineup slot the config ships with, so the split badge is exercised. */
 const SLOTS = ['QB', 'RB1', 'RB2', 'WR1', 'WR2', 'TE', 'FLEX', 'K'];
+/**
+ * The `flex3` contest format's slots, which is the vocabulary that caught the
+ * ordinal bug: `SLOT_POSITIONS` lists `FLEX`, the format emits `FLEX1..3`, and
+ * the exact-match lookup returned nothing — so a three-flex lineup drew three
+ * grey chips reading FLEX instead of three split badges. Kept here so the split
+ * form is exercised against an ORDINAL slot and not only against a bare one.
+ */
+const FLEX3_SLOTS = ['QB', 'FLEX1', 'FLEX2', 'FLEX3', 'WR3', 'K'];
 
 const team = (id: string, abbreviation: string) => ({ id, abbreviation, name: abbreviation });
 
@@ -692,7 +700,7 @@ function Kit() {
 
           <Section
             title="Contest card"
-            note="ONE CARD. Head, trade and foot are the same rows in the same order everywhere — entering a contest INSERTS a middle band and moves nothing else, so it never changes shape on you. The first two here are lobby cards, with no middle; the rest are entered. THE HEAD’S RIGHT COLUMN is ranked by usefulness rather than by fallback: your score once anybody has played, the COUNTDOWN while the roster can still be changed — the only figure on the card that is both moving and actionable — and the filled count once it is locked and unplayed. HOW IT IS WON leads the trade band at full width; it used to be the tail of the head’s format line, and it was the string that got truncated on every entered card before lock. The arrow is the divider AND the label: left is what leaves, right is what arrives, which is what RISK and REWARD spent a line saying. The last four are the ones that matter — a top-three contest where the median decides nothing and the mark is the CUT (27.1 is above that field’s median and outside the places that pay, exactly the state the old card drew as winning); the locked-and-unplayed state, the only one where the slot count takes the figure back; and the same card carrying the RUN as its own foot band rather than as a second panel underneath it, drawn at both levels so the two fills can be compared — `page` sits level with the tab bar, `sheet` a step above the lobby it is drawn in."
+            note="ONE CARD. Head and trade are the same rows in the same order everywhere — entering a contest INSERTS a middle band and moves nothing else, so it never changes shape on you. The first two here are lobby cards, with no middle; the rest are entered. THE HEAD’S RIGHT COLUMN is ranked by usefulness rather than by fallback: your score once anybody has played, the COUNTDOWN while the roster can still be changed — the only figure on the card that is both moving and actionable — and the filled count once it is locked and unplayed. HOW IT IS WON leads the trade band at full width; it used to be the tail of the head’s format line, and it was the string that got truncated on every entered card before lock. The arrow is the divider AND the label: left is what leaves, right is what arrives, which is what RISK and REWARD spent a line saying. The last four are the ones that matter — a top-three contest where the median decides nothing and the mark is the CUT (27.1 is above that field’s median and outside the places that pay, exactly the state the old card drew as winning); the locked-and-unplayed state, the only one where the slot count takes the figure back; and the same card at both levels so the two fills can be compared — `page` sits level with the tab bar, `sheet` a step above the lobby it is drawn in. The RUN is no longer a band here: it is a row under the whole carousel, because a run does not change when you swipe between contests."
           >
             <ContestCard
               name="WR Room"
@@ -783,12 +791,10 @@ function Kit() {
               filled={6}
               lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
             />
-            {/* THE FOOT: the run, inside the card whose risk column priced the
-                heart it draws. Three hearts, two riding on contests that have
-                not settled, one lost — and the gold tick marks the pip THIS
-                card is holding, which is what makes the rack a property of the
-                contest rather than of the screen. Drawn at `page` level, which
-                is the fill the board uses: the same grey as the tab bar. */}
+            {/* AT `page` LEVEL, which is the fill the board uses: the same grey
+                as the tab bar. The run used to be a fourth band under this one;
+                it is a row beneath the whole carousel now — see `RunRail`, and
+                the rack states below. */}
             <KitEntered
               name="Preseason Week 4"
               terms={KIT_TERMS_FREE}
@@ -798,16 +804,18 @@ function Kit() {
               filled={8}
               level="page"
               lock={{ at: DEMO_LOCK_SOON, locked: false, now: DEMO_NOW }}
-              foot={
-                <RunFoot
-                  hearts={3}
-                  wagered={2}
-                  rack={4}
-                  focus={{ start: 0, count: 1 }}
-                  rung={{ lead: '3 MORE WINS', body: 'and a death keeps 1 card' }}
-                />
-              }
             />
+          </Section>
+
+          <Section
+            title="The run rack"
+            note="THREE STATES AND THREE DIFFERENT OBJECTS. A heart you hold is solid whether or not it is staked, because it is equally yours either way; what marks a stake is a blade driven through it, and what marks a loss is the heart torn in two. The old set was one shape at three intensities — solid, outlined, outlined-and-cracked — which inverted the one convention every player knows (filled means you have it) and, worse, drew “at risk” as a cracked heart, i.e. as the picture of a heart that has already broken. WHICH HEART THE PAGE IS ABOUT is drawn ONE way, whatever the heart is: it stays at full strength while the rest recede, and gold corner ticks confirm it. That was two different marks once — a gold blade on a staked heart, a dashed box on a free one — which made the reader learn the same answer twice. The blade is identity and stays steel; the ticks are focus and are always gold; brightness is the primary signal and survives being small. Rows below: a fresh run, a run with two of three staked and one already lost, the last-heart state, and the tile’s view of the same rack.">
+            <View style={{ gap: Spacing.three }}>
+              <Hearts hearts={3} rack={3} size={26} />
+              <Hearts hearts={3} wagered={2} rack={4} focus={{ start: 0, count: 1 }} size={26} />
+              <Hearts hearts={1} wagered={1} rack={4} focus={{ start: 0, count: 1 }} size={26} />
+              <Hearts hearts={3} wagered={2} rack={4} available size={26} />
+            </View>
           </Section>
 
           <Section
@@ -1051,7 +1059,7 @@ function Kit() {
 
           <Section
             title="Position badges"
-            note="Every position; then every lineup slot as the lineup draws it — one fixed width, no ordinals — and the same slots at their natural widths.">
+            note="Every position; then every lineup slot AS THE LINEUP DRAWS IT — filled with the position's own accent, one fixed width, no ordinals. The bench keeps the grey outline, which is what tells a starting slot from a benched card now. Then the same slots at their natural widths, and last the `flex3` format's ordinal slots — FLEX1/2/3 and WR3 — which resolve by stripping the ordinal. That last row is a regression guard: those codes are not keys in `SLOT_POSITIONS`, and when the lookup did not strip they all fell through to a solid grey chip.">
             <View style={styles.row}>
               {POSITIONS.map((p) => (
                 <PositionBadge key={p} label={p} size={28} />
@@ -1065,9 +1073,9 @@ function Kit() {
                   positions={positionsForSlot(slot)}
                   size={BADGE_SIZE}
                   width={BADGE_WIDTH}
-                  tone="neutral"
                 />
               ))}
+              <PositionBadge label="BN" size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />
             </View>
             <View style={styles.row}>
               {SLOTS.map((slot) => (
@@ -1076,6 +1084,17 @@ function Kit() {
                   label={slot}
                   positions={positionsForSlot(slot)}
                   size={20}
+                />
+              ))}
+            </View>
+            <View style={styles.row}>
+              {FLEX3_SLOTS.map((slot) => (
+                <PositionBadge
+                  key={`f3-${slot}`}
+                  label={slotBadgeLabel(slot)}
+                  positions={positionsForSlot(slot)}
+                  size={BADGE_SIZE}
+                  width={BADGE_WIDTH}
                 />
               ))}
             </View>
@@ -1536,7 +1555,6 @@ function KitEntered({
   prize = null,
   final = false,
   level = 'sheet',
-  foot,
 }: {
   name: string;
   terms: ContestTerms;
@@ -1549,7 +1567,6 @@ function KitEntered({
   prize?: number | null;
   final?: boolean;
   level?: CardLevel;
-  foot?: React.ReactNode;
 }) {
   return (
     <ContestCard
@@ -1577,7 +1594,6 @@ function KitEntered({
           filled={filled}
         />
       }
-      foot={foot}
     />
   );
 }

@@ -145,34 +145,3 @@ export function nextRungLine(run: Run): string | null {
   const cards = run.nextRung.cardSlots === 1 ? '1 card' : `${run.nextRung.cardSlots} cards`;
   return `${wins} and a death keeps ${cards}`;
 }
-
-/**
- * The same fact as `nextRungLine`, split so a dense row can rank its halves.
- *
- * ONE SENTENCE WAS THE PROBLEM. "3 more wins and a death keeps 1 card" is a
- * conditional with its reward buried in the middle of it, printed at 11pt on a
- * row that also carries a heart rack — so the two numbers a reader actually
- * wants, the wins and the cards, arrived with equal weight and four connecting
- * words between them. It also had nowhere to break: the row is one line by
- * design, so on a narrow phone the clause that says what you GET was the half
- * that truncated.
- *
- * As two parts the row can set the count in the label voice the rest of the app
- * uses for a number-with-a-unit and leave the consequence as prose beside it,
- * which is both shorter and correctly ranked. Same arithmetic, same wording,
- * one string split at the join.
- *
- * `nextRungLine` stays, and is still what the lobby wants: there the rung is one
- * clause of a joined sentence ("1 heart riding on a contest · 3-1 · …"), where a
- * two-part shape would have nothing to be two parts of.
- */
-export function rungParts(run: Run): { lead: string; body: string } | null {
-  if (!run.nextRung) return null;
-  const away = run.nextRung.atWins - run.wins;
-  if (away <= 0) return null;
-  const cards = run.nextRung.cardSlots === 1 ? '1 card' : `${run.nextRung.cardSlots} cards`;
-  return {
-    lead: away === 1 ? '1 MORE WIN' : `${away} MORE WINS`,
-    body: `and a death keeps ${cards}`,
-  };
-}

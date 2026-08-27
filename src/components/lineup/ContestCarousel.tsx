@@ -17,10 +17,16 @@
  * nobody chose to be in, the only one with a season riding on it, and the only
  * one that is there before you have done anything.
  *
- * ONE CARD DRAWS NO CHROME. With a single contest — which is every account
- * until it enters something, and most accounts most weeks — this has to be
- * indistinguishable from the card that was here before it: no dots, no page
- * indicator, nothing that implies there is something to swipe to.
+ * ONE CARD DRAWS NO CHROME, and there is very little chrome left to draw. The
+ * page dots are gone: they stated position and nothing else, in a row of small
+ * marks sitting directly above the run's rack — two indicators of the same size
+ * arguing about which one the reader should be counting. Position is carried by
+ * the rack now (the lit heart names the page) and by a pair of edge chevrons
+ * that appear only in the directions that exist, so a single-contest account
+ * sees one arrow toward the lobby and nothing else.
+ *
+ * THE RACK IS ALSO THE NAVIGATOR. Tapping a heart goes to the page it belongs
+ * to — its contest, or the lobby tile for a heart still free. See `pipPage`.
  *
  * ---------------------------------------------------------------------------
  * `onMomentumScrollEnd` DOES NOT EXIST ON WEB
@@ -43,7 +49,11 @@
  *
  * The snapping itself is fine on web: `pagingEnabled` compiles to CSS
  * scroll-snap there, so the offset always settles on a real page and the
- * rounding below cannot land between two.
+ * rounding below cannot land between two. A `snapToInterval` peek was tried in
+ * its place and reverted — see the note on `step`.
+ *
+ * `goTo` exists because none of that fires for a PROGRAMMATIC scroll: a tap on a
+ * heart has to move the list and the state itself.
  */
 import { useCallback, useRef, useState } from 'react';
 import {
@@ -58,10 +68,10 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 
-import { ContestCard, Figure, RunFoot, Standing, figureOf } from '@/components/contests/ContestCard';
+import { ContestCard, Figure, Standing, figureOf } from '@/components/contests/ContestCard';
 import { termsOfEntry, type MyContest } from '@/components/contests/use-my-contests';
 import { recordLabel, type Record_ } from '@/components/lineup/field';
-import { rungParts } from '@/components/runs/run';
+import { Hearts, type HeartSpan } from '@/components/runs/Hearts';
 import { Colors, Radius, Spacing, Type, selectionAccent } from '@/constants/theme';
 import type { PlayerState } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -120,10 +130,19 @@ export function ContestCarousel({
 }) {
   const listRef = useRef<FlatList<MyContest>>(null);
   const { width: windowWidth } = useWindowDimensions();
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
   /* Before the parent has measured, fall back to the window rather than to
      zero: a zero-width page makes `getItemLayout` divide by nothing and the
-     list snaps to index NaN. */
-  const pageWidth = width > 0 ? width : windowWidth;
+     list snaps to index NaN.
+
+     A PEEK WAS TRIED HERE — a sliver of the next card at the right edge, in
+     place of the page dots. It is the standard carousel affordance and it was
+     wrong for this card: at any width big enough to read as another card, the
+     bordered slab at the edge looks like a layout fault rather than a hint, and
+     at any width small enough not to, it reads as a rendering seam. Full-width
+     pages, and the swipe is advertised some other way. */
+  const step = width > 0 ? width : windowWidth;
 
   /* A dead run draws no rack, which is the masthead's old rule and its reason
      holds here too: an empty rack is the death screen's line to deliver, and
@@ -166,13 +185,42 @@ export function ContestCarousel({
      web from the debounced scroll event. Same arithmetic either way. */
   const onSettle = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const next = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+      const next = Math.round(e.nativeEvent.contentOffset.x / step);
       if (next < 0 || next > contests.length) return;
       setPage(next);
       // The tile is not a contest; the board below keeps the one it had.
       if (next < contests.length && next !== index) onIndexChange(next);
     },
-    [pageWidth, contests.length, index, onIndexChange],
+    [step, contests.length, index, onIndexChange],
+  );
+
+  /**
+   * Drive the carousel from somewhere other than a swipe — today, a tap on a
+   * heart. Moves the list AND the state, because a programmatic scroll fires no
+   * settle event on web.
+   */
+  const goTo = useCallback(
+    (next: number) => {
+      if (next < 0 || next > contests.length) return;
+      /**
+       * NOT ANIMATED, and that is a correctness fix rather than a taste one.
+       *
+       * On web this component listens on `onScroll` directly (see the header —
+       * `onMomentumScrollEnd` never fires there), so an animated programmatic
+       * scroll emits a stream of intermediate offsets and the FIRST of them,
+       * still reading ~0, ran `onSettle` and put the page straight back where it
+       * started. The tap moved the list a couple of points and snapped home.
+       *
+       * A jump lands on the target before any scroll event is dispatched, so the
+       * settle that follows agrees with the state instead of fighting it. It also
+       * happens to be the better interaction: a tap is a direct instruction and
+       * should not make the reader watch it being carried out.
+       */
+      listRef.current?.scrollToOffset({ offset: step * next, animated: false });
+      setPage(next);
+      if (next < contests.length && next !== index) onIndexChange(next);
+    },
+    [step, contests.length, index, onIndexChange],
   );
 
   /**
@@ -213,9 +261,42 @@ export function ContestCarousel({
     });
   })();
 
-  const rung = rack ? rungParts(rack) : null;
+  /**
+   * The inverse of `spans`: for each pip, the page a tap on it should go to.
+   *
+   * THIS IS WHAT MAKES THE RACK A NAVIGATOR rather than a readout. A staked
+   * heart goes to the contest holding it; a free heart goes to the lobby tile,
+   * which is the page about spending one; a killed heart goes nowhere, because
+   * the contest that took it is over and there is nothing to show.
+   *
+   * The free-heart case is the same mapping the tile already draws in reverse —
+   * standing on the tile lights every free heart — so the two directions agree
+   * by construction rather than by two lists being kept in step.
+   */
+  const pipPage = (() => {
+    if (!rack) return [];
+    const held = Math.max(0, rack.hearts);
+    const atRisk = Math.min(Math.max(0, rack.wagered), held);
+    const total = Math.max(rack.rack, held, 1);
+    const out: (number | null)[] = Array.from({ length: total }, (_, i) =>
+      /* Free hearts point at the invitation to spend them. Killed ones at
+         nothing. */
+      i >= atRisk && i < held ? contests.length : null,
+    );
+    spans.forEach((span, contest) => {
+      if (!span) return;
+      for (let i = span.start; i < span.start + span.count && i < total; i += 1) {
+        out[i] = contest;
+      }
+    });
+    return out;
+  })();
 
   if (contests.length === 0) return null;
+
+  /* The tile is the page after the last contest, and it is the one page whose
+     rail speaks about free hearts rather than staked ones. */
+  const onTile = page >= contests.length;
 
   return (
     <View>
@@ -233,7 +314,7 @@ export function ContestCarousel({
           ? { onScroll: onSettle, scrollEventThrottle: 16 }
           : null)}
         keyExtractor={(item) => item.id}
-        getItemLayout={(_, i) => ({ length: pageWidth, offset: pageWidth * i, index: i })}
+        getItemLayout={(_, i) => ({ length: step, offset: step * i, index: i })}
         /* OPENS ON THE LINKED CARD, not on the first one. Arriving from the
            contest sheet means the reader has just chosen a contest, and a
            carousel that marked it active while showing the free contest's card
@@ -243,7 +324,7 @@ export function ContestCarousel({
         initialScrollIndex={index}
         renderItem={({ item, index: i }) => (
           <View
-            style={{ width: pageWidth }}
+            style={{ width: step }}
             /* The first card only: they are within a few points of each other
                — the same rows in the same order — and measuring every page
                would set the same state from three directions on every swipe. */
@@ -251,17 +332,6 @@ export function ContestCarousel({
             <Card
               contest={item}
               onOpen={onOpen}
-              foot={
-                rack ? (
-                  <RunFoot
-                    hearts={rack.hearts}
-                    wagered={rack.wagered}
-                    rack={rack.rack}
-                    focus={spans[i] ?? null}
-                    rung={rung}
-                  />
-                ) : null
-              }
               {...{ displayName, lockAt, locked, now, record }}
             />
           </View>
@@ -272,12 +342,199 @@ export function ContestCarousel({
            and the index arithmetic all stay about contests. It is exactly one
            page wide, so `round(x / page)` keeps working across it. */
         ListFooterComponent={
-          <View style={{ width: pageWidth }}>
+          <View style={{ width: step }}>
             <EnterTile onPress={onEnter} minHeight={cardHeight} />
           </View>
         }
       />
-      <Rules page={page} pages={contests.length + 1} />
+      {/* THE SWIPE, ADVERTISED. Only in the directions that exist, so the last
+          page shows one arrow and a single-contest account never sees a left
+          one. `pointerEvents="none"` is load-bearing rather than tidy: these sit
+          on top of the scroll surface, and a tap target at the card's edge would
+          swallow the start of the very drag it is asking for. They are an
+          indicator, not a control — the rack below is the control. */}
+      {cardHeight > 0 && page > 0 ? (
+        <View pointerEvents="none" style={[styles.chevSlot, { left: 5, top: cardHeight / 2 - 5 }]}>
+          <Chevron side="left" color={c.textTertiary} />
+        </View>
+      ) : null}
+      {cardHeight > 0 && page < contests.length ? (
+        <View pointerEvents="none" style={[styles.chevSlot, { right: 5, top: cardHeight / 2 - 5 }]}>
+          <Chevron side="right" color={c.textTertiary} />
+        </View>
+      ) : null}
+      {rack ? (
+        <RunRail
+          run={rack}
+          focus={onTile ? null : (spans[page] ?? null)}
+          onTile={onTile}
+          pipPage={pipPage}
+          onGo={goTo}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * The run, under the whole carousel: what you hold, what is riding, and which
+ * heart belongs to the card above.
+ *
+ * ---------------------------------------------------------------------------
+ * IT IS UNDER THE CAROUSEL BECAUSE A RUN DOES NOT SWIPE
+ * ---------------------------------------------------------------------------
+ *
+ * This has now lived in three places, and the first two were both wrong for the
+ * same reason at different scales.
+ *
+ * In the MASTHEAD it stated your hearts on Collection and Players — screens
+ * where a heart cannot be won or lost — beside a gem balance, with nothing
+ * linking it to the contest actually risking one.
+ *
+ * As a BAND OF THE CARD it was adjacent to the right thing and still lied about
+ * ownership: the rack was rendered once per page, so the identical three hearts
+ * slid off the screen and three more slid on every time you swiped. A run does
+ * not change when you change which contest you are looking at. Drawing it
+ * inside the thing that moves said that it did.
+ *
+ * Here the rack is FIXED and only the highlight travels. The motion now tells
+ * the truth — the run stays, the stake moves — which is the whole reason the
+ * mapping is worth drawing at all.
+ *
+ * (The intermediate objection is still real and is why this is not a panel: a
+ * bordered, filled, rounded box under a bordered, filled, rounded card is a
+ * second card, and two cards argue about which one matters. This is a hairline
+ * and a row. No border, no fill, no radius.)
+ *
+ * ---------------------------------------------------------------------------
+ * ONE ROW, AND WHAT WAS CUT TO GET IT
+ * ---------------------------------------------------------------------------
+ *
+ * The band version was three rows — a `YOUR RUN` label, the rack, and a caption
+ * — and two of them were not carrying anything.
+ *
+ * The LABEL went because the count is the fact. "Wagering 2 of 3 hearts" needs
+ * no heading; `YOUR RUN` was a title for a thing that is self-evidently your
+ * run.
+ *
+ * The CONTEST NAME under the lit heart went because the card directly above the
+ * rail already says it. Naming it twice, eight points apart, to explain a
+ * highlight whose subject is the only card on screen.
+ *
+ * What is left is the rack on the left and two lines of text on the right, and
+ * those two lines have different sources on purpose:
+ *
+ *   LEAD  is the RUN's state — how much of what you hold is committed. True
+ *         wherever you are in the carousel; it does not change as you swipe.
+ *   SUB   is the PAGE's meaning — what the contest in view does to you. This
+ *         is the half that changes under your thumb.
+ *
+ * So the row answers "where do I stand" and "what does this one cost" without
+ * either question borrowing the other's words.
+ *
+ * ---------------------------------------------------------------------------
+ * EVERY PAGE LIGHTS SOMETHING
+ * ---------------------------------------------------------------------------
+ *
+ * A contest that stakes a heart lights that heart. The free contest lights
+ * nothing and says so. And the lobby tile — the last page, the app's main call
+ * to action — lights every heart you have NOT spent, dashed, in the same
+ * language as the tile's own dashed border.
+ *
+ * That last case is why free hearts needed a state of their own. "Enter a new
+ * contest" is an invitation to spend something, and before this the thing being
+ * spent was drawn nowhere near it.
+ */
+function RunRail({
+  run,
+  focus,
+  onTile,
+  pipPage,
+  onGo,
+}: {
+  run: NonNullable<PlayerState['run']>;
+  focus: HeartSpan | null;
+  onTile: boolean;
+  /** Where a tap on each pip should land, or null for pips that go nowhere. */
+  pipPage: (number | null)[];
+  onGo: (page: number) => void;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const accent = selectionAccent(scheme);
+
+  const held = Math.max(0, run.hearts);
+  const staked = Math.min(Math.max(0, run.wagered), held);
+  const free = held - staked;
+
+  /**
+   * ONE SHORT LINE, AND IT IS A COUNT.
+   *
+   * This was two lines — "Wagering 2 of 3 hearts" over "Lose all 3 and your team
+   * is eliminated." — and the second was doing a job this row should not have.
+   * A consequence that severe is something a player should be TAUGHT once, in
+   * onboarding, not reminded of on every glance at their own lineup; standing
+   * permanently under the board it reads as nagging, and by week three it is
+   * furniture nobody parses.
+   *
+   * What is left is the fact the rack cannot state on its own: how many of these
+   * are committed. The hearts show which; the words show how many. Set at `fine`
+   * in the tertiary colour, so it sits under the rack rather than beside it as
+   * an equal.
+   *
+   * The tile still gets its own phrasing, because there the count IS the call to
+   * action — "1 free" is the answer to the invitation directly above it.
+   */
+  /**
+   * IT NAMES THE HEART IN VIEW, NOT THE RUN'S TOTAL.
+   *
+   * This read "2 of 3 staked" on every page — an aggregate, so it said the same
+   * thing no matter which card you were looking at, and the one row that moves
+   * with the swipe was the one row that never changed. Now the number is the
+   * lit heart's POSITION in the rack, so it counts up as you swipe: "1 of 3
+   * staked", "2 of 3 staked", "3 of 3 free". The words say what that heart is;
+   * the number says which one.
+   *
+   * `of 3` IS THE HEARTS YOU HOLD, not the pips drawn. Killed hearts sort to the
+   * end of the rack (see `Hearts`), so held hearts occupy positions 1..held and
+   * the index never has to skip a gap — and "2 of 4" on a run that holds three
+   * would be counting a heart the player no longer has.
+   *
+   * A range where a contest stakes more than one. No contest priced so far does,
+   * but `hearts_at_risk` is a number and the first two-heart contest must not
+   * quietly report itself as one.
+   */
+  const span = (first: number, count: number) =>
+    count > 1 ? `${first}–${first + count - 1}` : `${first}`;
+
+  const line = onTile
+    ? free > 0
+      ? `${span(staked + 1, free)} of ${held} free`
+      : 'none free'
+    : focus
+      ? `${span(focus.start + 1, focus.count)} of ${held} staked`
+      : `${held} ${held === 1 ? 'heart' : 'hearts'}`;
+
+  return (
+    <View style={styles.rail}>
+      <Hearts
+        hearts={run.hearts}
+        wagered={run.wagered}
+        rack={run.rack}
+        focus={focus}
+        /* Nothing to offer means nothing to light: on the tile with every heart
+           already committed, dimming the whole rack to highlight an empty set
+           would read as a fault rather than as an answer. */
+        available={onTile && free > 0}
+        size={26}
+        onPressPip={onGo}
+        pipTarget={pipPage}
+      />
+      <Text
+        numberOfLines={1}
+        style={[Type.fine, { color: onTile && free > 0 ? accent : c.textTertiary }]}>
+        {line}
+      </Text>
     </View>
   );
 }
@@ -320,42 +577,16 @@ function EnterTile({ onPress, minHeight }: { onPress: () => void; minHeight: num
   );
 }
 
-/**
- * Where you are in the swipe, and nothing else.
- *
- * ---------------------------------------------------------------------------
- * THE RUN RACK USED TO SHARE THIS ROW. IT IS INSIDE THE CARD NOW.
- * ---------------------------------------------------------------------------
- *
- * This was a two-part foot: a bordered panel holding the heart rack on the
- * left, page marks pinned to the right, both under the card. The panel was the
- * problem — see `RunFoot` — and moving it into the card took the rack's half of
- * this row with it. What is left is genuinely the carousel's own business:
- * which page of how many.
- *
- * SO THEY CENTRE NOW. They were right-aligned to sit on the card's right edge
- * opposite the rack on its left; with nothing on the left they read as marks
- * that had slid off the end of something. Centred under the card they are what
- * a page indicator is, and the row costs 2pt plus its gap.
- *
- * THE MARKS ARE RULES, NOT DOTS. Dots were a separate widget reporting position
- * and nothing else, in an app whose whole navigation language is a word with a
- * rule under it — see `FantasyTopNav`. As rules they borrow that vocabulary.
- */
-function Rules({ page, pages }: { page: number; pages: number }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  const accent = selectionAccent(scheme);
-
+/** One arrow, from a box and two borders. See `styles.chev`. */
+function Chevron({ side, color }: { side: 'left' | 'right'; color: string }) {
   return (
-    <View style={styles.rules}>
-      {Array.from({ length: pages }, (_, i) => (
-        <View
-          key={i}
-          style={[styles.rule, { backgroundColor: i === page ? accent : c.border }]}
-        />
-      ))}
-    </View>
+    <View
+      style={[
+        styles.chev,
+        side === 'right' ? styles.chevRight : styles.chevLeft,
+        { borderColor: color },
+      ]}
+    />
   );
 }
 
@@ -373,7 +604,6 @@ function Card({
   locked,
   now,
   record,
-  foot,
   onOpen,
 }: {
   contest: MyContest;
@@ -382,7 +612,6 @@ function Card({
   locked: boolean;
   now: number;
   record: Record_;
-  foot: React.ReactNode;
   onOpen?: (contest: MyContest) => void;
 }) {
   const terms = termsOfEntry(contest);
@@ -426,24 +655,48 @@ function Card({
           filled={contest.filled}
         />
       }
-      foot={foot}
       onPress={onOpen ? () => onOpen(contest) : undefined}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  /* Under the card rather than over it, and centred — see `Rules`. */
-  rules: {
+  /**
+   * The run's row. Hearts left, words right, one hairline above.
+   *
+   * `flex-start` rather than `center`: the left is a rack of glyphs and the
+   * right is two lines of text, and centring them parks each against the
+   * other's middle. Aligned to the top, the hearts sit on the lead line — which
+   * is the line they are the evidence for.
+   */
+  /**
+   * The run's row. Rack left, one quiet count right.
+   *
+   * NO RULE ABOVE IT. It had a hairline, on the reasoning that a divider
+   * separates the carousel's chrome from the run. There is no chrome left to
+   * separate from — the dots are gone — so the line was drawing a boundary
+   * between a card and the only other thing on the screen, which is exactly the
+   * "second container" mistake that got the rack thrown out of a panel in the
+   * first place. Space does the separating.
+   */
+  rail: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: 5,
-    paddingTop: Spacing.two,
+    justifyContent: 'space-between',
+    gap: Spacing.three,
+    paddingTop: Spacing.two + 2,
   },
-  /* The board strip's mark, at the size a page indicator can afford: 14 rather
-     than the width of a word, and the same 2pt rule and 1pt radius. */
-  rule: { width: 14, height: 2, borderRadius: 1 },
+
+  /* Absolutely placed over the card, in the card's OWN gutter — `band` pads by
+     `Spacing.three`, so a 7pt mark 5pt from the edge sits in air the card had
+     already reserved and never lands on a word. */
+  chevSlot: { position: 'absolute', width: 12, alignItems: 'center' },
+  /* A chevron from one box and two borders, the way `TabIcon` builds every glyph
+     it draws — no font, no asset, and it inherits the stroke weight of the rules
+     around it. */
+  chev: { width: 7, height: 7, borderTopWidth: 1.5, borderRightWidth: 1.5, opacity: 0.55 },
+  chevRight: { transform: [{ rotate: '45deg' }] },
+  chevLeft: { transform: [{ rotate: '-135deg' }] },
   /* Stretches to the tallest page — a horizontal row stretches its children by
      default — so the tile is the height of the card beside it and the foot
      below does not move as you swipe onto it. */

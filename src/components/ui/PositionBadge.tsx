@@ -80,9 +80,33 @@ export type PositionBadgeProps = {
   tone?: 'position' | 'neutral';
 };
 
-/** Resolves a slot code to its eligible positions, falling back to the label. */
+/**
+ * Resolves a slot code to its eligible positions, falling back to the label.
+ *
+ * ---------------------------------------------------------------------------
+ * IT STRIPS THE ORDINAL, AND NOT DOING SO WAS A REAL BUG
+ * ---------------------------------------------------------------------------
+ *
+ * The exact-match lookup silently failed on every slot whose code carries a
+ * number the table does not list. `SLOT_POSITIONS` has `FLEX`; the `flex3`
+ * contest format emits `FLEX1`, `FLEX2`, `FLEX3` (see `20260825010000`), so the
+ * lookup returned undefined, the badge fell through to its SOLID form, and a
+ * three-flex lineup drew three grey chips reading FLEX — the exact thing the
+ * split badge exists to prevent, in the exact format that needs it most.
+ * `WR3` was silently in the same boat; it only looked right because the LABEL
+ * path independently resolves `WR`.
+ *
+ * The root cause is that `slotBadgeLabel` already strips the ordinal and this
+ * did not, so the two halves of one badge disagreed about what slot they were
+ * drawing. They strip the same way now.
+ *
+ * Exact match FIRST, because `RB1` and `RB2` are listed in their own right and
+ * a future slot may legitimately want an ordinal-specific answer — stripping
+ * unconditionally would take that away.
+ */
 export function positionsForSlot(slot: string): Position[] | undefined {
-  return SLOT_POSITIONS[slot.toUpperCase()];
+  const code = slot.toUpperCase();
+  return SLOT_POSITIONS[code] ?? SLOT_POSITIONS[code.replace(/\d+$/, '')];
 }
 
 /**

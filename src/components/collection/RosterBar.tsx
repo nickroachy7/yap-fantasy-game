@@ -24,6 +24,29 @@
  * not quietly recommend one: committing preserves the collection's board value
  * and feeds a set, selling pays double and destroys it. Which of those a player
  * wants is genuinely their call, and the bar's job is to say a decision exists.
+ *
+ * ---------------------------------------------------------------------------
+ * ONE LINE, COUNT FIRST
+ * ---------------------------------------------------------------------------
+ *
+ * This was a three-part row — a `ROSTER` label, a sentence, and the count — and
+ * the sentence was long enough to wrap, so the bar was two lines tall on a phone
+ * in the one state where it appears over a board the reader is trying to fix.
+ * Three things went:
+ *
+ *   the ROSTER label   a caption for "31/30", which is not a number anybody
+ *                      mistakes for something else. It was a word spending a
+ *                      third of the row to name the thing beside it.
+ *   "the limit"        "1 over" is the whole fact; over WHAT is the number it
+ *                      is printed next to.
+ *   "to set your       the bar only appears on the lineup screen when it is
+ *   lineup"            BLOCKING that screen, so the consequence is the page the
+ *                      reader is already looking at.
+ *
+ * The count LEADS now instead of trailing. It is the fact; the remedy is what
+ * you do about the fact, and a row that opens with its subject can be read at a
+ * glance without finishing it. Capped to one line — if a future state cannot say
+ * itself in the room available, that state needs shorter words, not a taller bar.
  */
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -44,16 +67,18 @@ export function RosterBar({ roster }: { roster: RosterStatus | null }) {
     <View
       accessibilityRole="summary"
       style={[styles.bar, { backgroundColor: c.surfaceSunken, borderColor: edge }]}>
-      <Text style={[Type.label, { color: c.textTertiary }]}>ROSTER</Text>
-      <Text style={[Type.body, styles.grow, { color: tone }]} numberOfLines={2}>
-        {roster.isOver
-          ? `${roster.overBy} over the limit — commit or sell ${roster.overBy} to set your lineup`
-          : roster.isNear
-            ? `${roster.remaining} ${roster.remaining === 1 ? 'slot' : 'slots'} left`
-            : 'Cards you hold'}
-      </Text>
       <Text style={[Type.strong, NUMERIC, { color: tone }]}>
         {roster.held}/{roster.cap}
+      </Text>
+      {/* Truncates before the count does, and the count cannot truncate at all —
+          it is `flexShrink: 0` by being first with no `grow` on it. A clipped
+          remedy is survivable; a clipped "31/3…" is not. */}
+      <Text style={[Type.body, styles.grow, { color: tone }]} numberOfLines={1}>
+        {roster.isOver
+          ? `${roster.overBy} over — commit or sell ${roster.overBy}`
+          : roster.isNear
+            ? `${roster.remaining} ${roster.remaining === 1 ? 'slot' : 'slots'} left`
+            : 'cards held'}
       </Text>
     </View>
   );
@@ -68,7 +93,10 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: Radius.control,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    /* Tighter than the `Spacing.two` it was. One line needs less air around it
+       than two did, and this bar's whole job in its loudest state is to get out
+       of the way of the board it is blocking. */
+    paddingVertical: Spacing.one + 2,
     marginBottom: Spacing.two,
   },
 });

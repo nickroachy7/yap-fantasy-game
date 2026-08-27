@@ -220,11 +220,27 @@ export function StarterRow({
   return (
     <Row
       card={card}
-      /* Neutral, not the position accent. This screen is about CARDS, and a
-         card's TIER is the colour that has to carry down this column — see the
-         note on PositionBadge's `tone`. The bench's BN badge stays FILLED, so
-         starter and bench are still told apart at a glance, by weight rather
-         than by hue. */
+      /**
+       * THE POSITION ACCENT, and this reverses a deliberate earlier decision.
+       *
+       * These were neutral outlines on the argument that this screen is about
+       * CARDS, so a card's TIER is the colour that should carry down the column
+       * and a position accent would be a second colour system competing with it.
+       * That argument is real and it lost to what the column actually looks
+       * like: nine identical grey chips, in the one place a reader is scanning
+       * specifically for POSITION — "where does my flex go", not "what tier is
+       * my flex". Tier has the `TierMark` and the card art; the slot had
+       * nothing but three grey letters.
+       *
+       * It also makes the split badge earn its keep. FLEX draws as R|W|T in
+       * three separate accents, so the slot answers what may go in it at a
+       * glance instead of spelling it out in monochrome.
+       *
+       * THE BENCH STAYS NEUTRAL, which is what now tells the two apart — filled
+       * means it is in your lineup, outlined means it is not. (An older note
+       * here claimed the bench was already filled. It was not; both were grey,
+       * and starter and bench were distinguished by nothing at all.)
+       */
       badge={
         <PositionBadge
           /* `RB`, not `RB1` — the ordinal is for the code. See slotBadgeLabel. */
@@ -233,7 +249,6 @@ export function StarterRow({
           positions={positionsForSlot(slot)}
           size={BADGE_SIZE}
           width={BADGE_WIDTH}
-          tone="neutral"
         />
       }
       right={<WeekFigure points={week} status={card?.game?.status ?? null} />}

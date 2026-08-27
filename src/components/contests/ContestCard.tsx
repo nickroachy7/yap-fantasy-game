@@ -25,15 +25,17 @@
  *     ├────────────────────────────────────┤
  *     │ how it is won                      │   TRADE   — always
  *     │ what you put up  →  what you take  │
- *     ├────────────────────────────────────┤
- *     │ YOUR RUN ♥♥♥       3 MORE WINS …   │   FOOT    — only with a run
  *     └────────────────────────────────────┘
  *
  * Nothing above or below the middle moves when it appears. That is the whole
- * design and the reason the middle, the head's right column and the foot all
- * arrive as NODES rather than as variant flags: a variant invites the bands to
- * acquire per-variant conditions and drift apart, which is exactly what
- * happened the first time these two surfaces were unified.
+ * design and the reason the middle and the head's right column arrive as NODES
+ * rather than as variant flags: a variant invites the bands to acquire
+ * per-variant conditions and drift apart, which is exactly what happened the
+ * first time these two surfaces were unified.
+ *
+ * THERE WAS A FOURTH BAND — the run's heart rack, under the trade. It is a row
+ * beneath the whole carousel now (`RunRail`), because a run is not a property
+ * of a contest: sliding it off the screen with the card said it was.
  *
  * ---------------------------------------------------------------------------
  * THE 2026-08-26 REWORK: FIVE BANDS OF EQUAL WEIGHT, THREE OF THEM AGREEING
@@ -130,7 +132,7 @@
  */
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Heart, Hearts, type HeartSpan } from '@/components/runs/Hearts';
+import { Heart } from '@/components/runs/Hearts';
 import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -446,7 +448,7 @@ function TradeColumn({ lines, align = 'left' }: { lines: TradeLine[]; align?: 'l
     <View style={[styles.tradeCol, align === 'right' && styles.tradeColRight]}>
       {lines.map((line) => (
         <View key={line.text} style={styles.tradeLine}>
-          {line.heart ? <Heart size={10} state="safe" color={c.negative} /> : null}
+          {line.heart ? <Heart size={10} state="free" color={c.negative} /> : null}
           {/* TWO LINES ALLOWED, NEVER RESERVED. Every line here is two or three
               words except "Gem pool, once entries start" — the state a paid
               contest sits in until somebody enters it — which clipped to "Gem
@@ -575,20 +577,23 @@ function ScaleBar({
 /* ==================================================================== card */
 
 /**
- * The frame. Head, optional middle, trade, optional foot — in that order,
- * always.
+ * The frame. Head, optional middle, trade — in that order, always.
  *
- * The middle and the foot arrive as NODES rather than as `variant` flags on
- * purpose. A flag invites the head and the trade to acquire per-variant
- * conditions, which is precisely how the lobby and the board drifted into two
- * layouts the first time they were unified.
+ * The middle arrives as a NODE rather than as a `variant` flag on purpose. A
+ * flag invites the head and the trade to acquire per-variant conditions, which
+ * is precisely how the lobby and the board drifted into two layouts the first
+ * time they were unified.
+ *
+ * THE RUN IS NO LONGER ONE OF THESE BANDS. It was, briefly — see `RunRail` in
+ * `ContestCarousel` for why it left. Short version: the rack is a property of
+ * the RUN, and a run does not change when you swipe, so drawing it inside a
+ * card that slides off the screen made it look as though it did.
  */
 export function ContestCard({
   name,
   terms,
   state,
   middle,
-  foot,
   prize = null,
   level = 'sheet',
   onPress,
@@ -604,31 +609,6 @@ export function ContestCard({
   state: React.ReactNode;
   /** Present exactly when there is an entry to show. */
   middle?: React.ReactNode;
-  /**
-   * A band under the trade, for what the entry is riding ON rather than what it
-   * is worth. Today that is exactly one thing: the run.
-   *
-   * ---------------------------------------------------------------------------
-   * THE RUN RACK WAS A SECOND CARD, AND TWO CARDS ARGUE
-   * ---------------------------------------------------------------------------
-   *
-   * It lived in a bordered panel of its own directly under this one, and its
-   * own note admitted the problem while solving half of it: it was kept one row
-   * tall so it would not read as a second card competing with the contest. But
-   * a bordered, filled, rounded panel eight points below a bordered, filled,
-   * rounded panel is a second card whatever its height — and this one had the
-   * strange property of being ABOUT the card above it. The heart it draws is
-   * the heart that card's risk column has just priced.
-   *
-   * As a band it is inside the object it describes, and it costs a hairline
-   * rather than a whole container.
-   *
-   * A NODE, LIKE `middle`, AND FOR THE SAME REASON. The lobby draws no run per
-   * card — it has one panel above the whole list, where it belongs, because
-   * there the run is what you are shopping WITH rather than what one contest is
-   * holding.
-   */
-  foot?: React.ReactNode;
   prize?: number | null;
   /** What this card is sitting on. See `CardLevel`. */
   level?: CardLevel;
@@ -642,10 +622,9 @@ export function ContestCard({
     <>
       <Head name={name} terms={terms} state={state} />
       {middle}
-      <View style={[styles.band, foot ? { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: c.border } : null]}>
+      <View style={styles.band}>
         <Trade terms={terms} prize={prize} />
       </View>
-      {foot}
     </>
   );
 
@@ -825,78 +804,6 @@ export function figureOf(field: FieldWeek | null, myPoints: number | null) {
 }
 
 /**
- * The card's foot: the run this entry is riding on, and the pip it is holding.
- *
- * ---------------------------------------------------------------------------
- * IT WAS A PANEL UNDER THE CARD, AND IT IS A BAND OF THE CARD
- * ---------------------------------------------------------------------------
- *
- * The rack has moved twice. It started in the masthead, where it stated your
- * hearts on Collection and Players — screens where a heart cannot be won or
- * lost — beside a gem balance with nothing linking it to the contest actually
- * risking one. It moved to a panel under the contest card, which fixed the
- * adjacency and created a new problem: a bordered, filled, rounded panel eight
- * points below a bordered, filled, rounded panel is a second card, and two
- * cards on one screen argue about which one matters.
- *
- * Here it is neither. It is the last band of the card whose risk column has
- * just priced the heart it draws — one hairline above it, the same gutter as
- * every other band, no border and no fill of its own.
- *
- * THE PIP THIS CONTEST HOLDS COMES FORWARD as you swipe, which is the whole
- * reason the rack belongs to a contest card at all rather than to the screen.
- * The card says what it risks; this says WHICH heart, and what is left behind
- * it. See `Hearts` for why the mapping can be made in the carousel and still be
- * stable for the week.
- *
- * WHAT THE WORDS SAY IS WHAT THE PIPS CANNOT. The rack is already stating the
- * stake in hearts, so "lose this and 2 remain" would be a sentence restating a
- * graphic two points to its left. The next rung is the one fact on this screen
- * nothing else carries, so it is the one that earns the line — and it is set as
- * a count in the label voice with the consequence beside it rather than as one
- * clause, because at 11pt on a shared row the half that says what you GET was
- * the half that truncated. See `rungParts`.
- */
-export function RunFoot({
-  hearts,
-  wagered,
-  rack,
-  focus,
-  rung,
-}: {
-  hearts: number;
-  wagered: number;
-  rack: number;
-  focus: HeartSpan | null;
-  rung: { lead: string; body: string } | null;
-}) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-
-  return (
-    <View style={[styles.band, styles.foot]}>
-      <View style={styles.footMain}>
-        <Text style={[Type.micro, { color: c.textTertiary }]}>YOUR RUN</Text>
-        <Hearts hearts={hearts} wagered={wagered} rack={rack} focus={focus} size={13} rail />
-      </View>
-      {/* ONE TEXT WITH A SPAN INSIDE IT, not two Texts in a row — which is what
-          this was, and it truncated both halves on a phone: "3 MORE WI…" beside
-          "and a death keeps 1 c…". Two sibling Texts each get their own width
-          and each clip independently, so the row had no way to spend the space
-          where the words actually were. Nested, the count and the consequence
-          are one flow that wraps to a second line on a narrow card and stays on
-          one line on a wide one, and neither half can lose its ending. */}
-      {rung ? (
-        <Text numberOfLines={2} style={[Type.fine, styles.footRung, { color: c.textTertiary }]}>
-          <Text style={[Type.micro, { color: c.text }]}>{rung.lead}</Text>
-          {` ${rung.body}`}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
-/**
  * The trade on its own, for the contest's page.
  *
  * THE SHEET USED TO KNOW LESS ABOUT RISK THAN THE ROW YOU TAPPED. It listed
@@ -999,14 +906,4 @@ const styles = StyleSheet.create({
 
   termsHead: { borderBottomWidth: StyleSheet.hairlineWidth },
 
-  /* One row, ruled off above by the trade band's bottom border. It is a rail
-     rather than a section — the whole argument for folding it into the card was
-     that it should not look like one more thing of equal weight. */
-  foot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
-  /* The label and the rack are one reading and never separate; only the line on
-     the right may be pushed to the edge, and it truncates before they do. */
-  footMain: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexShrink: 0 },
-  /* Right-aligned so the second line, when there is one, hangs off the card's
-     right edge with the first rather than starting under the rack. */
-  footRung: { flexShrink: 1, minWidth: 0, textAlign: 'right' },
 });
