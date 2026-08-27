@@ -152,31 +152,50 @@ export default function PullScreen() {
    * the two cases a presented route has. Same guard as `/packs` and the two
    * profiles; see the note there.
    */
-  const leave = useCallback(
-    (to: '/packs' | '/fantasy/collect') => {
-      /* THE SESSION IS NOT ENDED HERE, deliberately. Clearing it re-renders
-         this page — which is still mounted for the length of the dismissal —
-         into its "no pack open" state, so leaving a pack flashed an empty
-         screen on the way out. Nothing needs it cleared: the only route to this
-         page is a press that calls `beginPull`, and that replaces whatever is
-         held. `endPull` is for the one case where there is genuinely nothing to
-         show, which the shelf handles. */
-      if (router.canGoBack() && to === '/packs') router.back();
-      else router.dismissTo(to);
-    },
-    [router],
-  );
+  /**
+   * Back to the shelf.
+   *
+   * `back()` is a DISMISSAL — the shelf is still mounted underneath, so this
+   * puts the pull down and leaves you on the pack you just bought, which is
+   * what "open another" means.
+   *
+   * THE SESSION IS NOT ENDED HERE, deliberately. Clearing it re-renders this
+   * page — which is still mounted for the length of the dismissal — into its
+   * "no pack open" state, so leaving a pack flashed an empty screen on the way
+   * out. Nothing needs it cleared: the only route to this page is a press that
+   * calls `beginPull`, and that replaces whatever is held. `endPull` is for the
+   * one case where there is genuinely nothing to show, which the shelf handles.
+   *
+   * The fallback is for arriving cold — a reloaded browser tab on /pull, or a
+   * link straight to it. `back()` on an empty stack does nothing at all,
+   * silently, which would strand a player on a page whose only exit had stopped
+   * working. Same guard as `/packs` and the two profiles; see the note there.
+   */
+  const toShelf = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.dismissTo('/packs');
+  }, [router]);
 
+  /**
+   * Keep these cards, and go and look at them.
+   *
+   * ONE `dismissTo`, ALL THE WAY DOWN, AND IT HAS TO BE. This was `back()` then
+   * `push('/fantasy/collect')`, which is wrong by exactly one screen: `back()`
+   * pops THIS page and lands on `/packs`, which is itself presented over the
+   * app — so the push then stacked the inventory ON TOP of the packs sheet.
+   * You got the inventory as a third layer over a sheet you thought you had
+   * left, and the way out of it was a back gesture nobody has a reason to
+   * expect.
+   *
+   * `dismissTo` is the primitive for this and there is no counting involved: it
+   * pops until the named href is reached, and `/fantasy/collect` lives inside
+   * `(tabs)` — the stack's anchor, so it is always at the bottom. Both the pull
+   * and the shelf go, the tabs are already there, and the inventory is a PAGE
+   * again rather than a layer. It is also what makes the cold path work
+   * unchanged: with nothing to pop it replaces this screen outright.
+   */
   const seeInventory = useCallback(() => {
-    /* Dismiss FIRST, then navigate. A push out of a presented route that is
-       still up leaves this page stacked over the one it sent you to, and the
-       way out of that is a back gesture the player has no reason to expect. */
-    if (!router.canGoBack()) {
-      router.dismissTo('/fantasy/collect');
-      return;
-    }
-    router.back();
-    router.push('/fantasy/collect');
+    router.dismissTo('/fantasy/collect');
   }, [router]);
 
   /* NO SESSION IS NOT AN ERROR. It is a reloaded browser tab, or a link
@@ -230,7 +249,7 @@ export default function PullScreen() {
       {/* ---- the rail: out, and how far through you are ------------------ */}
       <View style={styles.rail}>
         <Pressable
-          onPress={() => leave('/packs')}
+          onPress={toShelf}
           accessibilityRole="button"
           accessibilityLabel="Close, and go back to the packs"
           hitSlop={Spacing.two}
@@ -373,7 +392,7 @@ export default function PullScreen() {
           onRevealAll={reveal.revealAll}
           onCommitAll={() => pull.commitAll(plan.commits)}
           onSellAll={() => pull.sellAll(plan.sells)}
-          onAgain={() => leave('/packs')}
+          onAgain={toShelf}
           onInventory={seeInventory}
         />
         </View>
