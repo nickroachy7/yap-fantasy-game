@@ -16,6 +16,7 @@ import type { CardSet } from '@/components/collection/sets';
 import type { CollectionCard } from '@/components/collection/types';
 import type { CardActions, CardActionSet } from '@/components/cards/card-actions';
 import type { CommitPlan } from '@/components/collection/bulk';
+import type { Json } from '@/lib/database.types';
 
 /**
  * The four sample cards, one per tier.
@@ -491,6 +492,65 @@ export const PULLED_FIXTURE: PulledFixture[] = [
   { card_instance_id: 'ci-4', player_name: 'Evan Engram',             position_abbreviation: 'TE', team_abbreviation: 'JAX', rarity: 'common' },
   { card_instance_id: 'ci-5', player_name: 'Cam Little',              position_abbreviation: 'PK', team_abbreviation: 'JAX', rarity: 'common' },
 ];
+
+/**
+ * A shelf holding one of each kind of pack row.
+ *
+ * THE POINT OF THE THIRD ROW is the bulk control: a repeatable pack you spend
+ * gems on is the only kind that carries ×1/×5/×10, because it is the only kind
+ * you could buy twice anyway — see `PackShelf`. Priced at 200 against the kit's
+ * 1,240 gem balance so that ×5 is affordable and ×10 is not, which is the pair
+ * of states the row's dimming and the money line's shortfall both need.
+ *
+ * `guaranteed_positions` is jsonb in the database and `unknown` until parsed,
+ * so it is written here exactly as the column returns it.
+ */
+export const SHELF_FIXTURE: ShelfPack[] = [
+  {
+    id: 'pk-starter',
+    code: 'starter',
+    name: 'Starter Pack',
+    gem_cost: 0,
+    card_count: 8,
+    once_per_user: true,
+    daily_limit: null,
+    guaranteed_positions: { qb: 1, rb: 2, wr: 3, te: 1, pk: 1 },
+  },
+  {
+    id: 'pk-daily',
+    code: 'daily',
+    name: 'Daily Pack',
+    gem_cost: 0,
+    card_count: 3,
+    once_per_user: false,
+    daily_limit: 1,
+    guaranteed_positions: {},
+  },
+  {
+    id: 'pk-standard',
+    code: 'standard',
+    name: 'Standard Pack',
+    gem_cost: 200,
+    card_count: 5,
+    once_per_user: false,
+    daily_limit: null,
+    guaranteed_positions: { qb: 1, wr: 2 },
+  },
+];
+
+/** The starter is spent, which is what makes its button read "Claimed". */
+export const SHELF_OPENINGS = new Map<string, number>([['pk-starter', 1]]);
+
+type ShelfPack = {
+  id: string;
+  code: string;
+  name: string;
+  gem_cost: number;
+  card_count: number;
+  once_per_user: boolean;
+  daily_limit: number | null;
+  guaranteed_positions: Json;
+};
 
 type PulledFixture = {
   card_instance_id: string;

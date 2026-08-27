@@ -54,12 +54,15 @@ import {
   OWNED_CARDS,
   OWNED_MANY,
   PULLED_FIXTURE,
+  SHELF_FIXTURE,
+  SHELF_OPENINGS,
   PULL_ACTIONS_FIXTURE,
 } from '@/components/dev/fixtures';
 import { BulkBar, type BulkStage } from '@/components/collection/BulkBar';
 import { InventoryCard } from '@/components/collection/InventoryCard';
 import { CardExits } from '@/components/cards/CardExits';
 import { PackReveal } from '@/components/cards/PackReveal';
+import { PackShelf } from '@/components/cards/PackShelf';
 import type { Disposition } from '@/components/cards/use-pull-actions';
 import { GameRow } from '@/components/scores/GameRow';
 import { ScoreStrip } from '@/components/scores/ScoreStrip';
@@ -638,6 +641,8 @@ function Kit() {
   const [pullDisposed, setPullDisposed] = useState<Map<string, Disposition>>(() => new Map());
   const [pullActions, setPullActions] = useState(PULL_ACTIONS_FIXTURE);
   const [pullOpen, setPullOpen] = useState(false);
+  /** Which pack the shelf fixture is pretending to open, so `busy` is reachable. */
+  const [shelfOpening, setShelfOpening] = useState<string | null>(null);
   /* The card profile's two exits, which cannot be reached in this gallery any
      other way — that screen is behind a sign-in. */
   const [exitPicked, setExitPicked] = useState<string | null>(null);
@@ -1195,6 +1200,29 @@ function Kit() {
               onConfirm={() => setConfirm(false)}
               onCancel={() => setConfirm(false)}
             />
+          </Section>
+
+          <Section
+            title="Pack shelf"
+            note="The three rows a shelf can hold: a free once-per-player pack (spent, so the button is dead), a free daily (claimable), and a paid repeatable one — which is the only kind that carries the ×1/×5/×10 row, because it is the only kind you could buy twice anyway. The ×10 here costs more than the fixture's 1,240 gems, so it is dimmed; pressing it is still allowed and the money line answers with the shortfall.">
+            <Panel>
+              <View style={styles.summaryPad}>
+                <PackShelf
+                  packs={SHELF_FIXTURE}
+                  dailyAvailable
+                  gems={1240}
+                  openings={SHELF_OPENINGS}
+                  openingCode={shelfOpening}
+                  progress={shelfOpening === 'standard' ? { done: 3, total: 10 } : null}
+                  /* Inert: there is no session behind this page. The press is
+                     here to prove the busy state is reachable and that the
+                     count reaches the button, not to mint anything. */
+                  onOpen={(code) =>
+                    setShelfOpening((held) => (held === code ? null : code))
+                  }
+                />
+              </View>
+            </Panel>
           </Section>
 
           <Section

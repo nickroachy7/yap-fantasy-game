@@ -314,12 +314,12 @@ function SetsFixture() {
 
   return (
     <View style={styles.profile}>
-      {/* The strip and the chips are `SetsPanel`'s rather than the list's —
-          both are pinned above the scroll on the real screen, at the same
-          height the inventory pins its own pair. Drawn here so the gallery
+      {/* The chips and the sweep are `SetsPanel`'s rather than the list's, and
+          they come FIRST because that is the order the real screen has: they
+          are the two controls, pinned above the scroll, and everything below
+          this point goes up the page as you read. Drawn here so the gallery
           shows the whole page and not just the rows under it, and so the
           filters' own states are reachable without a session. */}
-      <SetsStrip stats={summariseSets(SETS_FIXTURE)} />
       <SetsFilters sets={SETS_FIXTURE} filter={filter} onFilter={setFilter} />
       {/* The sweep, which replaced the lifted "ready to claim" section. Its
           numbers come off the same summary the strip's READY cell does, so the
@@ -330,6 +330,9 @@ function SetsFixture() {
         busy={false}
         onPress={() => undefined}
       />
+      {/* UNDER THE CONTROLS AND INSIDE THE SCROLL, which is where it moved to
+          on both Collection tabs at once — see `SetsPanel`. */}
+      <SetsStrip stats={summariseSets(SETS_FIXTURE)} />
       <SetsList
         sets={shown}
         claimingCode={claiming}

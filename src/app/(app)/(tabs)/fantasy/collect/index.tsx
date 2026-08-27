@@ -4,16 +4,27 @@
  * Virtualised from the first render: a collection has no upper bound, so
  * mapping over an array here would be a cliff rather than a slowdown.
  *
- * NOTHING ABOVE THE GRID IS INSIDE THE GRID. The summary, the chips, the
- * controls and the search field are all siblings of the FlatList rather than
- * its header, and the search field is the one that had no choice: a TextInput
- * used as a `ListHeaderComponent` is remounted on every keystroke and loses
- * focus after one character. The rest followed it out so that a control could
- * not scroll away from the thing it controls.
+ * THE CONTROLS ARE OUTSIDE THE GRID; THE SUMMARY IS INSIDE IT. The chips, the
+ * controls and the search field are siblings of the FlatList rather than its
+ * header, and the search field is the one that had no choice: a TextInput used
+ * as a `ListHeaderComponent` is remounted on every keystroke and loses focus
+ * after one character. The rest followed it out so that a control could not
+ * scroll away from the thing it controls.
  *
- * WHICH COST HEIGHT, so the top band of it collapses on a push up the page and
- * comes back at the top of the grid — see `CollapsingBlock`, and the note on
- * the block itself for the line between what may leave and what may not.
+ * THE SUMMARY WENT THE OTHER WAY, and that is the change this note is about.
+ * It used to sit ABOVE the controls and collapse on a push up the page — a
+ * transform on a block one strip taller than the frame, a threshold, a measured
+ * travel, and a matching pad on the bottom of every list inside it. All of that
+ * machinery existed to buy back ~50pt of height that a summary does not need to
+ * be holding once you are twenty rows in.
+ *
+ * Scrolling it away with the cards buys the same height for none of the
+ * machinery, and it fixes what the collapse could not: the strip is a statement
+ * about the whole collection, so it belongs where the collection is drawn, not
+ * over the controls that cut the collection down. So the order is now controls
+ * first, then the scroll — and the first thing in the scroll is what you own.
+ *
+ * The controls still do not move. They are the things you just pressed.
  */
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -58,7 +69,6 @@ import { useCollection } from '@/components/collection/use-collection';
 import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
 import { SearchField } from '@/components/ui/Controls';
 import { ToggleButton } from '@/components/ui/MenuButton';
-import { CollapsingHeader, useChromeScroll } from '@/components/shell/collapse';
 import { Screen } from '@/components/shell/Screen';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
@@ -73,10 +83,7 @@ let starterOffered = false;
 
 const GUTTER = Spacing.three;
 const GAP = Spacing.two + 4;
-/**
- * Clearance under the last row of cards, before the strip's own is added to it
- * — see the grid's `contentContainerStyle`.
- */
+/** Clearance under the last row of cards. */
 const LIST_TAIL = Spacing.six;
 /**
  * Below this the card's nameplate stops working: the position and club are
@@ -114,7 +121,6 @@ export default function InventoryScreen() {
   const router = useRouter();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const chromeScroll = useChromeScroll();
   /**
    * 0 until the list has been laid out; the grid waits rather than guess.
    *
@@ -139,27 +145,6 @@ export default function InventoryScreen() {
     },
     [windowWidth],
   );
-
-  /**
-   * How far the summary travels before it has gone — see `CollapsingHeader`.
-   *
-   * CEILED, NOT ROUNDED, and that is a bug fix rather than a preference. A
-   * strip measuring 50.33 rounded to 50, so the travel stopped a third of a
-   * point short and what stayed on screen was the strip's own 1.5pt bottom
-   * border, clipped to a hairline above the chips. Rounding up can only
-   * over-travel, and over-travelling by a fraction of a point is invisible —
-   * the header simply parks that much higher.
-   *
-   * COMPARED BEFORE IT IS SET, because `onLayout` fires on every pass that
-   * touches the box and a sub-pixel difference between two of them would be a
-   * state change, a re-render and a rebuilt worklet for a distance nobody can
-   * see. The strip is one fixed row, so in practice this settles once.
-   */
-  const [summaryHeight, setSummaryHeight] = useState(0);
-  const rememberSummary = useCallback((height: number) => {
-    const h = Math.ceil(height);
-    if (h > 0) setSummaryHeight((prev) => (prev === h ? prev : h));
-  }, []);
 
 
   const { cards, error, loading, refreshing, refresh } = useCollection();
@@ -454,198 +439,162 @@ export default function InventoryScreen() {
           </ScrollView>
         ) : listWidth === 0 ? null : (
           <>
-            {/* THE STRIP AND THE GRID SLIDE AS ONE BLOCK, and only the strip
-                clears the top of it — see `CollapsingHeader`. Scroll past the
-                strip's own height and it goes; return to the top of the grid
-                and it comes back.
+            {/* THE CONTROLS ARE THE WHOLE OF WHAT IS PINNED, and the summary
+                is no longer among them — it is the first thing in the scroll
+                below. See the note at the top of this file for why it moved.
 
-                ONLY THE SUMMARY LEAVES, and it is the order that makes it so:
-                the block travels exactly `summaryHeight`, so the chips and the
-                controls under it land flush against the top of the page rather
-                than following it off. */}
-            <CollapsingHeader retract={summaryHeight}>
-              <View>
-                {/* WHAT YOU OWN, ABOVE WHAT NARROWS IT. The summary is a
-                    statement about the whole collection and the row below it is
-                    the set of controls that cut the collection down, so it
-                    reads in that order: here is everything, now here is how to
-                    sieve it.
-
-                    IT IS THE PART THAT LEAVES, and the order is what makes it
-                    so — the block travels exactly this box, which takes it off
-                    the top and lands everything below it flush. It can go where
-                    the controls cannot for the reason `CollapsingHeader` sets
-                    out: it answers nothing you can ask it, so it is not a
-                    control you just pressed.
-
-                    MEASURED RATHER THAN ASSUMED. The strip is ONE ROW at any
-                    cell count — see `CollectionSummary`, where equal columns
-                    are what guarantee it cannot grow a second — but the roster
-                    bar below it is conditional, and the travel is over the
-                    summary alone, so the number has to come from the box that
-                    actually leaves.
-
-                    THE GAP UNDER THE SECTION BAR IS NOT IN IT: `Screen` puts
-                    that padding on the box this block sits inside, so it stays
-                    put and the chips end up the same 14pt under the nav whether
-                    the strip is there or not. */}
-                <View
-                  style={styles.summary}
-                  onLayout={(e) => rememberSummary(e.nativeEvent.layout.height)}>
-                  <CollectionSummary stats={stats} />
+                The roster warning stays up here with them. It is the one
+                thing on this page that is neither a statement about the
+                collection nor a control over it: it is a cap you are about to
+                hit, and a warning you can scroll away from is a warning about
+                cards you are scrolling through. */}
+            <View>
+              {/* Only once it is actionable. See RosterBar's own header for
+                  where the always-visible count lives instead. */}
+              {roster && (roster.isNear || roster.isOver) ? (
+                <View style={styles.summary}>
+                  <RosterBar roster={roster} />
                 </View>
+              ) : null}
 
-                {/* Only once it is actionable — and it does NOT collapse, being
-                    below where the stack stops travelling. A cap warning that got out
-                    of the way of the cards it is a warning about would be reading
-                    the room backwards. See RosterBar's own header for where the
-                    always-visible count lives instead. */}
-                {roster && (roster.isNear || roster.isOver) ? (
-                  <View style={styles.summary}>
-                    <RosterBar roster={roster} />
-                  </View>
-                ) : null}
+              {/* ONE ROW, and it is the Players boards' row: the shared
+                  position chips on the left, the page's own controls on the
+                  right. Both are filters over the same grid, and side by side
+                  they read as the two of them rather than as three bands of
+                  chrome before the first card. See `CollectionFilters`.
 
-                {/* ONE ROW, and it is the Players boards' row: the shared
-                    position chips on the left, the page's own controls on the
-                    right. Both are filters over the same grid, and side by side
-                    they read as the two of them rather than as three bands of
-                    chrome before the first card. See `CollectionFilters`.
-
-                    The chips take the room that is left and SCROLL — `ChipRow` is
-                    a horizontal ScrollView — while the buttons keep their size at
-                    every width. Which is why the buttons are the side pinned and
-                    the chips are the side that gives: a round button cannot be
-                    narrowed, where chips you can push are merely narrower. Same
-                    reasoning, same numbers, as the trend board. */}
-                <View style={styles.toolbar}>
-                  <View style={styles.chips}>
-                    <PositionFilter value={position} onChange={setPosition} />
-                  </View>
-                  <InventoryControls
-                    searchable={searchable}
-                    searchOpen={showSearch}
-                    onToggleSearch={() => setShowSearch((v) => !v)}
-                    searching={needle.length > 0}
-                    tier={tier}
-                    onTier={setTier}
-                    tierTotal={forTierCounts.length}
-                    tierCounts={tierCounts}
-                    sort={sort}
-                    dir={dir}
-                    onSort={pressSort}
-                  />
-                  {/* LAST ON THE ROW, and it is the odd one out that earns the
-                      end: everything to its left NARROWS what you are looking
-                      at, where this changes what a tap on a card DOES. Sitting
-                      among the filters it read as another one of them. It keeps
-                      their language — a round `ToggleButton`, lit while the
-                      mode is on — because it is still a control on their row.
-
-                      A hold on any card opens the same mode with that card
-                      already picked, which is the shortcut this button is the
-                      long way round of. See `holdCard`. */}
-                  <ToggleButton
-                    icon="select"
-                    label={selecting ? 'Stop selecting cards' : 'Select several cards'}
-                    on={selecting}
-                    onPress={toggleSelecting}
-                  />
+                  The chips take the room that is left and SCROLL — `ChipRow` is
+                  a horizontal ScrollView — while the buttons keep their size at
+                  every width. Which is why the buttons are the side pinned and
+                  the chips are the side that gives: a round button cannot be
+                  narrowed, where chips you can push are merely narrower. Same
+                  reasoning, same numbers, as the trend board. */}
+              <View style={styles.toolbar}>
+                <View style={styles.chips}>
+                  <PositionFilter value={position} onChange={setPosition} />
                 </View>
+                <InventoryControls
+                  searchable={searchable}
+                  searchOpen={showSearch}
+                  onToggleSearch={() => setShowSearch((v) => !v)}
+                  searching={needle.length > 0}
+                  tier={tier}
+                  onTier={setTier}
+                  tierTotal={forTierCounts.length}
+                  tierCounts={tierCounts}
+                  sort={sort}
+                  dir={dir}
+                  onSort={pressSort}
+                />
+                {/* LAST ON THE ROW, and it is the odd one out that earns the
+                    end: everything to its left NARROWS what you are looking
+                    at, where this changes what a tap on a card DOES. Sitting
+                    among the filters it read as another one of them. It keeps
+                    their language — a round `ToggleButton`, lit while the
+                    mode is on — because it is still a control on their row.
 
-                {/* Pinned OUTSIDE the list, and it has to be: a TextInput in a
-                    `ListHeaderComponent` is remounted on every keystroke and loses
-                    focus after one character. */}
-                {searchable && showSearch ? (
-                  <View style={styles.searchRow}>
-                    <SearchField
-                      value={query}
-                      onChange={setQuery}
-                      placeholder="Search name, team or position"
-                      hint={`${total} OWNED`}
-                      accessibilityLabel="Search your collection"
-                      autoFocus
-                    />
-                  </View>
-                ) : null}
-
+                    A hold on any card opens the same mode with that card
+                    already picked, which is the shortcut this button is the
+                    long way round of. See `holdCard`. */}
+                <ToggleButton
+                  icon="select"
+                  label={selecting ? 'Stop selecting cards' : 'Select several cards'}
+                  on={selecting}
+                  onPress={toggleSelecting}
+                />
               </View>
 
-              <FlatList
-                /* The grid is the page's scroll, so it is what decides whether
-                   the strip above it is up or down. Everything else on the
-                   screen holds still — the masthead, the board strip, the
-                   section bar and every control on this page. See
-                   `collapse.tsx`. */
-                {...chromeScroll}
-                // numColumns cannot change on a live list, so a width change that
-                // changes the column count remounts it. Holding the first render
-                // until the measurement lands avoids one guaranteed remount.
-                key={`cols-${columns}`}
-                style={styles.fill}
-                data={visible}
-                keyExtractor={(card) => card.id}
-                numColumns={columns}
-                columnWrapperStyle={styles.row}
-                /* CLEARANCE FOR THE STRIP'S WORTH OF PAGE THAT HANGS BELOW THE
-                   SCREEN while the strip is up — `CollapsingHeader`'s one cost.
-                   At the END of the content, never the top: the strip is in flow
-                   above the grid and supplies the gap over it itself. */
-                contentContainerStyle={[
-                  styles.list,
-                  { paddingBottom: LIST_TAIL + summaryHeight },
-                ]}
-                initialNumToRender={columns * 4}
-                maxToRenderPerBatch={columns * 4}
-                windowSize={7}
-                removeClippedSubviews
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="on-drag"
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-                ListHeaderComponent={
-                  /* One line, and it is the only thing here that belongs to the
-                     RESULT rather than to the collection: what the controls above
-                     did to the pool. The summary went up with them — it describes
-                     what you own, which does not change when a chip is pressed.
+              {/* Pinned OUTSIDE the list, and it has to be: a TextInput in a
+                  `ListHeaderComponent` is remounted on every keystroke and loses
+                  focus after one character. */}
+              {searchable && showSearch ? (
+                <View style={styles.searchRow}>
+                  <SearchField
+                    value={query}
+                    onChange={setQuery}
+                    placeholder="Search name, team or position"
+                    hint={`${total} OWNED`}
+                    accessibilityLabel="Search your collection"
+                    autoFocus
+                  />
+                </View>
+              ) : null}
 
-                     Everything pressable moved either onto the row above or into
-                     the sheet behind it, which is what stopped this header
-                     changing height as facets were opened and closed.
+            </View>
 
-                     THE WRAPPER STAYS EVEN WHEN THE LINE DOES NOT. `ResultLine`
-                     renders nothing while no filter is narrowing anything — the
-                     count it printed then is the summary's CARDS cell — and the
-                     8pt below is the gap between the controls and the first row
-                     of cards. Dropping the wrapper with the line would close that
-                     gap and reopen it the moment a chip was pressed. */
+            <FlatList
+              // numColumns cannot change on a live list, so a width change that
+              // changes the column count remounts it. Holding the first render
+              // until the measurement lands avoids one guaranteed remount.
+              key={`cols-${columns}`}
+              style={styles.fill}
+              data={visible}
+              keyExtractor={(card) => card.id}
+              numColumns={columns}
+              columnWrapperStyle={styles.row}
+              contentContainerStyle={styles.list}
+              initialNumToRender={columns * 4}
+              maxToRenderPerBatch={columns * 4}
+              windowSize={7}
+              removeClippedSubviews
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+              ListHeaderComponent={
+                /* TWO STATEMENTS, NEITHER OF THEM A CONTROL, which is exactly
+                   why they are in here rather than pinned above with the
+                   chips: the header of a list is the one place a fact about
+                   the list is allowed to scroll away with it.
+
+                   WHAT YOU OWN, THEN WHAT THE FILTERS LEFT. The strip is over
+                   the WHOLE collection and never the current filter — see
+                   `CollectionSummary` — and the line under it is the opposite,
+                   the only thing on the page that belongs to the RESULT. Read
+                   together they are "here is everything, and here is how much
+                   of it you are looking at", which is the pair the old
+                   arrangement split across a collapsing block.
+
+                   NOTHING PRESSABLE IS IN HERE. Every control moved onto the
+                   row above or into the sheet behind it, which is what stops
+                   this header changing height as facets are opened and closed
+                   — and what makes it safe to scroll: a `TextInput` here is
+                   remounted on every keystroke, but a strip and a line are
+                   not.
+
+                   THE WRAPPER STAYS EVEN WHEN THE LINE DOES NOT. `ResultLine`
+                   renders nothing while no filter is narrowing anything — the
+                   count it printed then is the summary's CARDS cell — and the
+                   8pt below is the gap before the first row of cards. Dropping
+                   the wrapper with the line would close that gap and reopen it
+                   the moment a chip was pressed. */
+                <View>
+                  <View style={styles.headerStrip}>
+                    <CollectionSummary stats={stats} />
+                  </View>
                   <View style={styles.header}>
                     <ResultLine shown={visible.length} total={all.length} />
                   </View>
-                }
-                ListEmptyComponent={<EmptyFilterResult onClear={clearFilters} hasFilters={filtered} />}
-                extraData={selecting ? selected : null}
-                renderItem={({ item }) => (
-                  <InventoryCard
-                    card={item}
-                    width={itemWidth}
-                    selecting={selecting}
-                    selected={selected.has(item.id)}
-                    onPress={selecting ? () => toggleCard(item.id) : openCard(item)}
-                    onLongPress={holdCard(item.id)}
-                  />
-                )}
-              />
-            </CollapsingHeader>
+                </View>
+              }
+              ListEmptyComponent={<EmptyFilterResult onClear={clearFilters} hasFilters={filtered} />}
+              extraData={selecting ? selected : null}
+              renderItem={({ item }) => (
+                <InventoryCard
+                  card={item}
+                  width={itemWidth}
+                  selecting={selecting}
+                  selected={selected.has(item.id)}
+                  onPress={selecting ? () => toggleCard(item.id) : openCard(item)}
+                  onLongPress={holdCard(item.id)}
+                />
+              )}
+            />
 
             {/* PINNED UNDER THE GRID, not pushed into it. The bar appears the
                 moment the mode opens rather than on the first tick, so the grid
                 does not reflow under a thumb that has just started picking —
-                and it sits outside the FlatList for the same reason the summary
-                does: anything inside it scrolls away from the action it
-                describes. OUTSIDE THE COLLAPSING BLOCK, too, which is the
-                stronger constraint: that block hangs a strip's height below the
-                screen while the strip is up, and a bar that went with it would
-                be pinned to an edge nobody can see. */}
+                and it sits outside the FlatList because anything inside it
+                scrolls away from the action it describes. */}
             {selecting ? (
               <BulkBar
                 count={selected.size}
@@ -693,14 +642,17 @@ const styles = StyleSheet.create({
      is left. */
   chips: { flex: 1, minWidth: 0 },
   searchRow: { paddingHorizontal: GUTTER, paddingBottom: Spacing.two },
-  /* `paddingBottom` is not here: it depends on a measurement — see the grid's
-     `contentContainerStyle`. */
-  list: { paddingHorizontal: GUTTER, gap: GAP },
+  list: { paddingHorizontal: GUTTER, paddingBottom: LIST_TAIL, gap: GAP },
   row: { gap: GAP },
-  /* The gutter the list's own content padding used to give it, now that it
-     sits outside the list. Same GUTTER as the toolbar below, so the strip's
-     frame and the chips line up on one left edge. */
+  /* The roster warning, which is the only thing left OUTSIDE the list that
+     needs the gutter for itself. Same GUTTER as the toolbar below it, so the
+     bar's frame and the chips line up on one left edge. */
   summary: { paddingHorizontal: GUTTER, paddingBottom: Spacing.two },
+  /* NO horizontal padding on these two: they are inside the list now, and the
+     content container already carries the gutter. Adding it again here is a
+     double indent that only shows up once the strip is drawn against the cards
+     under it — which was the whole point of moving it in. */
+  headerStrip: { paddingBottom: Spacing.two },
   header: { paddingBottom: Spacing.two },
   emptyContent: { padding: GUTTER, paddingBottom: Spacing.six },
   centred: {

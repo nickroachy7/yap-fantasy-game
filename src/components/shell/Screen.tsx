@@ -9,7 +9,6 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppHeader } from '@/components/shell/AppHeader';
-import { useChromeScroll } from '@/components/shell/collapse';
 import { useFrame } from '@/components/shell/frame';
 import { isOverlayPath, webSectionOf } from '@/components/shell/sections';
 import { useIsWide } from '@/components/shell/useResponsive';
@@ -137,7 +136,6 @@ export function Screen({
    */
   const frame = useFrame();
   const flush = frame.nav && !isWide;
-  const chromeScroll = useChromeScroll();
 
   /* Null on a page that is a page in its own right, and on every phone: the
      narrow build still navigates these with the action bar and has no heading
@@ -188,12 +186,6 @@ export function Screen({
         flush && styles.flushTop,
         { maxWidth, paddingBottom: Spacing.three },
       ]}
-      /* This page's scroll is what tells the section bar above to get out of
-         the way. Nothing on wide, where there is no such bar — see
-         `useChromeScroll`. A page that owns its own list (`scroll={false}`)
-         passes the same props to it instead; the collection grid, the player
-         boards and the leaderboards all do. */
-      {...chromeScroll}
       keyboardShouldPersistTaps="handled"
       refreshControl={
         onRefresh ? <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} /> : undefined
@@ -300,10 +292,10 @@ const styles = StyleSheet.create({
 
      14 RATHER THAN THE PAGE'S 16, and it used to be zero. The section bar was
      paying for this gap out of its own bottom padding, which worked for exactly
-     as long as the bar could not move: once it collapses, a page with no top
-     padding of its own arrives flush against the top nav's hairline — the card
-     on the lineup touched it. So the gap is the page's now and the bar pays
-     nothing, which makes the rhythm the same in both states: 14 under the
+     as long as the bar could not move — and during the spell when it could, a
+     page with no top padding of its own arrived flush against the top nav's
+     hairline and the card on the lineup touched it. So the gap is the page's
+     and the bar pays nothing, which keeps the rhythm even: 14 under the
      hairline to the bar, 14 under the bar to the content, 14 to whatever is
      under that. */
   flushTop: { paddingTop: 14 },

@@ -44,10 +44,13 @@
  *     no longer see the finished half of is a worse checklist.
  *
  * The list itself is `SetsList`, which takes rows and draws them. This half is
- * the network, the wallet, the two notices — and the summary strip, which is
- * pinned here above the scroll rather than drawn by the list. That is what puts
- * it at the same height as the inventory's, which is pinned above ITS list for
- * the same reason; see the note at the render.
+ * the network, the wallet, the two notices — and the summary strip, which sits
+ * at the TOP OF THE SCROLL, under the filters, and goes up the page with the
+ * rows. It used to be pinned above the scroll and collapse on a push; see the
+ * note at the render for why it stopped. The inventory's strip made the same
+ * move in the same change, and the two have to keep making it together — a
+ * strip that scrolls on one tab and collapses on the other is a step down half
+ * a line every time you flip between them.
  */
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -60,7 +63,6 @@ import {
   View,
 } from 'react-native';
 
-import { CollapsingHeader, useChromeScroll } from '@/components/shell/collapse';
 import { useTabBarInset } from '@/components/shell/useResponsive';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
@@ -95,22 +97,6 @@ export function SetsPanel({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const tabInset = useTabBarInset();
-  /* This list is the page's scroll, so it is the one that tells the section
-     bar above to get out of the way. See `collapse.tsx`. */
-  const chromeScroll = useChromeScroll();
-  /**
-   * How far the strip travels before it has gone — see `CollapsingHeader`.
-   *
-   * CEILED, NOT ROUNDED. A strip measuring 50.33 rounded to 50 stopped a third
-   * of a point short, and what stayed on screen was its own 1.5pt bottom
-   * border, clipped to a hairline under the filters. Over-travelling by a
-   * fraction is invisible.
-   */
-  const [stripHeight, setStripHeight] = useState(0);
-  const rememberStrip = useCallback((h: number) => {
-    const n = Math.ceil(h);
-    if (n > 0) setStripHeight((prev) => (prev === n ? prev : n));
-  }, []);
   // Single source of truth for the balance: the header reads the same value, so
   // a claim has to refresh THAT rather than keep a second copy here.
   const { refresh: refreshPlayer } = usePlayer();
@@ -265,67 +251,55 @@ export function SetsPanel({
 
   return (
     <View style={styles.fill}>
-      {/* THE STRIP AND THE BOARD UNDER IT SLIDE AS ONE BLOCK — see
-          `CollapsingHeader`. Scroll past the strip and it goes; return to
-          the top and it comes back. `retract` is the strip alone, so the
-          filters and the claim bar under it land flush rather than
-          following it off the top. */}
-      <CollapsingHeader retract={stripHeight}>
-        {/* AT THE INVENTORY'S HEIGHT, AND IT COLLAPSES LIKE THE INVENTORY'S. The
-            two tabs draw the same `SummaryStrip` in the same place, and it has to
-            behave the same way on both — otherwise flipping between them is a
-            step down half a line and a different answer to "does this move".
+      {/* WHAT IS PINNED IS THE CONTROLS AND NOTHING ELSE.
 
-            THE STRIP IS THE ONLY PART THAT LEAVES. It is a statement — how many
-            sets, how many claimed, how much is waiting — and answers nothing you
-            can ask it. The filters below it and the claim-all bar below those are
-            controls and stay: the block travels exactly the strip, so they land
-            flush against the top of the page. See `CollapsingHeader`.
+          The chips decide what you are looking at, so they cannot leave the
+          screen you are looking at. The claim-all bar acts on sets you may not
+          have scrolled to, so it must not be possible to scroll past it. Both
+          only exist when there are sets — the empty state below is a whole-page
+          message, and chips over it would be filters on nothing.
+
+          THE STRIP IS NOT UP HERE ANY MORE. It is the first thing in the scroll
+          instead, and goes up the page with the rows. It is a statement — how
+          many sets, how many claimed, how much is waiting — and a statement
+          about a list belongs with the list rather than over the controls that
+          cut the list down. The inventory's strip made the identical move; see
+          the note at the top of this file for why the two have to match. */}
+      {all.length > 0 ? (
+        <View style={styles.strip}>
+          <SetsFilters sets={all} filter={filter} onFilter={setFilter} />
+          {ready.length > 0 ? (
+            <ClaimAllBar
+              count={ready.length}
+              gems={summary.gemsWaiting}
+              busy={claimingAll}
+              onPress={() => void claimAll()}
+            />
+          ) : null}
+        </View>
+      ) : null}
+
+      <ScrollView
+        style={styles.fill}
+        contentContainerStyle={[
+          styles.content,
+          /* The pinned chips own the gap under the nav now, so the scroll starts
+             flush — except with no chips above it, where this is the only thing
+             holding the empty state off the nav. */
+          all.length === 0 && styles.contentTop,
+          { paddingBottom: tabInset + Spacing.four },
+        ]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+        {/* FIRST IN THE SCROLL, above the notices and the rows, which is the
+            place the filters used to occupy. It is the same `SummaryStrip` the
+            inventory draws in the same position on its own list — see the note
+            at the render above.
 
             Only when there ARE sets: the empty state below is a whole-page
-            message and a summary of nothing above it would be four noughts
+            message, and a summary of nothing over it would be four noughts
             explaining themselves. */}
-        {all.length > 0 ? (
-          <View style={styles.strip}>
-            <View onLayout={(e) => rememberStrip(e.nativeEvent.layout.height)}>
-              <SetsStrip stats={summary} />
-            </View>
-            {/* WHAT YOU HAVE, ABOVE WHAT NARROWS IT — the inventory's order, for
-                the inventory's reason: here is the whole board, now here is how
-                to sieve it. It does NOT go with the strip: the control that
-                decides what you are looking at cannot leave the screen you are
-                looking at. */}
-            <SetsFilters sets={all} filter={filter} onFilter={setFilter} />
-            {/* STAYS TOO, and only when there is something in it. It is the one control on this page that
-                acts on sets you may not be looking at, so it must not be possible
-                to scroll past it — and an empty version of it would be a button
-                offering nothing. */}
-            {ready.length > 0 ? (
-              <ClaimAllBar
-                count={ready.length}
-                gems={summary.gemsWaiting}
-                busy={claimingAll}
-                onPress={() => void claimAll()}
-              />
-            ) : null}
-          </View>
-        ) : null}
+        {all.length > 0 ? <SetsStrip stats={summary} /> : null}
 
-        <ScrollView
-          {...chromeScroll}
-          style={styles.fill}
-          contentContainerStyle={[
-            styles.content,
-            /* The strip owns the gap under the nav now, so the scroll starts
-               flush — except with no strip above it, where this is the only thing
-               holding the empty state off the nav. */
-            all.length === 0 && styles.contentTop,
-            /* THE LAST TERM IS CLEARANCE for the strip's worth of page that
-               hangs below the screen while the strip is up — `CollapsingHeader`'s
-               one cost. Zero on a board with no strip to collapse. */
-            { paddingBottom: tabInset + Spacing.four + stripHeight },
-          ]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {all.length === 0 ? (
           /* No sets AT ALL is a season with no card pool behind it — a fresh
              database, or a season whose cards have not synced. That is not the
@@ -386,20 +360,17 @@ export function SetsPanel({
             )}
             </>
           )}
-        </ScrollView>
-      </CollapsingHeader>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  /* The inventory's `summary` wrapper, to the point: one gutter, and the 8pt
-     gap to whatever comes next. Two screens with the same strip at different
-     heights is what this replaced. */
-  /* `gap` because this block holds two rows now — the strip and the chips —
-     and they must sit apart by the same 8 the inventory puts between its own
-     pair, or they read as one control with a bar stuck on top of it. */
+  /* The pinned controls: one gutter, the 8pt gap down to the scroll, and the
+     same 8 between the chips and the claim bar when both are drawn. Named
+     `strip` from when the summary lived in here too — it is the chips' block
+     now, and the strip is inside the scroll. */
   strip: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two, gap: Spacing.two },
   content: { paddingHorizontal: Spacing.three, gap: Spacing.three },
   contentTop: { paddingTop: Spacing.three },

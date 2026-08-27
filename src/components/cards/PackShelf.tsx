@@ -22,6 +22,10 @@
  * letting the user fire the RPC and read a raw Postgres error, and a zero gem
  * cost reads as "Free".
  *
+ * BUYING SEVERAL AT ONCE is the card's one control beyond the button. See
+ * `BULK_COUNTS` and the note on the quantity row for which packs get it and
+ * why the free ones do not.
+ *
  * What a pack contains is stated from DATA or not at all. `guaranteed_positions`
  * is real and is the one promise we can make about a pack's contents, so it is
  * printed position by position — the old copy said the starter pack "guarantees
@@ -30,6 +34,7 @@
  * are still being tuned, and printing them as odds would be a promise the game
  * does not currently keep.
  */
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Gem } from '@/components/shell/AppHeader';
@@ -56,6 +61,28 @@ export type Pulled = {
   team_abbreviation: string | null;
   rarity: string | null;
 };
+
+/**
+ * How many of one pack you may buy in a press.
+ *
+ * THREE, NOT A STEPPER. A stepper is the general answer and it is the wrong one
+ * here: it is two controls (a minus and a plus) plus a readout to fit into a
+ * card that is 240pt wide at its narrowest, and it invites a player to dial in
+ * seven when nothing about the economy rewards seven over five. Three fixed
+ * jumps are one tap each, and the jumps are the ones the rest of the game is
+ * priced in — a single, a handful, a bulk buy.
+ *
+ * IT STARTS AT ONE, ALWAYS. A card that remembered ten from the last visit is a
+ * card that spends ten times what the player expected on a press they have made
+ * before.
+ *
+ * WHY 1/5/10 AND NOT 1/3/5. A standard pack against a season's income means a
+ * bulk buy has to be worth leaving the sheet for; ten is roughly the point at
+ * which a paid pack is a session rather than an errand. It is also the largest
+ * count that keeps the reveal usable — see `PackReveal`, whose deck is one card
+ * at a time, so ten five-card packs is already fifty swipes.
+ */
+const BULK_COUNTS = [1, 5, 10] as const;
 
 /**
  * Lineup order, so coverage reads QB → PK. It cannot come off the jsonb: it
@@ -102,6 +129,7 @@ export function PackShelf({
   gems,
   openings,
   openingCode,
+  progress,
   onOpen,
 }: {
   /** null while the first read is in flight. */
@@ -119,7 +147,18 @@ export function PackShelf({
   openings: Map<string, number>;
   /** The pack currently being opened, if any. */
   openingCode: string | null;
-  onOpen: (code: string) => void;
+  /**
+   * How far through a bulk buy the pack in flight is — `{done, total}` — or
+   * null for a single open.
+   *
+   * IT EXISTS BECAUSE TEN PACKS IS TEN ROUND TRIPS. `open_pack` takes one code
+   * and mints one pack, so a bulk buy is a loop (see `packs.tsx`), and a
+   * spinner that sat there for ten sequential calls is indistinguishable from a
+   * sheet that has hung. A count that moves is the cheapest possible proof that
+   * it has not.
+   */
+  progress: { done: number; total: number } | null;
+  onOpen: (code: string, count: number) => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -143,10 +182,11 @@ export function PackShelf({
             opened={openings.get(p.id) ?? 0}
             dailyAvailable={dailyAvailable}
             busy={openingCode === p.code}
+            progress={openingCode === p.code ? progress : null}
             // Any open in flight blocks every pack: the balance is about to
             // change, so a second purchase would be decided against a stale one.
             locked={openingCode !== null}
-            onOpen={() => onOpen(p.code)}
+            onOpen={(count) => onOpen(p.code, count)}
           />
         ))}
       </View>
@@ -196,6 +236,7 @@ function PackCard({
   opened,
   dailyAvailable,
   busy,
+  progress,
   locked,
   onOpen,
 }: {
@@ -204,8 +245,10 @@ function PackCard({
   opened: number;
   dailyAvailable: boolean | null;
   busy: boolean;
+  /** Where a bulk buy on THIS pack has got to, or null. See `PackShelf`. */
+  progress: { done: number; total: number } | null;
   locked: boolean;
-  onOpen: () => void;
+  onOpen: (count: number) => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -224,7 +267,28 @@ function PackCard({
   const claimedToday = isDaily && dailyAvailable !== true;
   const claimed = (pack.once_per_user && opened > 0) || claimedToday;
   const free = pack.gem_cost === 0;
-  const affordable = gems >= pack.gem_cost;
+
+  /**
+   * WHICH PACKS MAY BE BOUGHT IN BULK: the ones you could buy twice anyway.
+   *
+   * A once-per-player pack has exactly one open in it, and a daily has one
+   * TODAY — offering ×5 on either would be a control whose every option but the
+   * first is a guaranteed server refusal. A free pack is both of those in
+   * practice (the two free rows are the starter and the daily), and a "×10" on
+   * something that costs nothing is a quantity picker for a thing there is no
+   * decision to make about.
+   *
+   * So the row appears on a repeatable pack you spend gems on, which today is
+   * the standard pack and whatever is priced beside it later.
+   */
+  const bulkable = !pack.once_per_user && !isDaily && pack.gem_cost > 0;
+  const [count, setCount] = useState(1);
+  /* Never trust the state over the pack: a row that stops being repeatable
+     between renders must not keep a 10 the button would then fire. */
+  const buying = bulkable ? count : 1;
+  const total = pack.gem_cost * buying;
+
+  const affordable = gems >= total;
   const blocked = locked || claimed || !affordable;
   const coverage = coverageOf(pack.guaranteed_positions);
 
@@ -234,11 +298,18 @@ function PackCard({
       ? 'Claimed'
       : free
         ? 'Claim free pack'
-        : 'Open';
+        : buying > 1
+          ? `Open ${buying}`
+          : 'Open';
   /**
    * The one line that answers "can I press this, and what happens to my
    * balance if I do". Stating the shortfall beats "Not enough gems", which
    * leaves the player to do the subtraction against a number in the header.
+   *
+   * THE TOTAL LEADS ON A BULK BUY, because the figure printed at the top of the
+   * card is the price of ONE and the press spends `buying` of them. A line that
+   * only showed the balance either side of the purchase would leave the player
+   * to work out what the difference was for.
    */
   const money = claimedToday
     ? 'Claimed today — a new one every day'
@@ -247,8 +318,10 @@ function PackCard({
       : free
         ? 'Free · does not touch your balance'
         : affordable
-          ? `${gems.toLocaleString()} → ${(gems - pack.gem_cost).toLocaleString()} gems`
-          : `${(pack.gem_cost - gems).toLocaleString()} more gems needed`;
+          ? buying > 1
+            ? `${total.toLocaleString()} gems · ${gems.toLocaleString()} → ${(gems - total).toLocaleString()}`
+            : `${gems.toLocaleString()} → ${(gems - total).toLocaleString()} gems`
+          : `${(total - gems).toLocaleString()} more gems needed`;
 
   return (
     <View style={[styles.pack, { backgroundColor: c.surface, borderColor: c.border }]}>
@@ -301,9 +374,62 @@ function PackCard({
 
       <View style={[styles.rule, { backgroundColor: c.border }]} />
 
+      {/* HOW MANY, on its own row above the button rather than beside it.
+
+          The action row is a button with a hard 128pt floor and a money line
+          that runs to two lines beside it, inside a card that is 240pt at its
+          narrowest — there is no third slot in there, and every attempt at one
+          either shrank the button below a thumb or pushed the money line to
+          three lines. Above it the chips get the full measure and read as what
+          they are: the thing you set before you press.
+
+          A CHIP YOU CANNOT AFFORD IS STILL PRESSABLE, and that is deliberate.
+          Selecting it is how you find out what ten costs — the money line
+          answers with the shortfall and the button goes dead, which is the same
+          pair of facts a pack you cannot afford at all already shows. Disabling
+          the chip would leave the player guessing at the number. */}
+      {bulkable && !claimed ? (
+        <View
+          style={styles.countRow}
+          accessibilityRole="radiogroup"
+          accessibilityLabel="How many packs to open">
+          {BULK_COUNTS.map((n) => {
+            const on = buying === n;
+            const reach = pack.gem_cost * n <= gems;
+            return (
+              <Pressable
+                key={n}
+                onPress={() => setCount(n)}
+                disabled={locked}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: on, disabled: locked }}
+                accessibilityLabel={`Open ${n === 1 ? 'one pack' : `${n} packs`}, ${(
+                  pack.gem_cost * n
+                ).toLocaleString()} gems`}
+                style={({ pressed }) => [
+                  styles.countChip,
+                  {
+                    backgroundColor: on ? c.backgroundSelected : 'transparent',
+                    borderColor: on ? accent : c.border,
+                  },
+                  /* Dimmed, not disabled — see the note above. */
+                  !reach && !on && styles.outOfReach,
+                  locked && styles.disabled,
+                  pressed && !locked && styles.pressed,
+                ]}>
+                <Text
+                  style={[Type.label, NUMERIC, { color: on ? c.text : c.textSecondary }]}>
+                  {`×${n}`}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+
       <View style={styles.actionRow}>
         <Pressable
-          onPress={onOpen}
+          onPress={() => onOpen(buying)}
           disabled={blocked}
           accessibilityRole="button"
           // The reason a disabled button is disabled lives in the money line
@@ -317,7 +443,17 @@ function PackCard({
             pressed && !blocked && styles.pressed,
           ]}>
           {busy ? (
-            <ActivityIndicator />
+            /* A COUNT RATHER THAN A SPINNER once there is more than one pack in
+               flight: ten opens is ten sequential round trips, and a spinner
+               that does not move for that long reads as a hang. See
+               `PackShelf`'s `progress`. */
+            progress && progress.total > 1 ? (
+              <Text numberOfLines={1} style={[Type.strong, NUMERIC, { color: '#17130A' }]}>
+                {`${progress.done} / ${progress.total}`}
+              </Text>
+            ) : (
+              <ActivityIndicator />
+            )
           ) : (
             <Text
               numberOfLines={1}
@@ -378,6 +514,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.one + 1,
     paddingVertical: 2,
   },
+  countRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
+  /* Sized off the open button's 40pt minimum rather than off the coverage
+     chips beside them: these are things you press, and a 20pt chip in a row of
+     things you press is a miss waiting to happen. */
+  countChip: {
+    minWidth: 52,
+    minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.chip,
+    paddingHorizontal: Spacing.two,
+  },
+  /* A count the balance does not cover. Still pressable — see the row's note. */
+  outOfReach: { opacity: 0.45 },
   actionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   openButton: {
     paddingVertical: Spacing.two + 2,

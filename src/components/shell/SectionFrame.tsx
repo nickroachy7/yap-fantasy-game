@@ -113,13 +113,13 @@ export function SectionFrame({
           of the way, which cost more than it bought: the bar is how you get
           between Collection and Sets, so a bar that leaves is a press you have
           to scroll to get back, and everything under it had to be taught to
-          reserve the room it would vacate. The one thing on these pages worth
-          collapsing is the summary strip the page draws itself — see
-          `collapse.tsx`, which is now about that alone.
+          reserve the room it would vacate. Nothing on these pages travels on
+          scroll now — the summary strips that were the last thing collapsing
+          sit inside their own lists and go up with the rows.
 
           `action` is the section's own control, pinned to the right of the
           tabs. Collect passes the Packs button, which used to live on the
-          summary strip and would have collapsed with it. */}
+          summary strip and would have gone up the page with it. */}
       <SectionNav section={section} action={action} />
       {children}
     </FrameProvider>

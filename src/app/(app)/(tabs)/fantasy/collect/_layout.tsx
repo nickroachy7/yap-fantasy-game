@@ -30,9 +30,9 @@ import { SectionFrame } from '@/components/shell/SectionFrame';
  *   chrome rendered above the navigator survives a navigation, so opening Packs
  *     and closing it again does not rebuild the bar you pressed — and drawn by
  *     each page instead, the button blinks on every flip between them;
- *   the summary strip COLLAPSES as you scroll (see `collapse.tsx`), and the way
- *     out to the shop is not a statement about your collection. It must not
- *     leave with one.
+ *   the summary strip SCROLLS AWAY with the rows it summarises, and the way out
+ *     to the shop is not a statement about your collection. It must not leave
+ *     with one.
  */
 export default function CollectLayout() {
   return (

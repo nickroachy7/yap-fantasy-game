@@ -77,11 +77,11 @@ export function SectionNav({
    * A control pinned to the RIGHT of the tabs, where the section has one.
    *
    * Collect's Packs button is the only one today, and where it moved FROM is
-   * the argument for the slot existing: it sat on the summary strip, which is
-   * the one piece of chrome on those pages that collapses as you scroll. The
-   * way out to the shop is not a statement about your collection and must not
-   * leave with one. Up here it is beside the two tabs, which is the row that
-   * already means "where in this board am I going".
+   * the argument for the slot existing: it sat on the summary strip, which
+   * leaves the screen as you scroll those pages. The way out to the shop is not
+   * a statement about your collection and must not leave with one. Up here it
+   * is beside the two tabs, which is the row that already means "where in this
+   * board am I going".
    */
   action?: ReactNode;
 }) {
@@ -143,11 +143,10 @@ const styles = StyleSheet.create({
      navigates rather than sitting a few points inside or outside it.
 
      ABOVE ONLY. The gap UNDER the bar belongs to the page, not to this — see
-     `flushTop` in `Screen`, which is the one number that has to hold in both
-     states. While this bar paid for it the page had none of its own, so the
-     moment the bar collapsed the first card sat flush against the top nav's
-     hairline with nothing between them. The bar leaves; the gap must not leave
-     with it. */
+     `flushTop` in `Screen`. While this bar paid for it the page had none of its
+     own, so during the spell when the bar could collapse the first card sat
+     flush against the top nav's hairline with nothing between them. The bar
+     holds still today, and the gap stays the page's regardless. */
   wrap: {
     paddingHorizontal: Spacing.three,
     paddingTop: 14,

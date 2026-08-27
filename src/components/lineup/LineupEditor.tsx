@@ -1139,8 +1139,8 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
    * flick from it anyway.
    *
    * So `Screen` owns the scroll again — which is also where the gutter, the
-   * 14pt rhythm, pull-to-refresh and the section-bar collapse come from, and
-   * why none of them are re-stated here. `bleed` still cancels exactly 16
+   * 14pt rhythm and pull-to-refresh come from, and why none of them are
+   * re-stated here. `bleed` still cancels exactly 16
    * because that gutter is unchanged.
    */
   return (

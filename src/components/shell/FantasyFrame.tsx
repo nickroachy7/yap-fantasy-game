@@ -55,13 +55,12 @@ export function FantasyFrame({ children }: { /** The tab's navigator. */ childre
         {wide ? null : (
           <>
             {/* NEITHER OF THESE MOVES ON SCROLL, and that is a decision rather
-                than an omission. The section bar below them collapses out of
-                the way while you read a list (see `collapse.tsx`); this pair
-                does not, because between them they carry the only way OUT of
+                than an omission. Between them they carry the only way OUT of
                 the board you are on and the balance every price on the screen
                 is measured against. A reader twenty rows down should not have
                 to scroll back up to find out where they are or what they can
-                afford. */}
+                afford. Nothing in the app's chrome moves on scroll now; the
+                summary strips that once did are inside their lists. */}
             <AppHeader attached />
             <FantasyTopNav />
           </>

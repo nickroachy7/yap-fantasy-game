@@ -23,6 +23,11 @@
  * TWO STATES, ONE SHEET. The shelf, and then what you pulled — and the second
  * REPLACES the first rather than appending to it. See `PackReveal`.
  *
+ * A BULK BUY IS STILL ONE PULL. Opening ten packs runs ten `open_pack` calls
+ * and hands the reveal everything they dealt as a single deck, so the second
+ * state means "what this press produced" rather than "what one pack produced".
+ * See `open` for the loop and what it does when the fourth of ten is refused.
+ *
  * THE TONE IS GOLD, which is the app's own: the gem, the rail's active marker,
  * the Open button. The frame's note asks that every sheet carry a colour rather
  * than reinstating the hairline it replaced, and for this one the answer is
@@ -67,6 +72,8 @@ export default function PacksScreen() {
   const [openings, setOpenings] = useState<Map<string, number>>(() => new Map());
   const [silverAt, setSilverAt] = useState<number>(50);
   const [openingCode, setOpeningCode] = useState<string | null>(null);
+  /** How far through a bulk buy the open in flight is. Null for a single. */
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [pulled, setPulled] = useState<Pulled[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -122,19 +129,73 @@ export default function PacksScreen() {
      one's offers with it — see `usePullActions`. */
   const pull = usePullActions(pulled);
 
+  /**
+   * Open `count` of one pack, and show everything they dealt as one pull.
+   *
+   * ONE CALL PER PACK, SEQUENTIALLY. `open_pack` takes a code and mints exactly
+   * one pack; there is no batch form of it, and adding one would be a migration
+   * for something the client can do honestly. Sequential rather than parallel
+   * because every open takes the SAME wallet row lock — fired together they
+   * would queue on that lock anyway, and a failure in the middle of a pile of
+   * concurrent writes is far harder to report truthfully than one in a loop.
+   * This is `claimAll`'s shape in `SetsPanel`, for `claimAll`'s reasons.
+   *
+   * IT STOPS AT THE FIRST REFUSAL rather than pressing on. Unlike the set sweep
+   * — where five independent sets can fail independently — every open here is
+   * the same pack against the same balance, so whatever refused the fourth will
+   * refuse the fifth. The overwhelmingly likely cause is that the gems ran out,
+   * and firing six more doomed calls to prove it is six round trips of nothing.
+   *
+   * PARTIAL SUCCESS IS SHOWN AND SAID. What was dealt goes to the reveal; the
+   * shortfall goes to the error notice above it, naming how many of how many
+   * landed. A bulk buy that opened three of ten and said only "opened" would be
+   * lying about seven, and the balance would be the evidence.
+   *
+   * THE CLIENT NEVER PRE-CHECKS THE BALANCE. The button is disabled below what
+   * the total costs, which is a courtesy — the authority is `open_pack`, which
+   * charges under a lock and refuses when it cannot. A client that decided for
+   * itself would eventually disagree with it.
+   */
   const open = useCallback(
-    async (code: string) => {
+    async (code: string, count: number) => {
+      // The shelf offers 1, 5 or 10; anything else is a caller bug, and a
+      // clamp is cheaper than trusting one.
+      const packs = Math.max(1, Math.min(10, Math.floor(count) || 1));
+
       setOpeningCode(code);
+      setProgress(packs > 1 ? { done: 0, total: packs } : null);
       setError(null);
       setPulled(null);
-      // All RNG, gem math and minting happen inside this one call, server-side.
-      const { data, error: err } = await supabase.rpc('open_pack', { p_pack_code: code });
-      if (err) {
+
+      const cards: Pulled[] = [];
+      /* Counted here rather than inferred from `cards.length` afterwards: a
+         pack's card count is a column, packs of different sizes could share a
+         code one day, and an open that legitimately deals nothing must still
+         count as an open. */
+      let opened = 0;
+      let refusal: string | null = null;
+
+      for (let i = 0; i < packs; i += 1) {
+        // All RNG, gem math and minting happen inside this one call, server-side.
+        const { data, error: err } = await supabase.rpc('open_pack', { p_pack_code: code });
+        if (err) {
+          refusal = err.message;
+          break;
+        }
+        cards.push(...((data ?? []) as Pulled[]));
+        opened += 1;
+        if (packs > 1) setProgress({ done: opened, total: packs });
+      }
+
+      if (opened === 0) {
         // Left on the shelf, with the reason under it. Switching to the pull
         // view with nothing to show would read as the pack having been empty.
-        setError(err.message);
+        setError(refusal);
       } else {
-        setPulled((data ?? []) as Pulled[]);
+        /* Named as a count of PACKS, not of cards: the player pressed "open 10"
+           and the honest answer is how many of the ten happened. */
+        if (refusal) setError(`${opened} of ${packs} packs opened — ${refusal}`);
+        setPulled(cards);
         // The cards this just minted are in the collection now, and the
         // inventory holds it for the session — so the held copy is wrong until
         // it is dropped. See `invalidateCollection`.
@@ -145,7 +206,9 @@ export default function PacksScreen() {
         // flips to Claimed, `refresh` re-reads the balance the header shows.
         await Promise.all([reloadShelf(), refresh()]);
       }
+
       setOpeningCode(null);
+      setProgress(null);
     },
     [reloadShelf, refresh],
   );
@@ -289,7 +352,8 @@ export default function PacksScreen() {
           gems={gems}
           openings={openings}
           openingCode={openingCode}
-          onOpen={(code) => void open(code)}
+          progress={progress}
+          onOpen={(code, count) => void open(code, count)}
         />
       )}
     </PlayerSheetFrame>

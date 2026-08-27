@@ -30,7 +30,6 @@ import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } f
 
 import { POS_FILTERS, type PosFilter } from '@/components/cards/PositionFilter';
 import { MenuButton, MenuHeading, MenuItem } from '@/components/ui/MenuButton';
-import { useChromeScroll } from '@/components/shell/collapse';
 import { useTabBarInset } from '@/components/shell/useResponsive';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Colors, Spacing, Type } from '@/constants/theme';
@@ -80,9 +79,6 @@ export function CommunityBoard({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const tabInset = useTabBarInset();
-  /* This list is the page's scroll, so it is the one that tells the section
-     bar above to get out of the way. See `collapse.tsx`. */
-  const chromeScroll = useChromeScroll();
   const list = useRef<FlatList<BoardRowModel>>(null);
 
   const [position, setPosition] = useState<PosFilter>('ALL');
@@ -226,7 +222,6 @@ export function CommunityBoard({
         </View>
       ) : null}
       <FlatList
-        {...chromeScroll}
         ref={list}
         data={rows ?? []}
         style={styles.fill}
