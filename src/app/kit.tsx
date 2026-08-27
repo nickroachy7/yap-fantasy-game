@@ -24,13 +24,10 @@ import { ActionBar } from '@/components/shell/ActionBar';
 import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
 import {
   ContestCard,
-  Figure,
-  Standing,
-  figureOf,
   type CardLevel,
   type Lock,
 } from '@/components/contests/ContestCard';
-import type { ContestTerms } from '@/components/contests/contest-model';
+import type { ContestTerms, Duel } from '@/components/contests/contest-model';
 import { ContestFieldList } from '@/components/contests/ContestFieldPanel';
 import type { FieldEntrant } from '@/components/contests/use-contest-field';
 import type { FieldWeek } from '@/components/lineup/field';
@@ -700,12 +697,12 @@ function Kit() {
 
           <Section
             title="Contest card"
-            note="ONE CARD. Head and trade are the same rows in the same order everywhere — entering a contest INSERTS a middle band and moves nothing else, so it never changes shape on you. The first two here are lobby cards, with no middle; the rest are entered. THE HEAD’S RIGHT COLUMN is ranked by usefulness rather than by fallback: your score once anybody has played, the COUNTDOWN while the roster can still be changed — the only figure on the card that is both moving and actionable — and the filled count once it is locked and unplayed. HOW IT IS WON leads the trade band at full width; it used to be the tail of the head’s format line, and it was the string that got truncated on every entered card before lock. The arrow is the divider AND the label: left is what leaves, right is what arrives, which is what RISK and REWARD spent a line saying. The last four are the ones that matter — a top-three contest where the median decides nothing and the mark is the CUT (27.1 is above that field’s median and outside the places that pay, exactly the state the old card drew as winning); the locked-and-unplayed state, the only one where the slot count takes the figure back; and the same card at both levels so the two fills can be compared — `page` sits level with the tab bar, `sheet` a step above the lobby it is drawn in. The RUN is no longer a band here: it is a row under the whole carousel, because a run does not change when you swipe between contests."
+            note="ONE CARD, ONE SIZE. Head, scoring and trade — always all three, always at the same three heights, on every surface and in every phase of the week. That is the point of the 2026-08-27 rework: these are the pages of a horizontal carousel over a lineup board, so a card eleven points taller than its neighbour makes the whole screen jump on a swipe, and a card that grows when the first score lands moves the board out from under a reader mid-tap. Every text is one line and the trade columns pad to two rows rather than collapsing — a contest that risks no hearts is a shorter LIST, not a shorter card. THE HEAD is two rows: the name with the countdown at the far right, then how the contest is WON directly under it with the fill count under the countdown. The win condition led the trade band before, one rank down — it is not a term of the trade, it is what the contest IS. The countdown doubles as the phase (NEXT LOCK, then LIVE, then FINAL) and the entry count keeps it company because both are the contest's clock: how long you have, and whether enough people have turned up for the week to be scoreable. The win condition is LABELLED (`TO WIN`) rather than emphasised — it was 13pt semibold and in an argument with the contest's own name eleven points above; a reader who does not know what “Top 3 of 6 win” is a statement ABOUT cannot be told by making it bolder, only by naming it. And every string in the entry slot is counted rather than eyeballed: there is room for about eighteen characters beside it, and two drafts have already been lost to that — see `fillLine`. The season record used to sit here and is gone — it is one contest's property drawn on every card, and nothing on this screen is about the season. THE SCORING BAND IS A SCOREBOARD, which is the 2026-08-27 evening rework. Every format this game can have is one sentence with a different noun in it — you against the community's middle, you against the score at the cut, you against another manager — so the band draws two named sides and two totals, and the right-hand NAME is the only thing a format changes. `opponentOf` answers “who am I playing” where `markOf` answered “where do I draw a line”, which is why the head-to-head cards below are the same card and not a second one. Under the totals is a SLOT, not a rail: a field draws the distribution (where you sit between its worst and best, with the line to beat marked — the one thing a 26-manager contest has that a duel does not), a duel draws a tug-of-war from level, and a week with nothing played says so in words. Before kickoff it reads 0–0 like any scoreboard before a game — which reverses an earlier call that 0.0 pregame was a bug. It WAS one, when a stored nought arrived under a FINAL chip on a week that had not started; a nought as one side of a scoreboard is a different claim made with the same character. The noughts are drawn tertiary so an empty scoreboard is not the loudest thing on the card. THE TRADE has its labels and its divider back — an arrow between the columns says which way a trade runs only to somebody who already knows they are looking at one. Both columns read from the LEFT: mirroring them about the divider gave the card two reading edges, so the reward lines began in a place that lined up with nothing above them. The first two here are lobby cards; the rest are entered. The ones that matter: a top-three contest where the median decides nothing and the mark is the CUT (27.1 is above that field's median and outside the places that pay, exactly the state the old card drew as winning); a field of ONE, which is its own low, mark and high; and the same card at both levels so the two fills can be compared. WHAT IS NO LONGER HERE: the lineup count. `1 SLOT TO FILL` and `7/8` are what the board's own `Starting lineup · 3/3 FILLED` heading says directly underneath, next to the rows you would fix it from."
           >
             <ContestCard
               name="WR Room"
               terms={KIT_TERMS_TOP_N}
-              state={<StatusChip label="Enter" tone="warning" />}
+              status={<StatusChip label="Enter" tone="warning" />}
               onPress={() => {}}
             />
             {/* No entries yet, so no pool yet — the state a four-tester week
@@ -715,7 +712,7 @@ function Kit() {
             <ContestCard
               name="Flex Three"
               terms={{ ...KIT_TERMS_MEDIAN, prizePool: 0, entrants: 0 }}
-              state={<StatusChip label="Not enough gems" />}
+              status={<StatusChip label="Not enough gems" />}
               onPress={() => {}}
             />
 
@@ -725,59 +722,81 @@ function Kit() {
             <KitEntered
               name="Preseason Week 3"
               terms={KIT_TERMS_FREE}
-              subtitle="Season 1-1"
               myPoints={null}
               field={DEMO_FIELD_UNPLAYED}
-              filled={7}
               lock={{ at: DEMO_LOCK_SOON, locked: false, now: DEMO_NOW }}
             />
             {/* Live, ahead of the median. */}
             <KitEntered
               name="Preseason Week 3"
               terms={KIT_TERMS_FREE}
-              subtitle="Season 2-1"
               myPoints={118.4}
               field={DEMO_FIELD_AHEAD}
-              filled={8}
               lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
             />
             {/* Final, behind it. */}
             <KitEntered
               name="Preseason Week 2"
               terms={{ ...KIT_TERMS_FREE, entrants: DEMO_FIELD_BEHIND.entrants }}
-              subtitle="Season 2-2-1"
               myPoints={71.9}
               field={DEMO_FIELD_BEHIND}
-              filled={8}
-              final
               lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
             />
             {/* A field of ONE: its own low, mark and high, so there is no range
-                to place anybody in and the rail stays a slot meter even though
-                there is a score. The rank is exempt from the tie rule — "#1 OF
-                1" is never in doubt and says exactly what it is worth. */}
+                to place anybody in and the rail stays empty even though there
+                IS a score. The rank is exempt from the tie rule — "#1 OF 1" is
+                never in doubt and says exactly what it is worth. */}
             <KitEntered
               name="Preseason Week 1"
               terms={{ ...KIT_TERMS_FREE, entrants: DEMO_FIELD_ALONE.entrants }}
-              subtitle="Season 0-0"
               myPoints={88.2}
               field={DEMO_FIELD_ALONE}
-              filled={8}
-              final
               lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
             />
-            {/* The cut, and a settled prize in place of the pool. */}
+            {/* The cut, and a settled prize in place of the pool.
+
+                SETTLED ON THE FIELD, not on a prop beside it. `final` used to
+                be handed to the card separately from the field it describes,
+                which let a fixture claim a paid-out prize on a live week. It is
+                `field.final` now and there is only one of it. */}
             <KitEntered
               name="WR Room"
               terms={KIT_TERMS_TOP_N}
               myPoints={27.1}
-              field={DEMO_FIELD_CUT}
+              field={{ ...DEMO_FIELD_CUT, final: true }}
               cut={38.4}
-              filled={3}
               prize={120}
-              final
               lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
             />
+            {/* HEAD TO HEAD — the format that does not exist yet, drawn by the
+                same card with nothing changed but the noun on the right.
+
+                THE POINT OF THE WHOLE SCOREBOARD IS THIS CARD. `opponentOf`
+                returns a handle instead of a derived line, the band swaps the
+                distribution for a tug-of-war because two people are not a
+                field, and every other row is byte-identical to the contest
+                above it. Nothing in the app constructs one of these; it is here
+                so that a switch with one case is not mistaken for a design. */}
+            <KitEntered
+              name="Sunday Duel"
+              terms={{ ...KIT_TERMS_MEDIAN, entrants: 2 }}
+              myPoints={118.4}
+              field={{ ...DEMO_FIELD_AHEAD, entrants: 2, low: 97.6, high: 118.4, myRank: 1 }}
+              opponent={{ handle: '@calvin', points: 97.6 }}
+              lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
+            />
+            {/* THE SAME DUEL, LOSING. The tug runs the other way and takes the
+                negative colour; the centre line stays put, because level is the
+                reference and has to be visible at any margin. */}
+            <KitEntered
+              name="Sunday Duel"
+              terms={{ ...KIT_TERMS_MEDIAN, entrants: 2 }}
+              myPoints={71.9}
+              field={{ ...DEMO_FIELD_BEHIND, entrants: 2, low: 71.9, high: 133.0, myRank: 2 }}
+              opponent={{ handle: '@calvin', points: 133.0 }}
+              lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
+            />
+
             {/* LOCKED AND UNPLAYED — the narrow third state of the figure slot:
                 no score yet, and no deadline left to count toward. The count
                 takes the slot back, and has earned the size here, because a
@@ -785,10 +804,8 @@ function Kit() {
             <KitEntered
               name="Preseason Week 4"
               terms={KIT_TERMS_FREE}
-              subtitle="Season 1-1"
               myPoints={null}
               field={DEMO_FIELD_UNPLAYED}
-              filled={6}
               lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
             />
             {/* AT `page` LEVEL, which is the fill the board uses: the same grey
@@ -798,10 +815,8 @@ function Kit() {
             <KitEntered
               name="Preseason Week 4"
               terms={KIT_TERMS_FREE}
-              subtitle="Season 1-0"
               myPoints={null}
               field={DEMO_FIELD_UNPLAYED}
-              filled={8}
               level="page"
               lock={{ at: DEMO_LOCK_SOON, locked: false, now: DEMO_NOW }}
             />
@@ -1539,33 +1554,30 @@ function Section({
  * section used to spell out its own `state` and `middle` by hand, which meant
  * eight chances to demonstrate a card the app does not actually draw — and the
  * gallery is the surface these states are reviewed on, so a wrong one here is
- * worse than no example. This wires the same three pieces in the same order as
- * `ContestCarousel`: `figureOf` reads the field, `Figure` takes the head's
- * right column, `Standing` takes the middle.
+ * worse than no example. It maps a fixture to an `Entry` exactly as `Card` in
+ * `ContestCarousel` maps a `MyContest` to one — which is now the whole of what
+ * either caller does, since the card owns all three of its bands.
  */
 function KitEntered({
   name,
   terms,
-  subtitle,
   myPoints,
   field,
   cut = null,
-  filled,
+  opponent = null,
   lock,
   prize = null,
-  final = false,
   level = 'sheet',
 }: {
   name: string;
   terms: ContestTerms;
-  subtitle?: string;
   myPoints: number | null;
   field: FieldWeek;
   cut?: number | null;
-  filled: number;
+  /** A head-to-head opponent. Only the kit builds one — see `opponentOf`. */
+  opponent?: Duel | null;
   lock: Lock;
   prize?: number | null;
-  final?: boolean;
   level?: CardLevel;
 }) {
   return (
@@ -1574,26 +1586,8 @@ function KitEntered({
       terms={terms}
       prize={prize}
       level={level}
-      state={
-        <Figure
-          {...figureOf(field, myPoints)}
-          filled={filled}
-          slots={terms.slotCount}
-          lock={lock}
-          final={final}
-        />
-      }
-      middle={
-        <Standing
-          manager="nickroachy"
-          subtitle={subtitle}
-          terms={terms}
-          myPoints={myPoints}
-          field={field}
-          cut={cut}
-          filled={filled}
-        />
-      }
+      lock={lock}
+      entry={{ myPoints, projected: null, field, cut, opponent }}
     />
   );
 }

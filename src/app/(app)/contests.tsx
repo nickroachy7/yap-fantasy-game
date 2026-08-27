@@ -249,14 +249,19 @@ function ContestEntry({ contest, onPress }: { contest: Contest; onPress: () => v
       ? { label: `${filled} of ${contest.slotCount}`, tone: 'warning' as const }
       : { label: 'Lineup in', tone: 'positive' as const };
 
-  /* NO MIDDLE. That is the entire difference between this card and the one over
-     your lineup — the head, the terms and the foot are the same rows in the
-     same order, so a contest you enter does not change shape on you. */
+  /* NO ENTRY, AND THAT IS THE ONLY DIFFERENCE. The card is the same three bands
+     at the same three heights here as it is over your lineup — the scoring band
+     says NOT ENTERED rather than disappearing — so a contest you enter does not
+     change shape on you.
+
+     THE CHIP TAKES THE LOCK TAG'S CORNER. On the board that corner counts down
+     to kickoff; here the question is "can I enter this", and `list_open_contests`
+     does not carry a lock time to count with. Same corner, same one row. */
   return (
     <ContestCard
       name={contest.name}
       terms={termsOfContest(contest)}
-      state={<StatusChip label={status.label} tone={status.tone} />}
+      status={<StatusChip label={status.label} tone={status.tone} />}
       onPress={onPress}
     />
   );

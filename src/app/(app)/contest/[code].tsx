@@ -43,6 +43,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ContestTermsPanel } from '@/components/contests/ContestCard';
+import { formatLine } from '@/components/contests/contest-model';
 import { termsOfContest, useContests } from '@/components/contests/use-contests';
 import { ContestFieldPanel } from '@/components/contests/ContestFieldPanel';
 import { LineupEditor } from '@/components/lineup/LineupEditor';
@@ -118,7 +119,12 @@ export default function ContestSheet() {
   return (
     <PlayerSheetFrame
       title={contest?.name}
-      subtitle={contest ? `${contest.formatName} · ${contest.slotCount} cards` : undefined}
+      /* THE SAME SENTENCE THE CARD USED TO CARRY, from the same function. It
+         was assembled by hand here and by `formatLine` there, which is two
+         places wording one fact — the exact drift `contest-model` exists to
+         close. It lives up here alone now: the card's head dropped it for the
+         win condition, and `ContestTermsPanel` does not repeat it. */
+      subtitle={contest ? formatLine(termsOfContest(contest)) : undefined}
       onClose={close}
       closeLabel="Close contest">
       {error ? (

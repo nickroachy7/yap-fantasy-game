@@ -68,24 +68,50 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 
-import { ContestCard, Figure, Standing, figureOf } from '@/components/contests/ContestCard';
+import { ContestCard } from '@/components/contests/ContestCard';
 import { termsOfEntry, type MyContest } from '@/components/contests/use-my-contests';
-import { recordLabel, type Record_ } from '@/components/lineup/field';
 import { Hearts, type HeartSpan } from '@/components/runs/Hearts';
 import { Colors, Radius, Spacing, Type, selectionAccent } from '@/constants/theme';
 import type { PlayerState } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+
+/**
+ * How far outside the card each chevron hangs.
+ *
+ * ---------------------------------------------------------------------------
+ * IT IS BORROWED FROM THE SCREEN'S PADDING, NOT TAKEN FROM THE CARD
+ * ---------------------------------------------------------------------------
+ *
+ * These arrows used to be absolutely positioned ON the scroll surface, 5pt
+ * inside the card's own border — a grey glyph on the card's fill, at the height
+ * of its densest band, legible only if you already knew it was there.
+ *
+ * The tidy fix was to give each one a real column in a row with the pager:
+ * gutter, pages, gutter. That was wrong on sight. 28pt off a 343pt phone column
+ * is a visibly crunched card, and the card is the densest thing on the screen —
+ * it cannot pay for its own affordance.
+ *
+ * `Screen` already pads its content by `Spacing.three`, and the boards below
+ * cancel that padding to bleed to the screen edge. So there are 16 points of
+ * air either side of the card that nothing else is using, and the arrows go
+ * there: outside the card, inside the screen, and free.
+ *
+ * 14 leaves 2pt of clearance at the screen edge and puts the 7pt glyph roughly
+ * halfway into the trough. They are placed absolutely and therefore draw
+ * OUTSIDE their parent's box, which iOS and the web both allow; if this ever
+ * ships to Android and the arrows vanish, that clipping is the reason.
+ */
+const CHEV_GUTTER = 14;
 
 export function ContestCarousel({
   contests,
   index,
   onIndexChange,
   onOpen,
-  displayName,
+  onTileChange,
   lockAt,
   locked,
   now,
-  record,
   run,
   onEnter,
   width,
@@ -103,12 +129,25 @@ export function ContestCarousel({
    * A contest you had entered had no page at all once you were in it.
    */
   onOpen?: (contest: MyContest) => void;
-  displayName: string;
+  /**
+   * "The reader has swiped past the last contest, onto the invitation."
+   *
+   * THE BOARD UNDERNEATH USED TO KEEP THE LAST CONTEST'S LINEUP HERE, and the
+   * reasoning was that swapping it for nothing empties the screen behind an
+   * invitation. In practice it did something worse: a page whose card says
+   * "enter a new contest" sat over a filled `Starting lineup · 3/3` belonging
+   * to a contest that had just slid off the screen — a lineup presented as
+   * though it were this page's, on the one page that has none.
+   *
+   * So the tile is a state the parent has to know about, and it draws its own
+   * empty board for it. Fired only when the answer CHANGES, because on web the
+   * settle handler runs on every scroll tick (see the header) and this would
+   * otherwise re-render the whole lineup screen mid-drag.
+   */
+  onTileChange?: (onTile: boolean) => void;
   lockAt: string | null;
   locked: boolean;
   now: number;
-  /** The SEASON record, which only the free contest's card shows. */
-  record: Record_;
   /**
    * The run, for the rack under the card. Null while it loads, and drawn only
    * while the run has hearts to draw — a dead one awaiting its carry shows
@@ -130,8 +169,6 @@ export function ContestCarousel({
 }) {
   const listRef = useRef<FlatList<MyContest>>(null);
   const { width: windowWidth } = useWindowDimensions();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
   /* Before the parent has measured, fall back to the window rather than to
      zero: a zero-width page makes `getItemLayout` divide by nothing and the
      list snaps to index NaN.
@@ -187,11 +224,17 @@ export function ContestCarousel({
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const next = Math.round(e.nativeEvent.contentOffset.x / step);
       if (next < 0 || next > contests.length) return;
+      /* ONLY ON A CHANGE OF ANSWER. On web this handler is the debounced
+         `onScroll` (see the header), so an unconditional call would re-render
+         the whole lineup screen on every tick of a drag. */
+      if ((next >= contests.length) !== (page >= contests.length)) {
+        onTileChange?.(next >= contests.length);
+      }
       setPage(next);
-      // The tile is not a contest; the board below keeps the one it had.
+      // The tile is not a contest; the board below draws its own empty state.
       if (next < contests.length && next !== index) onIndexChange(next);
     },
-    [step, contests.length, index, onIndexChange],
+    [step, contests.length, index, page, onIndexChange, onTileChange],
   );
 
   /**
@@ -217,10 +260,13 @@ export function ContestCarousel({
        * should not make the reader watch it being carried out.
        */
       listRef.current?.scrollToOffset({ offset: step * next, animated: false });
+      if ((next >= contests.length) !== (page >= contests.length)) {
+        onTileChange?.(next >= contests.length);
+      }
       setPage(next);
       if (next < contests.length && next !== index) onIndexChange(next);
     },
-    [step, contests.length, index, onIndexChange],
+    [step, contests.length, index, page, onIndexChange, onTileChange],
   );
 
   /**
@@ -300,69 +346,55 @@ export function ContestCarousel({
 
   return (
     <View>
-      <FlatList
-        ref={listRef}
-        data={contests}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={onSettle}
-        /* Web only, and only because the prop above never fires there. Adding
-           it on native as well would move the board mid-drag, which is a
-           behaviour change to the platform that already works. */
-        {...(Platform.OS === 'web'
-          ? { onScroll: onSettle, scrollEventThrottle: 16 }
-          : null)}
-        keyExtractor={(item) => item.id}
-        getItemLayout={(_, i) => ({ length: step, offset: step * i, index: i })}
-        /* OPENS ON THE LINKED CARD, not on the first one. Arriving from the
-           contest sheet means the reader has just chosen a contest, and a
-           carousel that marked it active while showing the free contest's card
-           would be the same mismatch this component exists to fix — one rank
-           down. Safe with `getItemLayout` supplied; without it the list cannot
-           measure ahead and silently ignores this. */
-        initialScrollIndex={index}
-        renderItem={({ item, index: i }) => (
-          <View
-            style={{ width: step }}
-            /* The first card only: they are within a few points of each other
-               — the same rows in the same order — and measuring every page
-               would set the same state from three directions on every swipe. */
-            onLayout={i === 0 ? (e) => setCardHeight(e.nativeEvent.layout.height) : undefined}>
-            <Card
-              contest={item}
-              onOpen={onOpen}
-              {...{ displayName, lockAt, locked, now, record }}
-            />
-          </View>
-        )}
-        /* THE LAST PAGE IS THE WAY INTO THE LOBBY, and it is a footer rather
-           than an extra row of data so that nothing downstream has to hold a
-           union of "contest or invitation": `keyExtractor`, `getItemLayout`
-           and the index arithmetic all stay about contests. It is exactly one
-           page wide, so `round(x / page)` keeps working across it. */
-        ListFooterComponent={
-          <View style={{ width: step }}>
-            <EnterTile onPress={onEnter} minHeight={cardHeight} />
-          </View>
-        }
-      />
-      {/* THE SWIPE, ADVERTISED. Only in the directions that exist, so the last
-          page shows one arrow and a single-contest account never sees a left
-          one. `pointerEvents="none"` is load-bearing rather than tidy: these sit
-          on top of the scroll surface, and a tap target at the card's edge would
-          swallow the start of the very drag it is asking for. They are an
-          indicator, not a control — the rack below is the control. */}
-      {cardHeight > 0 && page > 0 ? (
-        <View pointerEvents="none" style={[styles.chevSlot, { left: 5, top: cardHeight / 2 - 5 }]}>
-          <Chevron side="left" color={c.textTertiary} />
-        </View>
-      ) : null}
-      {cardHeight > 0 && page < contests.length ? (
-        <View pointerEvents="none" style={[styles.chevSlot, { right: 5, top: cardHeight / 2 - 5 }]}>
-          <Chevron side="right" color={c.textTertiary} />
-        </View>
-      ) : null}
+      {/* THE STAGE: the pages, with an arrow hung off each side in the screen's
+          own padding. Only in the directions that exist — see `CHEV_GUTTER`. */}
+      <View style={styles.stage}>
+        <ChevSlot side="left" show={page > 0} onPress={() => goTo(page - 1)} />
+        <ChevSlot side="right" show={page < contests.length} onPress={() => goTo(page + 1)} />
+        <FlatList
+          ref={listRef}
+          data={contests}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={onSettle}
+          /* Web only, and only because the prop above never fires there. Adding
+             it on native as well would move the board mid-drag, which is a
+             behaviour change to the platform that already works. */
+          {...(Platform.OS === 'web'
+            ? { onScroll: onSettle, scrollEventThrottle: 16 }
+            : null)}
+          keyExtractor={(item) => item.id}
+          getItemLayout={(_, i) => ({ length: step, offset: step * i, index: i })}
+          /* OPENS ON THE LINKED CARD, not on the first one. Arriving from the
+             contest sheet means the reader has just chosen a contest, and a
+             carousel that marked it active while showing the free contest's card
+             would be the same mismatch this component exists to fix — one rank
+             down. Safe with `getItemLayout` supplied; without it the list cannot
+             measure ahead and silently ignores this. */
+          initialScrollIndex={index}
+          renderItem={({ item, index: i }) => (
+            <View
+              style={{ width: step }}
+              /* The first card only: they are within a few points of each other
+                 — the same rows in the same order — and measuring every page
+                 would set the same state from three directions on every swipe. */
+              onLayout={i === 0 ? (e) => setCardHeight(e.nativeEvent.layout.height) : undefined}>
+              <Card contest={item} onOpen={onOpen} {...{ lockAt, locked, now }} />
+            </View>
+          )}
+          /* THE LAST PAGE IS THE WAY INTO THE LOBBY, and it is a footer rather
+             than an extra row of data so that nothing downstream has to hold a
+             union of "contest or invitation": `keyExtractor`, `getItemLayout`
+             and the index arithmetic all stay about contests. It is exactly one
+             page wide, so `round(x / page)` keeps working across it. */
+          ListFooterComponent={
+            <View style={{ width: step }}>
+              <EnterTile onPress={onEnter} minHeight={cardHeight} />
+            </View>
+          }
+        />
+      </View>
       {rack ? (
         <RunRail
           run={rack}
@@ -577,6 +609,53 @@ function EnterTile({ onPress, minHeight }: { onPress: () => void; minHeight: num
   );
 }
 
+/**
+ * A chevron in the screen's padding, beside the card.
+ *
+ * ---------------------------------------------------------------------------
+ * IT IS A CONTROL NOW, BECAUSE IT IS NO LONGER IN THE WAY
+ * ---------------------------------------------------------------------------
+ *
+ * These used to be `pointerEvents="none"` and that was load-bearing rather than
+ * fussy: they sat ON the scroll surface, so a tap target at the card's edge
+ * would have swallowed the start of the very drag it was asking for. Outside
+ * the card there is nothing to swallow — the trough is not part of the pager —
+ * so the arrow can do what an arrow looks like it does.
+ *
+ * IT DRAWS ONLY IN A DIRECTION THAT EXISTS, so the last page shows one arrow
+ * and a single-contest account never sees a left one. Nothing shifts when one
+ * disappears: the slots are absolutely placed and the pager does not know they
+ * are there.
+ */
+function ChevSlot({
+  side,
+  show,
+  onPress,
+}: {
+  side: 'left' | 'right';
+  show: boolean;
+  onPress: () => void;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  if (!show) return null;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={side === 'left' ? 'Previous contest' : 'Next contest'}
+      /* The glyph is 7pt in a 14pt trough; the thumb gets the rest. */
+      hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
+      style={({ pressed }) => [
+        styles.chevSlot,
+        side === 'left' ? styles.chevLeftSlot : styles.chevRightSlot,
+        pressed && styles.pressed,
+      ]}>
+      <Chevron side={side} color={c.textTertiary} />
+    </Pressable>
+  );
+}
+
 /** One arrow, from a box and two borders. See `styles.chev`. */
 function Chevron({ side, color }: { side: 'left' | 'right'; color: string }) {
   return (
@@ -591,27 +670,26 @@ function Chevron({ side, color }: { side: 'left' | 'right'; color: string }) {
 }
 
 /**
- * One card — the shared `ContestCard` with a `Standing` in its middle.
+ * One card — the shared `ContestCard`, handed this contest's facts.
  *
- * That middle is the ONLY thing this adds to what the lobby draws. See the
- * header on `ContestCard`: head, terms and foot are the same rows in the same
- * order on both surfaces, so entering a contest does not change its shape.
+ * THIS FUNCTION COMPOSES NOTHING NOW. It used to assemble a `Figure` for the
+ * head's right column and a `Standing` for the middle, which meant the board
+ * held two thirds of the card's layout and the lobby held its own copy of the
+ * other third. The card owns all three bands — its height is a contract, and a
+ * caller passing nodes is a caller who can break it — so what is left here is a
+ * mapping from `MyContest` to `Entry` and nothing else.
  */
 function Card({
   contest,
-  displayName,
   lockAt,
   locked,
   now,
-  record,
   onOpen,
 }: {
   contest: MyContest;
-  displayName: string;
   lockAt: string | null;
   locked: boolean;
   now: number;
-  record: Record_;
   onOpen?: (contest: MyContest) => void;
 }) {
   const terms = termsOfEntry(contest);
@@ -624,37 +702,21 @@ function Card({
          week the screen above already states. */
       name={contest.name}
       terms={terms}
-      /* THE HEAD'S RIGHT COLUMN IS THE FIGURE HERE, where the lobby puts a
-         chip. Same corner, same question — "what state is this in" — answered
-         with the number the state is about rather than with a word for it. The
-         `Locked` and `Final` chips this replaces were saying what the masthead
-         above already says in the week's context line, and the figure's own
-         qualifier says it again where it is useful. */
-      state={
-        <Figure
-          {...figureOf(contest.field, contest.field.myPoints)}
-          filled={contest.filled}
-          slots={terms.slotCount}
-          lock={{ at: lockAt, locked, now }}
-          final={contest.field.final}
-        />
-      }
+      lock={{ at: lockAt, locked, now }}
+      entry={{
+        myPoints: contest.field.myPoints,
+        /* NO PROJECTIONS EXIST. The slot is real and the value is null — see
+           `Entry.projected`. When a pregame number is available this is the one
+           line that changes. */
+        projected: null,
+        field: contest.field,
+        cut: contest.cut,
+      }}
       prize={contest.myPrize}
       /* THE PAGE, NOT A SHEET. The board is #000 with the tab bar's grey across
          the bottom, and this card is the other end of the same frame — see
          `CardLevel`. */
       level="page"
-      middle={
-        <Standing
-          manager={displayName}
-          subtitle={contest.kind === 'free' ? `Season ${recordLabel(record)}` : undefined}
-          terms={terms}
-          myPoints={contest.field.myPoints}
-          field={contest.field}
-          cut={contest.cut}
-          filled={contest.filled}
-        />
-      }
       onPress={onOpen ? () => onOpen(contest) : undefined}
     />
   );
@@ -687,10 +749,23 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.two + 2,
   },
 
-  /* Absolutely placed over the card, in the card's OWN gutter — `band` pads by
-     `Spacing.three`, so a 7pt mark 5pt from the edge sits in air the card had
-     already reserved and never lands on a word. */
-  chevSlot: { position: 'absolute', width: 12, alignItems: 'center' },
+  /* The pager, with the two arrows hung off its sides. Nothing here reserves
+     width for them — see `CHEV_GUTTER`. */
+  stage: { position: 'relative' },
+  /* `top: 0, bottom: 0` and centre: the arrow finds the card's vertical middle
+     from the stage's own height, which is what the old placement needed a
+     measured `cardHeight` for — and why it drew nothing at all until the first
+     layout had landed. */
+  chevSlot: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: CHEV_GUTTER,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chevLeftSlot: { left: -CHEV_GUTTER },
+  chevRightSlot: { right: -CHEV_GUTTER },
   /* A chevron from one box and two borders, the way `TabIcon` builds every glyph
      it draws — no font, no asset, and it inherits the stroke weight of the rules
      around it. */

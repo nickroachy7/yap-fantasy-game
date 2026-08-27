@@ -52,10 +52,10 @@ import {
 } from 'react-native';
 
 import { RosterBar } from '@/components/collection/RosterBar';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { BenchBoard } from '@/components/lineup/BenchBoard';
 import { ContestCarousel } from '@/components/lineup/ContestCarousel';
 import { useMyContests } from '@/components/contests/use-my-contests';
-import { useFieldRecord } from '@/components/lineup/field';
 import { SlotBoard } from '@/components/lineup/SlotBoard';
 import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
 import {
@@ -180,6 +180,18 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
      showing the wrong card before the right one. `swiped` is null until a
      swipe actually happens, and from then on it owns the selection. */
   const [swiped, setSwiped] = useState<number | null>(null);
+  /**
+   * "The carousel is parked on the invitation rather than on a contest."
+   *
+   * A LINEUP BELONGS TO A CONTEST, AND THAT PAGE HAS NONE. The carousel used to
+   * leave the board alone when you swiped onto the "enter a new contest" tile,
+   * on the reasoning that emptying the screen behind an invitation is worse than
+   * showing something. It is not: what it showed was a full `Starting lineup ·
+   * 3/3` belonging to a contest that had just slid off the screen, presented as
+   * though it were this page's. A reader could file, swipe, and read their own
+   * filed lineup as the one they were being invited to build.
+   */
+  const [onTile, setOnTile] = useState(false);
 
   /* ARRIVING WITH A CONTEST NAMED BEATS WHATEVER WAS SWIPED TO EARLIER.
      This board is a tab: it stays mounted while the lobby and the contest
@@ -195,6 +207,10 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
   if (linkedCode !== lastLinked) {
     setLastLinked(linkedCode);
     setSwiped(null);
+    /* Arriving with a contest named puts the carousel back on a card, so the
+       tile flag has to come back with it — the carousel adjusts its own page
+       during render and cannot call back out of one. */
+    setOnTile(false);
   }
   const linkedIndex = linkedCode
     ? (myContests?.findIndex((ct) => ct.code === linkedCode) ?? -1)
@@ -232,7 +248,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
     reload,
     reloadLineup,
   } = useLineupData(contestCode);
-  const { displayName, run, roster } = usePlayer();
+  const { run, roster } = usePlayer();
 
   /**
    * Edits are an overlay on the saved lineup rather than a copy of it. Copying
@@ -550,11 +566,12 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
    * `slate` on every countdown tick, and a hook that depended on the object
    * would re-read the season once a second.
    */
-  /* `record` only — the SEASON record, which the free contest's card shows.
-     The week's distribution now comes per contest from `useMyContests`, since
-     `median_record` is deliberately free-only and a lobby card needs its own
-     field. See `20260825070000`. */
-  const { record, reload: reloadField } = useFieldRecord(slate);
+  /* NO SEASON RECORD IS READ HERE ANY MORE. `useFieldRecord` fed exactly one
+     thing — a "SEASON 1-0" in the corner of the free contest's card — and the
+     card dropped it: the head is where you learn which contest this is, and a
+     season standing is not that. The hook is still in `field.ts` for whatever
+     surface wants to make a proper case for the season; this screen no longer
+     pays for a query it does not draw. */
 
   /* Both of these clear the failure state as well as the error text: a new
      choice is a new thing to try, and it deserves an attempt of its own. */
@@ -701,8 +718,8 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
    * watching a game on into a screen that appears to be struggling.
    */
   const reread = useCallback(async () => {
-    await Promise.all([reload(), reloadField(), reloadMyContests()]);
-  }, [reload, reloadField, reloadMyContests]);
+    await Promise.all([reload(), reloadMyContests()]);
+  }, [reload, reloadMyContests]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -1012,11 +1029,13 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
         contests={myContests ?? []}
         index={cardIndex}
         onIndexChange={setSwiped}
-        displayName={displayName}
+        /* The last page is the invitation, not a contest — the boards below
+           draw an empty state for it rather than keeping the last contest's
+           lineup. See `onTileChange` in the carousel. */
+        onTileChange={setOnTile}
         lockAt={nextLockAt ?? lockAt}
         locked={allLocked}
         now={now}
-        record={record}
         run={run}
         /* The lobby, over this board. It is a sheet rather than a page now, so
            this pushes and closing puts the reader back on the lineup they were
@@ -1028,8 +1047,40 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
     </View>
   );
 
+  /**
+   * THE INVITATION HAS NO LINEUP, AND SAYS SO.
+   *
+   * Swiping past the last contest lands on the "enter a new contest" tile, and
+   * the board under it used to keep whatever contest had just slid off the
+   * screen — a filled `Starting lineup · 3/3` sitting under a card offering to
+   * start one. The slots were real and they were not this page's, which is the
+   * worst kind of wrong a board can be.
+   *
+   * NO SLOTS AND NO REQUIREMENTS, because there is no contest to have any. A
+   * generic eight-slot skeleton would be inventing a format; the honest empty
+   * state is the sentence that says a lineup belongs to a contest and the way
+   * to go and pick one.
+   *
+   * THE BENCH GOES WITH IT. It is still true — those cards are still yours —
+   * but every interaction on it is "start this player", and there is nothing to
+   * start them into. A board of controls that all decline is worse than none.
+   */
+  const emptyBoard = (
+    <>
+      <SectionHead label="Starting lineup" hint="No contest" tone={c.textTertiary} />
+      <EmptyState
+        title="No lineup on this card"
+        body="A lineup belongs to a contest. Enter one and its slots appear here, with only the cards that contest allows."
+        actionLabel="See open contests"
+        onAction={() => router.push('/contests')}
+      />
+    </>
+  );
+
   /** Everything under the card. */
-  const boards = (
+  const boards = onTile ? (
+    emptyBoard
+  ) : (
     <>
       {/* THE WALL, WHERE IT CAN BE SEEN. Over the cap nothing on this board can
           be changed — see `overCap` — so the reason sits above the slots rather

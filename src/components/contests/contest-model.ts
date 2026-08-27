@@ -22,6 +22,8 @@
  * descriptions of one thing.
  */
 
+import { MIN_ENTRANTS } from '@/components/lineup/field';
+
 /** How a contest decides a winner. Mirrors `public.contest_win_condition`. */
 export type WinCondition = 'median' | 'top_n';
 
@@ -58,8 +60,15 @@ export type ContestTerms = {
  * The rank is stated WITH the field size wherever the field is known, for the
  * same reason every rank in this codebase is: "top 3" of four entrants and
  * "top 3" of forty are different offers wearing one phrase.
+ *
+ * IT TAKES THE OPPONENT FOR THE SAME REASON `opponentOf` EXISTS. A duel is won
+ * by beating one named person, and a head that said "Beat the median" over a
+ * scoreboard reading YOU against @calvin would be the card disagreeing with
+ * itself — which is the exact class of bug this file was written to end. One
+ * question, one answer, whichever surface is asking.
  */
-export function winLine(t: ContestTerms): string {
+export function winLine(t: ContestTerms, duel?: Duel | null): string {
+  if (duel) return `Beat ${duel.handle}`;
   if (t.winCondition === 'top_n' && t.winRank !== null) {
     return t.entrants > t.winRank
       ? `Top ${t.winRank} of ${t.entrants} win`
@@ -69,61 +78,166 @@ export function winLine(t: ContestTerms): string {
 }
 
 /**
- * The mark the bar should draw, which is NOT always the median.
+ * ONE OPPONENT, WHATEVER THE FORMAT — the right-hand side of the scoreboard.
  *
- * THE BUG THIS REPLACES: the card drew the median on every contest and labelled
- * it, including on a `top_n` contest where the median decides nothing. A player
+ * ---------------------------------------------------------------------------
+ * WHY THIS REPLACED `markOf`
+ * ---------------------------------------------------------------------------
+ *
+ * `markOf` answered "where do I draw the line on the bar", which is a question
+ * about a graphic. That was the right question while the card was a figure over
+ * an axis, and it is the wrong one now: the card is a SCOREBOARD, and every
+ * format it can ever draw is the same sentence with a different noun in it.
+ *
+ *     beat the median   you  vs  the community's middle
+ *     top n             you  vs  the score at the cut
+ *     head to head      you  vs  another manager
+ *
+ * So the model answers "who am I playing" instead, and the band draws two
+ * totals side by side without ever learning what kind of contest it is in.
+ * Adding a head-to-head format is then a branch HERE and a graphic there —
+ * nothing about the scoreboard itself changes, which is the whole point.
+ *
+ * ---------------------------------------------------------------------------
+ * THE BUG THIS STILL FIXES
+ * ---------------------------------------------------------------------------
+ *
+ * The card once drew the median on every contest and labelled it MEDIAN,
+ * including on a `top_n` contest where the median decides nothing. A player
  * could sit comfortably above the middle of a field that pays three and be
  * sixth — reading a threshold that could not win them anything, in the one
- * place they would look to find out whether they were winning.
- *
- * Under `top_n` the line is the CUT: the lowest score still inside the paying
- * places, computed by `my_contest_cards`. It is null until enough of the field
- * has scored to have one, which is the same condition the median has.
+ * place they would look to find out whether they were winning. Under `top_n`
+ * the opponent is the CUT: the lowest score still inside the paying places,
+ * computed by `my_contest_cards`. Null until enough of the field has scored to
+ * have one, which is the same condition the median has.
  */
-export function markOf(
+export function opponentOf(
   t: Pick<ContestTerms, 'winCondition' | 'winRank'>,
-  field: { median: number; cut: number | null },
-): { value: number | null; label: string } {
-  if (t.winCondition === 'top_n' && t.winRank !== null) {
-    return { value: field.cut, label: ordinal(t.winRank).toUpperCase() };
+  against: { median: number; cut: number | null; duel?: Duel | null },
+): Opponent {
+  /* A REAL PERSON BEATS EVERY DERIVED LINE. Where there is one there is nothing
+     to derive: you are playing them, not the field they happen to sit in. */
+  if (against.duel) {
+    return { label: against.duel.handle, value: against.duel.points, shape: 'duel' };
   }
-  return { value: field.median, label: 'MEDIAN' };
+  if (t.winCondition === 'top_n' && t.winRank !== null) {
+    return { label: `THE CUT · ${ordinal(t.winRank)}`, value: against.cut, shape: 'field' };
+  }
+  return { label: 'COMMUNITY', value: against.median, shape: 'field' };
 }
+
+/**
+ * The other manager, on a format that has one.
+ *
+ * NULL EVERYWHERE TODAY, and deliberately a shape rather than a stub. No
+ * head-to-head contest exists — see the note on `opponentOf` — so nothing
+ * constructs one of these outside the kit's fixtures. What it buys now is that
+ * the card cannot be written in a way that assumes its opponent is a number
+ * with no name, which is exactly how the previous version came to have no seat
+ * for a person in it.
+ */
+export type Duel = { handle: string; points: number | null };
+
+/**
+ * Who the scoreboard's right-hand column is, and which graphic goes under it.
+ *
+ * `shape` is the ONLY thing the band branches on. A field puts you somewhere in
+ * a distribution and the rail draws that; a duel has no distribution to be in
+ * and draws a tug-of-war from level. Everything above the graphic — both
+ * labels, both totals, the margin — is identical in the two cases.
+ */
+export type Opponent = {
+  /** `COMMUNITY`, `THE CUT · 3RD`, or a manager's handle. */
+  label: string;
+  /** Their total, or null while there is nothing to compare against. */
+  value: number | null;
+  shape: 'field' | 'duel';
+};
 
 const ORDINALS = ['0TH', '1ST', '2ND', '3RD'] as const;
 
+
+/** Uppercase throughout: every caller sets it in a 9pt micro label. */
 function ordinal(n: number): string {
   if (n > 0 && n < ORDINALS.length) return ORDINALS[n];
   const rem100 = n % 100;
-  if (rem100 >= 11 && rem100 <= 13) return `${n}th`;
+  if (rem100 >= 11 && rem100 <= 13) return `${n}TH`;
   switch (n % 10) {
     case 1:
-      return `${n}st`;
+      return `${n}ST`;
     case 2:
-      return `${n}nd`;
+      return `${n}ND`;
     case 3:
-      return `${n}rd`;
+      return `${n}RD`;
     default:
-      return `${n}th`;
+      return `${n}TH`;
   }
 }
 
-/* ----------------------------------------------------------------- seats */
+/* ------------------------------------------------------------------ fill */
 
 /**
- * How full it is.
+ * HOW FULL IT IS, AND WHETHER THAT IS ENOUGH.
  *
- * `max_entrants` is nullable and is null on every contest that exists — a cap
- * on a four-tester beta is a way to discover the lobby is empty rather than
- * full (`20260825050000`). So this degrades to a bare count rather than
- * inventing a denominator, and says nothing at all when nobody has entered:
- * "0 in" is a fact that makes a contest look dead when it is merely early.
+ * This replaced `seatsLine`, which said "12 in" and stopped there. A count on
+ * its own is a fact without a scale: "1 in" looks like a quiet contest and is
+ * actually a contest that CANNOT BE SCORED — `median_record` needs two entries
+ * to have a middle, so a field of one settles as nothing whatever you score in
+ * it. That is the single most useful thing the head can say about a young
+ * contest and the old line could not say it.
+ *
+ * So the line always carries the count and, where the contest is short of
+ * playable, what it is short BY. Three cases and they are ordered by how much
+ * the reader can act on:
+ *
+ *   capped     "12 of 20 entries" — the denominator is the contest's own.
+ *              Every contest that exists has a null cap (`20260825050000`), so
+ *              this is the branch that waits for the format to grow one.
+ *   short      "Needs 2 entries" — under `MIN_ENTRANTS` and therefore
+ *              unscoreable whatever anybody scores. It states the REQUIREMENT
+ *              rather than the count, because at nought or one entrant the
+ *              count is not information and what the contest is waiting for
+ *              is. The remedy is other people, so the sentence is about them
+ *              rather than about you.
+ *   playable   "12 entries" — nothing to add. A contest past the minimum with
+ *              no cap has no target to be measured against, and inventing one
+ *              ("12 entries, aiming for 20") would be a number the game does
+ *              not hold.
+ *
+ * IT SAYS "ENTRIES" BECAUSE "IN" DID NOT SAY ANYTHING. This read "12 in" and
+ * "1 in · 1 more to play", and at a glance nobody could tell what was in what —
+ * twelve cards? twelve gems? twelve minutes? The noun costs six characters in a
+ * slot that has room for them and turns a number into a fact.
+ *
+ * AND EVERY STRING IS UNDER ~18 CHARACTERS, WHICH IS A REQUIREMENT RATHER THAN
+ * A STYLE. This sits in the head's second row beside the win condition, which
+ * does not give way — so a long line here does not wrap, it CLIPS. Measured on
+ * a 375pt phone there is room for about eighteen characters beside
+ * "WIN CONDITION Beat the median", and two drafts of this line have already
+ * been lost to it: "No entries yet · 2 more to play" became "No entries yet ·
+ * 2 …" and "0 of 2 entries to play" became "0 of 2 entries to p…" — both times
+ * dropping the half that says what the contest is waiting for, in the one state
+ * where that is the only thing worth saying. Anything added here has to be
+ * counted, not eyeballed.
+ *
+ * NEVER SILENT. `seatsLine` returned null on an empty contest, on the argument
+ * that "0 in" makes a contest look dead when it is merely early — which was
+ * true of a bare count and is not true of a line that says what it is waiting
+ * for. The head reserves this row's height either way, so a null here bought
+ * nothing and cost the one state where the reader most needs telling.
  */
-export function seatsLine(t: ContestTerms): string | null {
-  if (t.maxEntrants != null) return `${t.entrants} of ${t.maxEntrants} in`;
-  if (t.entrants > 0) return `${t.entrants} in`;
-  return null;
+export function fillLine(t: ContestTerms): string {
+  if (t.maxEntrants != null) {
+    return t.entrants >= t.maxEntrants
+      ? `Full · ${t.maxEntrants} entries`
+      : `${t.entrants} of ${t.maxEntrants} entries`;
+  }
+  if (t.entrants < MIN_ENTRANTS) {
+    if (t.entrants === 0) return `Needs ${MIN_ENTRANTS} entries`;
+    const short = MIN_ENTRANTS - t.entrants;
+    return `Needs ${short} more ${short === 1 ? 'entry' : 'entries'}`;
+  }
+  return `${t.entrants} ${t.entrants === 1 ? 'entry' : 'entries'}`;
 }
 
 /**
@@ -235,7 +349,14 @@ export function rewardLines(t: ContestTerms, prize: number | null = null): Trade
 
   /* A SETTLED PRIZE REPLACES THE POOL, because the pool has stopped being a
      question. Never a running "you would win 60" — that is a projection and
-     this app does not sell them. */
+     this app does not sell them.
+
+     EVERY LINE HERE FITS ON ONE. The trade band reserves a fixed number of
+     single-line rows so the card's height cannot move — see `TRADE_LINES` in
+     `ContestCard` — so a string that needs two is a string that gets clipped.
+     "Gem pool, once entries start" was that string, and it is "Share of the
+     pool" now: the same sentence as the funded case rather than a separate
+     apology for an empty one. */
   if (prize !== null && prize > 0) {
     lines.push({ text: `Won ${prize} gems`, tone: 'positive' });
   } else if (t.entryFeeGems > 0) {
@@ -246,7 +367,7 @@ export function rewardLines(t: ContestTerms, prize: number | null = null): Trade
           ? top !== null
             ? `Up to ${top} gems`
             : `Share of ${t.prizePool} gems`
-          : 'Gem pool, once entries start',
+          : 'Share of the pool',
     });
   } else {
     lines.push({ text: 'From 1.5 gems a point' });

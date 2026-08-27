@@ -642,7 +642,7 @@ const SLOTS = ['QB', 'RB', 'RB', 'WR', 'WR', 'WR', 'TE', 'PK'];
  * nobody swipes a desktop browser during development — so the one platform the
  * bug existed on was the one platform it could not be seen on.
  *
- * The free contest is first, as it always is, and carries the season record.
+ * The free contest is first, as it always is.
  * The second is a `top_n` lobby contest with a heart and a pool on it, so the
  * card head has a stake to draw and — the reason it is `top_n` rather than a
  * second median contest — the bar has a CUT to mark rather than a median.
@@ -741,11 +741,9 @@ function LineupFixture() {
           contests={CONTEST_FIXTURES}
           index={contestIndex}
           onIndexChange={setContestIndex}
-          displayName="nickroachy"
           lockAt={null}
           locked={false}
           now={Date.parse('2026-08-25T12:00:00Z')}
-          record={{ wins: 1, losses: 0, ties: 0 }}
           /* The fixture run, so the rack under the card draws all three heart
              states and the focused pip can be seen moving as you swipe — see
              `Foot` in the carousel. */
