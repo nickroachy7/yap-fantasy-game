@@ -182,12 +182,11 @@ export default function AppLayout() {
             open it, enter something, put it down — and the bar it cost was two
             thirds of the chrome on the game's main screen. Reached from the
             last card of the lineup carousel; see `CONTESTS` in `sections.ts`. */}
+        {/* The lobby, which is also the archive: `contests` swaps its own
+            content rather than presenting a second sheet over itself. See the
+            note on `view` there — a sheet stacked on a sheet is the layering
+            `pull.tsx` was already burned by once. */}
         <Stack.Screen name="contests" options={sheetOptions} />
-        {/* The archive, opened from the lobby. A sheet like the lobby it comes
-            from rather than a tab of its own: it is a thing you go and look at
-            and put down, which is the rule `leagues.tsx` states and the one
-            `sheetOptions` exists for. */}
-        <Stack.Screen name="contest-history" options={sheetOptions} />
         {/* The death screen. An ORDINARY PUSH, and that is the decision:
             every other route in this stack is presented over the app, and this
             one deliberately is not.

@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ContestCard } from '@/components/contests/ContestCard';
@@ -7,6 +7,11 @@ import { termsOfContest, useContests, type Contest } from '@/components/contests
 import { Hearts } from '@/components/runs/Hearts';
 import { nextRungLine, recordOf, wageredLine } from '@/components/runs/run';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
+import {
+  ContestHistoryPanel,
+  historySummary,
+} from '@/components/contests/ContestHistoryPanel';
+import { useContestHistory } from '@/components/contests/use-contest-history';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
 import { StatusChip } from '@/components/ui/StatusChip';
@@ -74,10 +79,21 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  * contests would make the safe thing look like a lesser version of the risky
  * one, when it is simply a different offer.
  */
+/**
+ * Which of the sheet's two faces is showing.
+ *
+ * ONE SHEET, TWO VIEWS, rather than two sheets. The archive was a presented
+ * route for about an hour and it put a popup over a popup — two ✕s, and a back
+ * gesture nobody expects. See the note on `ContestHistoryPanel`.
+ */
+type View_ = 'open' | 'history';
+
 export default function ContestsScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const router = useRouter();
+  const [view, setView] = useState<View_>('open');
+  const history = useContestHistory(view === 'history');
   const { contests, loading, error } = useContests();
   const { run } = usePlayer();
 
@@ -99,11 +115,14 @@ export default function ContestsScreen() {
   const open = live.filter((c) => c.kind !== 'free' && c.mine === null);
   const entered = live.filter((c) => c.kind !== 'free' && c.mine !== null).length;
 
-  const context = loading
-    ? undefined
-    : open.length > 0
-      ? `${open.length} open · one card plays one contest`
-      : 'One card plays one contest a week';
+  const context =
+    view === 'history'
+      ? historySummary(history.entries, history.loading, history.done)
+      : loading
+        ? undefined
+        : open.length > 0
+          ? `${open.length} open · one card plays one contest`
+          : 'One card plays one contest a week';
 
   const close = useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -112,13 +131,17 @@ export default function ContestsScreen() {
 
   return (
     <PlayerSheetFrame
-      title="Contests"
+      title={view === 'history' ? 'Recent contests' : 'Contests'}
       /* The count, or the rule when there is nothing to count. The sheet's
          subtitle is the one line a reader gets before the list, so it says
          whichever of the two is news. */
       subtitle={context}
       onClose={close}
       closeLabel="Close contests">
+      {view === 'history' ? (
+        <ContestHistoryPanel {...history} onBack={() => setView('open')} />
+      ) : (
+        <>
       {error ? <ErrorLine message={error} /> : null}
 
       {/* THE RUN, ABOVE THE LOBBY, because the lobby cannot be read without it.
@@ -164,7 +187,7 @@ export default function ContestsScreen() {
           the second thing anybody came here for, and on most visits it is not
           why they came at all. */}
       <Pressable
-        onPress={() => router.push('/contest-history')}
+        onPress={() => setView('history')}
         accessibilityRole="button"
         accessibilityLabel="See your recent contests"
         style={({ pressed }) => [
@@ -184,6 +207,8 @@ export default function ContestsScreen() {
       </Pressable>
 
       <Footnote />
+        </>
+      )}
     </PlayerSheetFrame>
   );
 }

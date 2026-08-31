@@ -103,7 +103,21 @@ function toEntry(r: HistoryRow): HistoryEntry {
   };
 }
 
-export function useContestHistory() {
+/**
+ * @param enabled Whether to fetch at all. False until the archive is actually
+ * opened.
+ *
+ * IT IS HOISTED TO THE LOBBY, WHICH IS WHY THIS EXISTS. The hook lives on the
+ * screen that owns the sheet rather than inside the panel, so going back to the
+ * open list and returning does not refetch a season — but that also means it
+ * would run on every single lobby open, for a list most visits never look at.
+ * The flag buys the caching without buying the round trip.
+ *
+ * IT ONLY EVER TURNS ON. Once the archive has been opened the rows are kept, so
+ * flipping back to the open list does not throw them away and asking again is
+ * free.
+ */
+export function useContestHistory(enabled: boolean) {
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
   /* The first page only. A page appended to a list already on screen must not
      replace it with a spinner — see `loadingMore`. */
@@ -117,6 +131,12 @@ export function useContestHistory() {
      has re-rendered with the flag set. State drives the spinner; this decides
      whether the request happens at all. */
   const busy = useRef(false);
+  /* WHETHER THE FIRST PAGE HAS BEEN ASKED FOR. A ref rather than reading
+     `entries`, because `entries` as an effect dependency would re-run the
+     effect on every appended page and start the first one over. Set INSIDE the
+     effect: a ref written during render is a second source of truth for the
+     same frame, which is what `react-hooks/refs` is pointing at. */
+  const asked = useRef(false);
   const live = useRef(true);
   useEffect(() => {
     live.current = true;
@@ -179,6 +199,11 @@ export function useContestHistory() {
      list that is already on screen, where flipping the spinner back on IS the
      point. */
   useEffect(() => {
+    /* Not yet asked for, or already answered. Either way there is nothing to
+       fetch — and `loading` stays true so an enabled-later mount does not flash
+       an empty state before its first page lands. */
+    if (!enabled || asked.current) return;
+    asked.current = true;
     let alive = true;
     busy.current = true;
     void (async () => {
@@ -187,6 +212,10 @@ export function useContestHistory() {
       if (!alive || !live.current) return;
       setLoading(false);
       if (message !== null) {
+        /* A FAILED FIRST PAGE IS NOT AN ANSWER. Released so the next thing that
+           enables this — reopening the archive — tries again, rather than
+           leaving the screen permanently showing one refusal. */
+        asked.current = false;
         setError(message);
         return;
       }
@@ -196,7 +225,7 @@ export function useContestHistory() {
     return () => {
       alive = false;
     };
-  }, [fetchPage]);
+  }, [enabled, fetchPage]);
 
   return { entries, loading, loadingMore, done, error, more, reload };
 }

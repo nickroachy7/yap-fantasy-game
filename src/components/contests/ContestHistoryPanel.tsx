@@ -1,17 +1,27 @@
 /**
  * Every contest you have finished, newest first.
  *
- * WHY IT IS A ROOM AND NOT A PANEL ON THE LOBBY
+ * ---------------------------------------------------------------------------
+ * IT IS A VIEW OF THE LOBBY, NOT A SHEET OVER IT
+ * ---------------------------------------------------------------------------
  *
- * The lobby answers one question — what can I enter — and it answers it in a
- * list short enough to read in a glance. A season of results is neither: it is
- * long, it pages, and nothing on it can be acted on. Hung under the Open panel
- * it would push the thing the screen is FOR below the fold by week three, and
- * grow for the rest of the year.
+ * This was a presented route for about an hour, and it was wrong in the way
+ * this app has already been wrong once: `/contests` is itself a sheet, so
+ * pushing a second one put a popup on top of a popup, with two ✕s on screen
+ * and a back gesture nobody has a reason to expect. `pull.tsx` has the same
+ * lesson written on it — see the note on `dismissTo` there.
  *
- * So the lobby keeps one row pointing here, and here is a list with one job.
- * Same sheet treatment as the lobby it opens from, because it is the same kind
- * of object: something you go and look at and put down.
+ * So the lobby OWNS the sheet and swaps what is inside it. One surface, one
+ * dismiss, and a back row that returns to the list you came from rather than
+ * unstacking a layer. What is here is the content and nothing else: no frame,
+ * no title, no close button, because the sheet already has all three and this
+ * is not entitled to a second set.
+ *
+ * IT IS STILL NOT A PANEL UNDER THE OPEN LIST, which was the other option. The
+ * lobby answers one question — what can I enter — in a list short enough to
+ * read at a glance. A season of results is long, it pages, and nothing on it
+ * can be acted on; hung underneath, it would push the thing the screen is FOR
+ * below the fold by week three and grow for the rest of the year.
  *
  * WHAT A ROW SAYS, AND IN WHAT ORDER
  *
@@ -29,10 +39,8 @@
  * hearts are the server's, frozen at settlement; see `contest_history`.
  */
 import { useRouter } from 'expo-router';
-import { useCallback } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { Gem } from '@/components/shell/AppHeader';
 import { Heart } from '@/components/runs/Hearts';
 import { useContestHistory, type HistoryEntry } from '@/components/contests/use-contest-history';
@@ -41,34 +49,54 @@ import { Panel } from '@/components/ui/Panel';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-export default function ContestHistoryScreen() {
-  const router = useRouter();
-  const { entries, loading, loadingMore, done, error, more } = useContestHistory();
-
-  const close = useCallback(() => {
-    if (router.canGoBack()) router.back();
-    else router.dismissTo('/contests');
-  }, [router]);
-
+/**
+ * The record, for the sheet's subtitle.
+ *
+ * Counted off what has LOADED, and it says so while there is more to come:
+ * "3 of 7 won so far" is honest about being a running total where "3 of 7 won"
+ * would be claiming to have counted the season.
+ */
+export function historySummary(
+  entries: HistoryEntry[] | null,
+  loading: boolean,
+  done: boolean,
+): string | undefined {
+  if (loading) return undefined;
   const played = entries?.length ?? 0;
+  if (played === 0) return 'Nothing settled yet';
   const won = entries?.filter((e) => e.result === 'W').length ?? 0;
+  return `${won} of ${played} won${done ? '' : ' so far'}`;
+}
+
+export function ContestHistoryPanel({
+  entries,
+  loading,
+  loadingMore,
+  done,
+  error,
+  more,
+  onBack,
+}: ReturnType<typeof useContestHistory> & { onBack: () => void }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const router = useRouter();
+  const played = entries?.length ?? 0;
 
   return (
-    <PlayerSheetFrame
-      title="Recent contests"
-      /* The record, which is the one line worth having before the list — and
-         the only figure on this screen that is about the SEASON rather than
-         about a week. Counted off what has loaded, so it is honest about being
-         a running total rather than claiming to be the year's. */
-      subtitle={
-        loading
-          ? undefined
-          : played === 0
-            ? 'Nothing settled yet'
-            : `${won} of ${played} won${done ? '' : ' so far'}`
-      }
-      onClose={close}
-      closeLabel="Close recent contests">
+    <>
+      {/* THE WAY BACK, and it is the first thing in the view rather than a
+          control on the frame. The sheet's own ✕ still means "put the whole
+          thing down"; this means "back to what I can enter", and the two must
+          not be the same button wearing two meanings. */}
+      <Pressable
+        onPress={onBack}
+        accessibilityRole="button"
+        accessibilityLabel="Back to open contests"
+        style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
+        <Text style={[Type.section, styles.chevron, { color: c.textTertiary }]}>‹</Text>
+        <Text style={[Type.strong, { color: c.textSecondary }]}>Open contests</Text>
+      </Pressable>
+
       {error ? <ErrorLine message={error} /> : null}
 
       <Panel title="Finished" inset={false}>
@@ -112,7 +140,7 @@ export default function ContestHistoryScreen() {
           </View>
         )}
       </Panel>
-    </PlayerSheetFrame>
+    </>
   );
 }
 
@@ -250,6 +278,19 @@ const styles = StyleSheet.create({
   },
   markEmpty: { borderWidth: StyleSheet.hairlineWidth },
   markText: { fontSize: 13 },
+
+  /* Sits above the panel rather than inside it, so the back control is at the
+     top of the SHEET's scroll and not at the top of a list that scrolls under
+     it. 44 tall like every other target in the app. */
+  back: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    minHeight: 44,
+    alignSelf: 'flex-start',
+    paddingRight: Spacing.two,
+  },
+  chevron: { lineHeight: 22 },
 
   centre: { paddingVertical: Spacing.four, alignItems: 'center' },
   more: {
