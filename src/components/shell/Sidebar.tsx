@@ -48,7 +48,7 @@ import {
   type WebNavItem,
 } from '@/components/shell/sections';
 import { NavIcon } from '@/components/icons/NavIcon';
-import { ChromeBand, RailWidth, TierColors } from '@/constants/theme';
+import { ChromeBand, RailWidth, TierColors, selectionAccent } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -62,7 +62,14 @@ const NUMERIC = { fontVariant: ['tabular-nums' as const] };
  */
 export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  /* Gold is CURRENCY and identity here — the coins pill and the avatar ring.
+     It is deliberately not the nav marker any more: since selection became its
+     own colour, "you are here" and "this is what things cost" are two ideas and
+     must not share a swatch. */
   const accent = TierColors[scheme].gold.accent;
+  /* "You are here" on the web rail — the same job the action bar does on a
+     phone, so it reads the same token that bar does. */
+  const selection = selectionAccent(scheme);
   const realPathname = usePathname();
   const pathname = pathnameOverride ?? realPathname;
   const { coins, displayName, run, loading } = usePlayer();
@@ -105,7 +112,7 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
       <View style={styles.nav}>
         {WEB_NAV.map((item) => (
           <View key={item.href} style={item.spacedAbove ? styles.spacedAbove : undefined}>
-            <NavRow item={item} active={isWebNavActive(item, pathname)} accent={accent} />
+            <NavRow item={item} active={isWebNavActive(item, pathname)} accent={selection} />
           </View>
         ))}
       </View>

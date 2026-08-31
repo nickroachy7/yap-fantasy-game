@@ -7,22 +7,22 @@
  * players to one position — looked like navigation on one screen and like a
  * filter on the other. One component, both screens.
  *
- * SELECTION IS THE APP'S GOLD, FILLED. It was a white 1.5pt outline over a
+ * SELECTION IS `selectionAccent`, FILLED. It was a white 1.5pt outline over a
  * lifted grey fill, which is the same "raised tile" the action bar and the
  * segmented control both moved off — a lot of furniture to say one word, and
  * on a row of seven chips the outline was the loudest mark on the screen while
  * being the one carrying the least meaning. Filling with `selectionAccent`
- * makes the selected chip the only warm thing in a grey row, which is the
- * treatment every other selected control in the app already uses.
+ * makes the selected chip the only saturated thing in a neutral row, which is
+ * the treatment every other selected control in the app already uses.
  *
  * IT IS STILL NOT COLOUR ALONE, and it is now further from it than the outline
- * was: the label INVERTS, dark ink on a light fill against light text on a dark
- * one. That survives greyscale by a wide margin — #E3BE4A against
+ * was: the label INVERTS, dark ink on a bright fill against light text on a
+ * dark one. That survives greyscale by a wide margin — the accent against
  * `backgroundElement` is most of the luminance range — where two dark greys a
  * border apart did not.
  *
- * The ink is the palette's own `gold.onAccent` rather than a black picked here,
- * so it moves if the accent ever does. 10.5:1 against the fill.
+ * The ink is the accent's own paired `selectionInk` rather than a black picked
+ * here, so it moves if the accent ever does.
  *
  * `FilterChips` is the same chip put to a second job: the page-level toggles —
  * search, sort, tiers — that used to sit in the section's action bar. They came
@@ -32,7 +32,7 @@
  */
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Colors, NUMERIC, Radius, Spacing, TierColors, Type, selectionAccent } from '@/constants/theme';
+import { Colors, NUMERIC, Radius, Spacing, Type, selectionAccent, selectionInk } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { horizontalStrip } from '@/components/ui/scroll-strip';
 
@@ -67,9 +67,10 @@ export function Chip({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const accent = selectionAccent(scheme);
-  /* The pair is fixed by construction — `selectionAccent` IS `gold.accent` —
-     so reading the ink from the same swatch is what stops the two drifting. */
-  const onAccent = TierColors[scheme].gold.onAccent;
+  /* Read the ink from the same swatch as the fill, which is what stops the two
+     drifting. It used to be `gold.onAccent` back when selection WAS the gold
+     tier; selection is its own colour now, so this follows it. */
+  const onAccent = selectionInk(scheme);
 
   return (
     <Pressable
