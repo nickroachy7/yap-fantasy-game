@@ -1,27 +1,51 @@
 /**
- * The floating tab pill's material, and the fade that gives it clean ground.
+ * The floating tab pill's material, and the surround that gives it clean ground.
  *
  * ---------------------------------------------------------------------------
- * THE FADE IS BELOW THE CAPSULE, NEVER BEHIND IT
+ * ONE SHAPE WITH A HOLE IN IT, BECAUSE FOUR RECTANGLES NEVER MEET CLEANLY
  * ---------------------------------------------------------------------------
  *
- * The first scrim ran from 44pt above the pill down to the screen's edge and
- * was fully opaque from the capsule's top edge onward. It solved the problem it
- * was aimed at — rows sliced by the capsule's edge — and destroyed the reason
- * the pill exists: glass with a solid black panel behind it has nothing to
- * refract, so the Liquid Glass rendered as a flat grey capsule. The material
- * only exists where content passes under it.
+ * The surround was assembled out of separate bands — one above the capsule, one
+ * below — and the pieces did not join. Beside the pill, in the 20pt margins
+ * either side of it, nothing was drawn at all: content there went from 80%
+ * dimmed to fully lit at exactly the capsule's top edge, which put a hard
+ * horizontal line across a bench row every time one scrolled past. That is not
+ * a tuning problem. Any surround built from rectangles that dodge the capsule
+ * has seams wherever two of them abut.
  *
- * So content stays visible behind the glass, and the fade is a 20pt band
- * BELOW the capsule, transparent at its top and the page's own black by the
- * screen's edge. That is the one place a scrim is unambiguously worth it: the
- * strip between the pill and the bottom of the screen is too short to show a
- * whole row, so whatever lands in it is always a fragment, and a fragment
- * reads as a rendering fault. Everywhere else the content showing through IS
- * the effect.
+ * So it is ONE rectangle covering the whole region, with the capsule punched
+ * out of it by a mask. There is nothing for a seam to form between, and the
+ * dimming is continuous from the top of the fade to the bottom of the screen
+ * and out to both edges.
  *
- * It reaches out past the pill's own margins to the screen's edges, so the band
- * runs the full width rather than stopping under the capsule's ends.
+ * ---------------------------------------------------------------------------
+ * THE HOLE IS WHAT KEEPS THE GLASS ALIVE
+ * ---------------------------------------------------------------------------
+ *
+ * An earlier version blacked out everything from the capsule's top edge down.
+ * It fixed rows being sliced and destroyed the reason the pill exists: glass
+ * with a solid panel behind it has nothing to refract, so Liquid Glass rendered
+ * as flat grey. The material only exists where content passes under it.
+ *
+ * The mask is the resolution. Everything around the capsule dims; the capsule's
+ * own footprint stays perfectly clear, so the list runs under the glass exactly
+ * as before. The pill reads as a lit window in a dimmed surround, which is what
+ * Sleeper's does.
+ *
+ * ---------------------------------------------------------------------------
+ * THE RAMP
+ * ---------------------------------------------------------------------------
+ *
+ *   0                    transparent, `TOP_FADE` above the capsule
+ *   at the capsule top   `SURROUND`, and it holds that value down the sides
+ *   at the screen edge   solid
+ *
+ * SURROUND STOPS SHORT OF SOLID. Reaching full black at the capsule's edge
+ * draws the same hard line this rewrite exists to remove, just in a different
+ * place: black outside, lit content through glass inside. At 0.8 rows stay
+ * faintly present as they pass, which is dimming a surround rather than erasing
+ * it. Only the last strip goes solid, because it is too short to show a whole
+ * row and a fragment at the screen's edge reads as a rendering fault.
  *
  * ---------------------------------------------------------------------------
  * REAL GLASS WHERE THERE IS REAL GLASS, AND A DESIGNED FALLBACK WHERE NOT
@@ -41,19 +65,18 @@
  *
  * THE TINT IS LIGHT, AND IT WAS NOT. It went in at 55% on the argument that
  * untinted regular glass over a near-black page comes out lighter than anything
- * else in the app — true, but that was measured against a scrim that had
- * already blacked out everything behind it. With the content back, a 55% wash
- * flattens the refraction into a plain grey capsule and the tint becomes a
- * second thing muting the effect. At 25% the app's own ramp still pulls it back
- * from UIKit's default luminance without paying for it in transparency.
+ * else in the app — true, but measured against a scrim that had already
+ * blacked out everything behind it. With the content back, a 55% wash flattens
+ * the refraction into a plain grey capsule. At 25% the app's own ramp still
+ * pulls it back from UIKit's default luminance without paying in transparency.
  *
  * The scheme is forced rather than left on `auto`, because this app has its own
  * theme and does not follow the system one — on `auto` a phone in light mode
  * would draw light glass under white labels.
  */
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { StyleSheet, View } from 'react-native';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import Svg, { Defs, LinearGradient, Mask, Rect, Stop } from 'react-native-svg';
 
 import { Colors, TabPillHeight, TabPillInset } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -67,78 +90,77 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  */
 const LIQUID = isLiquidGlassAvailable();
 
-/**
- * How far the fade reaches ABOVE the capsule, and how dark it gets there.
- *
- * This is the safe place to add weight. Above the pill's top edge is outside
- * the glass's own footprint, so darkening it cannot flatten the refraction the
- * way the first scrim did — that one was opaque from the capsule's top edge
- * DOWN, which is precisely the region the glass needs to see.
- *
- * IT STOPS AT 0.8 RATHER THAN GOING SOLID. A fade that reaches full black
- * exactly at the capsule's top edge draws a hard line there: black above,
- * content visible through glass below. Stopping short keeps rows faintly
- * present as they meet the pill, which is what the darkening around Sleeper's
- * bar actually does — it dims its surroundings rather than erasing them.
- *
- * 24 against the earlier 44: that one was both too tall and fully opaque, and
- * it made the bottom of every screen read as dimmed. This is a softening at the
- * point of contact.
- */
+/** How far the dimming reaches above the capsule, and how dark it gets there. */
 const TOP_FADE = 24;
-const TOP_FADE_TO = 0.8;
+const SURROUND = 0.8;
 
 export function TabBarGlass() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
+  /**
+   * The surround spans the screen, and the mask needs real numbers.
+   *
+   * Percentages would do for the rectangle but not for the hole: the capsule
+   * has to be punched at a fixed inset from both edges with a fixed corner
+   * radius, and a radius cannot be expressed as a percentage of a box whose
+   * width it does not follow. The scrim box IS the screen's width — it is the
+   * bar, inset by `TabPillInset` on each side and then pushed back out by the
+   * same amount — so the window's width is the right measure.
+   */
+  const { width } = useWindowDimensions();
+  const height = TOP_FADE + TabPillHeight + TabPillInset;
+
   return (
     <>
-      {/* ABOVE THE CAPSULE, so rows dim as they arrive at it rather than
-          meeting a hard edge. Outside the glass's footprint — see `TOP_FADE`. */}
       <View
         style={[
           styles.scrim,
-          { top: -TOP_FADE, height: TOP_FADE, start: -TabPillInset, end: -TabPillInset },
+          { top: -TOP_FADE, height, start: -TabPillInset, end: -TabPillInset },
         ]}
         pointerEvents="none">
-        <Svg width="100%" height="100%">
+        <Svg width={width} height={height}>
           <Defs>
-            <LinearGradient id="tabScrimTop" x1="0" y1="0" x2="0" y2="1">
+            <LinearGradient id="tabSurround" x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0" stopColor={c.background} stopOpacity="0" />
-              <Stop offset="1" stopColor={c.background} stopOpacity={`${TOP_FADE_TO}`} />
-            </LinearGradient>
-          </Defs>
-          <Rect x="0" y="0" width="100%" height="100%" fill="url(#tabScrimTop)" />
-        </Svg>
-      </View>
-
-      {/* THE BAND UNDER THE CAPSULE. `top: TabPillHeight` is the bar's own
-          bottom edge, so this occupies exactly the margin between the pill and
-          the screen — nothing sits behind the glass. */}
-      <View
-        style={[
-          styles.scrim,
-          { top: TabPillHeight, height: TabPillInset, start: -TabPillInset, end: -TabPillInset },
-        ]}
-        pointerEvents="none">
-        <Svg width="100%" height="100%">
-          <Defs>
-            <LinearGradient id="tabScrim" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={c.background} stopOpacity="0" />
-              {/* SOLID BY HALFWAY, not at the very last pixel. Ramping evenly
-                  across all 20 points meant the band never actually reached
-                  black on screen — the darkest it ever got was the bottom edge
-                  itself, so a row sitting in the strip stayed legible and the
-                  fade read as absent. Reaching black at the midpoint gives a
-                  10pt dissolve and 10pt of clean ground under it, which is what
-                  makes it visible at all. Starting at zero rather than at a low
-                  opacity keeps the capsule's bottom edge seamless. */}
-              <Stop offset="0.5" stopColor={c.background} stopOpacity="1" />
+              {/* At the capsule's top edge, and held at the same value to its
+                  bottom edge — so the margins either side of the pill are one
+                  even tone rather than two bands with a seam between them. */}
+              <Stop
+                offset={`${TOP_FADE / height}`}
+                stopColor={c.background}
+                stopOpacity={`${SURROUND}`}
+              />
+              <Stop
+                offset={`${(TOP_FADE + TabPillHeight) / height}`}
+                stopColor={c.background}
+                stopOpacity={`${SURROUND}`}
+              />
               <Stop offset="1" stopColor={c.background} stopOpacity="1" />
             </LinearGradient>
+            {/* White shows the dimming, black punches it away. The black
+                capsule is the pill's exact footprint, so the glass sees the
+                page unobstructed. */}
+            <Mask id="tabHole">
+              <Rect x="0" y="0" width={width} height={height} fill="white" />
+              <Rect
+                x={TabPillInset}
+                y={TOP_FADE}
+                width={width - TabPillInset * 2}
+                height={TabPillHeight}
+                rx={TabPillHeight / 2}
+                fill="black"
+              />
+            </Mask>
           </Defs>
-          <Rect x="0" y="0" width="100%" height="100%" fill="url(#tabScrim)" />
+          <Rect
+            x="0"
+            y="0"
+            width={width}
+            height={height}
+            fill="url(#tabSurround)"
+            mask="url(#tabHole)"
+          />
         </Svg>
       </View>
 
