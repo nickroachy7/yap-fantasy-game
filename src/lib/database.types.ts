@@ -1843,6 +1843,25 @@ export type Database = {
           user_id: string
         }[]
       }
+      contest_history: {
+        Args: { p_before?: string; p_before_id?: string; p_limit?: number }
+        Returns: {
+          code: string
+          contest_id: string
+          entrants: number
+          finalized_at: string
+          hearts_delta: number
+          kind: string
+          name: string
+          points: number
+          prize_gems: number
+          result: string
+          rnk: number
+          season: number
+          season_type: string
+          week: number
+        }[]
+      }
       contest_lineup: {
         Args: { p_contest: string; p_user: string }
         Returns: {

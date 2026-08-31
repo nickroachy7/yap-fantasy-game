@@ -75,6 +75,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  * one, when it is simply a different offer.
  */
 export default function ContestsScreen() {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
   const router = useRouter();
   const { contests, loading, error } = useContests();
   const { run } = usePlayer();
@@ -154,6 +156,32 @@ export default function ContestsScreen() {
           />
         )}
       </Panel>
+
+      {/* THE WAY BACK THROUGH THE SEASON. One row rather than a panel of
+          results: the lobby's subject is what you can enter, and a list that
+          grows every week would push that below the fold by October. It sits
+          under Open rather than above it for the same reason — the archive is
+          the second thing anybody came here for, and on most visits it is not
+          why they came at all. */}
+      <Pressable
+        onPress={() => router.push('/contest-history')}
+        accessibilityRole="button"
+        accessibilityLabel="See your recent contests"
+        style={({ pressed }) => [
+          styles.historyRow,
+          { borderColor: c.border, backgroundColor: c.backgroundElement },
+          pressed && styles.pressed,
+        ]}>
+        <View style={styles.rowText}>
+          <Text style={[Type.strong, { color: c.text }]}>Recent contests</Text>
+          <Text style={[Type.fine, { color: c.textSecondary }]}>
+            Every week you have finished, back to the start of the season.
+          </Text>
+        </View>
+        {/* The affordance, as the one glyph this app already uses for "there is
+            a page behind this". */}
+        <Text style={[Type.section, { color: c.textTertiary }]}>›</Text>
+      </Pressable>
 
       <Footnote />
     </PlayerSheetFrame>
@@ -297,6 +325,19 @@ function Footnote() {
 }
 
 const styles = StyleSheet.create({
+  /* The same shape as the dead-run row above it — a block of text and one
+     affordance on the right — because they are the same kind of object: a thing
+     on this sheet that opens a different screen. */
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.panel,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+    minHeight: 56,
+  },
   /* Cards separated by space rather than by rules. A hairline between two
      bordered cards reads as a third edge; the gap is what says these are
      separate objects rather than rows of one table. */
