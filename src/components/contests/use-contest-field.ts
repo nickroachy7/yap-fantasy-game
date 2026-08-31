@@ -122,6 +122,32 @@ export type PeekSlot = {
   points: number;
   /** Their game has kicked off. False only on a bye, which cannot score. */
   started: boolean;
+  /**
+   * What the CARD has earned across every week it has started, this one
+   * included — so `careerFp - points` is what it walked in with.
+   *
+   * NULL MEANS THE SERVER DID NOT SEND IT, and that is a state worth being
+   * able to represent. `career_fp` is `not null default 0` on the table, so a
+   * real card always has one — null here can only mean this client is talking
+   * to a database where `contest_lineup` has not been rewritten yet
+   * (20260831020000). The row draws no card line at all in that case rather
+   * than doing arithmetic on a zero that means "absent"; see `cardStory`.
+   *
+   * This is what makes the JS and the migration independent of each other. The
+   * OTA can land first and show what it always showed, or the migration can
+   * land first and wait — neither order produces a broken row, which matters
+   * because CI publishes the update and does NOT run `db push`.
+   */
+  careerFp: number | null;
+  /**
+   * Where the card's current tier begins. Only interesting next to the two
+   * figures above it: a card whose pre-contest total was below this floor was
+   * promoted BY this contest. See `EntryLineup`.
+   */
+  tierFloorFp: number | null;
+  /** Where the next tier begins, and which one. Null on the top tier. */
+  nextTierAt: number | null;
+  nextTierLabel: string | null;
 };
 
 type PeekRow = {
@@ -133,6 +159,12 @@ type PeekRow = {
   tier: string;
   points: number | string | null;
   started: boolean | null;
+  /* numeric over the wire is a STRING through PostgREST, which is why every
+     one of these goes through `num` rather than being trusted as a number. */
+  career_fp: number | string | null;
+  tier_floor_fp: number | string | null;
+  next_tier_at: number | string | null;
+  next_tier_label: string | null;
 };
 
 /**
@@ -168,6 +200,16 @@ export function useContestLineup(contestId: string | null, userId: string | null
           tier: r.tier,
           points: num(r.points) ?? 0,
           started: Boolean(r.started),
+          /* NOT DEFAULTED. A zero here would be indistinguishable from a
+             card that has never scored, and the row would print a career of
+             0.0 for a card with a season behind it. See the type. */
+          careerFp: num(r.career_fp),
+          tierFloorFp: num(r.tier_floor_fp),
+          /* Null is a real answer on these two as well, for a second reason:
+             the top tier has nothing above it. `0 to Diamond` would be a
+             promotion that never arrives. */
+          nextTierAt: num(r.next_tier_at),
+          nextTierLabel: r.next_tier_label,
         })),
       );
       return null;

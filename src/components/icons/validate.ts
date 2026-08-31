@@ -55,7 +55,7 @@ function points(d: string): Pt[] {
   // absolute coordinates, which for the vocabulary in `system.ts` is all of
   // them — every builder emits absolute commands on purpose so this stays
   // parseable without implementing a full path interpreter.
-  const re = /([MLHVAQ])([^A-Za-z]*)/g;
+  const re = /([MLHVAQC])([^A-Za-z]*)/g;
   let cursor: Pt = { x: 0, y: 0, authored: true };
   let m: RegExpExecArray | null;
   while ((m = re.exec(d))) {
@@ -110,6 +110,52 @@ function points(d: string): Pt[] {
         // never lies on it.
         out.push({ x: cxp, y: cyp, authored: true, control: true });
       }
+    } else if (cmd === 'C') {
+      // Imported artwork is almost entirely cubics — the Figma round-trip
+      // returns 30-70 of them per icon — so measuring only their endpoints
+      // would under-report a glyph's true bounds and let it fail the keyline
+      // check for the wrong reason. Cubic extrema are the roots of the
+      // derivative, a plain quadratic; both control points are flagged
+      // `control` so they never widen the bounds themselves.
+      for (let i = 0; i + 5 < nums.length; i += 6) {
+        const c1 = { x: nums[i], y: nums[i + 1] };
+        const c2 = { x: nums[i + 2], y: nums[i + 3] };
+        const e = { x: nums[i + 4], y: nums[i + 5] };
+        const p0 = cursor;
+        for (const [v0, v1, v2, v3, axis] of [
+          [p0.x, c1.x, c2.x, e.x, 'x'],
+          [p0.y, c1.y, c2.y, e.y, 'y'],
+        ] as const) {
+          const A = 3 * (-v0 + 3 * v1 - 3 * v2 + v3);
+          const B = 6 * (v0 - 2 * v1 + v2);
+          const Cc = 3 * (v1 - v0);
+          const roots: number[] = [];
+          if (Math.abs(A) < 1e-9) {
+            if (Math.abs(B) > 1e-9) roots.push(-Cc / B);
+          } else {
+            const disc = B * B - 4 * A * Cc;
+            if (disc >= 0) {
+              const r = Math.sqrt(disc);
+              roots.push((-B + r) / (2 * A), (-B - r) / (2 * A));
+            }
+          }
+          for (const t of roots) {
+            if (!(t > 0 && t < 1)) continue;
+            const u = 1 - t;
+            const v =
+              u * u * u * v0 + 3 * u * u * t * v1 + 3 * u * t * t * v2 + t * t * t * v3;
+            out.push(
+              axis === 'x'
+                ? { x: v, y: p0.y, authored: false }
+                : { x: p0.x, y: v, authored: false },
+            );
+          }
+        }
+        cursor = { x: e.x, y: e.y, authored: true };
+        out.push(cursor);
+        out.push({ x: c1.x, y: c1.y, authored: true, control: true });
+        out.push({ x: c2.x, y: c2.y, authored: true, control: true });
+      }
     } else if (cmd === 'A') {
       // An arc's last two numbers are its endpoint; the radii and flags before
       // them are not positions and must not be measured as if they were.
@@ -159,7 +205,9 @@ export function validateGlyph(g: Glyph): Finding[] {
   }
 
   // ---- every coordinate on the half-unit grid --------------------------
-  for (const part of g.parts) {
+  // Waived for imported artwork: see `Glyph.source`. Hand-drawn curves carry
+  // their optical corrections in exactly these decimals.
+  for (const part of g.source ? [] : g.parts) {
     for (const p of points(part.d)) {
       if (!p.authored) continue;
       for (const [axis, v] of [['x', p.x], ['y', p.y]] as const) {
@@ -177,7 +225,13 @@ export function validateGlyph(g: Glyph): Finding[] {
   // Skipped for a glyph that declares it bleeds, so the exception is a
   // decision recorded in the glyph rather than a silent pass.
   if (!g.bleeds) {
-    if (b.minX < LIVE.min || b.minY < LIVE.min || b.maxX > LIVE.max || b.maxY > LIVE.max) {
+    const sc = g.source ? GRID / g.source : 1;
+    if (
+      b.minX * sc < LIVE.min ||
+      b.minY * sc < LIVE.min ||
+      b.maxX * sc > LIVE.max ||
+      b.maxY * sc > LIVE.max
+    ) {
       err(
         'live-area',
         `extends to (${b.minX},${b.minY})-(${b.maxX},${b.maxY}), outside ${LIVE.min}..${LIVE.max}` +
@@ -190,9 +244,12 @@ export function validateGlyph(g: Glyph): Finding[] {
   // The rule the first attempt at this set had no way to state, and the reason
   // a hand-drawn glyph could look wrong beside its neighbours for no nameable
   // reason. See KEYLINE in `system.ts`.
+  // Imported art is measured after scaling into the 24 box, so one keyline
+  // governs composed and drawn glyphs alike.
+  const k = g.source ? GRID / g.source : 1;
   const key = KEYLINE[g.keyline];
-  const w = b.maxX - b.minX;
-  const h = b.maxY - b.minY;
+  const w = (b.maxX - b.minX) * k;
+  const h = (b.maxY - b.minY) * k;
   const along = Math.max(w / key.w, h / key.h);
   if (along < FILL_FLOOR) {
     err(
@@ -230,8 +287,8 @@ export function validateGlyph(g: Glyph): Finding[] {
   // ---- centred in the box ----------------------------------------------
   // Optical centring is a judgement call, so this is a warning; being a whole
   // unit off is not a judgement call, so the threshold is one unit.
-  const offX = (b.minX + b.maxX) / 2 - GRID / 2;
-  const offY = (b.minY + b.maxY) / 2 - GRID / 2;
+  const offX = ((b.minX + b.maxX) / 2) * k - GRID / 2;
+  const offY = ((b.minY + b.maxY) / 2) * k - GRID / 2;
   if (Math.abs(offX) > 1 || Math.abs(offY) > 1) {
     warn('centre', `mass sits ${offX.toFixed(1)},${offY.toFixed(1)} off centre`);
   }

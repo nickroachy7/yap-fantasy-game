@@ -491,6 +491,21 @@ export type Glyph = {
    * leave the box by design.
    */
   bleeds?: boolean;
+  /**
+   * The coordinate space this glyph's path data was authored in, when it is
+   * not `GRID`.
+   *
+   * Artwork drawn in Figma or exported from a generator arrives on its own
+   * canvas — 2048 is what the Figma round-trip returns. Rather than rewrite
+   * every coordinate on import (lossy, unreviewable, and it would fight the
+   * optical corrections that make the drawing good), the renderer scales the
+   * whole glyph once and the validator measures in the same space.
+   *
+   * Set it and the `snap` rule is waived for that glyph: a curve drawn by hand
+   * lands on the decimals it needs to, and forcing those onto a half-unit grid
+   * is exactly the rule that made the composed glyphs look stiff.
+   */
+  source?: number;
 };
 
 /**

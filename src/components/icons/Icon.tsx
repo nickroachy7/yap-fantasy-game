@@ -95,7 +95,9 @@ export function Icon({
             ))}
           </Mask>
         ) : null}
-        <G mask={knockouts.length > 0 ? `url(#${maskId})` : undefined}>
+        <G
+          mask={knockouts.length > 0 ? `url(#${maskId})` : undefined}
+          {...(glyph.source ? { transform: `scale(${GRID / glyph.source})` } : {})}>
           {painted.map((part, i) => {
             const role = part.role ?? 'stateful';
 
