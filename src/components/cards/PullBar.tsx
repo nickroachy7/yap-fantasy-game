@@ -134,27 +134,20 @@ export function PullBar({
      the player dealt with it — including by deciding to keep the lot. */
   const settled = hidden === 0 && !canCommit && !canSell;
 
-  /* The line under the sweep buttons, assembled rather than branched: the two
-     halves are independent and either can be absent. Empty means there is
-     nothing to explain, and the line is not drawn at all. */
+  /* ONE SENTENCE, AND ONLY THE ONE THAT CANNOT BE SHOWN ANY OTHER WAY. This
+     briefly carried the kept count as a second sentence and ran to two lines
+     of prose above the buttons — for a fact that is a NUMBER. It is a counter
+     in the status row now; see `Frame`. What is left here is the thing a
+     number cannot say: that pressing sell will not sell the pack. */
   const hint =
-    hidden === 0 && (canCommit || canSell)
-      ? [
-          canCommit && canSell ? 'Selling leaves out every card a set can still use.' : null,
-          plan.kept > 0
-            ? plan.kept === 1
-              ? 'One card you are keeping is left out.'
-              : `${plan.kept} cards you are keeping are left out.`
-            : null,
-        ]
-          .filter(Boolean)
-          .join(' ')
+    hidden === 0 && canCommit && canSell
+      ? 'Selling leaves out every card a set can still use.'
       : '';
 
   /* ---- a confirm, or a sweep, takes the whole bar ---------------------- */
   if (sweep) {
     return (
-      <Frame earned={earned}>
+      <Frame earned={earned} kept={plan.kept}>
         <View style={[styles.progress, { backgroundColor: c.backgroundElement }]}>
           <ActivityIndicator />
           <Text style={[Type.strong, NUMERIC, { color: c.text }]}>
@@ -168,7 +161,7 @@ export function PullBar({
   if (question === 'commit') {
     const spares = plan.commits.filter((x) => x.spare).length;
     return (
-      <Frame earned={earned}>
+      <Frame earned={earned} kept={plan.kept}>
         <Text style={[Type.fine, styles.measure, { color: c.textSecondary }]}>
           {`Adds ${count(plan.commits.length, 'card')} to ${count(plan.setCount, 'set')} for ${plan.commitGems} gems. A card in a set is burnt and cannot be started again.`}
           {spares > 0
@@ -201,7 +194,7 @@ export function PullBar({
 
   if (question === 'sell') {
     return (
-      <Frame earned={earned}>
+      <Frame earned={earned} kept={plan.kept}>
         <Text style={[Type.fine, styles.measure, { color: c.textSecondary }]}>
           {`Sells ${count(plan.sells.length, 'card')} for ${plan.sellGems} gems. Selling is permanent — a future copy starts again at bronze. No card a set can still use is in this.`}
           {keptNote(plan.kept)}
@@ -234,7 +227,7 @@ export function PullBar({
 
   /* ---- the ordinary bar: the phase, then the way on -------------------- */
   return (
-    <Frame earned={earned}>
+    <Frame earned={earned} kept={plan.kept}>
       {hidden > 0 ? (
         <View style={styles.row}>
           <Button
@@ -292,11 +285,9 @@ export function PullBar({
         </View>
       ) : null}
 
-      {/* WHY THESE NUMBERS ARE SMALLER THAN THE PACK, in one line under the
-          buttons rather than only inside the confirm — a player deciding
-          whether to press at all is the one who needs it. Two reasons, either
-          or both: sell never takes a card a set wants, and neither button
-          takes a card you kept. */}
+      {/* THE ONE LINE THAT STOPS "Sell 4" READING AS "sell the pack", under
+          the buttons rather than only inside the confirm — a player deciding
+          whether to press at all is the one who needs it. */}
       {hint ? (
         <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>{hint}</Text>
       ) : null}
@@ -336,28 +327,58 @@ export function PullBar({
 }
 
 /**
- * The bar's shell: a hairline, the payout so far, and whatever the bar is
- * currently for.
+ * The bar's shell: a hairline, where the pack has got to, and whatever the bar
+ * is currently for.
  *
- * THE PAYOUT IS DRAWN ONLY ONCE THERE IS ONE. "+0 gems" on an untouched pack
- * reads as a reward that failed to arrive.
+ * ONE STATUS LINE, TWO FACTS, BOTH NUMBERS. What the pack has paid, and how
+ * many cards are being held back. The second used to be a sentence in the hint
+ * below the buttons, which is the wrong shape for it twice over: prose for a
+ * count, and a second line of it right where the thumb is going. Up here it is
+ * scannable, and it survives into the states where there is no hint at all —
+ * including the one where every card has been kept and the sweeps are gone.
+ *
+ * NEITHER IS DRAWN UNTIL THERE IS ONE. "+0 gems" on an untouched pack reads as
+ * a reward that failed to arrive, and "0 kept" is a feature advertising itself.
  */
-function Frame({ earned, children }: { earned: number; children: React.ReactNode }) {
+function Frame({
+  earned,
+  kept,
+  children,
+}: {
+  earned: number;
+  kept: number;
+  children: React.ReactNode;
+}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const gold = TierColors[scheme].gold.accent;
 
   return (
     <View style={[styles.bar, { borderTopColor: c.border, backgroundColor: c.background }]}>
-      {earned > 0 ? (
-        <View
-          accessible
-          accessibilityRole="text"
-          accessibilityLabel={`${earned} gems earned from this pack`}
-          style={styles.earned}>
-          <Gem size={11} color={gold} />
-          <Text style={[Type.strong, NUMERIC, { color: c.text }]}>{`+${earned}`}</Text>
-          <Text style={[Type.fine, { color: c.textTertiary }]}>from this pack</Text>
+      {earned > 0 || kept > 0 ? (
+        <View style={styles.status}>
+          {earned > 0 ? (
+            <View
+              accessible
+              accessibilityRole="text"
+              accessibilityLabel={`${earned} gems earned from this pack`}
+              style={styles.earned}>
+              <Gem size={11} color={gold} />
+              <Text style={[Type.strong, NUMERIC, { color: c.text }]}>{`+${earned}`}</Text>
+              <Text style={[Type.fine, { color: c.textTertiary }]}>from this pack</Text>
+            </View>
+          ) : null}
+          {earned > 0 && kept > 0 ? (
+            <Text style={[Type.fine, { color: c.textTertiary }]}>·</Text>
+          ) : null}
+          {kept > 0 ? (
+            <Text
+              accessibilityRole="text"
+              accessibilityLabel={`${count(kept, 'card')} you are keeping, left out of the whole-pack buttons`}
+              style={[Type.fine, NUMERIC, { color: c.textTertiary }]}>
+              {`${kept} kept`}
+            </Text>
+          ) : null}
         </View>
       ) : null}
       {children}
@@ -475,6 +496,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.control,
     minHeight: 48,
   },
+  status: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
   earned: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1 },
   measure: { maxWidth: 560 },
   dim: { opacity: 0.5 },

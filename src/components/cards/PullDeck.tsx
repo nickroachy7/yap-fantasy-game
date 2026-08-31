@@ -486,6 +486,26 @@ function RevealSlot({
     transform: [{ scale: interpolate(lift.value, [0, 1], [ASIDE_SCALE, 1]) }],
   }));
 
+  /**
+   * The panel belongs to the card in the middle, and to no other.
+   *
+   * IT USED TO BE DRAWN AT FULL STRENGTH ON EVERY SLIDE, which the peek then
+   * sliced down the middle: either edge of the screen carried the tail of a
+   * neighbour's buttons — `elling`, `t take` — at the same weight as the two
+   * you were meant to be reading. Three sets of controls competing, two of them
+   * cut in half, for a deck whose entire premise is one card at a time.
+   *
+   * SO IT FADES OUT WITH FOCUS RATHER THAN DIMMING LIKE THE CARD DOES. The card
+   * either side is still a card and should still be legible — that is what the
+   * peek is for. A BUTTON either side is not a smaller button, it is a hazard:
+   * at 104pt of peek a `Sell` on the card you are not looking at is on screen
+   * and pressable. Gone, and `pointerEvents` off with it.
+   *
+   * The box stays, because `opacity` is not `display`. The deck must not resize
+   * under a thumb mid-scroll, which is the same reason `panel` has a floor.
+   */
+  const panelStyle = useAnimatedStyle(() => ({ opacity: lift.value }));
+
   /* Both halves read the same 0..1. The back owns the first half of it and the
      face the second, so the face is at zero width for exactly as long as the
      back is shrinking and the two never overlap. */
@@ -533,7 +553,11 @@ function RevealSlot({
         </Animated.View>
       </Animated.View>
 
-      {actions(turned)}
+      <Animated.View
+        style={[panelStyle, { pointerEvents: focused ? 'auto' : 'none' }]}
+        aria-hidden={!focused}>
+        {actions(turned)}
+      </Animated.View>
     </View>
   );
 }
@@ -889,71 +913,94 @@ function CardActionPanel({
             </Pressable>
           ) : null}
 
-          {action?.sellable ? (
-            <Pressable
-              onPress={() => setStage('selling')}
-              disabled={locked || busy}
-              accessibilityRole="button"
-              accessibilityLabel={`Quick sell ${player} for ${action.sellValue} gems`}
-              accessibilityState={{ disabled: locked || busy }}
-              style={({ pressed }) => [
-                styles.button,
-                styles.buttonGrow,
-                styles.sell,
-                { backgroundColor: c.backgroundElement, borderColor: c.border },
-                pressed && styles.pressed,
-                (locked || busy) && styles.dim,
-              ]}>
-              {busy ? (
-                <ActivityIndicator />
-              ) : (
-                <>
-                  <Text style={[Type.strong, { color: c.text }]}>Quick sell</Text>
-                  <Gem size={10} color={gold} />
-                  <Text style={[Type.strong, NUMERIC, { color: c.text }]}>{action.sellValue}</Text>
-                </>
-              )}
-            </Pressable>
-          ) : null}
+          {/* THE TWO ORDINARY FATES, SIDE BY SIDE. Three full-width buttons
+              stacked is three things of equal weight and no reading order —
+              which is what this was. Committing to a set is the act with a
+              NAME on it and it keeps the full width above; sell and keep are
+              the two ends of the same ordinary question and belong on one line
+              as each other's alternative. Both words are short at any card
+              width, which is what the column rule below was protecting
+              against — a set's name is not. */}
+          {action?.sellable || sweepable ? (
+            <View style={styles.buttonPair}>
+              {action?.sellable ? (
+                <Pressable
+                  onPress={() => setStage('selling')}
+                  disabled={locked || busy}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Sell ${player} for ${action.sellValue} gems`}
+                  accessibilityState={{ disabled: locked || busy }}
+                  style={({ pressed }) => [
+                    styles.button,
+                    styles.sell,
+                    styles.buttonPairHalf,
+                    { backgroundColor: c.backgroundElement, borderColor: c.border },
+                    pressed && styles.pressed,
+                    (locked || busy) && styles.dim,
+                  ]}>
+                  {busy ? (
+                    <ActivityIndicator />
+                  ) : (
+                    <>
+                      {/* NOT "Quick sell". The "quick" was distinguishing this
+                          from the sell on the card's own profile, which is a
+                          screen away and not in the running here — so it was a
+                          word doing nothing, in the one place a word costs
+                          width. */}
+                      <Text style={[Type.strong, { color: c.text }]}>Sell</Text>
+                      <Gem size={10} color={gold} />
+                      <Text style={[Type.strong, NUMERIC, { color: c.text }]}>
+                        {action.sellValue}
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+              ) : null}
 
-          {/* THE THIRD ANSWER. Outlined rather than filled, and `Type.fine`
-              rather than `Type.strong`, because it is the one control here that
-              does nothing — see the note on this panel. It sits under the two
-              exits because you reach for it after deciding NOT to take either. */}
-          {sweepable ? (
-            <Pressable
-              onPress={onToggleKeep}
-              /* Locked with everything else while a write is in flight. It
-                 changes what the bar's buttons mean, and the bar is mid-act. */
-              disabled={locked || busy}
-              accessibilityRole="button"
-              accessibilityState={{ selected: kept, disabled: locked || busy }}
-              accessibilityLabel={
-                kept
-                  ? `Stop keeping ${player}. Adding or selling the whole pack will include this card again.`
-                  : `Keep ${player}. Adding or selling the whole pack will leave this card alone.`
-              }
-              style={({ pressed }) => [
-                styles.button,
-                styles.keep,
-                {
-                  backgroundColor: kept ? c.backgroundElement : 'transparent',
-                  borderColor: kept ? c.borderStrong : c.border,
-                },
-                pressed && styles.pressed,
-                (locked || busy) && styles.dim,
-              ]}>
-              <Text
-                numberOfLines={1}
-                style={[
-                  kept ? Type.strong : Type.fine,
-                  { color: kept ? c.text : c.textSecondary },
-                ]}>
-                {/* The tick is the state. Drawn as a character for the same
-                    reason the close glyph on `/pull` is: it needs no legend. */}
-                {kept ? '✓  Keeping this one' : 'Keep this one'}
-              </Text>
-            </Pressable>
+              {/* THE THIRD ANSWER, and the quietest thing on the panel:
+                  outlined until it is on, because it is the one control here
+                  that does nothing. Alone in the pair — a card no set wants
+                  that you also cannot sell does not reach here — it takes the
+                  full width on its own, which `flex: 1` does without asking. */}
+              {sweepable ? (
+                <Pressable
+                  onPress={onToggleKeep}
+                  /* Locked with everything else while a write is in flight. It
+                     changes what the bar's buttons mean, and the bar is
+                     mid-act. */
+                  disabled={locked || busy}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: kept, disabled: locked || busy }}
+                  accessibilityLabel={
+                    kept
+                      ? `Stop keeping ${player}. Adding or selling the whole pack will include this card again.`
+                      : `Keep ${player}. Adding or selling the whole pack will leave this card alone.`
+                  }
+                  style={({ pressed }) => [
+                    styles.button,
+                    styles.keep,
+                    styles.buttonPairHalf,
+                    {
+                      backgroundColor: kept ? c.backgroundElement : 'transparent',
+                      borderColor: kept ? c.borderStrong : c.border,
+                    },
+                    pressed && styles.pressed,
+                    (locked || busy) && styles.dim,
+                  ]}>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      Type.strong,
+                      { color: kept ? c.text : c.textSecondary },
+                    ]}>
+                    {/* The tick is the state. Drawn as a character for the same
+                        reason the close glyph on `/pull` is: it needs no
+                        legend. */}
+                    {kept ? '✓ Keeping' : 'Keep'}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
           ) : null}
 
           {/* THE SPARE-COPY CAVEAT, on the path that never sees the picker.
@@ -1040,9 +1087,11 @@ const styles = StyleSheet.create({
      the one word on the button worth reading — or wrapped into a ragged two
      lines that did not line up with the card's edges. */
   buttonRow: { gap: Spacing.two },
-  /* The one pair that IS a row: two short words that fit side by side at any
-     card width, and reading "Not now" above "Sell for 8" would make the safe
-     choice look like the primary one. */
+  /* WHAT IS ALLOWED TO BE A ROW: short words only. The sell confirm's pair
+     ("Not now" / "Sell for 8"), and the resting pair of `Sell` and `Keep`.
+     Both read as one question with two answers, which stacking would break —
+     and reading "Not now" above "Sell for 8" would make the safe choice look
+     like the primary one. A set's NAME is what cannot go here; see above. */
   buttonPair: { flexDirection: 'row', gap: Spacing.two },
   button: {
     borderRadius: Radius.chip,
@@ -1065,15 +1114,13 @@ const styles = StyleSheet.create({
     gap: Spacing.one + 2,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  /* Shorter and thinner than the two exits above it, which is the whole of how
-     it says "this is the quiet one". Still 40pt, so it is a target a thumb can
-     land on. */
+  /* Outlined rather than filled, which is the whole of how it says "this is
+     the quiet one" — it shares a row with `Sell` now, so it cannot also be
+     shorter without the pair looking ragged. Height and shape come from
+     `button`; only the border is its own. */
   keep: {
-    alignSelf: 'stretch',
     flexDirection: 'row',
     borderWidth: StyleSheet.hairlineWidth,
-    minHeight: 40,
-    paddingVertical: Spacing.one + 2,
   },
 
   measure: { maxWidth: 560 },
