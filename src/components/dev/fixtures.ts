@@ -18,6 +18,7 @@ import type { CardActions, CardActionSet } from '@/components/cards/card-actions
 import type { CommitPlan } from '@/components/collection/bulk';
 import type { Json } from '@/lib/database.types';
 import type { PeekSlot as PeekEntrySlot } from '@/components/contests/use-contest-field';
+import type { HistoryEntry } from '@/components/contests/use-contest-history';
 
 /**
  * The four sample cards, one per tier.
@@ -834,4 +835,61 @@ export const KIT_ENTRY_SLOTS: PeekEntrySlot[] = [
     tier: 'bronze', points: 12.4, started: true,
     careerFp: null, tierFloorFp: null, nextTierAt: null, nextTierLabel: null,
   },
+];
+
+/**
+ * Unseen results, as the welcome-back banner receives them.
+ *
+ * FOUR SETS, because the banner's sentence changes shape with the count and
+ * with what is in it, and only one of those shapes can be reached by waiting
+ * for a Sunday. A single win, a single loss, a mixed week, and the player back
+ * after a fortnight whose marks are capped with a count.
+ *
+ * The last row carries a NULL result — a field too small to be a contest
+ * produces no result at all, and the banner has to word that as "finished"
+ * rather than as a loss. It is the sentence most likely to be got wrong and the
+ * least likely to occur while anybody is looking.
+ *
+ * `finalizedAt` is a fixed string rather than a computed one: `new Date()` in a
+ * module the gallery imports would make this file's output differ between two
+ * renders of the same screen.
+ */
+const settled = (
+  n: number,
+  name: string,
+  result: 'W' | 'L' | 'T' | null,
+  points: number,
+): HistoryEntry => ({
+  contestId: `kit-unseen-${n}`,
+  code: `KIT${n}`,
+  name,
+  kind: 'lobby',
+  season: 2026,
+  seasonType: 'preseason',
+  week: 4,
+  points,
+  rank: result === 'W' ? 2 : 14,
+  entrants: result === null ? 1 : 26,
+  result,
+  heartsDelta: result === 'W' ? 1 : result === 'L' ? -1 : 0,
+  prizeGems: result === 'W' ? 120 : null,
+  finalizedAt: '2026-08-31T10:00:00.000Z',
+});
+
+export const KIT_UNSEEN_SETS: HistoryEntry[][] = [
+  [settled(1, 'Flex Three', 'W', 118.4)],
+  [settled(2, 'WR Room', 'L', 71.9)],
+  [
+    settled(3, 'Flex Three', 'W', 118.4),
+    settled(4, 'WR Room', 'L', 71.9),
+    settled(5, 'The Free One', 'T', 88.2),
+  ],
+  [
+    settled(6, 'Flex Three', 'W', 118.4),
+    settled(7, 'WR Room', 'L', 71.9),
+    settled(8, 'The Free One', 'T', 88.2),
+    settled(9, 'Deep League', 'W', 131.0),
+    settled(10, 'Kicker Special', 'L', 44.5),
+    settled(11, 'Week One Special', null, 88.2),
+  ],
 ];

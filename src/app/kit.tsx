@@ -47,6 +47,7 @@ import { summarise } from '@/components/collection/types';
 import {
   KIT_COMMIT_PLAN,
   KIT_ENTRY_SLOTS,
+  KIT_UNSEEN_SETS,
   KIT_SET_DAILY,
   KIT_SET_COMPLETE,
   KIT_SET_UNDER_FLOOR,
@@ -80,6 +81,7 @@ import { DropdownChip } from '@/components/ui/DropdownChip';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
 import { EntryLineup } from '@/components/contests/EntryLineup';
+import { WelcomeBackBanner } from '@/components/contests/WelcomeBackBanner';
 import { PositionBadge, positionsForSlot, slotBadgeLabel } from '@/components/ui/PositionBadge';
 import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
 import { SegmentedControl } from '@/components/shell/SegmentedControl';
@@ -957,6 +959,35 @@ function Kit() {
                 focus={{ start: 2, count: 1 }}
                 size={26}
               />
+              {/* THE RECEIPTS LAPSED. Same five contests, a day later — or one
+                  press of the banner's ✕. This is the row that cannot be
+                  reached by waiting, and the one most worth looking at: the
+                  badges are gone and NOTHING has reverted to a lie. */}
+              <ContestHearts
+                entries={[
+                  { result: null, entered: false, showResult: false },
+                  { result: null, entered: true, showResult: false },
+                  { result: 'W', entered: true, showResult: false },
+                  { result: 'L', entered: true, showResult: false },
+                  { result: 'T', entered: true, showResult: false },
+                ]}
+                size={26}
+              />
+            </View>
+          </Section>
+
+          <Section
+            title="Welcome back"
+            note="The one thing a settled week owes a player who was not watching, at the top of the board rather than as a modal over it: the board is already two sheets deep on its busiest path, and a dismissal handed to somebody who opened the app to set a lineup is a tax paid every Tuesday for news that needs no answer. It has NO TIMER, deliberately, and that is what makes the 24-hour clock on the rail's receipts safe — recap_slate() exists because results that expire on a clock mean a player who does not open the app for two days never learns how they did, so this carries that guarantee instead and waits as long as it has to. Pressing the row opens the archive; only the ✕ marks anything seen, because a banner that cleared itself on the way to the detail would be gone when you came back. Four states: one contest won, one lost, a mixed week, and the returning player whose marks are capped at four with a count — a fortnight away is a dozen results, and twelve pips in a banner is a texture rather than a summary. The last is the case with NO result at all, which a field too small to be a contest produces and which must never be worded as a loss.">
+            <View style={{ gap: Spacing.three }}>
+              {KIT_UNSEEN_SETS.map((set, i) => (
+                <WelcomeBackBanner
+                  key={i}
+                  entries={set}
+                  onOpen={() => {}}
+                  onDismiss={() => {}}
+                />
+              ))}
             </View>
           </Section>
 
