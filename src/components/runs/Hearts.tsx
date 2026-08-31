@@ -382,6 +382,26 @@ export type HeartSpan = { start: number; count: number };
  * is wanted later, prove it on device AND on web across a full swipe before
  * trusting it.
  */
+/**
+ * HOW FAR AN UNFOCUSED PIP RECEDES.
+ *
+ * It was 0.42, which was correct while a gold bracket was drawn around the pip
+ * in focus: brightness only had to SUPPORT a mark that was already unmissable,
+ * and dimming much harder would have buried the settled receipts a reader is
+ * meant to be able to count at a glance.
+ *
+ * `ContestHearts` has no mark any more (see the note there), so brightness is
+ * not the primary signal — it is the ONLY one, and 0.42 is not a wide enough
+ * gap to carry that alone. A tied heart is already drawn in `textSecondary`, so
+ * at 0.42 a grey pip in focus and a red pip out of it sat at roughly the same
+ * weight and the row pointed at nothing in particular.
+ *
+ * 0.24 is the floor that still reads as a heart rather than a smudge on black,
+ * checked against the dimmest state the row can draw — a tied receipt, which is
+ * grey before this is applied at all.
+ */
+const DIMMED = 0.24;
+
 function Pip({
   size,
   state,
@@ -400,7 +420,7 @@ function Pip({
   label: string;
 }) {
   const body = (
-    <View style={{ opacity: dimmed ? 0.42 : 1 }}>
+    <View style={{ opacity: dimmed ? DIMMED : 1 }}>
       <Heart size={size} state={state} result={result} lit={lit} />
     </View>
   );
@@ -529,7 +549,27 @@ export function ContestHearts({
             size={size}
             state={state}
             result={badge}
-            lit={lit}
+            /**
+             * NO MARK ON THE PIP IN FOCUS — brightness is the whole signal.
+             *
+             * This drew `Heart`'s gold corner ticks, and that was the right
+             * call while the rack floated on the page: with nothing around a
+             * pip, a bracket is the only way to frame one.
+             *
+             * The rack sits in a tray now (see `RunRail`), and inside a
+             * container the brackets stopped working on two counts. They are
+             * drawn at the padded edge of the box, which is WIDER than the
+             * heart, so at a 5pt gap each mark reached into its neighbours and
+             * the row read as a crop tool rather than a pager. And they are
+             * gold — the same colour as the button at the end of the row, so
+             * one row said "you are here" and "press me" in one hue and the eye
+             * could not rank them.
+             *
+             * `Heart` keeps `lit`, and `Hearts` keeps using it: that rack is a
+             * RUN drawn on its own ground, which is the case the ticks were
+             * designed for and still the case they are right for.
+             */
+            lit={false}
             /* Recede only when the row IS pointing somewhere. */
             dimmed={focus !== null && !lit}
             onPress={onPress ? () => onPress(i) : undefined}

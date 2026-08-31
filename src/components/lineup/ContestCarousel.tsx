@@ -72,7 +72,7 @@ import { ContestCard } from '@/components/contests/ContestCard';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { termsOfEntry, type MyContest } from '@/components/contests/use-my-contests';
 import { ContestHearts, type HeartResult, type HeartSpan } from '@/components/runs/Hearts';
-import { Colors, Spacing, Type, selectionAccent } from '@/constants/theme';
+import { Colors, ControlDiameter, Spacing, Type, selectionAccent } from '@/constants/theme';
 import type { PlayerState } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -103,6 +103,12 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  * ships to Android and the arrows vanish, that clipping is the reason.
  */
 const CHEV_GUTTER = 14;
+
+/** The lobby button's height. See `styles.enter` for why it is not `ControlDiameter`. */
+const ENTER_HEIGHT = 28;
+
+/** The `+` ahead of the lobby button's label. See `Plus`. */
+const PLUS_SIZE = 9;
 
 export function ContestCarousel({
   contests,
@@ -538,118 +544,202 @@ function RunRail({
   const free = held - staked;
 
   /**
-   * ONE SHORT LINE, AND IT IS A COUNT.
+   * A TRAY AND A BUTTON, and the tray is the one that stretches.
    *
-   * This was two lines — "Wagering 2 of 3 hearts" over "Lose all 3 and your team
-   * is eliminated." — and the second was doing a job this row should not have.
-   * A consequence that severe is something a player should be TAUGHT once, in
-   * onboarding, not reminded of on every glance at their own lineup; standing
-   * permanently under the board it reads as nagging, and by week three it is
-   * furniture nobody parses.
+   * ---------------------------------------------------------------------------
+   * WHAT THIS REPLACED
+   * ---------------------------------------------------------------------------
    *
-   * What is left is the fact the rack cannot state on its own: how many of these
-   * are committed. The hearts show which; the words show how many. Set at `fine`
-   * in the tertiary colour, so it sits under the rack rather than beside it as
-   * an equal.
+   * First a 22pt `+` in a circle with `1 free · Contests` set beside it. Two
+   * objects for one idea: the words carried the meaning and could not be
+   * pressed, the circle took the press and said nothing a `+` does not say
+   * everywhere. Worse, the text sat hard against the button and read as its
+   * label — the one part of the row that looked tappable was the part that was
+   * not.
    *
-   * The tile still gets its own phrasing, because there the count IS the call to
-   * action — "1 free" is the answer to the invitation directly above it.
+   * Then one gold pill, which fixed the labelling and broke two other things.
+   *
+   * ---------------------------------------------------------------------------
+   * GOLD IS FILLED, BECAUSE IT ONLY MEANS ONE THING NOW
+   * ---------------------------------------------------------------------------
+   *
+   * This spent a while as an outline, and the reason was real: `selectionAccent`
+   * was spoken TWICE on this row. The focused heart wore gold corner ticks —
+   * this app's mark for "this is the one you are looking at" — so a gold button
+   * put "you are here" and "press me" in one hue forty points apart, and the eye
+   * could not rank them. Draining the button to a line resolved that without
+   * touching the rack.
+   *
+   * The rack gave up its ticks instead (see `ContestHearts`), and THAT is what
+   * earns the fill back. Gold now appears exactly once on this row and means
+   * exactly one thing.
+   *
+   * The other objection to a fill — that a gold slab out-shouts the card it
+   * serves — turned out to be an argument about SIZE wearing a colour's clothes.
+   * At 32pt with a 13/600 two-word label it did. At 28 with 12/500 and one word
+   * it is a chip, and a call to action is allowed to be the brightest chip in a
+   * row that is otherwise a status readout.
+   *
+   * ---------------------------------------------------------------------------
+   * THE GLYPH IS THE VERB, SO THE WORD CAN BE THE ROOM
+   * ---------------------------------------------------------------------------
+   *
+   * The label has been "Contests", then "Enter contest", and is now "Contests"
+   * again — which is not a circle, because what changed underneath it is the
+   * `+`.
+   *
+   * "Contests" was wrong beside a BARE `+`: two objects, neither of which said
+   * what pressing would do. A verb fixed that by making the button a sentence.
+   * But a verb over-claims here. `contests.tsx` is not a lobby — it is three
+   * views (open contests, `Recent contests`, and a recap reader), so "enter"
+   * names one of the things you go there for and hides the other, on a row whose
+   * own hearts are already half settled receipts.
+   *
+   * With a `+` in front the labour divides properly: the GLYPH carries the act,
+   * the WORD carries the room. "+ Contests" reads as "a new one" to anyone
+   * glancing and as "the contests screen" to anyone reading, which is the only
+   * version of this button that has been true of both.
+   *
+   * ---------------------------------------------------------------------------
+   * THE DEAD AIR IS INSIDE SOMETHING NOW
+   * ---------------------------------------------------------------------------
+   *
+   * `space-between` is not composition: it pushed a rack of flat glyphs to one
+   * edge and a slab to the other with a hundred points of nothing between, and
+   * the row read as two leftovers rather than one thing.
+   *
+   * The rack now sits in a tray that STRETCHES to just short of the button, so
+   * the slack is enclosed rather than spanned. It also solves the growth
+   * problem for free: the tray is the flexible box, so a week with eight cards
+   * squeezes the hearts and never the door.
+   *
+   * ---------------------------------------------------------------------------
+   * THE FREE COUNT GOES IN THE TRAY, NOT IN THE BUTTON
+   * ---------------------------------------------------------------------------
+   *
+   * The tray is the RUN — what you hold and what is left of it — and the button
+   * is the ACT. The count is a fact about the run, so it is the tray's right-hand
+   * occupant and the last thing read before the button, which is the position it
+   * wants without being mistaken for the label again. The tray's own edge is
+   * what keeps that distinction now; before, nothing did.
+   *
+   * It is not the rack restated. `pips` is one heart per CARD ON THE BOARD —
+   * staked, settled, or waiting on a contest you have not entered — so a heart
+   * you hold and have promised to nothing appears nowhere in the rack. This
+   * count is the only place it exists on the screen, and it is the fact that
+   * decides whether the button is worth pressing.
+   *
+   * NO GLYPH ON IT. A fifth heart drawn inside a rack of pips reads as a fifth
+   * pip. The words carry it.
+   *
+   * When nothing is free the count goes and the button drops to the quiet fill
+   * — still there, still pressable, because the screen behind it is worth
+   * reading either way, but no longer pointing at a spend the run cannot make.
    */
-  /**
-   * IT LABELS THE BUTTON, because the button is the only thing on this row that
-   * does not explain itself.
-   *
-   * ---------------------------------------------------------------------------
-   * TWO THINGS IT USED TO SAY, AND WHY NEITHER SURVIVED
-   * ---------------------------------------------------------------------------
-   *
-   * It read "1 of 3 staked" — the lit pip's POSITION in the rack — which was
-   * right while the rack drew every heart you held and the reader had to be
-   * told which one the page meant. The row draws only hearts that are in a
-   * contest now, so the highlight IS that answer and the sentence was the same
-   * fact in numbers.
-   *
-   * Then it read "Won" / "Lost" / "Tied" on a settled card. Same problem one
-   * step along: the receipt beside it is already a green heart with a W in it.
-   * A caption restating the glyph it sits next to is a caption doing nothing.
-   *
-   * ---------------------------------------------------------------------------
-   * SO IT NAMES THE DESTINATION
-   * ---------------------------------------------------------------------------
-   *
-   * A bare `+` in a row of hearts is not self-evident — it could add a heart,
-   * add a card, add a slot. "Contests" is the word on the screen it opens (see
-   * `contests.tsx`, whose title is exactly that), so the label and the landing
-   * agree rather than being two names for one place.
-   *
-   * The free count leads it because that is what decides whether pressing is
-   * worth anything, and the whole line goes quiet when there is nothing free —
-   * the button still works, the lobby is still worth reading, but neither is
-   * being urged.
-   */
-  const line = free > 0 ? `${free} free · Contests` : 'Contests';
+  const live = free > 0;
+  /* Knocked out of the fill in the page's own colour, the way every punched
+     glyph in this app is drawn. See `YapLogo`'s `ink`. */
+  const ink = live ? c.background : c.textSecondary;
 
   return (
     <View style={styles.rail}>
       {/**
-        * ONE HEART PER CARD, and the row is the carousel's pager.
+        * THE RUN'S TRAY: one heart per card, and what is left over.
         *
-        * It used to draw the RUN's rack — held, staked and lost — because it
-        * was the only place saying how many hearts you had. The masthead says
-        * that now (see `AppHeader`), which freed this row to be what the screen
-        * actually needs. See `ContestHearts` for what each state means and for
-        * the bug that made the one-to-one non-negotiable.
+        * The rack used to draw the RUN's own hearts — held, staked and lost —
+        * because it was the only place saying how many you had. The masthead
+        * says that now (see `AppHeader`), which freed this row to be what the
+        * screen actually needs: a pager whose lit pip names the card above. See
+        * `ContestHearts` for what each state means and for the bug that made
+        * the one-to-one non-negotiable.
         */}
-      <ContestHearts
-        entries={pips}
-        focus={focus}
-        size={26}
-        onPress={(i) => onGo(pips[i].contest)}
-      />
-
-      {/* THE COUNT THAT IS LEFT TO SPEND, which is the one fact the row no
-          longer draws and the only one that makes the button next to it worth
-          pressing. */}
-      <Text
-        numberOfLines={1}
-        style={[Type.fine, styles.railLine, { color: free > 0 ? accent : c.textTertiary }]}>
-        {line}
-      </Text>
+      <View style={[styles.tray, { backgroundColor: c.surface }]}>
+        <View style={styles.rack}>
+          <ContestHearts
+            entries={pips}
+            focus={focus}
+            size={24}
+            onPress={(i) => onGo(pips[i].contest)}
+          />
+        </View>
+        {live ? (
+          <Text style={[Type.fine, styles.freeCount, { color: c.textSecondary }]}>
+            {free} free
+          </Text>
+        ) : null}
+      </View>
 
       {/**
        * THE WAY INTO ANOTHER CONTEST, at the end of the row it belongs to.
        *
        * The lobby was reachable only by swiping past every card to a tile at
-       * the end of the carousel — which is fine when you are in one contest and
-       * a chore when you are in four, and it is the app's main call to action
-       * either way. A button at a fixed position under the thumb costs one tap
-       * from any page.
+       * the end of the carousel — fine when you are in one contest, a chore
+       * when you are in four, and it is the app's main call to action either
+       * way. A button at a fixed position under the thumb costs one tap from
+       * any page.
        *
-       * IT DOES NOT REPLACE THE TILE, yet. The tile is still the carousel's
-       * last page and still the thing an empty board falls back to; two doors
-       * to one room is worth a conversation rather than a silent removal.
+       * IT NEVER SHRINKS AND IT NEVER MOVES. The tray beside it is the half
+       * that gives. Whatever happens to the left of it, the door stays the same
+       * size in the same corner.
        */}
       <Pressable
         onPress={onEnter}
         accessibilityRole="button"
-        accessibilityLabel="Open the contest lobby"
-        /* Drawn at 22 and reached out to the platform's 44 — the ring was a
-           32pt outline and read as a third kind of object in a row that already
-           has hearts and text. Small and solid is quieter AND easier to hit. */
-        hitSlop={11}
+        accessibilityLabel={
+          live
+            ? `Contests. ${free === 1 ? '1 heart' : `${free} hearts`} free`
+            : 'Contests'
+        }
+        /* Drawn at `ControlDiameter` and reached out past the platform's 44 —
+           the same trick `Pip` uses, and the reason this can be a quiet outline
+           without being a small target. */
+        hitSlop={9}
         style={({ pressed }) => [
-          styles.plus,
-          { backgroundColor: free > 0 ? accent : c.backgroundElement },
+          styles.enter,
+          !live && styles.enterBare,
+          { backgroundColor: live ? accent : c.backgroundElement },
           pressed && styles.pressed,
         ]}>
-        <Text
-          style={[
-            styles.plusGlyph,
-            { color: free > 0 ? c.background : c.textSecondary },
-          ]}>
-          +
-        </Text>
+        {/**
+          * THE `+` IS BACK, AND THIS IS NOT THE ONE THAT WAS REMOVED.
+          *
+          * What was wrong before was a `+` ALONE: a bare glyph in a row of
+          * hearts could add a heart, a card or a slot, and the words that said
+          * which sat outside the button where they could not be pressed.
+          *
+          * Leading a label it has the opposite problem to solve and solves it
+          * well — the glyph is what the eye finds at a glance and the noun is
+          * what settles the ambiguity, so "a new contest, by choice" arrives in
+          * one look instead of a read. It is also the only mark on this row
+          * that says the act is VOLUNTARY: everything else here is a heart the
+          * week has already committed.
+          *
+          * DRAWN, NOT TYPED. A `+` glyph sits high in its own line box, so
+          * centring it needs a hand-tuned baseline nudge that drifts the first
+          * time the type size changes — the previous circle carried exactly
+          * that hack. Two bars cannot drift, and it is how `Chevron` below
+          * draws its own arrow.
+          *
+          * IT GOES WHEN NOTHING IS FREE, because by then it is a promise the
+          * run cannot keep. The quiet state already drops the gold and the
+          * count; leaving a `+` on it would be the one part of the button still
+          * offering a new contest to somebody with nothing to stake. What is
+          * left is the room's name, which is the half that stays true — there
+          * are still recaps in there to read.
+          */}
+        {live ? <Plus color={ink} /> : null}
+        <Text style={[styles.enterLabel, { color: ink }]}>Contests</Text>
       </Pressable>
+    </View>
+  );
+}
+
+/** A `+` from two bars, sized to sit inside the lobby button's label. */
+function Plus({ color }: { color: string }) {
+  return (
+    <View style={styles.plus}>
+      <View style={[styles.plusBar, { backgroundColor: color }]} />
+      <View style={[styles.plusBar, styles.plusBarUp, { backgroundColor: color }]} />
     </View>
   );
 }
@@ -782,27 +872,9 @@ function Card({
   );
 }
 
-/**
- * The lobby button's diameter.
- *
- * A shade under the 26pt hearts it sits beside, deliberately: the pips are the
- * row's subject and this is its end. It is NOT `ControlDiameter` (32) — that
- * one sizes the inventory's outlined filter buttons, which are a row of equals,
- * and borrowing it here made the plus the loudest thing on the line.
- */
-const PLUS_SIZE = 22;
-
 const styles = StyleSheet.create({
   /**
-   * The run's row. Hearts left, words right, one hairline above.
-   *
-   * `flex-start` rather than `center`: the left is a rack of glyphs and the
-   * right is two lines of text, and centring them parks each against the
-   * other's middle. Aligned to the top, the hearts sit on the lead line — which
-   * is the line they are the evidence for.
-   */
-  /**
-   * The run's row. Rack left, one quiet count right.
+   * The run's row: a tray that stretches, and a button that does not.
    *
    * NO RULE ABOVE IT. It had a hairline, on the reasoning that a divider
    * separates the carousel's chrome from the run. There is no chrome left to
@@ -814,44 +886,100 @@ const styles = StyleSheet.create({
   rail: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.three,
+    /* NO `space-between`. The tray flexes, so the slack is inside it — pushing
+       the two apart as well would just move the gap back out. */
+    gap: Spacing.two,
     paddingTop: Spacing.two + 2,
   },
-  /* Takes the room the pips and the button do not, and truncates rather than
-     pushing the button off the edge — the button is the one thing on this row
-     that must always be reachable. `textAlign: right` keeps it against the
-     button instead of floating in the middle of a short rack. */
-  railLine: { flex: 1, minWidth: 0, textAlign: 'right' },
   /**
-   * The lobby button. A 32pt ring, which is `ControlDiameter` — the same round
-   * control the inventory's filters use — reached out to the platform's 44pt
-   * minimum with `hitSlop` rather than by drawing something bigger. A solid
-   * button here would be the loudest thing in a row of 26pt glyphs and would
-   * read as the row's subject rather than its end.
-   */
-  /**
-   * FILLED AND SMALL. It was a 32pt hairline ring, which put a third kind of
-   * object — an outline — in a row that already holds solid hearts and text,
-   * and at that size the ring read as the loudest thing on the line while
-   * saying the least.
+   * THE TRAY, and the only flexible thing on the row.
    *
-   * 22 is a shade under the 26pt pips beside it, which is the right rank: the
-   * hearts are the row's subject and this is its end. The touch target is not
-   * 22 — `hitSlop` takes it past the platform's 44pt minimum without drawing
-   * anything bigger, the same trick `Pip` uses.
+   * It stretches to just short of the button so the slack between them is
+   * ENCLOSED rather than spanned — which is the whole reason the row stopped
+   * reading as two leftovers pushed to opposite edges.
+   *
+   * `surface` rather than `backgroundElement`: element is this app's fill for
+   * things you press, and the tray is not one — the pips inside it are. One
+   * step off black is all it needs to give the rack a floor.
    */
-  plus: {
-    width: PLUS_SIZE,
-    height: PLUS_SIZE,
-    borderRadius: PLUS_SIZE / 2,
+  tray: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
+    height: ControlDiameter,
+    paddingHorizontal: Spacing.two + 2,
+    borderRadius: ControlDiameter / 2,
   },
-  /* Sized and nudged by hand: a `+` sits high in its own line box, so centring
-     the glyph's box leaves it visibly above the circle's middle. */
-  plusGlyph: { fontSize: 15, fontWeight: '700', lineHeight: 16, marginTop: -0.5 },
+  /**
+   * One heart per card means the rack grows with the week, so it is the half
+   * that gives. `overflow: hidden` is the interim answer to a rack too long for
+   * the tray — a clipped rack is recoverable by swiping, and the alternative is
+   * pushing the door off the screen. The real answer is to let it scroll, which
+   * is worth doing the week a board can hold eight cards.
+   */
+  rack: { flexShrink: 1, minWidth: 0, overflow: 'hidden' },
+  /* The tray's right-hand occupant. `auto` rather than a spacer so it sits at
+     the tray's end whatever the rack is doing, and never wraps. */
+  freeCount: { marginLeft: 'auto', paddingLeft: Spacing.two, flexShrink: 0 },
+  /**
+   * THE LOBBY BUTTON. A gold line, not a gold slab.
+   *
+   * `ControlDiameter` tall — the app's one round-control height, so this agrees
+   * with the filter chips rather than inventing a size — and as wide as its
+   * words. An outline because the focus ticks on the active heart are already
+   * gold and already mean something else; see the note above `live`.
+   */
+  enter: {
+    flexShrink: 0,
+    justifyContent: 'center',
+    /**
+     * 28, NOT `ControlDiameter`.
+     *
+     * It was 32 — the app's one round-control height, so that it would agree
+     * with the inventory's filter chips. Set beside a 24pt rack it still read
+     * as the biggest thing on the row, and a filter chip is not the comparison
+     * that matters here: those sit in a row of their own peers, this sits next
+     * to hearts and has to rank BELOW them. The rack is what the row is about.
+     *
+     * Four points off the height, one off the type and two off the padding
+     * takes it from 112pt wide to about 92 — a quarter of the row rather than a
+     * third — without touching the label, because the noun is what tells you
+     * what you are entering and is worth more than the points it costs.
+     *
+     * The touch target does not shrink with it: `hitSlop` still reaches past
+     * 44pt.
+     */
+    height: ENTER_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two - 2,
+    /* TIGHTER ON THE GLYPH SIDE. A `+` is mostly air where a letter is mostly
+       ink, so equal padding leaves the left visibly slacker than the right.
+       Two points back is the optical correction, and it happens to pay for a
+       third of what the glyph costs in width. */
+    paddingLeft: Spacing.two + 2,
+    paddingRight: Spacing.three - 4,
+    borderRadius: ENTER_HEIGHT / 2,
+  },
+  /* NO GLYPH, NO OPTICAL CORRECTION. The tighter left padding above exists to
+     pay for the air inside a `+`; with the word alone it just parks the label
+     off-centre in its own pill. */
+  enterBare: { paddingLeft: Spacing.three - 4 },
+  /* The glyph's box. 9 against a 12pt label — a shade under the cap height, so
+     it reads as punctuation to the word rather than a second word. */
+  plus: { width: PLUS_SIZE, height: PLUS_SIZE, alignItems: 'center', justifyContent: 'center' },
+  /* Both bars are the same rule; one of them stood on its end. 1.5 because a
+     stroke this short needs the weight to hold its own beside 12pt type. */
+  plusBar: { position: 'absolute', width: PLUS_SIZE, height: 1.5, borderRadius: 0.75 },
+  plusBarUp: { width: 1.5, height: PLUS_SIZE },
+  /* Not on the type scale on purpose: `body` at 12/500 is a caption's weight
+     and this is a button. 13/600 is the smallest thing in this app that reads
+     as one without being set in caps — and it is a notch under the fill's 700,
+     because an outline does not have to work as hard to be seen. */
+  /* 12/500. At 13/600 the label was the heaviest text on the screen below the
+     card's own name — a button does not have to outweigh the thing it serves. */
+  enterLabel: { fontSize: 12, lineHeight: 15, fontWeight: '500' },
 
   /* The pager, with the two arrows hung off its sides. Nothing here reserves
      width for them — see `CHEV_GUTTER`. */
