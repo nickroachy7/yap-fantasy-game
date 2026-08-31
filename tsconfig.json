@@ -21,6 +21,7 @@
     "dist",
     "node_modules",
     "supabase",
+    "scripts/icons-lint.ts",
     ".expo/web",
     ".expo/devices.json"
   ]

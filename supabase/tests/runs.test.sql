@@ -455,6 +455,23 @@ select l.id, 'WR1', ci.id
 
 update public.games set status_state = 'final' where season = 2026 and week in (96, 97);
 
+-- THE DEATH CHAIN IS PINNED TO THREE HEARTS, rather than inheriting whatever a
+-- run happens to start with.
+--
+-- What is under test below is SETTLEMENT'S ARITHMETIC — two losses take two, a
+-- balance of one clamps at zero rather than going negative, and a run at zero
+-- ends — and none of that is a statement about `run_starting_hearts`. The
+-- assertions were written when that config was 3 and read the number straight
+-- out of the run, so the day it moved to 5 (`20260831010000`) the suite failed
+-- with "two losses should leave one heart, got 3": the losses were applied
+-- perfectly and the test was measuring the config.
+--
+-- A suite that asserts a number it did not set is asserting the config. This
+-- sets it.
+update public.runs
+   set hearts = 3, peak_hearts = 3
+ where user_id = '11111111-0000-0000-0000-000000000001' and ended_at is null;
+
 do $$
 declare
   a     constant uuid := '11111111-0000-0000-0000-000000000001';
@@ -696,12 +713,23 @@ select l.id, 'WR1', ci.id
  where c.code = 'test:top3:98'
    and not exists (select 1 from public.lineup_slots s where s.lineup_id = l.id);
 
+-- PINNED FOR THE SAME REASON THE DEATH CHAIN IS, and here it matters more: the
+-- assertion below is that a heal WIDENS THE RACK, which can only be observed on
+-- a run whose hearts and peak are equal and below the ceiling. A fresh run
+-- satisfies that at any starting value, but the numbers it is checked against
+-- are written down, so the fixture has to write the start down too.
+update public.runs
+   set hearts = 3, peak_hearts = 3
+ where user_id = '11111111-0000-0000-0000-000000000001' and ended_at is null;
+
 do $$
 declare
   a     constant uuid := '11111111-0000-0000-0000-000000000001';
   r     public.runs;
 begin
   select * into r from public.runs where user_id = a and ended_at is null;
+  /* Now a check that the PIN took, rather than a check on `run_starting_hearts`
+     wearing a fixture's clothes. */
   if r.hearts <> 3 or r.peak_hearts <> 3 then
     raise exception 'FAIL: fixture problem — new run is % of %', r.hearts, r.peak_hearts;
   end if;

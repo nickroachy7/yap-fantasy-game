@@ -28,9 +28,12 @@ import {
   type Lock,
 } from '@/components/contests/ContestCard';
 import type { ContestTerms, Duel } from '@/components/contests/contest-model';
+import { ContestAbout } from '@/components/contests/ContestAbout';
+import { ContestActions } from '@/components/contests/ContestActions';
 import { ContestFieldList } from '@/components/contests/ContestFieldPanel';
 import type { FieldEntrant } from '@/components/contests/use-contest-field';
 import type { FieldWeek } from '@/components/lineup/field';
+import type { Run } from '@/components/runs/run';
 import { BADGE_SIZE, BADGE_WIDTH, BenchRow, StarterRow } from '@/components/lineup/LineupRow';
 import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
@@ -38,7 +41,7 @@ import type { LineupCard } from '@/components/lineup/model';
 import { PlayerRow } from '@/components/cards/PlayerRow';
 import type { DirectoryPlayer } from '@/components/cards/player-directory';
 import { CollectionSummary } from '@/components/collection/CollectionSummary';
-import { Hearts } from '@/components/runs/Hearts';
+import { ContestHearts, Hearts } from '@/components/runs/Hearts';
 import { SearchField, SortChips } from '@/components/ui/Controls';
 import { summarise } from '@/components/collection/types';
 import {
@@ -81,7 +84,10 @@ import { SegmentedControl } from '@/components/shell/SegmentedControl';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { POSITION_ORDER, POSITIONS } from '@/constants/positions';
-import { Colors, Spacing, Type } from '@/constants/theme';
+import { Colors, Spacing, Type, selectionAccent } from '@/constants/theme';
+import { Icon } from '@/components/icons/Icon';
+import { GLYPHS } from '@/components/icons/glyphs';
+import { validateSet } from '@/components/icons/validate';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -196,36 +202,62 @@ const KIT_TERMS_MEDIAN: ContestTerms = {
 /**
  * A field with one row per state the panel has to draw.
  *
- * The REVEAL RULE is the reason this fixture is long. A lineup opens when every
- * card in it has kicked off, so on any given evening a real contest holds all
- * four of these at once — settled, open, still locked, and you — and arranging
- * that deliberately against a live database means waiting for a kickoff.
+ * FOUR ROWS BECAUSE THE SUB-LINE HAS FOUR ANSWERS, and they are ranked: a prize
+ * ends the story, an unfinished lineup is the most actionable thing about a
+ * rival, and after that it is whether what you would open is locked in or still
+ * being edited. A real contest holds all four at once on a Sunday evening, and
+ * arranging that against a live database means waiting for a kickoff.
  */
 const KIT_FIELD: FieldEntrant[] = [
   {
     userId: 'k1', displayName: 'seahawkcalvin', avatarKey: 'default',
     lineupId: 'kl1', filled: 3, points: 61.4, rank: 1,
-    result: 'W', prize: 120, isMe: false, open: true,
+    result: 'W', prize: 120, isMe: false, locked: true,
   },
   {
     userId: 'k2', displayName: 'Xx OG CHIEF Xx', avatarKey: 'default',
     lineupId: 'kl2', filled: 3, points: 48.2, rank: 2,
-    result: 'W', prize: 72, isMe: false, open: true,
+    result: 'W', prize: 72, isMe: false, locked: true,
   },
   /* You, mid-table, with a lineup that is always your own to read. */
   {
     userId: 'k3', displayName: 'nickroachy', avatarKey: 'default',
     lineupId: 'kl3', filled: 3, points: 27.1, rank: 3,
-    result: 'L', prize: null, isMe: true, open: true,
+    result: 'L', prize: null, isMe: true, locked: true,
   },
-  /* Still holding a card that has not kicked off — the state that must say so
-     in words rather than simply failing to respond to a tap. */
+  /* Still holding a card that has not kicked off, and one slot short. Both
+     facts are the row's sub-line, in that order — an unfinished lineup is the
+     more actionable of the two. */
   {
     userId: 'k4', displayName: 'bloomguy', avatarKey: 'default',
-    lineupId: 'kl4', filled: 3, points: 0, rank: 4,
-    result: null, prize: null, isMe: false, open: false,
+    lineupId: 'kl4', filled: 2, points: 0, rank: 4,
+    result: null, prize: null, isMe: false, locked: false,
   },
 ];
+
+/**
+ * A run mid-way through: four pips, three still held, two of them staked.
+ *
+ * The rack fixture the contest rules panel needs, and it is deliberately NOT a
+ * fresh run — a rack of three untouched hearts draws one state and hides the
+ * two that carry the meaning (a blade for staked, a tear for lost).
+ */
+const KIT_RUN: Run = {
+  id: 'kit-run',
+  hearts: 3,
+  maxHearts: 4,
+  rack: 4,
+  wagered: 2,
+  wageredIn: 2,
+  wins: 5,
+  losses: 1,
+  endedAt: null,
+  awaitingCarry: false,
+  carrySlots: 3,
+  nextRung: { atWins: 8, cardSlots: 5 },
+  heldCards: 24,
+  lostCards: 0,
+};
 
 const KIT_TERMS_TOP_N: ContestTerms = {
   formatName: 'WR Room', slotCount: 3, entryFeeGems: 40,
@@ -632,9 +664,19 @@ export default function KitScreen() {
  * return — which is a rules-of-hooks violation even when the condition is a
  * build-time constant.
  */
+/**
+ * The lint, run once at module load rather than per render.
+ *
+ * The glyph set is a module constant, so its findings are too — recomputing
+ * them on every re-render of a gallery would be work that can never produce a
+ * different answer.
+ */
+const ICON_FINDINGS = validateSet(GLYPHS);
+
 function Kit() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  const accent = selectionAccent(scheme);
   const [week, setWeek] = useState('2');
   const [confirm, setConfirm] = useState(false);
   const [confirmErr, setConfirmErr] = useState<string | null>(null);
@@ -697,6 +739,58 @@ function Kit() {
                 <TabIcon key={`big-${n}`} name={n} color={c.text} focused size={72} />
               ))}
             </View>
+          </Section>
+
+          <Section
+            title="Badge glyphs"
+            note="Every glyph in the construction system, hollow then solid, at 24 and 64 — plus what the lint says.">
+            {/* THE WHOLE SET IN ONE ROW IS THE POINT. A glyph is never wrong on
+                its own; it is wrong beside its neighbours, and the keyline
+                exists so a circle, a shield and a diamond can sit in one row
+                without any of them looking the wrong size. That is only
+                checkable here, all at once. */}
+            <View style={[styles.row, { gap: Spacing.four, flexWrap: 'wrap' }]}>
+              {GLYPHS.map((g) => (
+                <View key={g.name} style={styles.iconCell}>
+                  <Icon glyph={g} color={c.textSecondary} background={c.background} size={24} />
+                  <Icon glyph={g} color={c.text} background={c.background} focused size={24} />
+                  <Text style={[Type.micro, { color: c.textTertiary }]}>{g.name}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={[styles.row, { gap: Spacing.four, flexWrap: 'wrap' }]}>
+              {GLYPHS.map((g) => (
+                <Icon
+                  key={`big-${g.name}`}
+                  glyph={g}
+                  color={c.text}
+                  accent={accent}
+                  background={c.background}
+                  focused
+                  size={64}
+                />
+              ))}
+            </View>
+            {/* The lint's own report, rendered where the set is reviewed rather
+                than only in a terminal. A clean line here is the claim that
+                every glyph above agrees with `system.ts`; it is deliberately
+                loud when it is not. */}
+            {ICON_FINDINGS.length === 0 ? (
+              <Text style={[Type.fine, { color: c.textTertiary }]}>
+                Lint clean — {GLYPHS.length} glyphs agree with the system.
+              </Text>
+            ) : (
+              ICON_FINDINGS.map((f, i) => (
+                <Text
+                  key={i}
+                  style={[
+                    Type.fine,
+                    { color: f.severity === 'error' ? c.negative : c.warning },
+                  ]}>
+                  {f.severity} · {f.glyph} · {f.rule} — {f.detail}
+                </Text>
+              ))
+            )}
           </Section>
 
           <Section
@@ -828,19 +922,83 @@ function Kit() {
 
           <Section
             title="The run rack"
-            note="THREE STATES AND THREE DIFFERENT OBJECTS. A heart you hold is solid whether or not it is staked, because it is equally yours either way; what marks a stake is a blade driven through it, and what marks a loss is the heart torn in two. The old set was one shape at three intensities — solid, outlined, outlined-and-cracked — which inverted the one convention every player knows (filled means you have it) and, worse, drew “at risk” as a cracked heart, i.e. as the picture of a heart that has already broken. WHICH HEART THE PAGE IS ABOUT is drawn ONE way, whatever the heart is: it stays at full strength while the rest recede, and gold corner ticks confirm it. That was two different marks once — a gold blade on a staked heart, a dashed box on a free one — which made the reader learn the same answer twice. The blade is identity and stays steel; the ticks are focus and are always gold; brightness is the primary signal and survives being small. Rows below: a fresh run, a run with two of three staked and one already lost, the last-heart state, and the tile’s view of the same rack.">
+            note="A receipt is a fourth object and a separate axis: a settled contest's outcome, drawn on the heart it borrowed — green W, red L, grey T — and the letter is what carries it so the pair survives greyscale and a red-green deficiency. Receipts sit LEFT of the rack, separated by a breath rather than a rule, and they leave with the recap window. THREE STATES AND THREE DIFFERENT OBJECTS. A heart you hold is solid whether or not it is staked, because it is equally yours either way; what marks a stake is a blade driven through it, and what marks a loss is the heart torn in two. The old set was one shape at three intensities — solid, outlined, outlined-and-cracked — which inverted the one convention every player knows (filled means you have it) and, worse, drew “at risk” as a cracked heart, i.e. as the picture of a heart that has already broken. WHICH HEART THE PAGE IS ABOUT is drawn ONE way, whatever the heart is: it stays at full strength while the rest recede, and gold corner ticks confirm it. That was two different marks once — a gold blade on a staked heart, a dashed box on a free one — which made the reader learn the same answer twice. The blade is identity and stays steel; the ticks are focus and are always gold; brightness is the primary signal and survives being small. Rows below: a fresh run, a run with two of three staked and one already lost, the last-heart state, and the tile’s view of the same rack.">
             <View style={{ gap: Spacing.three }}>
               <Hearts hearts={3} rack={3} size={26} />
               <Hearts hearts={3} wagered={2} rack={4} focus={{ start: 0, count: 1 }} size={26} />
               <Hearts hearts={1} wagered={1} rack={4} focus={{ start: 0, count: 1 }} size={26} />
-              <Hearts hearts={3} wagered={2} rack={4} available size={26} />
+            </View>
+          </Section>
+
+          <Section
+            title="The board's contest row"
+            note="A DIFFERENT OBJECT FROM THE RACK ABOVE, and the difference is what it is counting. The rack is a RUN — held, staked, lost. This is one heart per CONTEST on the board, in the carousel's own order, so pip N is card N and tapping one is the same gesture as swiping to it. Four states: a hollow heart is a contest you have not entered (the one place this file uses an outline, and the one place “filled means you have it” points the right way round), a solid one is a heart riding right now, and a green W / red L / grey T is a settled week's receipt. Second row: the same set with the third card in view.">
+            <View style={{ gap: Spacing.three }}>
+              <ContestHearts
+                entries={[
+                  { result: null, entered: false },
+                  { result: null, entered: true },
+                  { result: 'W', entered: true },
+                  { result: 'L', entered: true },
+                  { result: 'T', entered: true },
+                ]}
+                size={26}
+              />
+              <ContestHearts
+                entries={[
+                  { result: null, entered: false },
+                  { result: null, entered: true },
+                  { result: 'W', entered: true },
+                  { result: 'L', entered: true },
+                  { result: 'T', entered: true },
+                ]}
+                focus={{ start: 2, count: 1 }}
+                size={26}
+              />
             </View>
           </Section>
 
           <Section
             title="Contest field"
-            note="Who else is in a contest, on the contest’s own page. The card draws the community as a distribution because there is no opponent to draw; this is the other half — the same field, named. Rows open into the entrant’s lineup, but only once every card in it has kicked off: players lock one at a time, so opening earlier would hand the last person to file the shape of the whole field. A row that is not open yet says why, because a dead tap is indistinguishable from a bug. Your own row is tinted and always open.">
-            <ContestFieldList entrants={KIT_FIELD} contestId={null} />
+            note="Who else is in a contest, on the contest’s own page. The card draws the community as a distribution because there is no opponent to draw; this is the other half — the same field, named. Every row is a door into that manager’s lineup, which is readable from the moment they file it: the reveal rule that used to seal a lineup until its last card kicked off is gone, and what is left of it is the sub-line, which says whether what you would open is locked in or still being edited. Your own row is tinted rather than badged — a “You” chip would compete with the result chip in the same corner."
+            >
+            <ContestFieldList entrants={KIT_FIELD} slotCount={3} onOpen={() => {}} />
+          </Section>
+
+          <Section
+            title="Contest rules"
+            note="The contest’s page in sentences, under the card that prices it in eight characters. Every number is derived from the same `ContestTerms` the card reads, so the panel cannot come to disagree with the row that was tapped to reach it — the pool share, the top prize and the minimum field are `contest-model`’s own arithmetic. The scoring row is the one that leads somewhere: the ruleset is the same for every contest and only `scoring.tsx` states it truly.">
+            <ContestAbout
+              terms={KIT_TERMS_TOP_N}
+              name="WR Room"
+              prizePoolBps={2500}
+              leavable
+              /* A rack of four with two staked and one already lost, so the
+                 row shows all three heart states rather than the one a live
+                 account happens to be in. */
+              run={KIT_RUN}
+            />
+          </Section>
+
+          <Section
+            title="Contest actions"
+            note="Pinned to the bottom of the contest sheet, because that page is now four screens long and the control it used to hide at the end was the way OUT. Leaving is outlined rather than filled: the gems come back in full and you can enter again while the games are still ahead, so a solid red button would be shouting about something completely reversible. Once a card has kicked off there is nothing to leave, and the bar says so rather than offering a button the server would refuse.">
+            <View style={{ gap: Spacing.three }}>
+              <ContestActions
+                entryFeeGems={40}
+                locked={false}
+                canLeave
+                onLineup={() => {}}
+                onLeave={() => {}}
+              />
+              <ContestActions
+                entryFeeGems={40}
+                locked
+                canLeave
+                onLineup={() => {}}
+                onLeave={() => {}}
+              />
+            </View>
           </Section>
 
           <Section

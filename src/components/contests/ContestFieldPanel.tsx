@@ -1,5 +1,5 @@
 /**
- * The people in a contest, and their lineups once those have locked.
+ * The people in a contest: the leaderboard, and the way into any one of them.
  *
  * ---------------------------------------------------------------------------
  * WHY A CONTEST NEEDS A FIELD DRAWN AS PEOPLE
@@ -13,46 +13,63 @@
  * It is not the whole of what a contest is. A distribution has nobody in it,
  * and a game whose entire premise is "you are somewhere in a base of managers"
  * had never once shown the base. This panel is the other half: the same field,
- * named. It lives here rather than on the card because it is a list you read,
- * not a shape you glance at, and because this is the page you come back to
- * after the games rather than the one you file from.
+ * named. It lives on the contest's page rather than on the card because it is a
+ * list you read, not a shape you glance at.
  *
  * ---------------------------------------------------------------------------
- * THE REVEAL RULE, AND WHY IT IS PER LINEUP
+ * A ROW IS A DOOR, NOT A DISCLOSURE
  * ---------------------------------------------------------------------------
  *
- * Players lock ONE AT A TIME, so a week drains over four days rather than
- * shutting at once. Open everybody's lineup immediately and the last person to
- * file reads the whole field's shape before choosing, which is a real edge and
- * a growing one as the base grows. Open them never and the best hour of the
- * week — everybody scoring at once, nothing left to change — is a column of
- * numbers with nothing behind it.
+ * Tapping an entrant used to expand their slots INSIDE the row, which meant a
+ * lineup — the densest object in the game, eight players deep with fixtures and
+ * scores — was drawn as a squashed four-column strip so it would fit under a
+ * 40pt row. It also meant only one could be open at a time, on a page where the
+ * comparison you actually want is against a lineup two rows down.
  *
- * So a lineup opens when every card in it has kicked off, decided by the server
- * (`contest_field.open`, 20260826030000) and never guessed at here. A row that
- * is not open yet says so in its own words rather than simply not responding to
- * a tap: a dead press is indistinguishable from a bug.
+ * So a row navigates to `entry/[contest]/[user]`, which draws their team the
+ * way a team is drawn everywhere else. The panel is a leaderboard and nothing
+ * else.
+ *
+ * ---------------------------------------------------------------------------
+ * AND IT NEVER SAYS "NOT YET"
+ * ---------------------------------------------------------------------------
+ *
+ * Lineups used to open one at a time, as their last card kicked off, so for the
+ * five days a contest spends being decided every row read "opens when their
+ * last card kicks off". A page whose whole subject is who else is in this thing
+ * answered "not yet" for exactly the stretch anybody was reading it.
+ *
+ * That rule is gone (`20260830010000`). What survives is `locked`, which no
+ * longer gates anything and is drawn as what it is: whether the lineup you are
+ * about to open can still change before kickoff.
  */
-import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { initialsOf } from '@/components/shell/AppHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
 import { StatusChip } from '@/components/ui/StatusChip';
-import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
+import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-import {
-  useContestField,
-  useContestLineup,
-  type FieldEntrant,
-} from './use-contest-field';
+import type { FieldEntrant } from './use-contest-field';
 
-export function ContestFieldPanel({ contestId }: { contestId: string }) {
+export function ContestFieldPanel({
+  entrants,
+  loading,
+  error,
+  slotCount,
+  onOpen,
+}: {
+  entrants: FieldEntrant[] | null;
+  loading: boolean;
+  error: string | null;
+  /** What a full lineup looks like here, so a row can say "2 of 3 cards". */
+  slotCount: number;
+  onOpen: (entrant: FieldEntrant) => void;
+}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const { entrants, loading, error } = useContestField(contestId);
 
   if (error) {
     return (
@@ -62,9 +79,14 @@ export function ContestFieldPanel({ contestId }: { contestId: string }) {
     );
   }
 
+  /* A heading with nothing under it rather than a spinner. The panel is one
+     screen down on a sheet that has already drawn the card and the terms, so a
+     loader here is a spinner nobody is looking at. */
   if (loading && entrants === null) return <Panel title="The field" />;
 
-  return <ContestFieldList entrants={entrants ?? []} contestId={contestId} />;
+  return (
+    <ContestFieldList entrants={entrants ?? []} slotCount={slotCount} onOpen={onOpen} />
+  );
 }
 
 /**
@@ -75,22 +97,18 @@ export function ContestFieldPanel({ contestId }: { contestId: string }) {
  * that only existed on web, in a component only reachable behind the auth gate,
  * on a screen nobody swipes during development. A panel whose every state
  * requires a real contest, a real field and a real kickoff time to see is that
- * situation again — the reveal rule in particular has four states and three of
- * them are hard to arrange on purpose.
+ * situation again.
  */
 export function ContestFieldList({
   entrants: rows,
-  contestId,
+  slotCount,
+  onOpen,
 }: {
   entrants: FieldEntrant[];
-  /** Null in the kit, where a row's peek is a fixture rather than a fetch. */
-  contestId: string | null;
+  slotCount: number;
+  /** Absent in the kit, where there is nowhere to navigate to. */
+  onOpen?: (entrant: FieldEntrant) => void;
 }) {
-  /* One open at a time. Two lineups expanded in a sheet this tall means
-     scrolling past one to read the other, and the comparison people actually
-     make is against their OWN lineup, which is a tab away and always visible. */
-  const [openUser, setOpenUser] = useState<string | null>(null);
-
   return (
     <Panel
       title="The field"
@@ -110,16 +128,27 @@ export function ContestFieldList({
           {rows.map((e) => (
             <EntrantRow
               key={e.userId}
-              contestId={contestId}
               entrant={e}
-              expanded={openUser === e.userId}
-              onToggle={() => setOpenUser(openUser === e.userId ? null : e.userId)}
+              slotCount={slotCount}
+              onOpen={onOpen ? () => onOpen(e) : undefined}
             />
           ))}
         </View>
       )}
     </Panel>
   );
+}
+
+/**
+ * WHAT A ROW CAN STILL TELL YOU, in order of what a reader wants: a prize is
+ * the end of the story, an unfinished lineup is the most actionable thing about
+ * a rival, and after that it is whether what you would be opening is settled or
+ * still being edited.
+ */
+function subLine(e: FieldEntrant, slotCount: number): string {
+  if (e.prize !== null && e.prize > 0) return `Won ${e.prize} gems`;
+  if (e.filled < slotCount) return `${e.filled} of ${slotCount} cards`;
+  return e.locked ? 'Locked in' : 'Still editing';
 }
 
 /**
@@ -135,15 +164,13 @@ export function ContestFieldList({
  * in the app uses to say the reader is in it.
  */
 function EntrantRow({
-  contestId,
   entrant,
-  expanded,
-  onToggle,
+  slotCount,
+  onOpen,
 }: {
-  contestId: string | null;
   entrant: FieldEntrant;
-  expanded: boolean;
-  onToggle: () => void;
+  slotCount: number;
+  onOpen?: () => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -151,127 +178,56 @@ function EntrantRow({
   const played = entrant.points > 0;
 
   return (
-    <View>
-      <Pressable
-        onPress={onToggle}
-        accessibilityRole="button"
-        accessibilityLabel={
-          entrant.open
-            ? `${expanded ? 'Hide' : 'Show'} ${entrant.displayName}'s lineup`
-            : `${entrant.displayName}'s lineup is not open yet`
-        }
-        style={({ pressed }) => [
-          styles.row,
-          { borderColor: c.border },
-          entrant.isMe && { backgroundColor: c.backgroundMine },
-          pressed && styles.pressed,
-        ]}>
-        <Text style={[Type.fine, NUMERIC, styles.rank, { color: c.textTertiary }]}>
-          {entrant.rank}
+    <Pressable
+      onPress={onOpen}
+      disabled={!onOpen}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${entrant.displayName}'s lineup`}
+      style={({ pressed }) => [
+        styles.row,
+        { borderColor: c.border },
+        entrant.isMe && { backgroundColor: c.backgroundMine },
+        pressed && styles.pressed,
+      ]}>
+      <Text style={[Type.fine, NUMERIC, styles.rank, { color: c.textTertiary }]}>
+        {entrant.rank}
+      </Text>
+      <View style={[styles.avatar, { borderColor: c.border }]}>
+        <Text style={[Type.micro, { color: c.textSecondary }]}>
+          {initialsOf(entrant.displayName)}
         </Text>
-        <View style={[styles.avatar, { borderColor: c.border }]}>
-          <Text style={[Type.micro, { color: c.textSecondary }]}>
-            {initialsOf(entrant.displayName)}
-          </Text>
-        </View>
-        <View style={styles.who}>
-          <Text numberOfLines={1} style={[Type.body, { color: c.text }]}>
-            {entrant.displayName}
-          </Text>
-          <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
-            {/* WHAT THIS ROW CAN STILL TELL YOU, in order of what a reader
-                wants. A prize is the end of the story; a lineup you may open is
-                an invitation; anything else is the state it is waiting in. */}
-            {entrant.prize !== null && entrant.prize > 0
-              ? `Won ${entrant.prize} gems`
-              : entrant.open
-                ? expanded
-                  ? 'Hide lineup'
-                  : 'See lineup'
-                : 'Lineup opens when their last card kicks off'}
-          </Text>
-        </View>
-        <Text style={[Type.strong, NUMERIC, { color: played ? c.text : c.textTertiary }]}>
-          {played ? entrant.points.toFixed(1) : '—'}
+      </View>
+      <View style={styles.who}>
+        <Text numberOfLines={1} style={[Type.body, { color: c.text }]}>
+          {entrant.displayName}
         </Text>
-        {entrant.result === null ? null : (
-          <StatusChip
-            label={entrant.result}
-            tone={
-              entrant.result === 'W' ? 'positive' : entrant.result === 'L' ? 'negative' : 'neutral'
-            }
-          />
-        )}
-      </Pressable>
-
-      {expanded && contestId ? <Peek contestId={contestId} entrant={entrant} /> : null}
-    </View>
+        <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
+          {subLine(entrant, slotCount)}
+        </Text>
+      </View>
+      <Text style={[Type.strong, NUMERIC, { color: played ? c.text : c.textTertiary }]}>
+        {played ? entrant.points.toFixed(1) : '—'}
+      </Text>
+      {entrant.result === null ? null : (
+        <StatusChip
+          label={entrant.result}
+          tone={
+            entrant.result === 'W' ? 'positive' : entrant.result === 'L' ? 'negative' : 'neutral'
+          }
+        />
+      )}
+      {/* The affordance, and the only thing on the row that is not a fact. A
+          list where every row leads somewhere still has to say so — a dense
+          table of numbers reads as a table until something marks it as a set
+          of doors. */}
+      {onOpen ? <Chevron color={c.textTertiary} /> : null}
+    </Pressable>
   );
 }
 
-/**
- * Their lineup, or the reason you cannot see it.
- *
- * THE SERVER'S REFUSAL IS SHOWN AS WRITTEN. `contest_lineup` raises rather than
- * returning an empty set precisely so that "they have not filed" and "you may
- * not look yet" stay different sentences — swallowing that here and drawing a
- * blank would put the distinction back in the bin it was taken out of.
- */
-function Peek({ contestId, entrant }: { contestId: string; entrant: FieldEntrant }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  const { slots, loading, error } = useContestLineup(contestId, entrant.userId);
-
-  if (loading && slots === null) return null;
-
-  if (error) {
-    return (
-      <View style={[styles.peek, { backgroundColor: c.backgroundElement }]}>
-        <Text style={[Type.fine, { color: c.textSecondary }]}>{error}</Text>
-      </View>
-    );
-  }
-
-  const rows = slots ?? [];
-  if (rows.length === 0) {
-    return (
-      <View style={[styles.peek, { backgroundColor: c.backgroundElement }]}>
-        <Text style={[Type.fine, { color: c.textSecondary }]}>
-          Nothing filed in this lineup.
-        </Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={[styles.peek, { backgroundColor: c.backgroundElement }]}>
-      {rows.map((s) => (
-        <View key={s.slot} style={styles.peekRow}>
-          <Text style={[Type.micro, styles.peekSlot, { color: c.textTertiary }]}>
-            {s.slot.toUpperCase()}
-          </Text>
-          <Text numberOfLines={1} style={[Type.fine, styles.peekName, { color: c.text }]}>
-            {s.playerName}
-          </Text>
-          <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
-            {[s.pos, s.team].filter(Boolean).join(' · ')}
-          </Text>
-          <Text
-            style={[
-              Type.fine,
-              NUMERIC,
-              styles.peekPoints,
-              /* A card on a bye never started and never will. Drawn at the
-                 quiet weight rather than as a nought, the same way an unplayed
-                 figure is drawn everywhere else in the app. */
-              { color: s.started ? c.text : c.textTertiary },
-            ]}>
-            {s.started ? s.points.toFixed(1) : '—'}
-          </Text>
-        </View>
-      ))}
-    </View>
-  );
+/** Two borders on a rotated square, which is the app's chevron everywhere. */
+function Chevron({ color }: { color: string }) {
+  return <View style={[styles.chev, { borderColor: color }]} />;
 }
 
 const styles = StyleSheet.create({
@@ -300,16 +256,13 @@ const styles = StyleSheet.create({
   /* Takes the spare width, so a long handle truncates rather than pushing the
      score and the chip off the right edge. */
   who: { flex: 1, minWidth: 0, gap: 1 },
-  /* Inset and tinted: it belongs to the row above it rather than being the next
-     row down. */
-  peek: {
-    gap: Spacing.one,
-    padding: Spacing.two,
-    marginBottom: Spacing.one,
-    borderRadius: Radius.control,
+  chev: {
+    width: 7,
+    height: 7,
+    borderRightWidth: 1.5,
+    borderTopWidth: 1.5,
+    transform: [{ rotate: '45deg' }],
+    marginLeft: Spacing.half,
+    flexShrink: 0,
   },
-  peekRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  peekSlot: { width: 32 },
-  peekName: { flex: 1, minWidth: 0 },
-  peekPoints: { width: 40, textAlign: 'right' },
 });

@@ -85,9 +85,17 @@ export default function ContestsScreen() {
      contest on two screens and make "which one do I edit" a question with two
      answers. See the note on the takeover in `contest/[code]`.
 
-     The free contest never appears: nobody chose it and nobody can leave it. */
-  const open = (contests ?? []).filter((c) => c.kind !== 'free' && c.mine === null);
-  const entered = (contests ?? []).filter((c) => c.kind !== 'free' && c.mine !== null).length;
+     The free contest never appears: nobody chose it and nobody can leave it.
+
+     NEITHER DOES A CONTEST BEING RECAPPED. `contest_lobby` carries last week's
+     entries so that the recap card on the board has a page to open — see
+     `20260830030000` — and this is a list of things you can still enter. They
+     were already out of `open` by the `mine === null` test, since a recap row
+     only exists where you filed; the count is the one that would have been
+     wrong, reporting a finished week's entries as contests you are in. */
+  const live = (contests ?? []).filter((c) => !c.recap);
+  const open = live.filter((c) => c.kind !== 'free' && c.mine === null);
+  const entered = live.filter((c) => c.kind !== 'free' && c.mine !== null).length;
 
   const context = loading
     ? undefined
@@ -199,7 +207,10 @@ function RunPanel({ run, onClaim }: { run: NonNullable<ReturnType<typeof usePlay
 
   return (
     <View style={styles.live}>
-      <Hearts hearts={run.hearts} wagered={run.wagered} rack={run.rack} size={14} />
+      {/* No blade — the same call the board's rail makes, and for the same
+          reason: a mark that says "committed" is nearly always on and never
+          moves. The line beside this one already says how many are riding. */}
+      <Hearts hearts={run.hearts} wagered={0} rack={run.rack} size={14} />
       <Text style={[Type.fine, { color: c.textSecondary }]} numberOfLines={1}>
         {/* WHAT IS ON THE LINE COMES FIRST when there is anything on it. The
             record and the next rung are context you read weekly; a live stake

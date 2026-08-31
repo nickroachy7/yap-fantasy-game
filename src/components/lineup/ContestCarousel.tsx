@@ -55,7 +55,7 @@
  * `goTo` exists because none of that fires for a PROGRAMMATIC scroll: a tap on a
  * heart has to move the list and the state itself.
  */
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Platform,
@@ -69,9 +69,10 @@ import {
 } from 'react-native';
 
 import { ContestCard } from '@/components/contests/ContestCard';
+import { StatusChip } from '@/components/ui/StatusChip';
 import { termsOfEntry, type MyContest } from '@/components/contests/use-my-contests';
-import { Hearts, type HeartSpan } from '@/components/runs/Hearts';
-import { Colors, Radius, Spacing, Type, selectionAccent } from '@/constants/theme';
+import { ContestHearts, type HeartResult, type HeartSpan } from '@/components/runs/Hearts';
+import { Colors, Spacing, Type, selectionAccent } from '@/constants/theme';
 import type { PlayerState } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -108,7 +109,6 @@ export function ContestCarousel({
   index,
   onIndexChange,
   onOpen,
-  onTileChange,
   lockAt,
   locked,
   now,
@@ -129,22 +129,6 @@ export function ContestCarousel({
    * A contest you had entered had no page at all once you were in it.
    */
   onOpen?: (contest: MyContest) => void;
-  /**
-   * "The reader has swiped past the last contest, onto the invitation."
-   *
-   * THE BOARD UNDERNEATH USED TO KEEP THE LAST CONTEST'S LINEUP HERE, and the
-   * reasoning was that swapping it for nothing empties the screen behind an
-   * invitation. In practice it did something worse: a page whose card says
-   * "enter a new contest" sat over a filled `Starting lineup · 3/3` belonging
-   * to a contest that had just slid off the screen — a lineup presented as
-   * though it were this page's, on the one page that has none.
-   *
-   * So the tile is a state the parent has to know about, and it draws its own
-   * empty board for it. Fired only when the answer CHANGES, because on web the
-   * settle handler runs on every scroll tick (see the header) and this would
-   * otherwise re-render the whole lineup screen mid-drag.
-   */
-  onTileChange?: (onTile: boolean) => void;
   lockAt: string | null;
   locked: boolean;
   now: number;
@@ -202,39 +186,43 @@ export function ContestCarousel({
    */
   const [page, setPage] = useState(index);
   const [lastIndex, setLastIndex] = useState(index);
-  /**
-   * How tall a card is, so the tile can be the same.
-   *
-   * MEASURED RATHER THAN STRETCHED. A row stretches its children by default and
-   * the tile asks for `flex: 1`, but a `ListFooterComponent` is wrapped by
-   * `VirtualizedList` in a box of its own that sizes to its content — so the
-   * tile came out card-width and text-height, with a hand's width of dead space
-   * under it before the foot row. The list's height is the tallest page either
-   * way; this makes the tile one of them instead of leaving the gap visible.
-   */
-  const [cardHeight, setCardHeight] = useState(0);
   if (index !== lastIndex) {
     setLastIndex(index);
     setPage(index);
   }
+
+  /**
+   * WHERE THE LIST ITSELF IS, which is not always where `index` says.
+   *
+   * `page` cannot answer this: the render-time adjustment above sets it from
+   * the `index` prop, so by the time an effect could compare them they already
+   * agree. This is written only by the two things that actually move the
+   * scroller — a settle and a `goTo` — so a change of `index` that neither of
+   * them caused is exactly a change driven from OUTSIDE the carousel, and that
+   * is the one case the list has to be told about.
+   *
+   * The case that made it necessary: "Play this week" on the recap board, which
+   * is under the carousel and sets the parent's index. Without this the board
+   * changed to the live week and the card above it stayed on the finished one —
+   * a card over somebody else's lineup, which is the single bug this component
+   * exists to prevent.
+   */
+  const settledAt = useRef(index);
 
   /* "The scroll has settled on a page." Native learns that from momentum end;
      web from the debounced scroll event. Same arithmetic either way. */
   const onSettle = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const next = Math.round(e.nativeEvent.contentOffset.x / step);
-      if (next < 0 || next > contests.length) return;
-      /* ONLY ON A CHANGE OF ANSWER. On web this handler is the debounced
-         `onScroll` (see the header), so an unconditional call would re-render
-         the whole lineup screen on every tick of a drag. */
-      if ((next >= contests.length) !== (page >= contests.length)) {
-        onTileChange?.(next >= contests.length);
-      }
+      /* EVERY PAGE IS A CONTEST NOW. The list used to carry one more — the
+         lobby tile as a footer — and every bound here was `contests.length`
+         rather than the last index because of it. */
+      if (next < 0 || next > contests.length - 1) return;
+      settledAt.current = next;
       setPage(next);
-      // The tile is not a contest; the board below draws its own empty state.
-      if (next < contests.length && next !== index) onIndexChange(next);
+      if (next !== index) onIndexChange(next);
     },
-    [step, contests.length, index, page, onIndexChange, onTileChange],
+    [step, contests.length, index, onIndexChange],
   );
 
   /**
@@ -244,7 +232,7 @@ export function ContestCarousel({
    */
   const goTo = useCallback(
     (next: number) => {
-      if (next < 0 || next > contests.length) return;
+      if (next < 0 || next > contests.length - 1) return;
       /**
        * NOT ANIMATED, and that is a correctness fix rather than a taste one.
        *
@@ -260,14 +248,26 @@ export function ContestCarousel({
        * should not make the reader watch it being carried out.
        */
       listRef.current?.scrollToOffset({ offset: step * next, animated: false });
-      if ((next >= contests.length) !== (page >= contests.length)) {
-        onTileChange?.(next >= contests.length);
-      }
+      settledAt.current = next;
       setPage(next);
-      if (next < contests.length && next !== index) onIndexChange(next);
+      if (next !== index) onIndexChange(next);
     },
-    [step, contests.length, index, page, onIndexChange, onTileChange],
+    [step, contests.length, index, onIndexChange],
   );
+
+  /**
+   * FOLLOW AN INDEX THAT CAME FROM OUTSIDE. A jump rather than an animation,
+   * for the same reason `goTo` jumps — on web an animated programmatic scroll
+   * emits intermediate offsets that `onSettle` reads as a swipe back.
+   *
+   * `step` is measured, so it is 0 for the first frame; scrolling on that would
+   * land everything at offset 0 and record it as the truth.
+   */
+  useEffect(() => {
+    if (step <= 0 || settledAt.current === index) return;
+    settledAt.current = index;
+    listRef.current?.scrollToOffset({ offset: step * index, animated: false });
+  }, [index, step]);
 
   /**
    * WHICH PIPS EACH CONTEST IS HOLDING — one span per card, computed once for
@@ -289,60 +289,91 @@ export function ContestCarousel({
    * The cursor walks every contest, including free ones, so a contest's span
    * never depends on how many free contests precede it.
    *
-   * Null on a contest that risks nothing, and null past `atRisk` — a stake with
-   * no wagered pip behind it gets no highlight rather than a borrowed one.
+   * ONLY A CONTEST YOU ARE ACTUALLY IN HOLDS A HEART, and getting that wrong is
+   * what made the rail stop pointing at anything.
+   *
+   * The walk used to run over EVERY card and bound itself by `run.wagered`. That
+   * held while the carousel only ever drew contests you had entered. It stopped
+   * holding the moment the free contest became unconditional (`20260830030000`):
+   * an unentered free contest sat at position 0, consumed the run's one stake,
+   * and every contest after it fell past the bound and got `null` — so on the
+   * Flex Three card the reader had actually entered, the rail highlighted
+   * nothing and the line read "3 hearts" instead of "1 of 3 staked".
+   *
+   * So the test is `lineupId`, which is the entry itself, and `recap` is
+   * excluded because a finished week's heart is already settled — spent or
+   * returned — and pointing at a pip for it would be pointing at a stake that
+   * no longer exists.
+   *
+   * Null on a contest that risks nothing, and null past the hearts held: a
+   * stake with no pip behind it gets no highlight rather than a borrowed one.
    */
-  const spans = (() => {
-    if (!rack) return [];
-    const held = Math.max(0, rack.hearts);
-    const atRisk = Math.min(Math.max(0, rack.wagered), held);
-    let cursor = 0;
-    return contests.map((ct) => {
-      const n = Math.max(0, ct.heartsAtRisk);
-      if (n <= 0) return null;
-      const start = cursor;
-      cursor += n;
-      if (start >= atRisk) return null;
-      return { start, count: Math.min(n, atRisk - start) };
-    });
-  })();
+  /**
+   * ONE PIP PER CARD, IN THE CAROUSEL'S ORDER — the whole rail, in one walk.
+   *
+   * This was three separate derivations that had to agree: a `receipts` list, a
+   * `spans` list mapping contests to rack indices, and a `pipPage` list mapping
+   * rack indices back to contests. They agreed by being written carefully,
+   * which is the same as not agreeing — the free contest becoming unconditional
+   * put a card on the board that consumed no heart, and the two lists quietly
+   * fell out of step: four cards, three pips, and a card that lit nothing when
+   * you swiped to it.
+   *
+   * One walk cannot fall out of step with itself. `pips[i].contest` IS the
+   * mapping in both directions, and `spanFor` reads it back.
+   */
+  const pips = contests.flatMap((ct, contest) =>
+    Array.from({ length: Math.max(0, ct.heartsAtRisk) }, () => ({
+      contest,
+      /* A settled contest shows how it went; a live one shows whether you are
+         in it. `lineupId` is the entry itself — the fee lands on the first
+         submission, so it is null right up until you file. */
+      result: ct.recap ? ct.field.result : null,
+      entered: ct.lineupId !== null,
+    })),
+  );
+
+  const spanFor = (contest: number): HeartSpan | null => {
+    const start = pips.findIndex((p) => p.contest === contest);
+    if (start < 0) return null;
+    return { start, count: pips.filter((p) => p.contest === contest).length };
+  };
 
   /**
-   * The inverse of `spans`: for each pip, the page a tap on it should go to.
-   *
-   * THIS IS WHAT MAKES THE RACK A NAVIGATOR rather than a readout. A staked
-   * heart goes to the contest holding it; a free heart goes to the lobby tile,
-   * which is the page about spending one; a killed heart goes nowhere, because
-   * the contest that took it is over and there is nothing to show.
-   *
-   * The free-heart case is the same mapping the tile already draws in reverse —
-   * standing on the tile lights every free heart — so the two directions agree
-   * by construction rather than by two lists being kept in step.
+   * Hearts riding on a live entry, which is what the free count is measured
+   * against. Settled contests do not hold one — theirs came back or did not —
+   * and a contest you have not entered has not taken one yet.
    */
-  const pipPage = (() => {
-    if (!rack) return [];
-    const held = Math.max(0, rack.hearts);
-    const atRisk = Math.min(Math.max(0, rack.wagered), held);
-    const total = Math.max(rack.rack, held, 1);
-    const out: (number | null)[] = Array.from({ length: total }, (_, i) =>
-      /* Free hearts point at the invitation to spend them. Killed ones at
-         nothing. */
-      i >= atRisk && i < held ? contests.length : null,
-    );
-    spans.forEach((span, contest) => {
-      if (!span) return;
-      for (let i = span.start; i < span.start + span.count && i < total; i += 1) {
-        out[i] = contest;
-      }
-    });
-    return out;
-  })();
+  const committed = contests.reduce(
+    (n, ct) => n + (!ct.recap && ct.lineupId !== null ? Math.max(0, ct.heartsAtRisk) : 0),
+    0,
+  );
 
-  if (contests.length === 0) return null;
-
-  /* The tile is the page after the last contest, and it is the one page whose
-     rail speaks about free hearts rather than staked ones. */
-  const onTile = page >= contests.length;
+  /**
+   * NO CARDS IS STILL A RAIL, and the rail is the way out.
+   *
+   * This returned null, which took the lobby down with the cards — a player
+   * whose week had rolled over got eight empty slots and no way to enter
+   * anything. It then returned the lobby TILE for the same reason. The tile is
+   * gone (see the note on `onEnter`) and the argument is unchanged: whatever
+   * empties this list must not also remove the door. The rail carries it now.
+   *
+   * `my_contest_cards` always returns the free contest, so this should be
+   * unreachable — it is kept because the next thing to empty the list will not
+   * announce itself either.
+   */
+  if (contests.length === 0) {
+    return rack ? (
+      <RunRail
+        run={rack}
+        committed={committed}
+        pips={[]}
+        focus={null}
+        onGo={goTo}
+        onEnter={onEnter}
+      />
+    ) : null;
+  }
 
   return (
     <View>
@@ -350,7 +381,7 @@ export function ContestCarousel({
           own padding. Only in the directions that exist — see `CHEV_GUTTER`. */}
       <View style={styles.stage}>
         <ChevSlot side="left" show={page > 0} onPress={() => goTo(page - 1)} />
-        <ChevSlot side="right" show={page < contests.length} onPress={() => goTo(page + 1)} />
+        <ChevSlot side="right" show={page < contests.length - 1} onPress={() => goTo(page + 1)} />
         <FlatList
           ref={listRef}
           data={contests}
@@ -373,35 +404,21 @@ export function ContestCarousel({
              down. Safe with `getItemLayout` supplied; without it the list cannot
              measure ahead and silently ignores this. */
           initialScrollIndex={index}
-          renderItem={({ item, index: i }) => (
-            <View
-              style={{ width: step }}
-              /* The first card only: they are within a few points of each other
-                 — the same rows in the same order — and measuring every page
-                 would set the same state from three directions on every swipe. */
-              onLayout={i === 0 ? (e) => setCardHeight(e.nativeEvent.layout.height) : undefined}>
+          renderItem={({ item }) => (
+            <View style={{ width: step }}>
               <Card contest={item} onOpen={onOpen} {...{ lockAt, locked, now }} />
             </View>
           )}
-          /* THE LAST PAGE IS THE WAY INTO THE LOBBY, and it is a footer rather
-             than an extra row of data so that nothing downstream has to hold a
-             union of "contest or invitation": `keyExtractor`, `getItemLayout`
-             and the index arithmetic all stay about contests. It is exactly one
-             page wide, so `round(x / page)` keeps working across it. */
-          ListFooterComponent={
-            <View style={{ width: step }}>
-              <EnterTile onPress={onEnter} minHeight={cardHeight} />
-            </View>
-          }
         />
       </View>
       {rack ? (
         <RunRail
           run={rack}
-          focus={onTile ? null : (spans[page] ?? null)}
-          onTile={onTile}
-          pipPage={pipPage}
+          committed={committed}
+          pips={pips}
+          focus={spanFor(page)}
           onGo={goTo}
+          onEnter={onEnter}
         />
       ) : null}
     </View>
@@ -479,24 +496,36 @@ export function ContestCarousel({
  */
 function RunRail({
   run,
+  committed,
+  pips,
   focus,
-  onTile,
-  pipPage,
   onGo,
+  onEnter,
 }: {
   run: NonNullable<PlayerState['run']>;
+  /**
+   * Hearts held by a live entry, counted off the same walk that placed the
+   * highlights — NOT `run.wagered`.
+   *
+   * `run.wagered` is the server's count and it is right; it just cannot say
+   * WHICH card each heart belongs to, and the carousel now draws cards you have
+   * not entered. Deriving both from one walk is what stops the rail lighting
+   * one heart while the sentence under it counts a different set.
+   */
+  committed: number;
+  /** One per card on the board, in the carousel's order — see `ContestHearts`. */
+  pips: { contest: number; result: HeartResult | null; entered: boolean }[];
   focus: HeartSpan | null;
-  onTile: boolean;
-  /** Where a tap on each pip should land, or null for pips that go nowhere. */
-  pipPage: (number | null)[];
   onGo: (page: number) => void;
+  /** The lobby, from the button at the end of the row. */
+  onEnter: () => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const accent = selectionAccent(scheme);
 
   const held = Math.max(0, run.hearts);
-  const staked = Math.min(Math.max(0, run.wagered), held);
+  const staked = Math.min(Math.max(0, committed), held);
   const free = held - staked;
 
   /**
@@ -518,94 +547,101 @@ function RunRail({
    * action — "1 free" is the answer to the invitation directly above it.
    */
   /**
-   * IT NAMES THE HEART IN VIEW, NOT THE RUN'S TOTAL.
+   * IT LABELS THE BUTTON, because the button is the only thing on this row that
+   * does not explain itself.
    *
-   * This read "2 of 3 staked" on every page — an aggregate, so it said the same
-   * thing no matter which card you were looking at, and the one row that moves
-   * with the swipe was the one row that never changed. Now the number is the
-   * lit heart's POSITION in the rack, so it counts up as you swipe: "1 of 3
-   * staked", "2 of 3 staked", "3 of 3 free". The words say what that heart is;
-   * the number says which one.
+   * ---------------------------------------------------------------------------
+   * TWO THINGS IT USED TO SAY, AND WHY NEITHER SURVIVED
+   * ---------------------------------------------------------------------------
    *
-   * `of 3` IS THE HEARTS YOU HOLD, not the pips drawn. Killed hearts sort to the
-   * end of the rack (see `Hearts`), so held hearts occupy positions 1..held and
-   * the index never has to skip a gap — and "2 of 4" on a run that holds three
-   * would be counting a heart the player no longer has.
+   * It read "1 of 3 staked" — the lit pip's POSITION in the rack — which was
+   * right while the rack drew every heart you held and the reader had to be
+   * told which one the page meant. The row draws only hearts that are in a
+   * contest now, so the highlight IS that answer and the sentence was the same
+   * fact in numbers.
    *
-   * A range where a contest stakes more than one. No contest priced so far does,
-   * but `hearts_at_risk` is a number and the first two-heart contest must not
-   * quietly report itself as one.
+   * Then it read "Won" / "Lost" / "Tied" on a settled card. Same problem one
+   * step along: the receipt beside it is already a green heart with a W in it.
+   * A caption restating the glyph it sits next to is a caption doing nothing.
+   *
+   * ---------------------------------------------------------------------------
+   * SO IT NAMES THE DESTINATION
+   * ---------------------------------------------------------------------------
+   *
+   * A bare `+` in a row of hearts is not self-evident — it could add a heart,
+   * add a card, add a slot. "Contests" is the word on the screen it opens (see
+   * `contests.tsx`, whose title is exactly that), so the label and the landing
+   * agree rather than being two names for one place.
+   *
+   * The free count leads it because that is what decides whether pressing is
+   * worth anything, and the whole line goes quiet when there is nothing free —
+   * the button still works, the lobby is still worth reading, but neither is
+   * being urged.
    */
-  const span = (first: number, count: number) =>
-    count > 1 ? `${first}–${first + count - 1}` : `${first}`;
-
-  const line = onTile
-    ? free > 0
-      ? `${span(staked + 1, free)} of ${held} free`
-      : 'none free'
-    : focus
-      ? `${span(focus.start + 1, focus.count)} of ${held} staked`
-      : `${held} ${held === 1 ? 'heart' : 'hearts'}`;
+  const line = free > 0 ? `${free} free · Contests` : 'Contests';
 
   return (
     <View style={styles.rail}>
-      <Hearts
-        hearts={run.hearts}
-        wagered={run.wagered}
-        rack={run.rack}
+      {/**
+        * ONE HEART PER CARD, and the row is the carousel's pager.
+        *
+        * It used to draw the RUN's rack — held, staked and lost — because it
+        * was the only place saying how many hearts you had. The masthead says
+        * that now (see `AppHeader`), which freed this row to be what the screen
+        * actually needs. See `ContestHearts` for what each state means and for
+        * the bug that made the one-to-one non-negotiable.
+        */}
+      <ContestHearts
+        entries={pips}
         focus={focus}
-        /* Nothing to offer means nothing to light: on the tile with every heart
-           already committed, dimming the whole rack to highlight an empty set
-           would read as a fault rather than as an answer. */
-        available={onTile && free > 0}
         size={26}
-        onPressPip={onGo}
-        pipTarget={pipPage}
+        onPress={(i) => onGo(pips[i].contest)}
       />
+
+      {/* THE COUNT THAT IS LEFT TO SPEND, which is the one fact the row no
+          longer draws and the only one that makes the button next to it worth
+          pressing. */}
       <Text
         numberOfLines={1}
-        style={[Type.fine, { color: onTile && free > 0 ? accent : c.textTertiary }]}>
+        style={[Type.fine, styles.railLine, { color: free > 0 ? accent : c.textTertiary }]}>
         {line}
       </Text>
+
+      {/**
+       * THE WAY INTO ANOTHER CONTEST, at the end of the row it belongs to.
+       *
+       * The lobby was reachable only by swiping past every card to a tile at
+       * the end of the carousel — which is fine when you are in one contest and
+       * a chore when you are in four, and it is the app's main call to action
+       * either way. A button at a fixed position under the thumb costs one tap
+       * from any page.
+       *
+       * IT DOES NOT REPLACE THE TILE, yet. The tile is still the carousel's
+       * last page and still the thing an empty board falls back to; two doors
+       * to one room is worth a conversation rather than a silent removal.
+       */}
+      <Pressable
+        onPress={onEnter}
+        accessibilityRole="button"
+        accessibilityLabel="Open the contest lobby"
+        /* Drawn at 22 and reached out to the platform's 44 — the ring was a
+           32pt outline and read as a third kind of object in a row that already
+           has hearts and text. Small and solid is quieter AND easier to hit. */
+        hitSlop={11}
+        style={({ pressed }) => [
+          styles.plus,
+          { backgroundColor: free > 0 ? accent : c.backgroundElement },
+          pressed && styles.pressed,
+        ]}>
+        <Text
+          style={[
+            styles.plusGlyph,
+            { color: free > 0 ? c.background : c.textSecondary },
+          ]}>
+          +
+        </Text>
+      </Pressable>
     </View>
-  );
-}
-
-/**
- * The empty slot at the end of the swipe: the lobby, as a card you can reach
- * with the gesture the carousel already teaches.
- *
- * IT IS THE ONLY DOOR ON THIS SCREEN NOW. The board's second view used to be a
- * tab in a bar above the page; that bar is gone (see `CONTESTS` in
- * `sections.ts`), and this took its job. Which is an improvement rather than a
- * swap: the bar was a word at the top of a screen nobody looks at twice, and
- * this is the next thing under your thumb after the contest you are already in.
- *
- * DASHED, AND DELIBERATELY NOT A BUTTON. The dashes say "a card could go here",
- * which is what an empty slot is for — a solid panel with a label would read as
- * another contest you are somehow already in, which is the one thing this must
- * not look like.
- */
-function EnterTile({ onPress, minHeight }: { onPress: () => void; minHeight: number }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel="Enter a new contest"
-      style={({ pressed }) => [
-        styles.tile,
-        { borderColor: c.border, minHeight },
-        pressed && styles.pressed,
-      ]}>
-      <Text style={[Type.strong, { color: c.text }]}>Enter a new contest</Text>
-      <Text style={[Type.fine, styles.tileBody, { color: c.textSecondary }]}>
-        See what is open this week. A card can only play in one contest, so
-        entering means playing deeper into your roster.
-      </Text>
-    </Pressable>
   );
 }
 
@@ -702,6 +738,21 @@ function Card({
          week the screen above already states. */
       name={contest.name}
       terms={terms}
+      /**
+       * A RECAP CARD SAYS WHICH WEEK IT IS, in the corner the live cards spend
+       * on a countdown.
+       *
+       * A lobby contest is named after its FORMAT, so once last week's entries
+       * stayed on the board the carousel could hold two cards both titled "Flex
+       * Three" — one to enter, one to read — and swiping between them was
+       * genuinely confusing. The countdown that corner usually carries is
+       * meaningless on a finished week, so the slot was free.
+       *
+       * It replaces the FINAL tag rather than joining it: the head reserves one
+       * row there, and the scoring band under it already draws a settled score
+       * and a W or an L. "Which week" is the fact that was missing.
+       */
+      status={contest.recap ? <StatusChip label={contest.weekLabel} tone="neutral" /> : undefined}
       lock={{ at: lockAt, locked, now }}
       entry={{
         myPoints: contest.field.myPoints,
@@ -721,6 +772,16 @@ function Card({
     />
   );
 }
+
+/**
+ * The lobby button's diameter.
+ *
+ * A shade under the 26pt hearts it sits beside, deliberately: the pips are the
+ * row's subject and this is its end. It is NOT `ControlDiameter` (32) — that
+ * one sizes the inventory's outlined filter buttons, which are a row of equals,
+ * and borrowing it here made the plus the loudest thing on the line.
+ */
+const PLUS_SIZE = 22;
 
 const styles = StyleSheet.create({
   /**
@@ -748,6 +809,40 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     paddingTop: Spacing.two + 2,
   },
+  /* Takes the room the pips and the button do not, and truncates rather than
+     pushing the button off the edge — the button is the one thing on this row
+     that must always be reachable. `textAlign: right` keeps it against the
+     button instead of floating in the middle of a short rack. */
+  railLine: { flex: 1, minWidth: 0, textAlign: 'right' },
+  /**
+   * The lobby button. A 32pt ring, which is `ControlDiameter` — the same round
+   * control the inventory's filters use — reached out to the platform's 44pt
+   * minimum with `hitSlop` rather than by drawing something bigger. A solid
+   * button here would be the loudest thing in a row of 26pt glyphs and would
+   * read as the row's subject rather than its end.
+   */
+  /**
+   * FILLED AND SMALL. It was a 32pt hairline ring, which put a third kind of
+   * object — an outline — in a row that already holds solid hearts and text,
+   * and at that size the ring read as the loudest thing on the line while
+   * saying the least.
+   *
+   * 22 is a shade under the 26pt pips beside it, which is the right rank: the
+   * hearts are the row's subject and this is its end. The touch target is not
+   * 22 — `hitSlop` takes it past the platform's 44pt minimum without drawing
+   * anything bigger, the same trick `Pip` uses.
+   */
+  plus: {
+    width: PLUS_SIZE,
+    height: PLUS_SIZE,
+    borderRadius: PLUS_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  /* Sized and nudged by hand: a `+` sits high in its own line box, so centring
+     the glyph's box leaves it visibly above the circle's middle. */
+  plusGlyph: { fontSize: 15, fontWeight: '700', lineHeight: 16, marginTop: -0.5 },
 
   /* The pager, with the two arrows hung off its sides. Nothing here reserves
      width for them — see `CHEV_GUTTER`. */
@@ -772,21 +867,5 @@ const styles = StyleSheet.create({
   chev: { width: 7, height: 7, borderTopWidth: 1.5, borderRightWidth: 1.5, opacity: 0.55 },
   chevRight: { transform: [{ rotate: '45deg' }] },
   chevLeft: { transform: [{ rotate: '-135deg' }] },
-  /* Stretches to the tallest page — a horizontal row stretches its children by
-     default — so the tile is the height of the card beside it and the foot
-     below does not move as you swipe onto it. */
-  tile: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: Spacing.two,
-    borderRadius: Radius.panel,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    padding: Spacing.four,
-  },
-  /* A measure rather than the full width: the sentence is the only thing on
-     this card and a line that runs the whole way across reads as a paragraph
-     of terms. */
-  tileBody: { maxWidth: 280 },
   pressed: { opacity: 0.6 },
 });

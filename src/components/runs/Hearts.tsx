@@ -68,7 +68,7 @@
  */
 import { useId } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, ClipPath, Defs, G, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { Colors, selectionAccent } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -130,7 +130,19 @@ const BLADE_ROTATION = 42;
 const VIEW_BOX = '-3.2 -3.2 30.4 30.4';
 const BOX = 1.32;
 
-export type HeartState = 'free' | 'wagered' | 'killed';
+export type HeartState = 'free' | 'wagered' | 'killed' | 'pending';
+
+/**
+ * How a contest that has settled came out.
+ *
+ * A SEPARATE AXIS FROM `HeartState`, not three more values on it. State says
+ * what a heart IS to the run — held, staked, gone — and every pip has one. This
+ * says what a finished contest DID with the heart it borrowed, and only the
+ * handful of pips belonging to a recapped week have one at all. Folding them
+ * into one union would have made every `switch` in this file answer a question
+ * most of its callers are not asking.
+ */
+export type HeartResult = 'W' | 'L' | 'T';
 
 /**
  * The steel, which is not a theme token because nothing else is made of it.
@@ -147,6 +159,19 @@ function bladeOf(scheme: 'light' | 'dark'): string {
 export function Heart({
   size = 13,
   state,
+  /**
+   * A SETTLED CONTEST'S OUTCOME, drawn on the heart it was played with.
+   *
+   * Overrides `state` entirely: a heart carrying a result is not held, staked
+   * or lost — it is a receipt. Green with a W, red with an L, grey with a T,
+   * and the letter is what carries the meaning so the pair survives greyscale
+   * and a red-green deficiency, exactly as `TierMark`'s initial does.
+   *
+   * These live only while the week that produced them is still being recapped
+   * (`recap_slate`, 20260830030000). When the window closes they go, and the
+   * rack is the run's own again.
+   */
+  result = null,
   /**
    * The page in view is about THIS heart — the contest it is staked on, or,
    * on the lobby tile, the fact that it is still free to spend.
@@ -186,6 +211,7 @@ export function Heart({
 }: {
   size?: number;
   state: HeartState;
+  result?: HeartResult | null;
   lit?: boolean;
   color?: string;
 }) {
@@ -210,6 +236,78 @@ export function Heart({
       <Path d="M2.2 26H-2V21.8" />
     </G>
   ) : null;
+
+  /**
+   * THE RECEIPT. One filled heart, one letter, no blade and no tear.
+   *
+   * The letter is set in the PAGE's colour rather than in white or black, so it
+   * reads as a hole punched through the heart on either scheme — the same trick
+   * `YapLogo` uses for the bot's face slots, and the reason `ink` is a prop
+   * there. `Text` from react-native-svg rather than an overlaid RN `Text`,
+   * because the glyph has to scale with the viewBox: an absolutely-positioned
+   * label would need its own font arithmetic per call site and would drift the
+   * first time a caller asked for a size nobody had tried.
+   */
+  if (result !== null) {
+    const fill =
+      result === 'W' ? c.positive : result === 'L' ? c.negative : c.textSecondary;
+    return (
+      <Svg width={size * BOX} height={size * BOX} viewBox={VIEW_BOX}>
+        <Path d={HEART} fill={fill} />
+        {/* POSITIONED BY BASELINE ALONE, which is the only thing every renderer
+            agrees on. `alignmentBaseline="central"` plus a compensating `dy`
+            was belt AND braces and they fought: iOS honoured both and dropped
+            the letter onto the heart's point, where the W bled out of the
+            bottom of the glyph.
+
+            So: no baseline attribute, and `y` is the baseline itself. The
+            heart is a FACETED one — it narrows to a point at y 21.6 — so the
+            letter has to live in the wide band above that, not on the centre of
+            the bounding box. Cap height runs from about y 7.5 to the baseline
+            at 14.2, which is the widest run of the shape; a glyph sized to the
+            box instead put the W's legs out through the point. */}
+        <SvgText
+          x={12}
+          y={14.2}
+          fill={c.background}
+          fontSize={9.5}
+          fontWeight="700"
+          textAnchor="middle">
+          {result}
+        </SvgText>
+        {ticks}
+      </Svg>
+    );
+  }
+
+  /**
+   * AN EMPTY VESSEL: a contest that wants a heart and has not been given one.
+   *
+   * Outlined rather than filled, which is the one place this file uses an
+   * outline and it is the correct place for it. `theme.ts`'s rule is that
+   * FILLED MEANS YOU HAVE IT — the old rack broke that by drawing "at risk" as
+   * an outline, so a heart you definitely held looked hollow. Here the hollow
+   * heart is a heart you have NOT committed, which is the rule pointing the
+   * right way round for once.
+   *
+   * Grey rather than red for the same reason the torn heart is grey: a faint
+   * red pip in a row of solid ones reads as a warning about the hearts you do
+   * have.
+   */
+  if (state === 'pending') {
+    return (
+      <Svg width={size * BOX} height={size * BOX} viewBox={VIEW_BOX}>
+        <Path
+          d={HEART}
+          fill="none"
+          stroke={c.textSecondary}
+          strokeWidth={1.9}
+          strokeLinejoin="round"
+        />
+        {ticks}
+      </Svg>
+    );
+  }
 
   if (state === 'killed') {
     return (
@@ -320,6 +418,7 @@ export type HeartSpan = { start: number; count: number };
 function Pip({
   size,
   state,
+  result = null,
   lit,
   dimmed,
   onPress,
@@ -327,6 +426,7 @@ function Pip({
 }: {
   size: number;
   state: HeartState;
+  result?: HeartResult | null;
   lit: boolean;
   dimmed: boolean;
   onPress?: () => void;
@@ -334,7 +434,7 @@ function Pip({
 }) {
   const body = (
     <View style={{ opacity: dimmed ? 0.42 : 1 }}>
-      <Heart size={size} state={state} lit={lit} />
+      <Heart size={size} state={state} result={result} lit={lit} />
     </View>
   );
   if (!onPress) return body;
@@ -355,6 +455,87 @@ function Pip({
   );
 }
 
+/**
+ * One heart per contest on the board, in the carousel's own order.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS IS NOT `Hearts`
+ * ---------------------------------------------------------------------------
+ *
+ * `Hearts` draws a RUN: hearts held, hearts lost, and the rack they sit in. It
+ * is the right object for the lobby, the sidebar, the death screen and the
+ * contest rules panel, all of which are asking "how is this run doing".
+ *
+ * The board's rail is asking something else, and the difference showed up as a
+ * bug the moment the free contest became unconditional (`20260830030000`): the
+ * carousel held four cards and the rail drew three pips, because a contest you
+ * had not entered yet spent no heart and therefore produced nothing. Swiping
+ * onto it lit nothing at all. A row that is a switcher for the cards above it
+ * has to have one pip per card or it is not a switcher, it is a coincidence.
+ *
+ * So this takes ENTRIES, not a run. Every contest on the board contributes its
+ * `heartsAtRisk`, whatever state that heart is in:
+ *
+ *   pending    the contest is on the board and you have not entered it
+ *   entered    a heart is riding on it right now
+ *   W / L / T  it settled, and this is the receipt
+ *
+ * Order is the carousel's, so pip N is card N and tapping one is the same
+ * gesture as swiping to it.
+ *
+ * A CONTEST THAT RISKS NO HEARTS CONTRIBUTES NO PIP, and would break the
+ * one-to-one. None is priced that way today — every contest in the schema
+ * stakes exactly one — but `hearts_at_risk` is a number and 0 is legal, so the
+ * first free-of-charge contest will need an answer here rather than silently
+ * going missing from its own row.
+ */
+export function ContestHearts({
+  entries,
+  focus = null,
+  size = 13,
+  gap = 5,
+  onPress,
+}: {
+  entries: { result: HeartResult | null; entered: boolean }[];
+  /** The card in view, as a span into `entries`. */
+  focus?: HeartSpan | null;
+  size?: number;
+  gap?: number;
+  /** Tap a pip, go to its card. Index-aligned with `entries`. */
+  onPress?: (index: number) => void;
+}) {
+  return (
+    <View style={[styles.row, { gap }]}>
+      {entries.map((e, i) => {
+        const lit = focus !== null && i >= focus.start && i < focus.start + focus.count;
+        return (
+          <Pip
+            key={i}
+            size={size}
+            state={e.result !== null ? 'free' : e.entered ? 'free' : 'pending'}
+            result={e.result}
+            lit={lit}
+            /* Recede only when the row IS pointing somewhere. */
+            dimmed={focus !== null && !lit}
+            onPress={onPress ? () => onPress(i) : undefined}
+            label={
+              e.result === 'W'
+                ? 'A contest you won. Show it'
+                : e.result === 'L'
+                  ? 'A contest you lost. Show it'
+                  : e.result === 'T'
+                    ? 'A contest that tied. Show it'
+                    : e.entered
+                      ? 'A contest you are in. Show it'
+                      : 'A contest you have not entered. Show it'
+            }
+          />
+        );
+      })}
+    </View>
+  );
+}
+
 export function Hearts({
   hearts,
   wagered = 0,
@@ -369,22 +550,6 @@ export function Hearts({
    * keeps the count honest and the mapping fixed for the week.
    */
   focus = null,
-  /**
-   * Light every heart that is NOT staked, because the reader is looking at the
-   * invitation to stake one.
-   *
-   * This is the other half of `focus` and the reason the rail has something to
-   * say on every page of the carousel: a contest page points at the heart it
-   * holds, and the lobby tile points at the hearts you could still spend. A
-   * page that lit nothing would leave the app's main call to action with no
-   * consequence drawn anywhere near it.
-   *
-   * IT LIGHTS THEM THE SAME WAY `focus` DOES. These two props choose WHICH pips
-   * the page is about; neither chooses how that is drawn. See `Heart.lit` — the
-   * mark was two different objects once and reading it meant learning the answer
-   * twice.
-   */
-  available = false,
   /**
    * Pips to draw in total — the run's `rack` (its high-water mark). Anything
    * beyond `hearts` is drawn KILLED. Defaults to the hearts held, which draws
@@ -416,7 +581,6 @@ export function Hearts({
   hearts: number;
   wagered?: number;
   focus?: HeartSpan | null;
-  available?: boolean;
   rack?: number;
   size?: number;
   gap?: number;
@@ -442,12 +606,10 @@ export function Hearts({
         /* The two ways a page can point at a pip, resolved to one flag before
            anything is drawn. `focus` is a contest naming the heart it holds;
            `available` is the lobby tile naming every heart still spendable. */
-        const lit =
-          (focus !== null && i >= focus.start && i < focus.start + focus.count) ||
-          (available && state === 'free');
-        /* Recede only when the page IS pointing somewhere. With no focus and no
-           tile the rack is a plain count and every pip is at full strength. */
-        const pointing = focus !== null || available;
+        const lit = focus !== null && i >= focus.start && i < focus.start + focus.count;
+        /* Recede only when the caller IS pointing somewhere. With no focus the
+           rack is a plain count and every pip is at full strength. */
+        const pointing = focus !== null;
         const target = pipTarget?.[i];
         const press =
           onPressPip && target !== null && target !== undefined

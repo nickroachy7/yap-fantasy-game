@@ -84,6 +84,13 @@ export type Contest = {
   prizePool: number;
   /** The share of collected fees paid out, in basis points. 2500 = 25%. */
   prizePoolBps: number;
+  /**
+   * A contest from the week the board has already moved past, carried so its
+   * page can still be opened from the recap card. THE LOBBY LIST FILTERS THESE
+   * OUT — a finished contest among the ones you can enter would be an offer
+   * that cannot be taken. See `20260830030000`.
+   */
+  recap: boolean;
 };
 
 type Row = {
@@ -110,6 +117,7 @@ type Row = {
   my_hearts: number | null;
   prize_pool: number;
   prize_pool_bps: number;
+  recap: boolean | null;
 };
 
 export type ContestsState = {
@@ -153,6 +161,7 @@ export function useContests(): ContestsState {
         myHearts: r.my_hearts === null || r.my_hearts === undefined ? null : Number(r.my_hearts),
         prizePool: Number(r.prize_pool ?? 0),
         prizePoolBps: Number(r.prize_pool_bps ?? 0),
+        recap: Boolean(r.recap),
       })),
     );
     return null;

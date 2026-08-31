@@ -74,3 +74,44 @@ eas update --branch production --message "..." --environment production --platfo
 
 `--platform ios` is load-bearing: `platform=all` static-renders web in Node, which
 executes `src/lib/supabase.ts` and dies on missing env.
+
+# Working two sessions at once
+
+Two Claude sessions in this one checkout share one set of files. The second
+write wins and the first session's edits vanish — no conflict, no warning,
+because there is nothing to merge. It is one pile.
+
+`npm run lane` gives each session its own git worktree and branch, then blends
+them back through git and gates the result before it ships.
+
+```
+npm run lane -- new recap      # branch + worktree, node_modules cloned (~10s)
+npm run lane -- list           # every lane and what it has waiting
+npm run lane -- land           # merge all lanes into main, gate, ready to push
+npm run lane -- land --push    # …and push when green
+npm run lane -- drop recap     # remove a landed lane
+```
+
+Lanes live in `../yap-fantasy-lanes/<name>` — outside the repo deliberately, so
+Metro does not walk them and find two copies of every package. `node_modules` is
+an APFS copy-on-write clone, so it is seconds and costs almost no disk.
+`.env.local` is symlinked, so a new `EXPO_PUBLIC_` var reaches every lane at once
+(the EAS half of rule 2 above is still on you).
+
+What `land` refuses to do, and why:
+
+- **Dirty main, or a lane with uncommitted work.** It merges commits; anything
+  uncommitted would be silently left out of the push.
+- **Two migrations sharing a timestamp**, or a merged migration sorting before
+  one already on `main`. Both lanes reach for the same slot on the same day, and
+  the loser is shadowed with no error at `db push` time. Renumber and re-land.
+- **A blend that fails `npm test`.** Git merging the text cleanly is not the same
+  as the result working — each lane can pass alone and fail together. This is
+  CI's `check` job run *before* the push, because a green push reaches testers'
+  phones as an OTA update.
+
+On conflict the merge is left in progress with the conflicted files named; open a
+session in the main checkout and resolve it there.
+
+**Lanes are for JavaScript.** `ios/` is not cloned. Anything on the STOP list
+above still needs an Xcode archive from the main checkout.

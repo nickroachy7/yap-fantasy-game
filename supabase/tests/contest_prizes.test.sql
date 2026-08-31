@@ -254,12 +254,14 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- THE FIELD, AND THE REVEAL RULE.
+-- THE FIELD, AND WHAT IT SAYS ABOUT A LINEUP THAT HAS NOT LOCKED.
 -- ---------------------------------------------------------------------------
 
 -- The third player re-enters, with LATE cards, so that when the early fixture
--- kicks off there is one lineup open and one still sealed. That is the state
--- the rule exists for and the only one a single-fixture week cannot produce.
+-- kicks off there is one lineup locked and one still open to edits. That
+-- distinction used to be a PERMISSION — see `20260830010000`, which traded the
+-- reveal rule away — and it is now only a fact the page reports. Both lineups
+-- must be readable; only one of them may still change.
 do $$
 declare ids uuid[];
 begin
@@ -290,7 +292,7 @@ update public.games set status_state = 'in_progress', starts_at = now() - interv
 do $$
 declare
   v_contest uuid;
-  v_open    boolean;
+  v_locked  boolean;
   v_rows    integer;
 begin
   select id into v_contest from public.contests where code = 'test:pool:88';
@@ -308,37 +310,42 @@ begin
     raise exception 'FAIL: the field held % entrants, expected 3', v_rows;
   end if;
 
-  -- 7. A LINEUP WHOSE CARDS HAVE ALL KICKED OFF IS OPEN.
-  select f.open into v_open from public.contest_field(v_contest) f
+  -- 7. A LINEUP WHOSE CARDS HAVE ALL KICKED OFF READS AS LOCKED.
+  select f.locked into v_locked from public.contest_field(v_contest) f
    where f.user_id = '88888888-0000-0000-0000-000000000002';
-  if not v_open then
-    raise exception 'FAIL: a fully kicked-off lineup was still sealed';
+  if not v_locked then
+    raise exception 'FAIL: a fully kicked-off lineup did not read as locked';
   end if;
 
-  -- 8. ONE THAT STILL HOLDS A CARD AHEAD OF KICKOFF IS NOT, and this is the
-  --    assertion the whole rule rests on: open it early and the last player to
-  --    file reads the shape of the field before choosing.
-  select f.open into v_open from public.contest_field(v_contest) f
+  -- 8. ONE THAT STILL HOLDS A CARD AHEAD OF KICKOFF DOES NOT. It is a draft,
+  --    and the field has to be able to say so — that is the whole of what this
+  --    column means now that it no longer gates anything.
+  select f.locked into v_locked from public.contest_field(v_contest) f
    where f.user_id = '88888888-0000-0000-0000-000000000003';
-  if v_open then
-    raise exception 'FAIL: a lineup with an unplayed card was readable';
+  if v_locked then
+    raise exception 'FAIL: a lineup with an unplayed card read as locked';
   end if;
 
-  -- 9. AND THE PEEK REFUSES RATHER THAN RETURNING NOTHING. An empty result is
-  --    indistinguishable from an empty lineup, and "they have not filed" and
-  --    "you may not look yet" are different facts.
+  -- 9. AND IT IS READABLE ANYWAY. This is the assertion that replaced the
+  --    reveal rule: a rival's lineup is public from the moment it is filed, so
+  --    the contest page has people in it during the days anybody is deciding.
+  select count(*) into v_rows
+    from public.contest_lineup(v_contest, '88888888-0000-0000-0000-000000000003');
+  if v_rows <> 3 then
+    raise exception 'FAIL: an unlocked lineup handed over % slots, expected 3', v_rows;
+  end if;
+
+  -- 10. A STRANGER IS STILL A BAD REQUEST rather than an empty lineup. That is
+  --     the one refusal left, and it is what keeps "not in this contest" and
+  --     "filed nothing" different answers.
   begin
-    perform public.contest_lineup(v_contest, '88888888-0000-0000-0000-000000000003');
-    raise exception 'FAIL: a sealed lineup was handed over';
-  exception when sqlstate '55006' then null;
+    perform public.contest_lineup(v_contest, '88888888-0000-0000-0000-000000000009');
+    raise exception 'FAIL: a lineup was returned for somebody not in the contest';
+  exception when sqlstate '22023' then null;
   end;
 
-  -- 10. YOUR OWN IS ALWAYS OPEN, whatever your cards are doing.
-  select f.open into v_open from public.contest_field(v_contest) f where f.is_me;
-  if not v_open then raise exception 'FAIL: my own lineup was sealed from me'; end if;
-
   perform set_config('role', 'postgres', true);
-  raise notice 'contest prizes: the reveal rule passed';
+  raise notice 'contest prizes: the field passed';
 end $$;
 
 -- ---------------------------------------------------------------------------

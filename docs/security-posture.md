@@ -56,7 +56,7 @@ subtransaction does make assertion 1 fire.
 
 ---
 
-## Accepted by design: eighteen SECURITY DEFINER functions callable by `authenticated`
+## Accepted by design: thirty-seven SECURITY DEFINER functions callable by `authenticated`
 
 The linter warns that a signed-in user can call these over `/rest/v1/rpc/…`.
 That is the intent — it is the whole server-authoritative design. Every one of
@@ -83,18 +83,43 @@ one is revoked from `anon` and pinned to `search_path = public, pg_temp`.
 | `board_collection` | Aggregates `card_instances`, which is RLS-scoped to its owner, so an invoker-rights version would report the caller's shelf as the whole community's. Counts and a gem valuation; nothing about which specific cards anybody holds. |
 | `board_cards` | The highest-scoring held copies across every user's `card_instances`. Exposes the owner's display name, the player, the tier and the score. It also returns `card_instances.id`, which is inert to anyone but the owner — `card_profile` filters on `auth.uid()`, so another user's id opens nothing. |
 | `board_sets` | Aggregates `set_milestone_claims` and committed `card_instances`, both RLS-scoped. Counts and gem totals only. |
+| `contest_lobby` | Counts entries in every contest on the slate, which means counting other people's `lineups` rows, and prices each one against the caller's wallet. An invoker-rights version would show a lobby where every contest looked empty. Returns aggregates and one boolean per row; no user is ever named. |
+| `my_contest_cards` | The same boundary for the contests you are in, plus each one's own distribution (`low`, `median`, `average`, `high`) and cut. Keyed on `auth.uid()`. |
+| `contest_field` | Names the field: display name, score, place, result, prize, and whether that lineup has locked. This is the one definer here whose *purpose* is publishing other people's rows, so the column list is the access control — nothing about anybody's collection, wallet, run or hearts crosses it. |
+| `contest_lineup` | An entrant's slots. It takes a contest and a user as arguments rather than reading `auth.uid()`, which makes it the widest read in this table and the one to think hardest about before changing. Until `20260830010000` it refused unless every card in that lineup had kicked off; that reveal rule was traded away deliberately so the contest page has people in it during the days anybody is deciding. It still returns nothing but a lineup: slot, player, club, tier, points. |
+| `leave_contest` | Deletes a lineup and refunds the fee in one transaction, and refuses once any card has started. Keyed on `auth.uid()`; a contest code is not an authorisation. |
+| `contest_entrants`, `contest_payouts`, `contest_prize_pool`, `locked_cards`, `game_config_value` | Helpers the functions above call. A nested call runs as the DEFINER, so `authenticated` holds the grant only because the client reads two of them directly. |
 
-Eleven further definer functions (`apply_injuries`, `assign_card_rarity`,
-`award_score_gems`, `gameday_sweep`, `grant_weekly_gems`, `handle_new_user`,
-`rebuild_card_sets`, `rebuild_daily_set`, `refresh_player_season_ranks`,
-`score_week`, `verify_sync_secret`) are callable by **neither** `anon` nor
-`authenticated`. They run from cron, from triggers, or from an Edge Function
-holding the sync secret. The linter does not flag them, correctly.
+Twenty-two further definer functions (`apply_injuries`, `assign_card_rarity`,
+`award_contest_prizes`, `award_position_bonuses`, `award_score_gems`,
+`backfill_week`, `contest_results`, `gameday_sweep`, `grant_weekly_gems`,
+`handle_new_user`, `rebuild_card_sets`, `rebuild_daily_set`,
+`rebuild_weekly_set`, `refresh_player_season_ranks`, `rotate_daily_set`,
+`rotate_weekly_set`, `score_week`, `settle_run_week`, `settle_week_payouts`,
+`verify_sync_secret`, `wagered_entries`, `wipe_run`) are callable by **neither**
+`anon` nor `authenticated`. They run from cron, from triggers, or from an Edge
+Function holding the sync secret. The linter does not flag them, correctly.
 
-The counts in this section drifted before: it read *ten* and *eight* while the
-database held eighteen and eleven, because the sets work added three callable
-functions and two internal ones without touching this file. Run the query below
-rather than trusting the prose.
+The counts in this section drift every time a feature lands without touching
+this file, and they have twice: it read *ten* and *eight* against a database
+holding eighteen and eleven after the sets work, and eighteen and eleven against
+thirty-seven and twenty-two after the contest work. Run the query below rather
+than trusting the prose.
+
+**And run it for `anon`, which is the assertion that actually matters.** On
+2026-08-30 it returned eleven rows. Every contest RPC written on August 25 and
+26 — `contest_lobby`, `contest_field`, `contest_lineup`, `my_contest_cards`,
+`leave_contest`, the five-argument `set_lineup`, and five helpers — carried its
+`grant ... to authenticated` and not the `revoke ... from public, anon` that
+every RPC before it had. Postgres grants EXECUTE to PUBLIC on a new function by
+default, so eleven definer functions over RLS-hidden tables were reachable with
+the publishable key that ships in the app bundle. `contest_lineup` was the
+serious one: it takes its subject as an argument rather than reading
+`auth.uid()`, so it answered to callers who had never signed in.
+
+`20260830020000` revokes all eleven and ends with a `DO` block that raises if
+`anon` can execute **any** definer function in `public` — the invariant is
+asserted in a migration now rather than only stated here.
 
 Verify the whole picture in one query:
 

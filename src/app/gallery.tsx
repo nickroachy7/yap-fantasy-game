@@ -685,6 +685,8 @@ const CONTEST_FIXTURES: MyContest[] = [
     cut: null,
     prizePool: 0,
     myPrize: null,
+    recap: false,
+    weekLabel: 'PRE 4',
   },
   {
     id: 'fx-wr',
@@ -720,6 +722,8 @@ const CONTEST_FIXTURES: MyContest[] = [
     cut: 38.4,
     prizePool: 240,
     myPrize: null,
+    recap: false,
+    weekLabel: 'PRE 4',
   },
 ];
 

@@ -1,5 +1,5 @@
 /**
- * Everybody in a contest, and one of their lineups on demand.
+ * Everybody in a contest, and any one of their lineups.
  *
  * THE CONTEST PAGE HAD NO PEOPLE IN IT. It could say the format, the fee and a
  * count, which is a strange thing for a game whose whole opponent model is "you
@@ -8,15 +8,18 @@
  *
  * BOTH RPCS ARE SECURITY DEFINER OVER RLS-HIDDEN ROWS, so what they return is
  * deliberate rather than incidental: a name, a score, a place, a result, a
- * prize. Nothing about anybody's collection, wallet, run or hearts. See
- * `20260826030000`.
+ * prize, a lineup. Nothing about anybody's collection, wallet, run or hearts.
+ * See `20260826030000` and `20260830010000`.
  *
- * THE LINEUP IS A SEPARATE CALL AND A SEPARATE DECISION. Every entrant's slots
- * shipped down with the list would be the whole contest's roster in one
- * payload, and most of it never looked at — but the real reason is the reveal
- * rule. `open` is decided per lineup, when every card in it has kicked off, and
- * a list that carried the slots would be shipping the ones it had decided you
- * may not see.
+ * THE LINEUP IS A SEPARATE CALL because it belongs to a separate SCREEN. Every
+ * entrant's slots shipped down with the list would be the whole contest's
+ * roster in one payload, most of it never looked at; the field is a list you
+ * scan and a lineup is a page you open.
+ *
+ * IT IS NO LONGER A SEPARATE PERMISSION. Lineups used to open one at a time, as
+ * their last card kicked off, so the list could not carry slots it had decided
+ * you may not see. That rule is gone — `20260830010000` — and what survives of
+ * it is `locked`, which says whether what you are reading can still change.
  */
 import { useCallback, useState } from 'react';
 
@@ -40,15 +43,16 @@ export type FieldEntrant = {
   prize: number | null;
   isMe: boolean;
   /**
-   * Their lineup may be read.
+   * Every card in this lineup has kicked off, so it can no longer be changed.
    *
-   * TRUE ONLY ONCE EVERY CARD IN IT HAS KICKED OFF, because players lock one at
-   * a time and a week drains over four days rather than shutting at once. Open
-   * it earlier and the last person to file reads the field's shape before
-   * choosing; open it never and the best hour of the week is a list of numbers
-   * with no lineups behind them. Your own is always open.
+   * NOT A PERMISSION. It was `open` and it gated the peek; now it is only the
+   * difference between a filed lineup and a draft, which is what a reader
+   * needs to know before drawing a conclusion from somebody else's team. It is
+   * also what decides whether LEAVING is still possible — `leave_contest`
+   * refuses once a card has started, and the button reads this rather than
+   * guessing at the fixtures.
    */
-  open: boolean;
+  locked: boolean;
 };
 
 type Row = {
@@ -62,7 +66,7 @@ type Row = {
   result: string | null;
   prize: number | string | null;
   is_me: boolean;
-  open: boolean;
+  locked: boolean;
 };
 
 /** Same trap as everywhere else: numeric and bigint can both arrive as strings. */
@@ -94,7 +98,7 @@ export function useContestField(contestId: string | null) {
           result: (r.result as Result) ?? null,
           prize: num(r.prize),
           isMe: Boolean(r.is_me),
-          open: Boolean(r.open),
+          locked: Boolean(r.locked),
         })),
       );
       return null;
@@ -106,7 +110,7 @@ export function useContestField(contestId: string | null) {
   return { entrants, loading, error, reload };
 }
 
-/* --------------------------------------------------------------- the peek */
+/* -------------------------------------------------------------- a lineup */
 
 export type PeekSlot = {
   slot: string;
@@ -132,12 +136,11 @@ type PeekRow = {
 };
 
 /**
- * One entrant's lineup, fetched when it is opened rather than with the list.
+ * One entrant's lineup, in the format's own slot order.
  *
- * THE SERVER REFUSES RATHER THAN RETURNING NOTHING when a lineup is not open
- * yet, and that refusal is surfaced as-is. An empty result is indistinguishable
- * from an empty lineup, and "they have not filed" and "you may not look yet"
- * are different sentences a reader is owed.
+ * THE SERVER STILL REFUSES ON A STRANGER — somebody who is not in this contest
+ * raises rather than returning nothing, because an empty result cannot be told
+ * apart from an empty lineup. That refusal is surfaced as written.
  */
 export function useContestLineup(contestId: string | null, userId: string | null) {
   const [slots, setSlots] = useState<PeekSlot[] | null>(null);

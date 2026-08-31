@@ -66,6 +66,28 @@ export type MyContest = {
   /** Gems collected by this contest that will be paid back out. */
   prizePool: number;
   /**
+   * This contest belongs to a week the board has already moved past, and is
+   * being shown so the result does not vanish the moment the slate rolls.
+   *
+   * NOT EDITABLE, and the board must branch on it: the lineup underneath the
+   * carousel is the CURRENT week's, so drawing the editor under a card from
+   * last week would put a finished contest's standing over a different week's
+   * slots — the exact mismatch the carousel exists to prevent. See
+   * `20260830030000` for the window, which is "until there is new football"
+   * rather than a duration.
+   */
+  recap: boolean;
+  /**
+   * WHICH WEEK THIS CONTEST BELONGS TO, in four characters or so.
+   *
+   * Needed because a lobby contest is named after its FORMAT, so the carousel
+   * can hold two cards both titled "Flex Three" — this week's, which you enter,
+   * and last week's, which you read — with nothing on either saying which is
+   * which. Swiping between them was the reported confusion, and the fix has to
+   * sit next to the name, because the name is what makes them look identical.
+   */
+  weekLabel: string;
+  /**
    * What YOU are owed out of it — null until the week is final and the places
    * are decided.
    *
@@ -84,6 +106,7 @@ type Row = {
   cut: number | string | null;
   prize_pool: number | string | null;
   my_prize: number | string | null;
+  recap: boolean | null;
   contest_id: string;
   code: string;
   kind: 'free' | 'lobby';
@@ -92,6 +115,7 @@ type Row = {
   format_name: string;
   slot_count: number;
   entry_fee_gems: number;
+  season_type: number;
   week: number;
   lineup_id: string | null;
   filled: number;
@@ -106,6 +130,19 @@ type Row = {
   ahead: number | string | null;
   result: string | null;
 };
+
+/**
+ * The week, short enough for a chip in the card's head.
+ *
+ * `season_type` is the NFL's own: 1 preseason, 2 regular, 3 post. Abbreviated
+ * rather than spelled out because this sits in a 20pt row beside a contest name
+ * that must not be truncated to make room for it.
+ */
+function weekLabelOf(seasonType: number, week: number): string {
+  if (seasonType === 1) return `PRE ${week}`;
+  if (seasonType === 3) return `PLAYOFF ${week}`;
+  return `WEEK ${week}`;
+}
 
 /**
  * numeric(10,2) and bigint both arrive as strings depending on how the driver
@@ -146,6 +183,7 @@ export function useMyContests(includeCode?: string): MyContestsState {
         formatName: r.format_name,
         slotCount: Number(r.slot_count),
         entryFeeGems: r.entry_fee_gems,
+        weekLabel: weekLabelOf(Number(r.season_type), Number(r.week)),
         lineupId: r.lineup_id,
         filled: Number(r.filled ?? 0),
         field: {
@@ -168,6 +206,7 @@ export function useMyContests(includeCode?: string): MyContestsState {
         cut: num(r.cut),
         prizePool: num(r.prize_pool) ?? 0,
         myPrize: num(r.my_prize),
+        recap: Boolean(r.recap),
       })),
     );
     return null;

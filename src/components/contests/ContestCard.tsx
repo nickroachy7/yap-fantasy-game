@@ -1016,38 +1016,6 @@ export function ContestCard({
   );
 }
 
-/**
- * The trade on its own, for the contest's page.
- *
- * THE SHEET USED TO KNOW LESS ABOUT RISK THAN THE ROW YOU TAPPED. It listed
- * Format, Entry and Entered — no hearts, no win condition, no payout — so the
- * lobby warned you a run was on the line and the page you opened to think it
- * over never mentioned it. That is exactly backwards for the surface where the
- * decision is actually taken.
- *
- * IT DOES NOT REPEAT THE SHEET'S OWN SUBTITLE. "Full Roster · 8 cards" is
- * already at the top of the page this sits on, built from the same `formatLine`
- * — see `contest/[code]`. What this adds is the two facts that were nowhere:
- * how the thing is won, and how close it is to being playable.
- */
-export function ContestTermsPanel({ terms }: { terms: ContestTerms }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  return (
-    <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-      <View style={[styles.band, styles.termsHead, { borderColor: c.border }]}>
-        <Text numberOfLines={1} style={[Type.strong, { color: c.text }]}>
-          {winLine(terms)}
-        </Text>
-        <Text numberOfLines={1} style={[Type.fine, { color: c.textSecondary }]}>
-          {fillLine(terms)}
-        </Text>
-      </View>
-      <Trade terms={terms} prize={null} />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.panel, overflow: 'hidden' },
   pressed: { opacity: 0.7 },
@@ -1165,6 +1133,4 @@ const styles = StyleSheet.create({
      mark's position sits entirely to the right of it, which at the top of the
      range would read as a threshold nobody could reach. */
   mark: { position: 'absolute', width: 2, top: 0, bottom: 0, marginLeft: -1 },
-
-  termsHead: { borderBottomWidth: StyleSheet.hairlineWidth },
 });

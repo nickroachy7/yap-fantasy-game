@@ -136,6 +136,13 @@ export default function AppLayout() {
             dismisses onto that contest's card in the lineup carousel, which is
             the one editor. */}
         <Stack.Screen name="contest/[code]" options={sheetOptions} />
+        {/* One entrant's lineup in one contest, opened off a row of the field.
+            The same presentation again — a rival's team is exactly the kind of
+            thing you glance at over the app and put down — and it is pushed
+            OVER the contest sheet rather than replacing it, so closing lands
+            you back on the row you tapped. Two stacked sheets is the same shape
+            `pull` already takes over `packs`. */}
+        <Stack.Screen name="entry/[contest]/[user]" options={sheetOptions} />
         {/* Packs. Same presentation again, and for the same reason: you open
             it, spend, and put it down. It replaced `collection/shop`, which
             was a whole sub-page for a shelf of two rows — see there. */}

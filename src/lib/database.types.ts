@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.5"
   }
   graphql_public: {
     Tables: {
@@ -1835,7 +1835,7 @@ export type Database = {
           filled: number
           is_me: boolean
           lineup_id: string
-          open: boolean
+          locked: boolean
           points: number
           prize: number
           result: string
@@ -1876,6 +1876,7 @@ export type Database = {
           name: string
           prize_pool: number
           prize_pool_bps: number
+          recap: boolean
           season: number
           season_type: number
           slot_count: number
@@ -2035,6 +2036,7 @@ export type Database = {
           my_rank: number
           name: string
           prize_pool: number
+          recap: boolean
           result: string
           season: number
           season_type: number
@@ -2078,6 +2080,14 @@ export type Database = {
       rebuild_weekly_set: {
         Args: { p_day: string; p_season: number }
         Returns: Json
+      }
+      recap_slate: {
+        Args: never
+        Returns: {
+          season: number
+          season_type: number
+          week: number
+        }[]
       }
       refresh_player_season_ranks: { Args: never; Returns: undefined }
       roster_status: { Args: never; Returns: Json }

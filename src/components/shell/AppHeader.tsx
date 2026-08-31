@@ -72,6 +72,7 @@ import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { YapMark } from '@/components/brand/YapLogo';
+import { Heart } from '@/components/runs/Hearts';
 import { Colors, Spacing, TierColors } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -116,7 +117,7 @@ export function AppHeader({
   const c = Colors[scheme];
   const accent = TierColors[scheme].gold.accent;
   const top = useSafeAreaInsets().top;
-  const { gems, loading } = usePlayer();
+  const { gems, run, loading } = usePlayer();
 
   return (
     <View style={[styles.base, { paddingTop: top, backgroundColor: c.background }]}>
@@ -132,6 +133,30 @@ export function AppHeader({
         </View>
 
         <View style={styles.right}>
+          {/* HEARTS BESIDE GEMS, because they are the same KIND of fact: a
+              balance you spend, that the game gives back, and that you check
+              before deciding anything. Gems buy cards; hearts buy entries.
+              Keeping one in the masthead and the other buried under a carousel
+              made the second look like a property of the lineup screen rather
+              than of the account.
+
+              It is also what freed the rail below to stop being a readout. The
+              rack had to draw every heart you held because nothing else did;
+              with the count up here the row is free to draw only the hearts
+              that are actually in a contest — see `RunRail`.
+
+              ONE GLYPH AND A NUMBER, exactly as the gem is. Not a rack: five
+              pips in a masthead would out-weigh the wordmark beside them, and
+              the shape of the run — what is staked, what is lost — is the
+              rail's job on the screen where it matters. */}
+          {run ? (
+            <View style={styles.balance}>
+              <Heart size={12} state="free" />
+              <Text style={[styles.figure, NUMERIC, { color: c.text }]}>
+                {loading ? '—' : run.hearts}
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.balance}>
             <Gem size={12} color={accent} />
             <Text style={[styles.figure, NUMERIC, { color: c.text }]}>

@@ -52,9 +52,9 @@ import {
 } from 'react-native';
 
 import { RosterBar } from '@/components/collection/RosterBar';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { BenchBoard } from '@/components/lineup/BenchBoard';
 import { ContestCarousel } from '@/components/lineup/ContestCarousel';
+import { RecapBoard } from '@/components/lineup/RecapBoard';
 import { useMyContests } from '@/components/contests/use-my-contests';
 import { SlotBoard } from '@/components/lineup/SlotBoard';
 import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
@@ -180,18 +180,6 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
      showing the wrong card before the right one. `swiped` is null until a
      swipe actually happens, and from then on it owns the selection. */
   const [swiped, setSwiped] = useState<number | null>(null);
-  /**
-   * "The carousel is parked on the invitation rather than on a contest."
-   *
-   * A LINEUP BELONGS TO A CONTEST, AND THAT PAGE HAS NONE. The carousel used to
-   * leave the board alone when you swiped onto the "enter a new contest" tile,
-   * on the reasoning that emptying the screen behind an invitation is worse than
-   * showing something. It is not: what it showed was a full `Starting lineup ·
-   * 3/3` belonging to a contest that had just slid off the screen, presented as
-   * though it were this page's. A reader could file, swipe, and read their own
-   * filed lineup as the one they were being invited to build.
-   */
-  const [onTile, setOnTile] = useState(false);
 
   /* ARRIVING WITH A CONTEST NAMED BEATS WHATEVER WAS SWIPED TO EARLIER.
      This board is a tab: it stays mounted while the lobby and the contest
@@ -207,10 +195,6 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
   if (linkedCode !== lastLinked) {
     setLastLinked(linkedCode);
     setSwiped(null);
-    /* Arriving with a contest named puts the carousel back on a card, so the
-       tile flag has to come back with it — the carousel adjusts its own page
-       during render and cannot call back out of one. */
-    setOnTile(false);
   }
   const linkedIndex = linkedCode
     ? (myContests?.findIndex((ct) => ct.code === linkedCode) ?? -1)
@@ -1029,10 +1013,6 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
         contests={myContests ?? []}
         index={cardIndex}
         onIndexChange={setSwiped}
-        /* The last page is the invitation, not a contest — the boards below
-           draw an empty state for it rather than keeping the last contest's
-           lineup. See `onTileChange` in the carousel. */
-        onTileChange={setOnTile}
         lockAt={nextLockAt ?? lockAt}
         locked={allLocked}
         now={now}
@@ -1048,38 +1028,21 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
   );
 
   /**
-   * THE INVITATION HAS NO LINEUP, AND SAYS SO.
+   * Everything under the card.
    *
-   * Swiping past the last contest lands on the "enter a new contest" tile, and
-   * the board under it used to keep whatever contest had just slid off the
-   * screen — a filled `Starting lineup · 3/3` sitting under a card offering to
-   * start one. The slots were real and they were not this page's, which is the
-   * worst kind of wrong a board can be.
+   * TWO BOARDS. A recap card belongs to a finished WEEK, so the editor under it
+   * would be the new week's empty slots beneath last week's final score — see
+   * `RecapBoard`. Everything else is the board this screen exists to be.
    *
-   * NO SLOTS AND NO REQUIREMENTS, because there is no contest to have any. A
-   * generic eight-slot skeleton would be inventing a format; the honest empty
-   * state is the sentence that says a lineup belongs to a contest and the way
-   * to go and pick one.
-   *
-   * THE BENCH GOES WITH IT. It is still true — those cards are still yours —
-   * but every interaction on it is "start this player", and there is nothing to
-   * start them into. A board of controls that all decline is worse than none.
+   * THERE WAS A THIRD, and it went with the lobby tile. Swiping past the last
+   * contest used to land on an invitation, which is a page with no contest and
+   * therefore no lineup, so the boards drew an empty state for it. The lobby is
+   * a button on the rail now (see `ContestCarousel`), every page of the
+   * carousel is a real contest again, and the state that existed only to
+   * describe the gap between them is gone with it.
    */
-  const emptyBoard = (
-    <>
-      <SectionHead label="Starting lineup" hint="No contest" tone={c.textTertiary} />
-      <EmptyState
-        title="No lineup on this card"
-        body="A lineup belongs to a contest. Enter one and its slots appear here, with only the cards that contest allows."
-        actionLabel="See open contests"
-        onAction={() => router.push('/contests')}
-      />
-    </>
-  );
-
-  /** Everything under the card. */
-  const boards = onTile ? (
-    emptyBoard
+  const boards = current?.recap ? (
+    <RecapBoard contest={current} onCurrent={() => setSwiped(0)} />
   ) : (
     <>
       {/* THE WALL, WHERE IT CAN BE SEEN. Over the cap nothing on this board can

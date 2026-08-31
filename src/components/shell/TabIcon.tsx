@@ -3,9 +3,24 @@
  *
  * No icon font and no SVG. That is the house rule already set by `Gem`
  * ("a rotated square rather than an icon font so it stays crisp everywhere and
- * costs no dependency"), `PositionGlyph` and `TierMotif` — and this project
- * has neither `@expo/vector-icons` nor `react-native-svg` installed. Adding
- * one for five glyphs would ship a font of a thousand icons to draw five.
+ * costs no dependency"), `PositionGlyph` and `TierMotif`: adding an icon font
+ * for five glyphs would ship a thousand icons to draw five.
+ *
+ * THIS USED TO SAY THE PROJECT HAS NO `react-native-svg` INSTALLED. It did,
+ * and then `YapLogo` arrived on 2026-08-21 and brought the dependency with it —
+ * so the claim was false for nine days and nobody noticed, because a comment
+ * that states a fact about the repo has nothing checking it.
+ *
+ * The distinction it was drawing still holds and is worth keeping: `Hearts` and
+ * the brand mark are ARTWORK, with path data lifted from a source of truth
+ * elsewhere, and they earn a renderer. These five are GEOMETRY — rectangles and
+ * circles on a 24pt grid — and a dependency to draw a circle would be one.
+ *
+ * It also, accidentally, made these the only icons on the screen that survived
+ * an out-of-date simulator binary: a Debug build from before the dependency
+ * landed drew every `<Svg>` as `Unimplemented component: <RNSVGSvgView>` and
+ * every one of these correctly. Native modules do not travel over the air, and
+ * they do not travel over a Metro reload either.
  *
  * Every icon is composed from rounded rectangles and circles inside a fixed
  * 24pt box, so they share a baseline, an optical weight and a stroke width, and
