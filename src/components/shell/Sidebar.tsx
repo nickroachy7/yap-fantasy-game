@@ -47,7 +47,7 @@ import {
   type WebNavIcon,
   type WebNavItem,
 } from '@/components/shell/sections';
-import { TabIcon } from '@/components/shell/TabIcon';
+import { NavIcon } from '@/components/icons/NavIcon';
 import { ChromeBand, RailWidth, TierColors } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -96,7 +96,7 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
               to deliver, not the chrome's. */}
           {!loading && run && !run.awaitingCarry ? (
             <View style={[styles.hearts, { borderColor: 'rgba(255,255,255,0.18)' }]}>
-              <Hearts hearts={run.hearts} wagered={0} rack={run.rack} size={12} />
+              <Hearts hearts={run.hearts} wagered={run.wagered} rack={run.rack} size={12} />
             </View>
           ) : null}
         </View>
@@ -141,7 +141,7 @@ function RowIcon({ icon, active }: { icon: WebNavIcon; active: boolean }) {
      so glyph and text always agree about whether the row is active. */
   const color = active ? '#FFFFFF' : 'rgba(255,255,255,0.58)';
   return icon.set === 'tab' ? (
-    <TabIcon name={icon.name} color={color} focused={active} size={18} />
+    <NavIcon name={icon.name} color={color} focused={active} size={18} />
   ) : (
     <ActionIcon name={icon.name} color={color} focused={active} size={18} />
   );

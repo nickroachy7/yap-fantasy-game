@@ -50,6 +50,9 @@ import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icons/Icon';
+import { runWiped } from '@/components/icons/glyphs';
+
 import { InventoryCard } from '@/components/collection/InventoryCard';
 import { invalidateCollection } from '@/components/collection/use-collection';
 import { Hearts } from '@/components/runs/Hearts';
@@ -163,7 +166,14 @@ export default function RunOverScreen() {
                 five, or the screen overstates what was lost on the one page
                 that must not. */}
             <Hearts hearts={0} rack={run?.rack ?? 3} size={16} />
-            <Text style={[Type.fine, { color: c.textSecondary }]}>Out of hearts</Text>
+            {/* The outcome mark sits on the LABEL's line, not the rack's.
+                `run-wiped` rather than another broken heart: the rack above is
+                already saying the hearts are gone, and a second heart would
+                repeat it instead of naming what that meant for the run. */}
+            <View style={styles.outcome}>
+              <Icon glyph={runWiped} color={c.negative} size={16} focused />
+              <Text style={[Type.fine, { color: c.textSecondary }]}>Out of hearts</Text>
+            </View>
           </View>
           <Text style={[Type.figure, NUMERIC, { color: c.text }]}>{record}</Text>
         </View>
@@ -276,6 +286,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   summaryLeft: { gap: Spacing.one },
+  outcome: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   note: { marginTop: Spacing.two },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
   pressed: { opacity: 0.6 },

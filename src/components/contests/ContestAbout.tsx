@@ -128,10 +128,11 @@ export function ContestAbout({
             }
             mark={
               run ? (
-                /* No blade here either — see the note on the board's rail.
-                   This row says what you HOLD; the words beside it say what
-                   this contest asks you to put up. */
-                <Hearts hearts={run.hearts} wagered={0} rack={run.rack} size={13} />
+                /* Staked pips are marked here too — see the note on the
+                   board's rail for why they came back. This row says what you
+                   HOLD and which of those are already riding; the words beside
+                   it say what THIS contest asks you to put up on top. */
+                <Hearts hearts={run.hearts} wagered={run.wagered} rack={run.rack} size={13} />
               ) : undefined
             }>
             {terms.heartsAtRisk > 0

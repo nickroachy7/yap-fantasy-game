@@ -40,6 +40,15 @@
  */
 import { ScrollView, StyleSheet, Pressable, Text, View, type ColorValue } from 'react-native';
 
+import { Icon } from '@/components/icons/Icon';
+import {
+  collection as collectionGlyph,
+  sets as setsGlyph,
+  shop as shopGlyph,
+  tierGold,
+} from '@/components/icons/glyphs';
+import type { Glyph } from '@/components/icons/system';
+
 import { ActionDiameter, Colors, Radius, selectionAccent, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { horizontalStrip } from '@/components/ui/scroll-strip';
@@ -245,6 +254,32 @@ export function DetachedAction({ action }: { action: Action }) {
  */
 const STROKE = 1.6;
 
+/**
+ * The four of these names that have drawn artwork.
+ *
+ * The header above sets out why this set is CONSTRUCTED rather than imported,
+ * and that reasoning still holds for the other ten: they are rectangles and
+ * circles on a 24pt grid, they cost no bytes and no dependency, and they
+ * survive a native binary too old for `react-native-svg`.
+ *
+ * These four are different because they name OBJECTS rather than operations. A
+ * sort control or a select control is a diagram of an action and geometry says
+ * it exactly; an inventory, a set, a shop and a rank are things in the game
+ * with a look of their own, and a drawn mark says more about them than a grid
+ * of squares can.
+ *
+ * One drawing each, no idle variant — unlike the bottom bar these never carry
+ * focus by shape, because `ActionBar` already marks the active item with a
+ * filled pill behind it. See `NavIcon` for the case where focus does need the
+ * second artwork.
+ */
+const DRAWN_ACTIONS: Partial<Record<ActionIconName, Glyph>> = {
+  inventory: collectionGlyph,
+  sets: setsGlyph,
+  shop: shopGlyph,
+  tiers: tierGold,
+};
+
 export function ActionIcon({
   name,
   color,
@@ -256,6 +291,11 @@ export function ActionIcon({
   focused: boolean;
   size?: number;
 }) {
+  const drawn = DRAWN_ACTIONS[name];
+  if (drawn) {
+    return <Icon glyph={drawn} color={String(color)} size={size} focused />;
+  }
+
   const u = size / 24;
   const stroke = Math.max(1, STROKE * u);
   const skin = focused

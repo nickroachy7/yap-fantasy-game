@@ -102,6 +102,10 @@
  */
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icons/Icon';
+import { formatFlex3, formatRoster, formatWr } from '@/components/icons/glyphs';
+import type { Glyph } from '@/components/icons/system';
+
 import { Heart } from '@/components/runs/Hearts';
 import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -369,6 +373,27 @@ export type CardLevel = 'page' | 'sheet';
  * you have; the other says whether enough people have turned up for the week to
  * be scoreable at all.
  */
+/**
+ * Contest format to glyph.
+ *
+ * KEYED ON THE DISPLAY NAME, WHICH IS DEBT. `contest_formats` has a `code`
+ * column — main, flex3, wr_room — and that is what this should key off; the
+ * model carries only `formatName`, so wiring the mark today means matching on
+ * a string a copy edit could change. The lookup normalises case and spacing to
+ * blunt that, and an unknown name renders no mark rather than the wrong one,
+ * but the durable fix is to carry `format_code` through `use-contests.ts` into
+ * `ContestTerms` and rekey this on it.
+ */
+const FORMAT_GLYPHS: Record<string, Glyph | undefined> = {
+  fullroster: formatRoster,
+  flexthree: formatFlex3,
+  wrroom: formatWr,
+};
+
+function formatGlyphOf(formatName: string): Glyph | undefined {
+  return FORMAT_GLYPHS[formatName.toLowerCase().replace(/[^a-z0-9]/g, '')];
+}
+
 function Head({
   name,
   terms,
@@ -384,10 +409,14 @@ function Head({
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  const formatMark = formatGlyphOf(terms.formatName);
 
   return (
     <View style={[styles.band, styles.head, { borderColor: c.border }]}>
       <View style={styles.headTop}>
+        {formatMark ? (
+          <Icon glyph={formatMark} color={c.textSecondary} size={18} focused />
+        ) : null}
         <Text numberOfLines={1} style={[Type.section, styles.headName, { color: c.text }]}>
           {name}
         </Text>

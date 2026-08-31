@@ -296,10 +296,19 @@ function RunPanel({ run, onClaim }: { run: NonNullable<ReturnType<typeof usePlay
 
   return (
     <View style={styles.live}>
-      {/* No blade — the same call the board's rail makes, and for the same
-          reason: a mark that says "committed" is nearly always on and never
-          moves. The line beside this one already says how many are riding. */}
-      <Hearts hearts={run.hearts} wagered={0} rack={run.rack} size={14} />
+      {/* THE BLADE IS BACK ON, and the note it replaces is worth keeping in
+          view: the rack used to pass `wagered={0}` because "a mark that says
+          committed is nearly always on and never moves, and the line beside
+          this one already says how many are riding."
+
+          That was written against the old blade — a thin grey stick that
+          resolved to a smudge at 14pt, so it cost legibility and bought
+          nothing. The drawn sword is a distinct silhouette at the same size,
+          and a heart staked on a live contest reading identically to a free one
+          is the rack misreporting the single number it exists to report. The
+          sentence beside it stays; it now says how many, where the pips say
+          which. */}
+      <Hearts hearts={run.hearts} wagered={run.wagered} rack={run.rack} size={14} />
       <Text style={[Type.fine, { color: c.textSecondary }]} numberOfLines={1}>
         {/* WHAT IS ON THE LINE COMES FIRST when there is anything on it. The
             record and the next rung are context you read weekly; a live stake

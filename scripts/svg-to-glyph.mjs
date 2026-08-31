@@ -86,6 +86,11 @@ if (kept.length === 0) {
   process.exit(1);
 }
 
+// `source` is simply the artwork's box: `flatten-svg-path.mjs` has already
+// centred the drawing on its keyline inside a 0,0-origin square, so the
+// renderer's single scale() is all that is left to do.
+const source = vbW;
+
 const parts = kept
   .map((d, i) => {
     const role = clip && i > 0 ? ", role: 'knockout'" : '';
@@ -93,12 +98,12 @@ const parts = kept
   })
   .join('\n');
 
-console.error(`  · ${kept.length} path(s), source viewBox ${vbW}`);
+console.error(`  · ${kept.length} path(s), box ${vbW} -> source ${source} (${keyline} keyline)`);
 console.log(`
 export const ${name.replace(/[-\s](.)/g, (_, c) => c.toUpperCase())}: Glyph = {
   name: '${name}',
   keyline: '${keyline}',
-  source: ${vbW},
+  source: ${source},
   parts: [
 ${parts}
   ],

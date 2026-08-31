@@ -16,6 +16,10 @@ import { useMemo, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Gem } from '@/components/shell/AppHeader';
+
+import { Icon } from '@/components/icons/Icon';
+import { setDaily, setPosition, setTeam, setWeekly } from '@/components/icons/glyphs';
+import type { Glyph } from '@/components/icons/system';
 import { Chip, ChipRow } from '@/components/ui/Chip';
 import { SummaryStrip, type SummaryCell } from '@/components/ui/SummaryStrip';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
@@ -29,6 +33,7 @@ import {
   type CardSet,
   type SetListFilter,
   type SetsSummary,
+  type SetFamily,
 } from './sets';
 
 export function SetsList({
@@ -277,6 +282,17 @@ export function ClaimAllBar({
 }
 
 /**
+ * Set family to glyph. `SetFamily` is a closed union, so this record is total:
+ * adding a fifth family fails to compile here rather than rendering nothing.
+ */
+const FAMILY_GLYPHS: Record<SetFamily, Glyph> = {
+  daily: setDaily,
+  weekly: setWeekly,
+  position: setPosition,
+  team: setTeam,
+};
+
+/**
  * One set.
  *
  * The row is a TARGET, not a container of controls — pressing anywhere opens
@@ -339,6 +355,15 @@ function SetRow({
         }${actionable > 0 ? ` You hold cards for ${actionable} more slots.` : ''}`}
         style={({ pressed }) => [styles.rowBody, pressed && styles.pressed]}>
         <View style={styles.rowHead}>
+          {/* Keyed off `card_sets.family`, which is a four-value enum in the
+              database and in `SetFamily` — so the map is total and a new
+              family would be a type error here rather than a blank row. */}
+          <Icon
+            glyph={FAMILY_GLYPHS[set.family]}
+            color={actionable > 0 ? c.positive : c.textTertiary}
+            size={22}
+            focused
+          />
           <View style={styles.rowTitle}>
             <Text numberOfLines={1} style={[Type.strong, { color: c.text }]}>
               {set.name}

@@ -293,6 +293,36 @@ export function validateGlyph(g: Glyph): Finding[] {
     warn('centre', `mass sits ${offX.toFixed(1)},${offY.toFixed(1)} off centre`);
   }
 
+  // ---- complexity, which is a proxy for "was this traced from noise" ----
+  //
+  // A drawn UI icon is a few hundred coordinates. Sleeper's, measured from
+  // their live site, run 270-450; the hearts in this set run 68-374. A glyph
+  // reporting tens of thousands is not a detailed drawing, it is a tracer that
+  // found a speckle field — a soft glow around the source art dithers at the
+  // threshold and each speck becomes its own path.
+  //
+  // This rule exists because two whole groups shipped into the set at 18,000
+  // and 24,000 coordinates and passed every other check: they were correctly
+  // sized, correctly centred, correctly on-grid and visibly scratchy. Geometry
+  // alone could not see it, but a coordinate count can.
+  const coords = g.parts.reduce(
+    (n, part) => n + (part.d.match(/-?\d*\.?\d+/g)?.length ?? 0),
+    0,
+  );
+  if (coords > 5000) {
+    err(
+      'complexity',
+      `${coords} coordinates across ${g.parts.length} paths — this is traced ` +
+        'noise, not artwork. Regenerate the source with clean flat edges',
+    );
+  } else if (coords > 1500) {
+    warn(
+      'complexity',
+      `${coords} coordinates across ${g.parts.length} paths — heavy for an ` +
+        'icon (the set runs a few hundred); check its edges are not ragged',
+    );
+  }
+
   // ---- stroke weights come from the scale ------------------------------
   for (const part of g.parts) {
     if (part.stroke && !(part.stroke in STROKE)) {

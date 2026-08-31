@@ -1,4 +1,7 @@
 import { Link } from 'expo-router';
+
+import { Icon } from '@/components/icons/Icon';
+import { cardBadge, runCashout, runCleared, runStreak } from '@/components/icons/glyphs';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -272,14 +275,20 @@ export default function ProfileScreen() {
       hint: season.pending > 0 ? `${season.pending} pending` : undefined,
     },
     {
+      /* The one figure on this strip that is a personal best rather than a
+         running total, so it is the one that earns a mark. Lit only when there
+         IS a best week — a mark on a dash claims a high nobody has set. */
       label: 'Best week',
       value: season.best ? Number(season.best.total_points).toFixed(1) : DASH,
       hint: season.best ? `Week ${season.best.week}` : undefined,
+      glyph: season.best ? <Icon glyph={runStreak} color={accent} size={9} focused /> : undefined,
     },
     { label: 'Avg', value: season.average === null ? DASH : season.average.toFixed(1) },
     {
       label: 'Rank',
       value: rank === null ? DASH : `#${rank}`,
+      glyph:
+        rank === null ? undefined : <Icon glyph={runCleared} color={accent} size={9} focused />,
       hint: rank === null ? `outside top ${RANK_DEPTH}` : rankPool ? `of ${rankPool}` : undefined,
     },
     {
@@ -407,7 +416,11 @@ export default function ProfileScreen() {
 
           <Panel
             title="Collection"
-            hint={`${cardCount} cards · ${collection.careerFp.toFixed(0)} career FP`}>
+            hint={`${cardCount} cards · ${collection.careerFp.toFixed(0)} career FP`}
+            /* The panel's own mark rather than a control. `action` is the only
+               slot on the title row, and a card is the one noun this panel is
+               entirely about — the tier bar below it is a breakdown OF cards. */
+            action={<Icon glyph={cardBadge} color={c.textTertiary} size={18} focused />}>
             {owned === null ? <ActivityIndicator style={styles.pad} /> : (
               <TierBreakdown counts={collection.counts} />
             )}
@@ -427,7 +440,12 @@ export default function ProfileScreen() {
                   value: gems.toLocaleString(),
                   glyph: <Gem size={9} color={accent} />,
                 },
-                { label: 'Earned', value: `+${gemFlow.earned.toLocaleString()}`, tone: 'positive' },
+                {
+                  label: 'Earned',
+                  value: `+${gemFlow.earned.toLocaleString()}`,
+                  tone: 'positive',
+                  glyph: <Icon glyph={runCashout} color={c.positive} size={9} focused />,
+                },
                 { label: 'Spent', value: `-${gemFlow.spent.toLocaleString()}`, tone: 'negative' },
               ]}
             />

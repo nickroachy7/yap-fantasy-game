@@ -37,6 +37,10 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icons/Icon';
+import { packDaily, packPro, packStandard, packStarter } from '@/components/icons/glyphs';
+import type { Glyph } from '@/components/icons/system';
+
 import { Gem } from '@/components/shell/AppHeader';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -230,6 +234,17 @@ function SpecRow({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
+/**
+ * Pack code to glyph. Keyed by `packs.code` — the same four values the table
+ * holds — so this cannot drift into a parallel list of what packs exist.
+ */
+const PACK_GLYPHS: Record<string, Glyph | undefined> = {
+  starter: packStarter,
+  standard: packStandard,
+  daily: packDaily,
+  pro: packPro,
+};
+
 function PackCard({
   pack,
   gems,
@@ -323,9 +338,22 @@ function PackCard({
             : `${gems.toLocaleString()} → ${(gems - total).toLocaleString()} gems`
           : `${(total - gems).toLocaleString()} more gems needed`;
 
+  const packGlyph = PACK_GLYPHS[pack.code];
+
   return (
     <View style={[styles.pack, { backgroundColor: c.surface, borderColor: c.border }]}>
       <View style={styles.packHead}>
+        {/* The mark is keyed off `packs.code`, so a pack added to the table
+            without a glyph here simply renders without one rather than
+            crashing or falling back to the wrong picture. */}
+        {packGlyph ? (
+          <Icon
+            glyph={packGlyph}
+            color={free ? c.positive : c.textSecondary}
+            size={28}
+            focused
+          />
+        ) : null}
         <View style={styles.packTitle}>
           <Text numberOfLines={2} style={[Type.section, { color: c.text }]}>
             {pack.name}

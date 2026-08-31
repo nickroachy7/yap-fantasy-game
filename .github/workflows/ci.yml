@@ -48,6 +48,17 @@ jobs:
         with:
           deno-version: v2.x
 
+      # The icon set's own gate. Deno rather than node because the system, the
+      # glyphs and the validator are TypeScript with no build step — and it has
+      # to run AFTER setup-deno for the same reason the unit tests do.
+      #
+      # It is a real gate, not a formality: it has already caught a glyph
+      # imported off-centre, four refused for sitting at 114% of their keyline,
+      # and two whole groups traced from a speckle field at 24,000 coordinates
+      # apiece. Every one of those passed typecheck and lint.
+      - name: Icon set lint
+        run: npm run icons:lint
+
       - name: Unit tests (Deno)
         run: npm run test:unit
 

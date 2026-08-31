@@ -9,6 +9,10 @@
  */
 import { StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icons/Icon';
+import { tierBronze, tierDiamond, tierGold, tierSilver } from '@/components/icons/glyphs';
+import type { Glyph } from '@/components/icons/system';
+
 import {
   Colors,
   NUMERIC,
@@ -20,6 +24,24 @@ import {
   type CardTier,
 } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+
+/**
+ * The rung marks, in `TierOrder`. Rank is COUNT — one chevron, two, three —
+ * and then a gemstone for the top, which is categorically a different mark
+ * rather than a fourth chevron nobody could count at this size.
+ *
+ * Tinted with the same accent the stacked bar above uses, so the legend row and
+ * its slice of the bar are obviously the same thing. The shape is the addition:
+ * `theme.ts` requires tier to keep a non-colour channel, and until now this
+ * legend's was the WORD beside the swatch. A reader who cannot separate the
+ * four accents now has the mark as well as the label.
+ */
+const TIER_GLYPHS: Record<CardTier, Glyph> = {
+  bronze: tierBronze,
+  silver: tierSilver,
+  gold: tierGold,
+  diamond: tierDiamond,
+};
 
 export function TierBreakdown({
   counts,
@@ -59,7 +81,12 @@ export function TierBreakdown({
               accessible
               accessibilityLabel={`${TierTreatments[tier].label}: ${n} cards, ${share(n, total)}`}
               style={styles.item}>
-              <View style={[styles.swatch, { backgroundColor: tiers[tier].accent }]} />
+              <Icon
+                glyph={TIER_GLYPHS[tier]}
+                color={n > 0 ? tiers[tier].accent : c.textTertiary}
+                size={16}
+                focused
+              />
               <Text
                 numberOfLines={1}
                 style={[Type.micro, styles.name, { color: n > 0 ? c.text : c.textTertiary }]}>

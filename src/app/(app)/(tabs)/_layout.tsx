@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NAV_TABS, routeNameOf } from '@/components/shell/sections';
 import { Sidebar } from '@/components/shell/Sidebar';
-import { TabIcon } from '@/components/shell/TabIcon';
+import { NavIcon } from '@/components/icons/NavIcon';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { WebHeader } from '@/components/shell/WebHeader';
 import { Colors, SheetCorner, TabBarContentHeight } from '@/constants/theme';
@@ -154,7 +154,7 @@ export default function TabsLayout() {
                    for why it is the one tab that wants to. */
                 href: (tab.sections ? undefined : tab.href) as Href | undefined,
                 tabBarIcon: ({ color, focused }) => (
-                  <TabIcon name={tab.icon} color={color} focused={focused} size={24} />
+                  <NavIcon name={tab.icon} color={color} focused={focused} size={24} />
                 ),
               }}
             />

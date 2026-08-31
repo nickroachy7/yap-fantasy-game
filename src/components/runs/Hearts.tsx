@@ -66,69 +66,74 @@
  * Drawn as a path rather than an icon font for the reason `Gem` gives: crisp
  * everywhere, and no dependency to ship a thousand glyphs to draw one.
  */
-import { useId } from 'react';
+
+import {
+  heartBroken,
+  heartFull,
+  heartLoss,
+  heartTie,
+  heartWagered,
+  heartWin,
+} from '@/components/icons/glyphs';
+import { GRID, type Glyph } from '@/components/icons/system';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Svg, { Circle, ClipPath, Defs, G, Path, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { G, Path } from 'react-native-svg';
 
 import { Colors, selectionAccent } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 /**
- * The heart, faceted, on a 24-box so the path scales by one number.
+ * ---------------------------------------------------------------------------
+ * THE GEOMETRY THAT USED TO LIVE HERE
+ * ---------------------------------------------------------------------------
  *
- * Nine straight segments. The notch at (12, 7.2) and the point at (12, 21.6)
- * are the two vertices the tear runs between — see `TEAR`.
+ * A faceted `HEART` path, a `BLADE`, a rotation constant, two tear-clip regions
+ * and a `bladeOf` steel ramp — hand-built geometry, all deleted when the drawn
+ * artwork landed. Everything it rendered is now one imported glyph per state;
+ * see `Art` below.
+ *
+ * The arguments those constants carried are NOT deleted, because they are about
+ * meaning rather than coordinates and they still bind:
+ *
+ *   FILLED MEANS YOU HOLD IT. An earlier rack drew "at risk" as an outline, so
+ *   a heart you definitely held looked hollow and the most important number on
+ *   the screen read backwards. A staked heart is still solid.
+ *
+ *   THE BLADE IS A FOREIGN OBJECT, NOT DAMAGE. A crack through a heart is the
+ *   universal picture of one that has ALREADY broken, so it cannot also mean
+ *   "this one might". Nothing has happened to a wagered heart yet; something is
+ *   merely poised to.
+ *
+ *   THE TORN HEART IS GREY, NOT FADED RED. A faint red pip in a row of solid
+ *   ones reads as a warning about the hearts you still have.
+ *
+ * The one thing the swap genuinely retired is the SVG `<Text>` letter and the
+ * baseline fight it documented — iOS and web disagreed about
+ * `alignmentBaseline`, and the W ended up through the heart's point. A letter
+ * punched into a path cannot drift.
  */
-const HEART =
-  'M12 7.2L9.3 3.6H4.6L1.9 7.9L2.4 12.2L12 21.6L21.6 12.2L22.1 7.9L19.4 3.6H14.7Z';
 
 /**
- * The line a heart breaks along: notch to point, zigzagging.
+ * The viewBox, and the multiplier that turns a caller's `size` into a rendered
+ * box.
  *
- * DELIBERATELY OFF-CENTRE AT EVERY TURN. A symmetrical break reads as a fold or
- * a seam — two halves that were designed to come apart — where the whole point
- * is that this one tore.
+ * THESE WERE SIZED FOR GEOMETRY THAT NO LONGER EXISTS. The constructed heart
+ * spanned x 1.9-22.1 inside a 24 grid, and the box was opened up by 3.2 on
+ * every side so the dagger's pommel and the torn halves had somewhere to go —
+ * a heart at `size` rendered about `size * 0.88` of actual heart.
  *
- * It is expressed as two CLIP REGIONS rather than as a stroked line, because
- * the two halves have to move independently. Each region is the zigzag plus a
- * generous box off its own side, so clipping the heart with it yields exactly
- * one half with a jagged inner edge.
+ * The drawn artwork bleeds nothing: the sword, the tear and the letters are all
+ * inside the drawing, and the icon system centres every glyph on an 18-unit
+ * keyline inside its 24 box. Left on the old padded viewBox the same call site
+ * rendered `size * 0.78` — visibly smaller than what it replaced, and a rack
+ * with a band of dead space down both sides of every pip.
+ *
+ * So the box is now the art's own bounds plus a margin for the focus ticks, and
+ * `BOX` is tuned so a rack at a given `size` reads slightly LARGER than the
+ * geometry it replaced rather than slightly smaller: `size * 1.05` of heart.
  */
-const TEAR = 'L9.8 11.5L13.4 13.4L10.6 17.2L12 21.6';
-const TEAR_LEFT = `M12 -8L12 7.2${TEAR}L-8 21.6L-8 -8Z`;
-const TEAR_RIGHT = `M12 -8L12 7.2${TEAR}L32 21.6L32 -8Z`;
-
-/**
- * The blade, drawn pointing straight down and then rotated into place.
- *
- * Long enough to cross the whole heart — the chord at this angle is about 18
- * units and the blade is 19.6 — so that both ends clear the silhouette. Short
- * grip on purpose: the hilt is the part that leaves the 24-box, and every unit
- * of it is a unit the glyph box has to grow by.
- */
-const BLADE = 'M10.05 1.4H13.95L13.4 16.4L12 20.8L10.6 16.4Z';
-/**
- * Degrees clockwise, about the heart's centre.
- *
- * 42 is chosen so the tip exits just above the heart's own point. Shallower and
- * the blade reads as a slash across the top; steeper and its tip crowds the
- * heart's point, putting two sharp things in the same corner. Rotating about
- * (12, 12) rather than translating is what guarantees the axis runs through the
- * middle at any angle.
- */
-const BLADE_ROTATION = 42;
-
-/**
- * The viewBox, padded so the hilt and the tear have somewhere to go.
- *
- * The heart occupies x 1.9–22.1 and y 3.6–21.6. The pommel swings out to about
- * (23.7, -0.8) and the torn halves rotate a unit and a half either way, so the
- * box is opened up by 3.2 on every side. `BOX` is the matching multiplier for
- * the rendered width: a caller asking for `size` gets a HEART about that wide,
- * not a heart shrunk to fit its own padding.
- */
-const VIEW_BOX = '-3.2 -3.2 30.4 30.4';
-const BOX = 1.32;
+const VIEW_BOX = '2 2 20 20';
+const BOX = 1.17;
 
 export type HeartState = 'free' | 'wagered' | 'killed' | 'pending';
 
@@ -143,18 +148,6 @@ export type HeartState = 'free' | 'wagered' | 'killed' | 'pending';
  * most of its callers are not asking.
  */
 export type HeartResult = 'W' | 'L' | 'T';
-
-/**
- * The steel, which is not a theme token because nothing else is made of it.
- *
- * Two values because it sits ON the heart and the heart is not the same red in
- * both schemes. Against dark mode's bright `#FF6369` a near-white blade
- * out-shouts the heart it is stuck in, so it is pulled down; against light
- * mode's much darker `#C4283C` it has to come up or it disappears.
- */
-function bladeOf(scheme: 'light' | 'dark'): string {
-  return scheme === 'dark' ? '#B8BDC4' : '#F5F7F9';
-}
 
 export function Heart({
   size = 13,
@@ -221,19 +214,17 @@ export function Heart({
   /* Clip ids are global in the DOM on web, and a rack draws several of these
      side by side. Without a per-instance id every torn heart on the screen
      clips against the first one's regions. */
-  const id = useId();
 
   const body = color ?? c.negative;
-  const steel = bladeOf(scheme);
 
   /* Drawn last so it sits over the blade, and identical on every state — see
      the note on `lit`. Four L-brackets at the corners of the padded box. */
   const ticks = lit ? (
     <G fill="none" stroke={accent} strokeWidth={1.6} strokeLinecap="square">
-      <Path d="M-2 2.2V-2H2.2" />
-      <Path d="M21.8 -2H26V2.2" />
-      <Path d="M26 21.8V26H21.8" />
-      <Path d="M2.2 26H-2V21.8" />
+      <Path d="M2 6V2H6" />
+      <Path d="M18 2H22V6" />
+      <Path d="M22 18V22H18" />
+      <Path d="M6 22H2V18" />
     </G>
   ) : null;
 
@@ -251,30 +242,10 @@ export function Heart({
   if (result !== null) {
     const fill =
       result === 'W' ? c.positive : result === 'L' ? c.negative : c.textSecondary;
+    const glyph = result === 'W' ? heartWin : result === 'L' ? heartLoss : heartTie;
     return (
       <Svg width={size * BOX} height={size * BOX} viewBox={VIEW_BOX}>
-        <Path d={HEART} fill={fill} />
-        {/* POSITIONED BY BASELINE ALONE, which is the only thing every renderer
-            agrees on. `alignmentBaseline="central"` plus a compensating `dy`
-            was belt AND braces and they fought: iOS honoured both and dropped
-            the letter onto the heart's point, where the W bled out of the
-            bottom of the glyph.
-
-            So: no baseline attribute, and `y` is the baseline itself. The
-            heart is a FACETED one — it narrows to a point at y 21.6 — so the
-            letter has to live in the wide band above that, not on the centre of
-            the bounding box. Cap height runs from about y 7.5 to the baseline
-            at 14.2, which is the widest run of the shape; a glyph sized to the
-            box instead put the W's legs out through the point. */}
-        <SvgText
-          x={12}
-          y={14.2}
-          fill={c.background}
-          fontSize={9.5}
-          fontWeight="700"
-          textAnchor="middle">
-          {result}
-        </SvgText>
+        <Art glyph={glyph} fill={fill} />
         {ticks}
       </Svg>
     );
@@ -295,15 +266,14 @@ export function Heart({
    * have.
    */
   if (state === 'pending') {
+    /* A contest that wants a heart and has not been given one. Held back with
+       opacity rather than an outline: these drawings are 70-370 point contours
+       and a stroke follows every wobble in them, so the outline that worked for
+       the constructed heart becomes a tangle here. Grey rather than red, for
+       the reason the torn heart is grey. */
     return (
       <Svg width={size * BOX} height={size * BOX} viewBox={VIEW_BOX}>
-        <Path
-          d={HEART}
-          fill="none"
-          stroke={c.textSecondary}
-          strokeWidth={1.9}
-          strokeLinejoin="round"
-        />
+        <Art glyph={heartFull} fill={c.textSecondary} opacity={0.34} />
         {ticks}
       </Svg>
     );
@@ -312,32 +282,7 @@ export function Heart({
   if (state === 'killed') {
     return (
       <Svg width={size * BOX} height={size * BOX} viewBox={VIEW_BOX}>
-        <Defs>
-          <ClipPath id={`l${id}`}>
-            <Path d={TEAR_LEFT} />
-          </ClipPath>
-          <ClipPath id={`r${id}`}>
-            <Path d={TEAR_RIGHT} />
-          </ClipPath>
-        </Defs>
-        {/* FILLED, not hollow. Two solid shapes with a torn void between them
-            read instantly at 12pt; the same halves as outlines become a tangle
-            of thin strokes with a gap somewhere in it. Grey rather than a faded
-            red, because a faint red pip reads as a warning about the hearts you
-            still have.
-
-            TRANSFORMS AS STRINGS ON A `G`, not as `translateX`/`rotation` props
-            on the `Path`. Those props are native-only: react-native-svg's web
-            build forwards them straight to the DOM, where React rejects them and
-            the halves render un-nudged and un-rotated — an untorn grey heart. */}
-        <G fill={c.textSecondary} opacity={0.68}>
-          <G transform="rotate(-9 12 12) translate(-1.5 0.5)">
-            <Path d={HEART} clipPath={`url(#l${id})`} />
-          </G>
-          <G transform="rotate(9 12 12) translate(1.5 0.5)">
-            <Path d={HEART} clipPath={`url(#r${id})`} />
-          </G>
-        </G>
+        <Art glyph={heartBroken} fill={c.textSecondary} opacity={0.68} />
         {ticks}
       </Svg>
     );
@@ -345,23 +290,45 @@ export function Heart({
 
   return (
     <Svg width={size * BOX} height={size * BOX} viewBox={VIEW_BOX}>
-      <Path d={HEART} fill={body} />
-      {/* THE HILT IS DELIBERATELY OVERSIZED against the blade. Drawn to
-          realistic proportions it read as a plain diagonal stick at 26pt —
-          pommel, grip and guard all resolving to one grey smudge. The guard is
-          now more than twice the blade's width and the pommel is wider than the
-          grip, which is what makes the silhouette say "dagger" before any of
-          its parts are individually legible. */}
-      {state === 'wagered' ? (
-        <G transform={`rotate(${BLADE_ROTATION} 12 12)`} fill={steel}>
-          <Circle cx={12} cy={-3.9} r={1.5} />
-          <Rect x={11.05} y={-3.4} width={1.9} height={3} rx={0.65} />
-          <Rect x={7.9} y={-0.4} width={8.2} height={1.8} rx={0.7} />
-          <Path d={BLADE} />
-        </G>
-      ) : null}
+      <Art glyph={state === 'wagered' ? heartWagered : heartFull} fill={body} />
       {ticks}
     </Svg>
+  );
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * THE ARTWORK IS NOW DRAWN, NOT CONSTRUCTED
+ * ---------------------------------------------------------------------------
+ *
+ * Every state below used to be built from `HEART` plus a blade, a clip pair or
+ * an SVG `<Text>`. It is now one imported drawing per state, generated and
+ * traced through the pipeline in `src/components/icons/`.
+ *
+ * WHAT THAT CHANGED, AND WHAT IT DID NOT. The geometry is new; every rule this
+ * file argued for is kept. Filled still means you hold it. The blade is still a
+ * foreign object rather than damage, so a staked heart never reads as a hurt
+ * one. The torn heart is still grey rather than faded red, because a faint red
+ * pip reads as a warning about the hearts you still have. The letters are still
+ * knocked out of the body rather than laid on it.
+ *
+ * The letters in particular are now part of the drawing rather than an SVG
+ * `<Text>` positioned by baseline. That removes the per-renderer baseline
+ * fight this file documents at length — iOS and web disagreed about
+ * `alignmentBaseline`, and the W ended up through the heart's point — because
+ * a hole in a path cannot drift.
+ */
+function Art({ glyph, fill, opacity }: { glyph: Glyph; fill: string; opacity?: number }) {
+  /* The drawings are authored in their own box (1000) and this file's viewBox
+     is the 24 grid padded for the hilt and the tear, so one scale puts them on
+     the same footing as the geometry they replace. */
+  const k = GRID / (glyph.source ?? GRID);
+  return (
+    <G transform={`scale(${k})`} fill={fill} opacity={opacity}>
+      {glyph.parts.map((part, i) => (
+        <Path key={i} d={part.d} />
+      ))}
+    </G>
   );
 }
 
@@ -535,14 +502,26 @@ export function ContestHearts({
         const badge = e.showResult === false ? null : e.result;
         /* A LOST CONTEST TOOK THE HEART, so the pip is torn whether or not the
            badge is still up — that is not a receipt, it is the state of the
-           run. Won and tied kept theirs and stay whole. */
+           run. Won and tied kept theirs and stay whole.
+
+           AN ENTERED CONTEST THAT HAS NOT SETTLED IS A WAGERED HEART, and this
+           used to draw it as `free`. That was wrong by this file's own
+           definition — the note above says `entered` means a heart is riding on
+           this RIGHT NOW — and it made the rack claim a stake was spendable on
+           the one screen where that decides whether you enter anything else. It
+           went unnoticed because the old blade was a thin grey stick that read
+           as noise at 13pt, so free and staked looked much the same either way;
+           the drawn sword is the difference being visible for the first time.
+
+           ORDER MATTERS HERE. `result` is checked first throughout: a settled
+           contest is never wagered, whatever `entered` still says. */
         const state =
           e.result === 'L'
             ? 'killed'
             : e.result !== null
               ? 'free'
               : e.entered
-                ? 'free'
+                ? 'wagered'
                 : 'pending';
         return (
           <Pip
