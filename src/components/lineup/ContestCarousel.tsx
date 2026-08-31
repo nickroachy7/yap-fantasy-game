@@ -69,7 +69,6 @@ import {
 } from 'react-native';
 
 import { ContestCard } from '@/components/contests/ContestCard';
-import { StatusChip } from '@/components/ui/StatusChip';
 import { termsOfEntry, type MyContest } from '@/components/contests/use-my-contests';
 import { ContestHearts, type HeartResult, type HeartSpan } from '@/components/runs/Hearts';
 import { Colors, ControlDiameter, Spacing, Type, selectionAccent } from '@/constants/theme';
@@ -872,7 +871,7 @@ function Card({
        * row there, and the scoring band under it already draws a settled score
        * and a W or an L. "Which week" is the fact that was missing.
        */
-      status={contest.recap ? <StatusChip label={contest.weekLabel} tone="neutral" /> : undefined}
+      period={contest.recap ? contest.weekLabel : undefined}
       lock={{ at: lockAt, locked, now }}
       entry={{
         myPoints: contest.field.myPoints,
@@ -885,10 +884,6 @@ function Card({
       }}
       prize={contest.myPrize}
       settled={settled}
-      /* THE PAGE, NOT A SHEET. The board is #000 with the tab bar's grey across
-         the bottom, and this card is the other end of the same frame — see
-         `CardLevel`. */
-      level="page"
       onPress={onOpen ? () => onOpen(contest) : undefined}
     />
   );

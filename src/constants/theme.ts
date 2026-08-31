@@ -57,6 +57,22 @@ export const Colors = {
     surfaceSheet: '#FFFFFF',
     positive: '#1A7F49',
     negative: '#C4283C',
+    /**
+     * A WEEK WITH A BALL IN THE AIR. The app's fourth semantic hue, and the
+     * only one that is not an outcome.
+     *
+     * IT IS NOT GOLD, AND THAT IS THE WHOLE REASON IT EXISTS. `selectionAccent`
+     * already means two things within a hundred points of the contest card —
+     * "this is the one you are looking at" on a focused heart, and "press me"
+     * on the Contests button directly under the carousel. A gold LIVE would be
+     * a third meaning for one hue on one screen, and the eye cannot rank three.
+     *
+     * It is not red either, which is the broadcast convention and would collide
+     * head-on with `negative` meaning you lost.
+     *
+     * Green and red are settled states; blue is the state that has not settled.
+     */
+    live: '#1F6FBF',
     warning: '#8A6100',
   },
   dark: {
@@ -116,6 +132,8 @@ export const Colors = {
     surfaceSheet: '#0E1013',
     positive: '#4CC38A',
     negative: '#FF6369',
+    /** See the light value. */
+    live: '#5AA9F0',
     warning: '#E0C46A',
   },
 } as const;
