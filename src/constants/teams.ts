@@ -117,13 +117,13 @@ function toHex(hue: number, s: number, l: number): string {
  * A FIXED ALPHA OVER A RAW BRAND COLOUR DOES NOT WORK, and this is the whole
  * reason this function exists rather than the map being read directly. The
  * league spans Cincinnati's #FB4F14 and Chicago's #0B162A: at any alpha that
- * makes the navy visible against #0E1013, the orange is a traffic cone, and at
+ * makes the navy visible against #101010, the orange is a traffic cone, and at
  * any alpha that tames the orange the navy is not there at all. Normalising
  * lightness first means the wash weight is one number for all thirty-two and
  * the HUE is the only thing that varies — which is the part that says Carolina
  * rather than Cincinnati.
  *
- * 0.52 is picked against `surfaceSheet` (#0E1013): bright enough that a hue
+ * 0.52 is picked against `surfaceSheet` (#101010): bright enough that a hue
  * registers at the low alpha the wash uses, dark enough that white `Type.page`
  * over the top of it never drops out of contrast.
  */

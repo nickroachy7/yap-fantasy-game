@@ -912,8 +912,8 @@ function Mark({ token, side }: { token: Token; side: 'risk' | 'win' }) {
  * is `backgroundElement`, which is a ramp that works on both grounds without
  * being told which one it is on:
  *
- *     on the page    #000     → #17191E zones → #212225 middle
- *     on a sheet     #0E1013  → #17191E zones → #212225 middle
+ *     on the page    #080808 → #171717 zones → #212121 middle
+ *     on a sheet     #101010  → #171717 zones → #212121 middle
  *
  * It also fixes a real inversion. On the lineup board the hearts tray under the
  * carousel is `surface`, and the card was `surfaceSheet` — one step DARKER — so

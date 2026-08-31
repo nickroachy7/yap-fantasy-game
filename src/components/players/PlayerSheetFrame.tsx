@@ -518,9 +518,9 @@ export function PlayerSheetFrame({
    * The grabber is the only thing telling an iOS reader this sheet can be
    * dragged away — the ✕ went when it arrived — so it is the one mark here that
    * must not be subtle. On the narrow web sheet it now marks a real gesture
-   * too, and is drawn inside the strip that owns it rather than here. At `borderStrong` (#34373C) it was four levels off the
+   * too, and is drawn inside the strip that owns it rather than here. At `borderStrong` (#363636) it was four levels off the
    * sheet's own fill and effectively disappeared once the tone wash tinted the
-   * area behind it. `textTertiary` (#7E8289) is roughly where UIKit draws its
+   * area behind it. `textTertiary` (#808080) is roughly where UIKit draws its
    * own grabber on a dark sheet, and the same value the player silhouette
    * already uses for a non-text mark.
    */

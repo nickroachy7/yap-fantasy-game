@@ -67,7 +67,7 @@ export default function Root({ children }: PropsWithChildren) {
 
         {/* The browser chrome the app is opened in. `theme-color` is what stops
             Safari on iOS drawing a white bar above a black app. */}
-        <meta name="theme-color" content="#000000" />
+        <meta name="theme-color" content="#080808" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content={TITLE} />

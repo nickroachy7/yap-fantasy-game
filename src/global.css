@@ -30,19 +30,24 @@
    * sized to the whole screen the app's header disappears under the address
    * bar instead.
    *
-   * Painting the canvas in `Colors.dark.surfaceSheet` — the tab bar's own fill —
+   * Painting the canvas in `Colors.dark.surface` — the tab bar's own fill —
    * makes that strip read as the bar continuing rather than as a black gap
    * below it. Everywhere the app does reach, `body` covers this completely, so
    * it is invisible on every other platform.
    *
-   * Duplicated from the theme because CSS cannot see it; if `surfaceSheet`
-   * moves, this moves with it.
+   * IT TRACKS THE BAR, NOT A FIXED TOKEN. It was `surfaceSheet` (#0e1013) for
+   * as long as the bar was, and moved here when `TabBarGlass` moved to
+   * `surface` in the 2026-08-31 neutral pass. If the bar's fill changes again,
+   * this changes with it — matching the bar is the whole job.
+   *
+   * Duplicated from the theme because CSS cannot see it.
    */
-  background-color: #0e1013;
+  background-color: #171717;
 }
 
+/* `Colors.dark.background`. Same duplication, same reason. */
 body {
-  background-color: #000000;
+  background-color: #080808;
 }
 
 /**

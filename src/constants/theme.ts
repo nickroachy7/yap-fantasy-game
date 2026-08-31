@@ -11,8 +11,8 @@ export const Colors = {
   light: {
     text: '#000000',
     background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
+    backgroundElement: '#F0F0F0',
+    backgroundSelected: '#E0E0E0',
     /**
      * "This row is you", wherever a list contains the reader.
      *
@@ -21,8 +21,8 @@ export const Colors = {
      * `backgroundSelected` marks a CHOICE the reader just made — the card
      * picked in the swap sheet — so it is loud on purpose and lasts a moment.
      * This marks an IDENTITY that is true on every row of every board forever,
-     * and at #2E3135 a permanent band of mid-grey out-shouted the seven rows
-     * around it that the reader was actually scanning.
+     * and at `backgroundSelected` a permanent band of mid-grey out-shouted the
+     * seven rows around it that the reader was actually scanning.
      *
      * It is the tab bar's own grey, which is the quietest surface in the app
      * that still reads as a surface — exactly the job here. `surfaceSheet`
@@ -35,18 +35,18 @@ export const Colors = {
      * its seam instead. A row has no seam, so this is the lightest grey that
      * still separates from the page.
      */
-    backgroundMine: '#F0F0F3',
-    textSecondary: '#60646C',
+    backgroundMine: '#F0F0F0',
+    textSecondary: '#616161',
     /** Third rank of text: units, footnotes, the quiet half of a stat pair. */
-    textTertiary: '#8B8D98',
+    textTertiary: '#8B8B8B',
     /** Hairline between rows in a dense table. Must not read as a box. */
-    border: '#E4E4E9',
+    border: '#E4E4E4',
     /** Around a panel, where the edge is doing real work. */
-    borderStrong: '#D0D1D9',
+    borderStrong: '#D0D0D0',
     /** A panel sitting on the page background. */
     surface: '#FFFFFF',
     /** A row inside a panel that needs to separate from it. */
-    surfaceSunken: '#F7F7F9',
+    surfaceSunken: '#F7F7F7',
     /**
      * The body of something presented OVER the app — see the dark value, which
      * is where this token earns its keep. White here, deliberately the same as
@@ -77,36 +77,52 @@ export const Colors = {
   },
   dark: {
     text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
+    background: '#080808',
+    backgroundElement: '#212121',
+    backgroundSelected: '#2E2E2E',
     /** See the light value. The tab bar's grey — the quietest real surface. */
-    backgroundMine: '#0E1013',
-    textSecondary: '#B0B4BA',
-    textTertiary: '#7E8289',
-    border: '#26282C',
-    borderStrong: '#34373C',
+    backgroundMine: '#101010',
+    textSecondary: '#B4B4B4',
+    textTertiary: '#808080',
+    border: '#272727',
+    borderStrong: '#363636',
     /**
-     * Lifted from #121316 when `surfaceSheet` arrived, because a panel has to
-     * clear the sheet it sits ON as well as the page. #121316 was 18 steps
-     * above the page and only 4 above the sheet, so "This copy" on the card
-     * profile was a hairline border around nothing. This clears both by a
-     * comparable margin, and keeps roughly the same distance to
-     * `backgroundElement` above it.
+     * A panel has to clear the sheet it sits ON as well as the page, which is
+     * why this sits where it does: 15 steps above the page and 7 above the
+     * sheet. An earlier #121316 was 18 above the page and only 4 above the
+     * sheet, and "This copy" on the card profile was a hairline border around
+     * nothing.
      */
-    surface: '#17191E',
-    surfaceSunken: '#0B0C0E',
+    surface: '#171717',
+    /**
+     * PURE BLACK LIVES HERE NOW, not on `background`, and that is the whole
+     * point of the 2026-08-31 neutral pass.
+     *
+     * When #000 was the page there was no such thing as sunken: this token was
+     * #0B0C0E and sat ABOVE the surface it was supposed to sink into, because
+     * nothing can be darker than black. Every "sunken" row in the app was a
+     * lighter row wearing the name. Moving black down one slot costs the page
+     * 8 points it does not miss and buys the ramp a real floor.
+     *
+     * It still clears the invariant its old note claimed and could not keep:
+     * darker than `surfaceSheet`, so a sunken row inside a sheet reads sunken.
+     */
+    surfaceSunken: '#000000',
     /**
      * The body of something presented OVER the app: both profile sheets, the
      * set checklist, the lineup's swap sheet.
      *
-     * IT EXISTS BECAUSE #000 OVER #000 IS NOT A SHEET. Every sheet used to fill
-     * with `background`, the same token the page uses, and the only thing UIKit
-     * does to separate a page sheet from what it covers is DIM the view behind
-     * it — which over pure black produces pure black. So the platform's one cue
-     * was invisible by construction, and a profile opening over the collection
-     * read as the collection having been replaced rather than covered. On web
-     * the same arithmetic killed the backdrop: `rgba(0,0,0,0.62)` over #000.
+     * IT EXISTS BECAUSE A DIM OVER A NEAR-BLACK PAGE IS NOT A SHEET. Every
+     * sheet used to fill with `background`, the same token the page uses, and
+     * the only thing UIKit does to separate a page sheet from what it covers is
+     * DIM the view behind it — which over a page this dark produces something
+     * indistinguishable from it. So the platform's one cue was invisible by
+     * construction, and a profile opening over the collection read as the
+     * collection having been replaced rather than covered. On web the same
+     * arithmetic killed the backdrop: `rgba(0,0,0,0.62)` over #080808.
+     *
+     * Lifting the page off #000 does not retire this token. It buys 8 points,
+     * and a sheet needs to clear the page by enough that the eye reads a layer.
      *
      * IT IS NOT `surface`, and that is the whole reason it is a fourth step
      * rather than a reuse. `Panel` fills with `surface`, so a sheet at the same
@@ -115,10 +131,11 @@ export const Colors = {
      * up at the same time for the same reason; see its note.) The ramp has to
      * keep stacking:
      *
-     *   background #000 → surfaceSheet #0E1013 → surface #17191E → element #212225
+     *   sunken #000000 → background #080808 → surfaceSheet #101010
+     *     → surface #171717 → element #212121
      *
-     * with `surfaceSunken` (#0B0C0E) still darker than the sheet, so a sunken
-     * row inside a sheet still reads sunken.
+     * with `surfaceSunken` (#000000) darker than the sheet AND darker than the
+     * page, so a sunken row reads sunken wherever it appears.
      *
      * Do not use it for anything that is part of the page. A raised layer that
      * appears in the flow of a screen is just a lighter page, and the next
@@ -129,7 +146,7 @@ export const Colors = {
      * confirmation opens on top of the card profile and has to read as raised
      * from it.
      */
-    surfaceSheet: '#0E1013',
+    surfaceSheet: '#101010',
     positive: '#4CC38A',
     negative: '#FF6369',
     /** See the light value. */
@@ -673,17 +690,46 @@ export function getTierTheme(tier: CardTier, scheme: 'light' | 'dark'): TierThem
  * which is a lot of furniture to say one word, and neither could be changed
  * without the other quietly disagreeing.
  *
- * It is the app's own gold: the rail's active marker, the coin, the avatar ring.
- * A selected page is now the only warm thing in a grey bar, which reads faster
- * than a box AND survives being small, where a few points of lightness between
- * two greys does not.
+ * IT IS KELLY GREEN, AND IT IS ITS OWN SWATCH. It used to return
+ * `TierColors[scheme].gold.accent` outright, which meant "this is selected" and
+ * "this is a gold-tier card" and "this is currency" were one value that could
+ * not move independently. Gems, coins and the gold tier keep the gold. Only
+ * SELECTION is green, and it now has somewhere to live that is not a tier.
+ *
+ * A selected page is the only saturated thing in a neutral bar, which reads
+ * faster than a box AND survives being small, where a few points of lightness
+ * between two greys does not. The 2026-08-31 neutral ground is what makes this
+ * work: with no chroma anywhere in the chrome, one hue carries the whole job.
+ *
+ * KNOWN TENSION, RECORDED ON PURPOSE. Green is now spoken three times: this,
+ * `positive` (#4CC38A, "you won"), and the RB position badge (also #4CC38A).
+ * The three are separated by about 25 degrees of hue and a visible step in
+ * saturation, and they are never adjacent doing different jobs on the same
+ * row — but this is the exact trap the `live` note warns about, and if a
+ * screen ever puts a green selection next to a green gain, one of them moves.
  *
  * COLOUR IS NEVER THE ONLY SIGNAL. Every control using this also fills its
  * glyph on selection, so the state is legible to a reader who cannot separate
  * the two hues. Do not drop that half.
  */
+export const SelectionColors = {
+  light: { accent: '#15702F', onAccent: '#FFFFFF' },
+  dark: { accent: '#3CCB4B', onAccent: '#04210A' },
+} as const;
+
 export function selectionAccent(scheme: 'light' | 'dark'): string {
-  return TierColors[scheme].gold.accent;
+  return SelectionColors[scheme].accent;
+}
+
+/**
+ * The ink that goes ON `selectionAccent`.
+ *
+ * Callers used to reach for `TierColors[scheme].gold.onAccent` and lean on the
+ * two being the same swatch by construction. They are not any more, so read the
+ * pair from here or a selected chip ships dark-brown text on green.
+ */
+export function selectionInk(scheme: 'light' | 'dark'): string {
+  return SelectionColors[scheme].onAccent;
 }
 
 /** Card geometry per size variant. Art slot keeps its box when real art lands. */

@@ -54,8 +54,17 @@
  * BELOW 26 IT MUST NOT LOOK LIKE THE GLASS FAILED. `GlassView` degrades to a
  * plain view on its own, which would leave a transparent capsule with the list
  * showing through the labels. So the fallback is drawn deliberately:
- * `surfaceSheet` at 88%, the fill the bar had when it was attached, plus the
- * hairline a floating object needs and an attached one did not.
+ * `surface` at 88%, plus the hairline a floating object needs and an attached
+ * one did not.
+ *
+ * IT READS `surface`, NOT `surfaceSheet`, SINCE THE 2026-08-31 NEUTRAL PASS.
+ * The bar used to sit on the sheet token and clear a #000 page by about 12
+ * points. Lifting the page to #080808 moved the ground and left the bar where
+ * it was, cutting that gap to 7 — the bar visibly dissolved into the page.
+ * `surface` at 88% over #080808 lands ~13 points clear, which is where it was.
+ * It is also the more honest token: `surfaceSheet` is documented as the body of
+ * something presented OVER the app, and a floating bar is chrome that is
+ * RAISED above the page, which is what `surface` means.
  *
  * THE TINT IS LIGHT, AND IT WAS NOT. It went in at 55% on the argument that
  * untinted regular glass over a near-black page comes out lighter than anything
@@ -162,7 +171,7 @@ export function TabBarGlass() {
             style={[
               StyleSheet.absoluteFill,
               styles.fallback,
-              { backgroundColor: sheetAt88(c.surfaceSheet), borderColor: c.borderStrong },
+              { backgroundColor: at88(c.surface), borderColor: c.borderStrong },
             ]}
           />
         )}
@@ -172,15 +181,15 @@ export function TabBarGlass() {
 }
 
 /**
- * `surfaceSheet` at 88%, without adding a second token for one use.
+ * A ramp token at 88%, without adding a second token for one use.
  *
  * The token is a six-digit hex in `theme.ts` and every other consumer wants it
  * opaque, so the alpha is applied here rather than by introducing a
- * `surfaceSheetTranslucent` that only this file would read. Falls back to the
- * flat colour if the token is ever changed to a form this cannot parse — an
- * opaque pill is a worse pill, not a broken screen.
+ * translucent twin that only this file would read. Falls back to the flat
+ * colour if the token is ever changed to a form this cannot parse — an opaque
+ * pill is a worse pill, not a broken screen.
  */
-function sheetAt88(hex: string): string {
+function at88(hex: string): string {
   const m = /^#([0-9a-f]{6})$/i.exec(hex);
   if (!m) return hex;
   const n = parseInt(m[1], 16);
