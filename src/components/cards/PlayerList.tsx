@@ -18,6 +18,7 @@
  */
 import { FlatList, StyleSheet } from 'react-native';
 
+import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { Spacing } from '@/constants/theme';
 
 import { PLAYER_ROW_HEIGHT, PlayerRow, type RowFigure } from './PlayerRow';
@@ -43,6 +44,7 @@ export function PlayerList({
   refreshing?: boolean;
   onRefresh?: () => void;
 }) {
+  const tabSpace = useTabBarSpace();
 
   return (
     <FlatList
@@ -68,7 +70,7 @@ export function PlayerList({
       refreshing={refreshing}
       onRefresh={onRefresh}
       style={styles.fill}
-      contentContainerStyle={styles.list}
+      contentContainerStyle={[styles.list, { paddingBottom: Spacing.four + tabSpace }]}
     />
   );
 }

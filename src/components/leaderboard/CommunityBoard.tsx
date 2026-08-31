@@ -28,6 +28,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
+import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { POS_FILTERS, type PosFilter } from '@/components/cards/PositionFilter';
 import { MenuButton, MenuHeading, MenuItem } from '@/components/ui/MenuButton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -75,6 +76,7 @@ export function CommunityBoard({
   board: BoardId;
   onBoardChange: (next: BoardId) => void;
 }) {
+  const tabSpace = useTabBarSpace();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const list = useRef<FlatList<BoardRowModel>>(null);
@@ -231,7 +233,7 @@ export function CommunityBoard({
         // The signed-in reader's tint and the column set are both outside `rows`.
         extraData={meId}
         keyExtractor={(row) => row.key}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: Spacing.four + tabSpace }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

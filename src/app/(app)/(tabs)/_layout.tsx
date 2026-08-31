@@ -1,13 +1,13 @@
 import { Tabs, type Href } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NAV_TABS, routeNameOf } from '@/components/shell/sections';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { NavIcon } from '@/components/icons/NavIcon';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { WebHeader } from '@/components/shell/WebHeader';
-import { Colors, SheetCorner, TabBarContentHeight } from '@/constants/theme';
+import { TabBarGlass } from '@/components/shell/TabBarGlass';
+import { Colors, TabPillHeight, TabPillInset } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 /**
@@ -55,7 +55,6 @@ export default function TabsLayout() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const isWide = useIsWide();
-  const insets = useSafeAreaInsets();
 
   /* One navigator either way. Swapping between a Tabs and a Drawer navigator
      on resize would remount every screen and lose scroll position, so the tab
@@ -95,53 +94,58 @@ export default function TabsLayout() {
             tabBarActiveTintColor: c.text,
             tabBarInactiveTintColor: c.textSecondary,
             tabBarLabelStyle: styles.tabLabel,
+            /* THE PILL IS A LAYER OVER THE PAGE, NOT A BAND UNDER IT.
+
+               `position: absolute` is what makes the glass mean anything: the
+               scene runs the full height of the screen and the content passes
+               UNDER the pill, which is the only thing there is to refract. A
+               bar that content stops above is a solid capsule with a blur
+               setting. The cost is that every list must now reserve a tail —
+               see `useTabBarSpace`, and the note on `TabPillHeight` for why
+               this app spent a while insisting the opposite.
+
+               NO FILL AND NO BORDER HERE. Both belong to `tabBarBackground`,
+               which is the only child clipped by the radius; a background set
+               on this style sits OVER the glass and would flatten it.
+
+               `overflow: hidden` is what does the clipping, and it has to be on
+               this box rather than on the glass — the glass is
+               `absoluteFill`ed inside it and would otherwise square off the
+               corners it is meant to fill. */
             tabBarStyle: isWide
               ? { display: 'none' }
               : {
-                  /* A SURFACE, LIFTED OFF THE PAGE, and curved at the top like
-                     the sheets are.
-
-                     It was `background` with a hairline over it — the same
-                     black as the page, separated by one grey line. That is the
-                     arrangement `AppHeader` already threw out at the top of the
-                     screen for the same reason: against #000 a near-black band
-                     is not chrome, it is a rectangle of very slightly different
-                     black whose only real signal is the seam. `surfaceSheet` is
-                     the app's answer to "a layer above the page" everywhere
-                     else, so the bar reads as one rather than as the page with
-                     a line drawn on it.
-
-                     THE BORDER GOES WITH IT. The fill is doing the separating
-                     now, and a hairline that only exists on one edge cannot
-                     follow the corner radius anyway — React Native needs a
-                     uniform border for that, so a top-only one would run
-                     straight off the curve. */
-                  backgroundColor: c.surfaceSheet,
+                  position: 'absolute',
+                  /* THE SAME NUMBER THREE TIMES, and the safe-area inset is
+                     deliberately not added to the bottom one — see
+                     `TabPillInset`. Adding it put the capsule 46pt off the
+                     bottom and 12 off the sides, which reads as drift. */
+                  left: TabPillInset,
+                  right: TabPillInset,
+                  bottom: TabPillInset,
+                  height: TabPillHeight,
+                  /* A capsule rather than a rounded rectangle: half the height
+                     is the only radius that stays a capsule if the height ever
+                     changes, and the app's `SheetCorner` is deliberately not
+                     used — this is not a sheet edge any more, it is a control
+                     floating over the page, and it should not read as the same
+                     kind of layer. */
+                  borderRadius: TabPillHeight / 2,
+                  overflow: 'hidden',
+                  backgroundColor: 'transparent',
                   borderTopWidth: 0,
-                  /* `SheetCorner`, not a number picked here: this is the same
-                     curve the profile, card, set and packs sheets are drawn
-                     with, and the point is that the bar is recognisably the
-                     same kind of layer. They must move together. */
-                  borderTopLeftRadius: SheetCorner,
-                  borderTopRightRadius: SheetCorner,
                   /* Android draws `elevation` as a rectangular shadow that
-                     ignores `borderRadius`, so the corners would sit in the
-                     square shadow of the bar they were rounded off. */
+                     ignores `borderRadius`, so a capsule would sit in a square
+                     shadow of itself. */
                   elevation: 0,
-                  /* The height is imposed rather than left to the navigator's
-                     default, so the bar is the same object on every device.
-                     Content sits in TabBarContentHeight; the safe area is
-                     padding beneath it, so the bar's background still runs to
-                     the bottom of the screen instead of floating above the home
-                     indicator.
-
-                     SCREENS DO NOT RESERVE THIS. The bar is a sibling of the
-                     scene rather than a layer over it, so a page already ends
-                     where the bar starts — see `TabBarContentHeight`. */
-                  height: TabBarContentHeight + insets.bottom,
-                  paddingBottom: insets.bottom,
+                  /* The navigator pads for the home indicator by default. The
+                     pill is already clear of it — that is what `bottom` is
+                     doing — so a second inset inside it would push the labels
+                     off the bottom of the capsule. */
+                  paddingBottom: 0,
                   paddingTop: 6,
                 },
+            tabBarBackground: isWide ? undefined : () => <TabBarGlass />,
           }}>
           {NAV_TABS.map((tab) => (
             <Tabs.Screen

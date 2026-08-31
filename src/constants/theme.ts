@@ -262,23 +262,58 @@ export const Spacing = {
 } as const;
 
 /**
- * Height of the bottom tab bar's CONTENT, excluding the safe-area inset.
+ * The floating tab pill: how tall it is, and how far it sits off the edges.
  *
- * This is not a measurement of react-navigation's default bar — it is a height
- * we impose on it; see `(app)/(tabs)/_layout.tsx`, which adds the safe area to
- * it so the bar's fill runs to the bottom of the screen.
+ * ---------------------------------------------------------------------------
+ * IT USED TO BE ATTACHED, AND THAT INVERTED THE TAIL-ROOM RULE
+ * ---------------------------------------------------------------------------
  *
- * 54 fits a 24pt icon over a 10pt label with breathing room either side.
+ * The bar was a full-width band fixed to the bottom of the screen, drawn as a
+ * SIBLING of the scene in `BottomTabView`'s column. That had one very useful
+ * consequence, and this constant's note used to be written entirely about it:
+ * a scrolling page already ended exactly where the bar began, so no list
+ * anywhere in the app reserved a tail for it. An earlier `useTabBarInset()`
+ * that did put ~88pt of dead black under every list, twice over.
  *
- * NO SCREEN SHOULD RESERVE THIS AS TAIL ROOM, and for a while every list in the
- * app did — via a `useTabBarInset()` that added this to the home indicator's
- * 34. The premise was wrong: `BottomTabView` renders the scene and the bar as
- * SIBLINGS in a column and only positions the bar absolutely when it is
- * HIDDEN, so a scrolling screen already ends exactly where the bar begins.
- * Reserving it again put ~88pt of black under every list in the app. A tail is
- * a tail; this number is the bar's business alone.
+ * A DETACHED PILL CANNOT WORK THAT WAY. The whole point of the glass is that
+ * content passes UNDER it — a pill with the page ending above it has nothing
+ * to refract and may as well be a solid capsule. So the bar is positioned
+ * absolutely now, the scene runs the full height of the screen, and every list
+ * does have to reserve room. `useTabBarSpace` is the one place that number is
+ * computed, and it returns 0 off the tab navigator so a pushed screen with no
+ * bar under it does not pad for one.
+ *
+ * That is a real cost and it is the reason the old note was so emphatic. The
+ * difference is that it is now TRUE: there is a bar floating over the content,
+ * and a list that ignores it hides its last row behind glass.
+ *
+ * 56 fits a 24pt icon over a 10pt label.
+ *
+ * ---------------------------------------------------------------------------
+ * ONE INSET, EQUAL ON ALL THREE SIDES, MEASURED FROM THE SCREEN'S EDGE
+ * ---------------------------------------------------------------------------
+ *
+ * The first version had 12 either side and `insets.bottom + 12` beneath, which
+ * is 46 on a notched phone — so the capsule floated visibly higher off the
+ * bottom than it did off the sides and read as an object that had drifted
+ * upward rather than one placed. A floating thing wants the same air all round;
+ * the moment the three margins differ, the eye reads the largest one as a
+ * mistake.
+ *
+ * SO THE SAFE-AREA INSET IS NOT ADDED. That is the part which looks wrong
+ * rather than the number: `insets.bottom` is 34, and it is Apple's conservative
+ * reserve, not the size of the home indicator. The indicator itself is a ~5pt
+ * bar sitting about 8pt off the bottom, so it occupies roughly the lowest 11pt
+ * of the screen. At 20 the capsule clears it by about nine points and the
+ * indicator sits in the margin, which is where Apple's own floating bars put
+ * it.
+ *
+ * 20 rather than `Spacing.three`: 16 leaves five points between the capsule and
+ * the indicator, which is close enough to read as a collision on a device even
+ * though it is not one.
  */
-export const TabBarContentHeight = 54;
+export const TabPillHeight = 56;
+export const TabPillInset = 20;
 
 /**
  * Content measures.

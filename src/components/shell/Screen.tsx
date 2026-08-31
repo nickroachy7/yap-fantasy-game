@@ -11,6 +11,7 @@ import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native
 import { AppHeader } from '@/components/shell/AppHeader';
 import { useFrame } from '@/components/shell/frame';
 import { isOverlayPath, webSectionOf } from '@/components/shell/sections';
+import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { WebPageTabs } from '@/components/shell/WebPageTabs';
 import { Colors, ContentMeasure, Spacing, type Measure } from '@/constants/theme';
@@ -171,6 +172,12 @@ export function Screen({
   const top = useSafeAreaInsets().top;
   const bare = !isWide && !frame.header && !masthead;
 
+  /* ROOM FOR THE PILL, which floats over this page rather than sitting under
+     it. Every scrolling page in the app comes through here, so this is the one
+     line that covers all of them; the handful of screens that own their own
+     virtualised list call the same hook. Zero off the tab navigator. */
+  const tabSpace = useTabBarSpace();
+
   /* Null on a page that is a page in its own right, and on every phone: the
      narrow build still navigates these with the action bar and has no heading
      for tabs to sit under. */
@@ -218,7 +225,7 @@ export function Screen({
       contentContainerStyle={[
         styles.content,
         flush && styles.flushTop,
-        { maxWidth, paddingBottom: Spacing.three },
+        { maxWidth, paddingBottom: Spacing.three + tabSpace },
       ]}
       keyboardShouldPersistTaps="handled"
       refreshControl={

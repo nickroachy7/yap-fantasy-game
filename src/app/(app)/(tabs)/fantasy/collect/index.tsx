@@ -59,6 +59,7 @@ import {
   ResultLine,
   SelectButton,
 } from '@/components/collection/CollectionFilters';
+import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { CollectionValue } from '@/components/collection/CollectionValue';
 import { RosterAlert } from '@/components/collection/RosterAlert';
 import { RosterCount } from '@/components/collection/RosterCount';
@@ -176,6 +177,7 @@ function cannotSelect(playerName: string | undefined): string {
 }
 
 export default function InventoryScreen() {
+  const tabSpace = useTabBarSpace();
   const router = useRouter();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -680,7 +682,7 @@ export default function InventoryScreen() {
         ) : all.length === 0 ? (
           <ScrollView
             style={styles.fill}
-            contentContainerStyle={styles.emptyContent}
+            contentContainerStyle={[styles.emptyContent, { paddingBottom: Spacing.six + tabSpace }]}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
             <EmptyCollection onGetCards={() => router.push('/packs')} />
           </ScrollView>
@@ -744,7 +746,7 @@ export default function InventoryScreen() {
               keyExtractor={(card) => card.id}
               numColumns={columns}
               columnWrapperStyle={styles.row}
-              contentContainerStyle={styles.list}
+              contentContainerStyle={[styles.list, { paddingBottom: LIST_TAIL + tabSpace }]}
               /* The roster line, drawn after one particular row. See `cut`. */
               ItemSeparatorComponent={cut}
               initialNumToRender={columns * 4}

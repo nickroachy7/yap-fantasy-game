@@ -25,6 +25,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
+import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { MenuButton, MenuHeading, MenuItem } from '@/components/ui/MenuButton';
 import { DASH } from '@/components/ui/DataTable';
 import { Colors, Spacing, Type, type CardTier } from '@/constants/theme';
@@ -83,6 +84,7 @@ export function PointsBoard({
   board: BoardId;
   onBoardChange: (next: BoardId) => void;
 }) {
+  const tabSpace = useTabBarSpace();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
@@ -316,7 +318,7 @@ export function PointsBoard({
         }}
         extraData={listExtra}
         keyExtractor={(r) => r.key}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: Spacing.four + tabSpace }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

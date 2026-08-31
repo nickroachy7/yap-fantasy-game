@@ -63,6 +63,7 @@ import {
   View,
 } from 'react-native';
 
+import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
@@ -93,6 +94,7 @@ export function SetsPanel({
    * with no router under it.
    */
 }) {
+  const tabSpace = useTabBarSpace();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   // Single source of truth for the balance: the header reads the same value, so
@@ -286,6 +288,7 @@ export function SetsPanel({
              holding the empty state off the nav. */
           all.length === 0 && styles.contentTop,
           styles.contentTail,
+          { paddingBottom: tabSpace },
         ]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {/* FIRST IN THE SCROLL, above the notices and the rows, which is the
