@@ -109,6 +109,7 @@ export function ContestCarousel({
   index,
   onIndexChange,
   onOpen,
+  showResult,
   lockAt,
   locked,
   now,
@@ -129,6 +130,14 @@ export function ContestCarousel({
    * A contest you had entered had no page at all once you were in it.
    */
   onOpen?: (contest: MyContest) => void;
+  /**
+   * Whether a settled contest's W/L/T badge is still being announced.
+   *
+   * Absent means yes, always — which is what every caller outside the board
+   * wants and what this did before the clock existed. The board passes the
+   * 24-hour-and-unacknowledged test; see `LineupEditor`.
+   */
+  showResult?: (contestId: string) => boolean;
   lockAt: string | null;
   locked: boolean;
   now: number;

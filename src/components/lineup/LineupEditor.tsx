@@ -54,6 +54,17 @@ import {
 import { RosterBar } from '@/components/collection/RosterBar';
 import { BenchBoard } from '@/components/lineup/BenchBoard';
 import { ContestCarousel } from '@/components/lineup/ContestCarousel';
+import { WelcomeBackBanner } from '@/components/contests/WelcomeBackBanner';
+import { useAuth } from '@/context/AuthContext';
+import {
+  recentlySettled,
+  useContestHistory,
+} from '@/components/contests/use-contest-history';
+import {
+  seedFor,
+  unseenResults,
+  useResultsSeen,
+} from '@/components/contests/use-results-seen';
 import { RecapBoard } from '@/components/lineup/RecapBoard';
 import { useMyContests } from '@/components/contests/use-my-contests';
 import { SlotBoard } from '@/components/lineup/SlotBoard';
@@ -943,6 +954,11 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
      for a frame before settling to three. Held rather than shown — a board
      that changes shape under the reader looks like a bug, and in a sheet it is
      the first thing they see. */
+  /* ABOVE THE LOADING RETURN, because hooks cannot be called conditionally and
+     there is an early exit a few lines down. It costs nothing there: the hook
+     is off entirely when `pinned`, and its own reads are gated. */
+  const results = useSettledResults(pinned);
+
   if (loading || (pinned && !current)) {
     const spinner = <ActivityIndicator style={styles.pad} />;
     return frame === 'plain' ? (
@@ -1001,6 +1017,27 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
       </Text>
     ) : null;
 
+  /**
+   * "Here is how you did", for a player who was not watching on Sunday.
+   *
+   * IT IS ON THIS SCREEN because this is the one you land on, and it is not in
+   * the sheet for the same reason the carousel is not: that surface is about
+   * one contest, and a summary of a different week's would be noise on it.
+   *
+   * THE HISTORY READ IS THE BANNER'S, and it is the first page only — twenty
+   * rows, once, on a screen already making several calls. Nothing unseen can be
+   * older than that without the player having ignored twenty settlements.
+   */
+  const banner =
+    pinned || results.unseen.length === 0 ? null : (
+      <WelcomeBackBanner
+        entries={results.unseen}
+        onOpen={() => router.push('/contests')}
+        /* Newest first, so the head of the list is the whole span. */
+        onDismiss={() => results.acknowledge(results.unseen[0].finalizedAt)}
+      />
+    );
+
   /* NO CAROUSEL IN THE SHEET. That surface is already about one contest, and a
      row of cards for the others would be offering to leave it. MEASURED HERE
      otherwise, so the carousel pages on the width of the column it is actually
@@ -1022,6 +1059,12 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
            filling — see `CONTESTS` in `sections.ts`. */
         onEnter={() => router.push('/contests')}
         width={cardWidth}
+        /* THE SAME BOOKKEEPING THE BANNER USES, which is the whole reason it is
+           held up here rather than inside it: dismissing the banner has to
+           clear the pips in the same gesture, and two components each holding
+           their own copy of "have they seen this" would disagree the moment one
+           of them was acknowledged. */
+        showResult={results.showResult}
         onOpen={(ct) => router.push({ pathname: '/contest/[code]', params: { code: ct.code } })}
       />
     </View>
@@ -1245,11 +1288,72 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}>
       {notice}
+      {banner}
       {card}
       {boards}
       {sheets}
     </Screen>
   );
+}
+
+/**
+ * What has settled since the player last looked, and what to still announce.
+ *
+ * ONE SOURCE FOR TWO SURFACES. The banner and the rail's pips are the same
+ * fact drawn twice — "this finished and you have not been told" — so they read
+ * one hook. Held apart they would disagree the instant either was dismissed.
+ *
+ * OFF IN THE SHEET. `LineupEditor` also renders inside the contest sheet with
+ * `frame="plain"`, which draws neither surface and has no business fetching a
+ * season of results to do it.
+ *
+ * THE SEED IS AN EFFECT, and has to be: it must not run until the history has
+ * landed, or a fresh install stamps an empty list and then announces its first
+ * ever result as if it had already been seen. See `seedFor`.
+ */
+function useSettledResults(pinned: boolean) {
+  const { session } = useAuth();
+  const me = session?.user.id ?? null;
+  const on = !pinned && Boolean(me);
+  const history = useContestHistory(on);
+  const { seenThrough, acknowledge } = useResultsSeen(on ? me : null);
+
+  const unseen = useMemo(
+    () => unseenResults(history.entries, seenThrough),
+    [history.entries, seenThrough],
+  );
+
+  useEffect(() => {
+    if (!on || history.loading) return;
+    const seed = seedFor(history.entries, seenThrough);
+    if (seed) acknowledge(seed);
+  }, [on, history.loading, history.entries, seenThrough, acknowledge]);
+
+  /**
+   * Still worth a badge: settled within the day, and not yet acknowledged.
+   *
+   * BOTH TESTS, because either alone is wrong. Time alone ignores a player who
+   * has explicitly said they have seen it; acknowledgement alone leaves a
+   * receipt up for the eleven days `recap_slate()` can run to, which is the
+   * thing the clock was added to stop.
+   *
+   * A contest with no row in the history has not settled, so there is nothing
+   * to expire and the badge is left alone — that is the live case, where the
+   * carousel is drawing `entered` rather than a result anyway.
+   */
+  const showResult = useCallback(
+    (contestId: string) => {
+      const entry = history.entries?.find((e) => e.contestId === contestId);
+      if (!entry) return true;
+      return (
+        recentlySettled([entry], Date.now()).length > 0 &&
+        unseen.some((u) => u.contestId === contestId)
+      );
+    },
+    [history.entries, unseen],
+  );
+
+  return { unseen, acknowledge, showResult };
 }
 
 /** A board's name and its count, on one baseline. */

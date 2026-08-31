@@ -480,6 +480,19 @@ function Pip({
  *   entered    a heart is riding on it right now
  *   W / L / T  it settled, and this is the receipt
  *
+ * THE RECEIPT EXPIRES; WHAT IT SETTLED INTO DOES NOT. `showResult` is a day-old
+ * clock the board applies (see `recentlySettled`) so a finished week stops
+ * shouting and the player looks forward. When it lapses the badge goes and the
+ * pip falls back to WHAT THE HEART ACTUALLY IS now — torn if that contest took
+ * it, whole if it did not.
+ *
+ * It must not fall back to `entered`, which was the obvious bug in the way:
+ * `entered` means a heart is riding on this RIGHT NOW, and drawing it on a
+ * contest that finished on Sunday claims a stake the player does not have. Nor
+ * to `pending`, which claims they never entered at all. The heart's own two
+ * states were already the truthful answer and needed no fourth invented for
+ * them.
+ *
  * Order is the carousel's, so pip N is card N and tapping one is the same
  * gesture as swiping to it.
  *
@@ -496,7 +509,18 @@ export function ContestHearts({
   gap = 5,
   onPress,
 }: {
-  entries: { result: HeartResult | null; entered: boolean }[];
+  entries: {
+    result: HeartResult | null;
+    entered: boolean;
+    /**
+     * Whether the W/L/T badge is still being shown for this one.
+     *
+     * Separate from `result` because the result is still what decides the
+     * heart's SHAPE once the badge is gone. Defaults on: every caller outside
+     * the board's rail draws a receipt for as long as it has one.
+     */
+    showResult?: boolean;
+  }[];
   /** The card in view, as a span into `entries`. */
   focus?: HeartSpan | null;
   size?: number;
@@ -508,16 +532,32 @@ export function ContestHearts({
     <View style={[styles.row, { gap }]}>
       {entries.map((e, i) => {
         const lit = focus !== null && i >= focus.start && i < focus.start + focus.count;
+        const badge = e.showResult === false ? null : e.result;
+        /* A LOST CONTEST TOOK THE HEART, so the pip is torn whether or not the
+           badge is still up — that is not a receipt, it is the state of the
+           run. Won and tied kept theirs and stay whole. */
+        const state =
+          e.result === 'L'
+            ? 'killed'
+            : e.result !== null
+              ? 'free'
+              : e.entered
+                ? 'free'
+                : 'pending';
         return (
           <Pip
             key={i}
             size={size}
-            state={e.result !== null ? 'free' : e.entered ? 'free' : 'pending'}
-            result={e.result}
+            state={state}
+            result={badge}
             lit={lit}
             /* Recede only when the row IS pointing somewhere. */
             dimmed={focus !== null && !lit}
             onPress={onPress ? () => onPress(i) : undefined}
+            /* The words follow the drawing, badge or no badge. A pip whose
+               receipt has lapsed still announces what happened rather than
+               going quiet — a screen reader has no 24-hour glance to have
+               caught it in. */
             label={
               e.result === 'W'
                 ? 'A contest you won. Show it'
