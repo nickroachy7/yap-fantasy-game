@@ -626,8 +626,7 @@ export function PlayerCard({
   const totalH = Math.round(totalSize * 1.2);
 
   /**
-   * THE PRICE — `/50 TO SILVER` — as ONE run of type, one point under the
-   * label size.
+   * THE PRICE — `/50 SILVER` — as ONE run of type, at the label size.
    *
    * The whole phrase after the total is a single size, weight and colour end
    * to end, threshold and tier name alike. It used to be two objects: the
@@ -636,22 +635,37 @@ export function PlayerCard({
    * competing in it and the eye had to rank them; as one run it has two — a
    * number that is yours, and a phrase that is the price of the next one.
    *
-   * The HALF POINT it gives up against `labelSize` is what buys the fit, and
-   * half is all there is to give. The worst line the card can ever draw is a
-   * gold card's `599 /600 TO DIAMOND`, and every gold card draws it — this is
-   * a whole tier, not an edge case. Against 93pt of plate it measures 94.1 at
-   * 7pt even with the gap and tracking wound all the way in, 90.3 at 6.5, and
-   * 88.3 at 6. So 6.5 is the ceiling: the next half point up costs the word
-   * "TO", and the preposition is how the line is read aloud.
+   * ---------------------------------------------------------------------------
+   * "TO" IS GONE, AND THE HALF POINT CAME BACK WITH IT
+   * ---------------------------------------------------------------------------
    *
-   * It went in at 6 first and read as fuzz on a device — correct on paper,
-   * a size too small in the hand. The half point back came out of the row gap
-   * and the tracking rather than out of the phrase.
+   * This ran at `labelSize - 0.5` to buy room for the preposition, on a
+   * measurement that said a gold card's `599 /600 TO DIAMOND` needed ~94pt of
+   * a 93pt plate at the full label size and 90.3 at the half point down.
    *
-   * This is the smallest type on the card, and it is legible for the same
-   * reason the labels it replaces were: uppercase and tracked out.
+   * MEASURED IN THE RENDERED FONT, THAT IS WRONG BY A WIDE MARGIN, and the
+   * shipped card was clipping. The stat row is 94pt on a compact card. The
+   * tier mark takes 7, the two gaps take 4, and a worst-case `599` takes 21.1,
+   * so the run has 61.9pt to live in. `/600 TO DIAMOND` measures 70.1 at 6.5 —
+   * over by eight, on every gold card, not a rare one. Keeping the preposition
+   * would have meant dropping to about 5.7pt, which is the wrong direction and
+   * below the floor anything is readable at.
+   *
+   * Without it, `/600 DIAMOND` measures 61.4 at 7pt — inside 61.9 with half a
+   * point to spare, and it is the LONGEST line the card can draw. Diamond is
+   * the top tier, so a diamond card has no next rung and prints nothing here;
+   * every other card's threshold is at most three digits.
+   *
+   * The reading survives the cut better than the earlier note assumed. `413
+   * /750 GOLD` is read as "413 of 750, gold" — the slash is already doing the
+   * preposition's work, which is why the line was made a fraction in the first
+   * place. What could not survive was a bare LETTER after the number: `1,216 D`
+   * read as a quantity of D. The tier is still spelled out in full.
+   *
+   * This is still the smallest type on the card, and it is legible for the
+   * same reason the labels it replaces were: uppercase and tracked out.
    */
-  const priceSize = dims.labelSize - 0.5;
+  const priceSize = dims.labelSize;
   /* Proportional rather than the flat 0.6 the old labels used. At 6.5pt a
      fixed 0.6 is nearly a tenth of the em — open enough to cost 3pt of the
      line's margin for no legibility the tighter setting does not already have,
@@ -930,13 +944,11 @@ export function PlayerCard({
               {fmt(model.careerFp)}
             </Text>
 
-            {/* Named in full — "TO SILVER", not "S". A bare letter after a
-                number reads as a quantity of that letter, which is exactly how
-                `1,216 D` read two revisions ago. Spelling it out is what the
-                price run gives up half a point of type size to afford: at the
-                label size a gold card's `599 /600 TO DIAMOND` needs ~94pt of a
-                93pt plate, and every gold card draws that line, not a rare
-                one. */}
+            {/* Named in full — "SILVER", not "S". A bare letter after a number
+                reads as a quantity of that letter, which is exactly how
+                `1,216 D` read two revisions ago. The PREPOSITION is what the
+                line gave up instead, and the slash had already been doing its
+                work: see `priceSize` for the measurement that settled it. */}
             {threshold !== null && nextTier ? (
               <Text
                 numberOfLines={1}
@@ -954,7 +966,7 @@ export function PlayerCard({
                     marginTop: priceSize * 0.12,
                   },
                 ]}>
-                {`/${fmt(threshold)} TO ${getTierTheme(nextTier, scheme).label}`}
+                {`/${fmt(threshold)} ${getTierTheme(nextTier, scheme).label}`}
               </Text>
             ) : null}
           </View>
