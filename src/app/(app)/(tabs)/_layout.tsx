@@ -116,12 +116,30 @@ export default function TabsLayout() {
               ? { display: 'none' }
               : {
                   position: 'absolute',
-                  /* THE SAME NUMBER THREE TIMES, and the safe-area inset is
-                     deliberately not added to the bottom one — see
-                     `TabPillInset`. Adding it put the capsule 46pt off the
-                     bottom and 12 off the sides, which reads as drift. */
-                  left: TabPillInset,
-                  right: TabPillInset,
+                  /* THE SAME NUMBER THREE TIMES, and it has to be `start` and
+                     `end` rather than `left` and `right`.
+
+                     React Navigation's own base style for a bottom bar is
+                     `{ start: 0, end: 0, bottom: 0 }`, and React Native gives
+                     the LOGICAL properties precedence over the physical ones.
+                     So `left`/`right` here were silently losing to `start: 0`
+                     and `end: 0` underneath: the capsule ran the full width of
+                     the screen while only the bottom inset took, which is
+                     exactly the "flush on the sides, floating at the bottom"
+                     it shipped as.
+
+                     It is also what put the bottom corners under the display's
+                     own corner radius. A phone's screen curves at roughly 55pt,
+                     so at 20pt off the bottom the visible edge is already ~13pt
+                     in from the side — an edge-to-edge bar has its last 13pt
+                     cut away on each side, and the cut lands exactly on the
+                     capsule's rounded ends where it reads as a rendering fault.
+                     Inset properly, the ends clear the curve with room.
+
+                     The safe-area inset is deliberately not added to the bottom
+                     one — see `TabPillInset`. */
+                  start: TabPillInset,
+                  end: TabPillInset,
                   bottom: TabPillInset,
                   height: TabPillHeight,
                   /* A capsule rather than a rounded rectangle: half the height
