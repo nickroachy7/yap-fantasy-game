@@ -138,7 +138,16 @@ export function TabBarGlass() {
       <View style={styles.capsule}>
         {LIQUID ? (
           <GlassView
-            style={StyleSheet.absoluteFill}
+            /* THE RADIUS IS ON THE GLASS, not just on the box clipping it.
+               UIKit draws Liquid Glass with its own rim — a bright edge
+               treatment that is most of what makes it read as a material — and
+               it derives that rim from the view's OWN corner radius. Left
+               square inside a rounded parent, the rim is drawn as a rectangle
+               and the parent's clip removes it at both ends, which is the same
+               outline-stopping-before-the-corners the fallback had. Clipping
+               cannot round an edge; it can only delete the parts outside the
+               shape. */
+            style={[StyleSheet.absoluteFill, styles.glass]}
             glassEffectStyle="regular"
             tintColor={scheme === 'dark' ? 'rgba(14,16,19,0.25)' : 'rgba(255,255,255,0.25)'}
             colorScheme={scheme}
@@ -199,4 +208,5 @@ const styles = StyleSheet.create({
    * shape. The border has to be drawn on the same shape it is meant to trace.
    */
   fallback: { borderWidth: StyleSheet.hairlineWidth, borderRadius: TabPillHeight / 2 },
+  glass: { borderRadius: TabPillHeight / 2 },
 });
