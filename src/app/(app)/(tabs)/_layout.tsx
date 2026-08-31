@@ -149,7 +149,12 @@ export default function TabsLayout() {
                      floating over the page, and it should not read as the same
                      kind of layer. */
                   borderRadius: TabPillHeight / 2,
-                  overflow: 'hidden',
+                  /* `visible`, NOT `hidden`, and that is what lets the scrim
+                     exist. `tabBarBackground` renders inside this box, so a
+                     clipping bar would crop the fade to the capsule and there
+                     would be nothing to soften the rows arriving at its edges.
+                     The glass rounds ITSELF instead — see `TabBarGlass`. */
+                  overflow: 'visible',
                   backgroundColor: 'transparent',
                   borderTopWidth: 0,
                   /* Android draws `elevation` as a rectangular shadow that
@@ -160,9 +165,19 @@ export default function TabsLayout() {
                      pill is already clear of it — that is what `bottom` is
                      doing — so a second inset inside it would push the labels
                      off the bottom of the capsule. */
+                  /* Both zero so the item row has the capsule's full height to
+                     centre itself in. The navigator pads for the home indicator
+                     by default, which the pill is already clear of, and a 6pt
+                     top pad here (the attached bar's, kept by reflex) pushed the
+                     icons 3pt below centre — 11 points of air above them against
+                     5 below. */
                   paddingBottom: 0,
-                  paddingTop: 6,
+                  paddingTop: 0,
                 },
+            /* React Navigation's own item style is `justifyContent: flex-start`
+               with 5pt of padding, which top-aligns the icon and label inside a
+               box that is now taller than they are. Centre it. */
+            tabBarItemStyle: isWide ? undefined : { justifyContent: 'center', paddingVertical: 0 },
             tabBarBackground: isWide ? undefined : () => <TabBarGlass />,
           }}>
           {NAV_TABS.map((tab) => (
