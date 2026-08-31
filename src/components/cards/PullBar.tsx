@@ -51,6 +51,17 @@
  *
  * NOTHING HERE COMPUTES A FIGURE. The counts and the gems are the plan's, which
  * are the server's. See `pull-plan` and `card-actions`.
+ *
+ * KEPT CARDS ARE ALREADY OUT OF THE COUNTS by the time they reach this file —
+ * `planSweep` never puts them in a plan — so nothing here has to filter. What
+ * this file owes them is a SENTENCE: a player who kept two cards and then reads
+ * "Sell 4 spares" is owed the reason the number is 4 and not 6, in the same
+ * breath as the number. See `keptNote`.
+ *
+ * AND KEEPING EVERYTHING IS AN ENDING. With both plans empty the phase row goes
+ * away and `Continue to inventory` fills, exactly as it does when every card
+ * has been spent — which is right, because "I am keeping all of them" is a
+ * finished pack. That falls out of `settled` with no change.
  */
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -123,6 +134,23 @@ export function PullBar({
      the player dealt with it — including by deciding to keep the lot. */
   const settled = hidden === 0 && !canCommit && !canSell;
 
+  /* The line under the sweep buttons, assembled rather than branched: the two
+     halves are independent and either can be absent. Empty means there is
+     nothing to explain, and the line is not drawn at all. */
+  const hint =
+    hidden === 0 && (canCommit || canSell)
+      ? [
+          canCommit && canSell ? 'Selling leaves out every card a set can still use.' : null,
+          plan.kept > 0
+            ? plan.kept === 1
+              ? 'One card you are keeping is left out.'
+              : `${plan.kept} cards you are keeping are left out.`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : '';
+
   /* ---- a confirm, or a sweep, takes the whole bar ---------------------- */
   if (sweep) {
     return (
@@ -146,6 +174,7 @@ export function PullBar({
           {spares > 0
             ? ` ${count(spares, 'of these uses', 'of these use')} a spare copy you already hold, so ${spares === 1 ? 'that card stays' : 'those cards stay'} in your collection.`
             : ''}
+          {keptNote(plan.kept)}
         </Text>
         <View style={styles.row}>
           <Button
@@ -175,10 +204,14 @@ export function PullBar({
       <Frame earned={earned}>
         <Text style={[Type.fine, styles.measure, { color: c.textSecondary }]}>
           {`Sells ${count(plan.sells.length, 'card')} for ${plan.sellGems} gems. Selling is permanent — a future copy starts again at bronze. No card a set can still use is in this.`}
+          {keptNote(plan.kept)}
         </Text>
         <View style={styles.row}>
           <Button
-            label="Keep them"
+            /* NOT "Keep them": keeping is now a thing you do to a card, on the
+               card, and a cancel button wearing the same word would read as
+               doing it to all four. The picker's word, and the deck's. */
+            label="Not now"
             onPress={() => setAsking(null)}
             tone={c.backgroundElement}
             ink={c.text}
@@ -238,7 +271,12 @@ export function PullBar({
           ) : null}
           {canSell ? (
             <Button
-              label={canCommit ? `Sell ${plan.sells.length}` : `Sell ${plan.sells.length} spares`}
+              /* `count`, not a hardcoded "spares": one card left to sell with
+                 nothing to commit read "Sell 1 spares". Reachable before
+                 keeping existed — a pack of one sellable card and no set that
+                 wants anything — and one tap away now, since keeping all but
+                 one leaves exactly that. */
+              label={canCommit ? `Sell ${plan.sells.length}` : `Sell ${count(plan.sells.length, 'spare')}`}
               gems={plan.sellGems}
               onPress={() => setAsking('sell')}
               tone={c.backgroundElement}
@@ -248,17 +286,19 @@ export function PullBar({
               border={c.border}
               grow={!canCommit}
               disabled={locked}
-              a11y={`Sell ${plan.sells.length} spare cards for ${plan.sellGems} gems`}
+              a11y={`Sell ${count(plan.sells.length, 'spare card')} for ${plan.sellGems} gems`}
             />
           ) : null}
         </View>
       ) : null}
 
-      {/* The one line that stops "Sell 4" reading as "sell the pack". */}
-      {hidden === 0 && canCommit && canSell ? (
-        <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
-          Selling leaves out every card a set can still use.
-        </Text>
+      {/* WHY THESE NUMBERS ARE SMALLER THAN THE PACK, in one line under the
+          buttons rather than only inside the confirm — a player deciding
+          whether to press at all is the one who needs it. Two reasons, either
+          or both: sell never takes a card a set wants, and neither button
+          takes a card you kept. */}
+      {hint ? (
+        <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>{hint}</Text>
       ) : null}
 
       {/* ---- the way on, in every state ---------------------------------- */}
@@ -383,6 +423,19 @@ function Button({
       )}
     </Pressable>
   );
+}
+
+/**
+ * The clause that explains a count that is smaller than the pack.
+ *
+ * Empty when nothing is being kept, so every sentence below can append it
+ * unconditionally rather than growing a ternary.
+ */
+function keptNote(n: number): string {
+  if (n === 0) return '';
+  return n === 1
+    ? ' The card you are keeping is not in this.'
+    : ` The ${n} cards you are keeping are not in this.`;
 }
 
 /** "1 card" / "3 cards", so no sentence in here has to say "card(s)". */

@@ -33,6 +33,13 @@
  * server-side, so `disposed` only ever grows. What it does NOT decide is
  * whether the card can still be acted on — see `Disposition`.
  *
+ * KEEPING IS THE ONE THING HERE THAT IS NOT AN ACT. `kept` writes nothing and
+ * asks the server nothing; it is the player marking a card so the bar's
+ * whole-pack sweeps step over it, and it toggles both ways. It lives beside
+ * `disposed` rather than in the deck because the PLAN reads it and the plan is
+ * built one screen up — and because it has to be dropped with the pack, which
+ * the tagged state below does for free.
+ *
  * ---------------------------------------------------------------------------
  * WHY EVERY FIELD LIVES IN ONE STATE OBJECT, TAGGED WITH THE PULL
  * ---------------------------------------------------------------------------
@@ -82,6 +89,8 @@ type PullState = {
   key: string;
   actions: Map<string, CardActions>;
   disposed: Map<string, Disposition>;
+  /** Cards the player has held back from the sweeps. Toggles; writes nothing. */
+  kept: Set<string>;
   loading: boolean;
   busy: string | null;
   sweep: Sweeping | null;
@@ -103,6 +112,7 @@ const fresh = (key: string): PullState => ({
   key,
   actions: new Map(),
   disposed: new Map(),
+  kept: new Set(),
   loading: key !== '',
   busy: null,
   sweep: null,
@@ -116,6 +126,13 @@ export type PullActionsState = {
   loading: boolean;
   /** What each card became. Only ever grows within one pull. */
   disposed: Map<string, Disposition>;
+  /**
+   * The cards the sweeps must not touch, by `card_instance_id`.
+   *
+   * Read by `planSweep`, which is what makes it mean anything. A kept card is
+   * still fully actionable on its own — see `toggleKeep`.
+   */
+  kept: Set<string>;
   /** The card a write is in flight for, if any. Blocks every other button. */
   busy: string | null;
   /** A whole-pack pass, while it runs. Blocks everything. */
@@ -129,6 +146,8 @@ export type PullActionsState = {
   commitAll: (plan: PlannedCommit[]) => void;
   /** Sell every planned card, one write at a time. */
   sellAll: (plan: PlannedSell[]) => void;
+  /** Hold a card back from the sweeps, or stop holding it back. */
+  toggleKeep: (cardInstanceId: string) => void;
 };
 
 export function usePullActions(pulled: Pulled[] | null): PullActionsState {
@@ -403,6 +422,27 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
   const commitAll = useCallback((plan: PlannedCommit[]) => runSweep('commit', plan), [runSweep]);
   const sellAll = useCallback((plan: PlannedSell[]) => runSweep('sell', plan), [runSweep]);
 
+  /**
+   * Keep this one out of the sweeps, or put it back in.
+   *
+   * IT DOES NOT WAIT ON `busy` OR `sweep`, unlike every other function here.
+   * Those two guard the WALLET — one write at a time against one balance — and
+   * this is not a write. What it also is not is a lock: a kept card's own Add
+   * and Sell buttons go on working, because pressing a button on one card is
+   * the player naming that card, and there is nothing there to protect them
+   * from. The flag only ever answers "did you mean this one too?", which is the
+   * only question a button that acts on eight cards has to ask.
+   */
+  const toggleKeep = useCallback((cardInstanceId: string) => {
+    setState((held) => {
+      const next = new Set(held.kept);
+      /* `delete` reports whether it removed anything, so the toggle is one
+         lookup rather than a `has` and then one of two branches. */
+      if (!next.delete(cardInstanceId)) next.add(cardInstanceId);
+      return { ...held, kept: next };
+    });
+  }, []);
+
   const clearError = useCallback(() => {
     setState((held) => (held.error === null ? held : { ...held, error: null }));
   }, []);
@@ -415,6 +455,7 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
     actions: live.actions,
     loading: live.loading,
     disposed: live.disposed,
+    kept: live.kept,
     busy: live.busy,
     sweep: live.sweep,
     error: live.error,
@@ -423,5 +464,6 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
     commit,
     commitAll,
     sellAll,
+    toggleKeep,
   };
 }

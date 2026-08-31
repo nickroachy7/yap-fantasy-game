@@ -163,12 +163,14 @@ export function PullDeck({
   actions,
   loadingActions,
   disposed,
+  kept,
   busy,
   frozen,
   error,
   onDismissError,
   onSell,
   onCommit,
+  onToggleKeep,
   cardHeightCap,
 }: {
   pulled: Pulled[];
@@ -180,6 +182,8 @@ export function PullDeck({
   actions: Map<string, CardActions>;
   loadingActions: boolean;
   disposed: Map<string, Disposition>;
+  /** The cards the bar's whole-pack sweeps must step over. */
+  kept: Set<string>;
   /** The card a write is in flight for. Blocks every button on every card. */
   busy: string | null;
   /** A whole-pack sweep is running. Every per-card button waits for it. */
@@ -188,6 +192,7 @@ export function PullDeck({
   onDismissError: () => void;
   onSell: (cardInstanceId: string) => void;
   onCommit: (cardInstanceId: string, setCode: string) => void;
+  onToggleKeep: (cardInstanceId: string) => void;
   /**
    * The tallest the card may be drawn, handed down by the page.
    *
@@ -367,6 +372,7 @@ export function PullDeck({
               action={actions.get(p.card_instance_id)}
               loading={loadingActions}
               became={disposed.get(p.card_instance_id)}
+              kept={kept.has(p.card_instance_id)}
               busy={busy === p.card_instance_id}
               /* Every button on every card waits on a write in flight — both
                  RPCs move the one wallet, so a second one decided against a
@@ -377,6 +383,7 @@ export function PullDeck({
               onDismissError={onDismissError}
               onSell={() => onSell(p.card_instance_id)}
               onCommit={(code) => onCommit(p.card_instance_id, code)}
+              onToggleKeep={() => onToggleKeep(p.card_instance_id)}
             />
           )}>
           <PlayerCard model={toModel(p)} size="detail" fixedWidth={false} />
@@ -611,6 +618,22 @@ type Stage = 'idle' | 'picking' | 'selling';
  * becomes the list of sets that can take it. Nothing destructive happens on a
  * first press, which is the property that actually matters on a surface you
  * scroll with your thumb. The bar's whole-pack sweeps are staged the same way.
+ *
+ * THE THIRD ANSWER IS `KEEP`, AND IT IS NOT AN EXIT. The two buttons above it
+ * both end with the card spent; keeping is the player saying they want this one
+ * for a lineup, which is what a card is actually FOR. It could not be said here
+ * before: the bar's sweeps take the whole pack, so the only way to hold one
+ * card back was to decline both sweeps and clear the other seven by hand.
+ *
+ * IT IS DRAWN QUIETER THAN THE OTHER TWO, deliberately. It is the outcome that
+ * happens anyway if you press nothing, so a third filled button competing with
+ * the two that DO something would be shouting an offer to stand still. It is a
+ * toggle, it costs nothing, and it can be taken back — the only control on this
+ * panel that can.
+ *
+ * AND IT DOES NOT DISABLE THE BUTTONS ABOVE IT. Keeping answers the bar, not
+ * the card: pressing `Quick sell` on a card you kept is you naming that one
+ * card, which is unambiguous and needs no protecting from. See `toggleKeep`.
  */
 function CardActionPanel({
   player,
@@ -618,18 +641,22 @@ function CardActionPanel({
   action,
   loading,
   became,
+  kept,
   busy,
   locked,
   error,
   onDismissError,
   onSell,
   onCommit,
+  onToggleKeep,
 }: {
   player: string;
   revealed: boolean;
   action: CardActions | undefined;
   loading: boolean;
   became: Disposition | undefined;
+  /** The player is holding this one back from the bar's whole-pack sweeps. */
+  kept: boolean;
   busy: boolean;
   /** Another card is mid-write, or the whole pack is. Everything here waits. */
   locked: boolean;
@@ -637,6 +664,7 @@ function CardActionPanel({
   onDismissError: () => void;
   onSell: () => void;
   onCommit: (setCode: string) => void;
+  onToggleKeep: () => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -670,12 +698,31 @@ function CardActionPanel({
   const gone = became && action?.held === false;
   const commitable = action?.sets.filter((s) => s.canCommit) ?? [];
   const blocked = action?.sets.filter((s) => !s.canCommit) ?? [];
+  /* A card no sweep would touch anyway has nothing to be kept FROM, and a
+     toggle under it would be offering to solve a problem it does not have. The
+     test is the same one `planSweep` applies: could either button reach it. */
+  const sweepable = !gone && (commitable.length > 0 || action?.sellable === true);
 
   return (
     <View style={styles.panel}>
       {/* What this card became, if anything. Kept ABOVE the buttons rather than
           replacing them, because a commit that burnt a spare copy leaves this
           one in your hand and still sellable — see `Disposition`. */}
+      {/* KEPT, AND NOT YET SPENT. Below `became` rather than beside it: a
+          disposition is what HAPPENED to the card and outranks a standing
+          intention about it, and a card committed off a spare copy is both.
+          The toggle further down still shows the flag either way. */}
+      {kept && !became ? (
+        <View style={styles.stamp}>
+          {/* Not `c.positive`, which is the two acts' colour. Keeping is a
+              position held rather than a transaction that went through. */}
+          <Text style={[Type.label, { color: c.textSecondary }]}>KEEPING</Text>
+          <Text style={[Type.fine, styles.stampText, { color: c.textSecondary }]}>
+            {`${player} stays in your collection. Adding or selling the whole pack leaves this card out.`}
+          </Text>
+        </View>
+      ) : null}
+
       {became ? (
         <View style={styles.stamp}>
           <Text style={[Type.label, { color: c.positive }]}>
@@ -717,7 +764,11 @@ function CardActionPanel({
                 { backgroundColor: c.backgroundElement },
                 pressed && styles.pressed,
               ]}>
-              <Text style={[Type.strong, { color: c.text }]}>Keep it</Text>
+              {/* NOT "Keep it", which this said until `Keep this one` arrived
+                  two buttons below. One panel cannot have two Keeps meaning
+                  different things — one cancels a sale, the other holds a card
+                  back from the pack buttons. This is the picker's word. */}
+              <Text style={[Type.strong, { color: c.text }]}>Not now</Text>
             </Pressable>
             <Pressable
               onPress={() => {
@@ -865,6 +916,46 @@ function CardActionPanel({
             </Pressable>
           ) : null}
 
+          {/* THE THIRD ANSWER. Outlined rather than filled, and `Type.fine`
+              rather than `Type.strong`, because it is the one control here that
+              does nothing — see the note on this panel. It sits under the two
+              exits because you reach for it after deciding NOT to take either. */}
+          {sweepable ? (
+            <Pressable
+              onPress={onToggleKeep}
+              /* Locked with everything else while a write is in flight. It
+                 changes what the bar's buttons mean, and the bar is mid-act. */
+              disabled={locked || busy}
+              accessibilityRole="button"
+              accessibilityState={{ selected: kept, disabled: locked || busy }}
+              accessibilityLabel={
+                kept
+                  ? `Stop keeping ${player}. Adding or selling the whole pack will include this card again.`
+                  : `Keep ${player}. Adding or selling the whole pack will leave this card alone.`
+              }
+              style={({ pressed }) => [
+                styles.button,
+                styles.keep,
+                {
+                  backgroundColor: kept ? c.backgroundElement : 'transparent',
+                  borderColor: kept ? c.borderStrong : c.border,
+                },
+                pressed && styles.pressed,
+                (locked || busy) && styles.dim,
+              ]}>
+              <Text
+                numberOfLines={1}
+                style={[
+                  kept ? Type.strong : Type.fine,
+                  { color: kept ? c.text : c.textSecondary },
+                ]}>
+                {/* The tick is the state. Drawn as a character for the same
+                    reason the close glyph on `/pull` is: it needs no legend. */}
+                {kept ? '✓  Keeping this one' : 'Keep this one'}
+              </Text>
+            </Pressable>
+          ) : null}
+
           {/* THE SPARE-COPY CAVEAT, on the path that never sees the picker.
               With one set there is no list to put it in and the button commits
               on the next tap, so without this the only warning that a DIFFERENT
@@ -950,7 +1041,7 @@ const styles = StyleSheet.create({
      lines that did not line up with the card's edges. */
   buttonRow: { gap: Spacing.two },
   /* The one pair that IS a row: two short words that fit side by side at any
-     card width, and reading "Keep it" above "Sell for 8" would make the safe
+     card width, and reading "Not now" above "Sell for 8" would make the safe
      choice look like the primary one. */
   buttonPair: { flexDirection: 'row', gap: Spacing.two },
   button: {
@@ -973,6 +1064,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.one + 2,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  /* Shorter and thinner than the two exits above it, which is the whole of how
+     it says "this is the quiet one". Still 40pt, so it is a target a thumb can
+     land on. */
+  keep: {
+    alignSelf: 'stretch',
+    flexDirection: 'row',
+    borderWidth: StyleSheet.hairlineWidth,
+    minHeight: 40,
+    paddingVertical: Spacing.one + 2,
   },
 
   measure: { maxWidth: 560 },

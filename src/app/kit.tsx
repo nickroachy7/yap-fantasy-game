@@ -1666,6 +1666,11 @@ function Kit() {
  *
  * The writes are the caller's, and they are the same lies the shelf fixture
  * tells: a fixed price, and a card marked unheld afterwards.
+ *
+ * KEEPING IS HELD HERE, not threaded down from `Kit`, because unlike the two
+ * exits it is not a write and there is nothing for the caller to fake — it is
+ * exactly the client-side flag the real page holds, so the gallery exercises
+ * the real thing.
  */
 function KitPull({
   actions,
@@ -1683,7 +1688,14 @@ function KitPull({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const reveal = useReveal(PULLED_FIXTURE);
-  const plan = planSweep(PULLED_FIXTURE, actions, disposed);
+  const [kept, setKept] = useState<Set<string>>(() => new Set());
+  const toggleKeep = (id: string) =>
+    setKept((held) => {
+      const next = new Set(held);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  const plan = planSweep(PULLED_FIXTURE, actions, disposed, kept);
   let earned = 0;
   for (const d of disposed.values()) earned += d.gems;
 
@@ -1713,12 +1725,14 @@ function KitPull({
           actions={actions}
           loadingActions={false}
           disposed={disposed}
+          kept={kept}
           busy={null}
           frozen={false}
           error={null}
           onDismissError={() => {}}
           onSell={onSell}
           onCommit={onCommit}
+          onToggleKeep={toggleKeep}
           cardHeightCap={320}
         />
       </ScrollView>

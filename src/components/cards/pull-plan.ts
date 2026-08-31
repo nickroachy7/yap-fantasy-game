@@ -30,6 +30,20 @@
  * a card a set wanted. A player who presses sell without pressing add loses
  * nothing they were being offered; the cards a set can use are still there.
  *
+ * A KEPT CARD IS IN NEITHER, and that is the third answer the reveal owes a
+ * player. The two buttons act on the whole pack, so until now the only way to
+ * hold one card back was to decline both and clear the other seven by hand —
+ * which is the eight decisions the sweep exists to spare you. `kept` is the
+ * player saying "not this one" and it is read here, in the one place that
+ * decides what a sweep touches, rather than filtered out of the two plans
+ * afterwards. Keeping is not an act on the card: nothing is written, the card's
+ * own buttons still work, and the flag dies with the pull.
+ *
+ * IT ALSO FREES THE SLOT IT WAS GOING TO FILL. Keeping your one Bills card
+ * takes it out of the loop below BEFORE `room` and `taken` are counted, so the
+ * duplicate in the same pack takes that set slot instead. A keep that quietly
+ * cost you the commit as well would be a worse trade than the player agreed to.
+ *
  * BEST-PAYING SET WINS, when more than one will take a card. There is no
  * reading of "add all" under which the player wanted the cheaper one, and a
  * sweep that stopped to ask which set would not be a sweep. Ties break on code
@@ -64,6 +78,14 @@ export type Sweep = {
   sellGems: number;
   /** How many distinct sets the commits touch — the sentence needs it. */
   setCount: number;
+  /**
+   * How many cards the player is holding back, still in hand.
+   *
+   * Counted here rather than off the set itself, because a kept card that was
+   * then sold by hand is no longer being held back from anything — and the
+   * sentence on the bar would be naming a card that is gone.
+   */
+  kept: number;
 };
 
 export const EMPTY_SWEEP: Sweep = {
@@ -72,6 +94,7 @@ export const EMPTY_SWEEP: Sweep = {
   commitGems: 0,
   sellGems: 0,
   setCount: 0,
+  kept: 0,
 };
 
 /**
@@ -81,9 +104,17 @@ export const EMPTY_SWEEP: Sweep = {
  * questions and a sweep needs both. A commit that burnt a SPARE copy leaves
  * this card held and sellable — but the player has already dealt with it, and a
  * sweep that then sold it would be acting twice on one decision.
+ *
+ * `kept` is the third way a card is spoken for, and it is the only one the
+ * player can take back.
  */
-function open(id: string, actions: Map<string, CardActions>, disposed: Map<string, Disposition>) {
-  if (disposed.has(id)) return null;
+function open(
+  id: string,
+  actions: Map<string, CardActions>,
+  disposed: Map<string, Disposition>,
+  kept: Set<string>,
+) {
+  if (disposed.has(id) || kept.has(id)) return null;
   const action = actions.get(id);
   if (!action || !action.held) return null;
   return action;
@@ -93,6 +124,7 @@ export function planSweep(
   pulled: Pulled[],
   actions: Map<string, CardActions>,
   disposed: Map<string, Disposition>,
+  kept: Set<string>,
 ): Sweep {
   const commits: PlannedCommit[] = [];
   const sells: PlannedSell[] = [];
@@ -105,7 +137,7 @@ export function planSweep(
   const claimed = new Set<string>();
 
   for (const p of pulled) {
-    const action = open(p.card_instance_id, actions, disposed);
+    const action = open(p.card_instance_id, actions, disposed, kept);
     if (!action) continue;
 
     const offers = action.sets
@@ -141,7 +173,7 @@ export function planSweep(
 
   for (const p of pulled) {
     if (claimed.has(p.card_instance_id)) continue;
-    const action = open(p.card_instance_id, actions, disposed);
+    const action = open(p.card_instance_id, actions, disposed, kept);
     if (!action || !action.sellable) continue;
     sells.push({
       cardInstanceId: p.card_instance_id,
@@ -156,5 +188,11 @@ export function planSweep(
     commitGems: commits.reduce((n, x) => n + x.pays, 0),
     sellGems: sells.reduce((n, x) => n + x.gems, 0),
     setCount: new Set(commits.map((x) => x.setCode)).size,
+    /* Only the ones still in hand. A card kept and then sold by hand is spent,
+       and the bar must not say it is being held back from anything. */
+    kept: pulled.filter((p) => {
+      if (!kept.has(p.card_instance_id) || disposed.has(p.card_instance_id)) return false;
+      return actions.get(p.card_instance_id)?.held === true;
+    }).length,
   };
 }

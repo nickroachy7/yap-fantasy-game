@@ -130,8 +130,11 @@ export default function PullScreen() {
    * about the pull rather than about the strip at the bottom of the screen.
    */
   const plan = useMemo(
-    () => (cards.length === 0 ? EMPTY_SWEEP : planSweep(cards, pull.actions, pull.disposed)),
-    [cards, pull.actions, pull.disposed],
+    () =>
+      cards.length === 0
+        ? EMPTY_SWEEP
+        : planSweep(cards, pull.actions, pull.disposed, pull.kept),
+    [cards, pull.actions, pull.disposed, pull.kept],
   );
 
   /** What this pack has paid out so far. */
@@ -341,12 +344,14 @@ export default function PullScreen() {
               actions={pull.actions}
               loadingActions={pull.loading}
               disposed={pull.disposed}
+              kept={pull.kept}
               busy={pull.busy}
               frozen={pull.sweep !== null}
               error={pull.error}
               onDismissError={pull.clearError}
               onSell={pull.sell}
               onCommit={pull.commit}
+              onToggleKeep={pull.toggleKeep}
               cardHeightCap={cardHeightCap}
             />
           </ScrollView>
