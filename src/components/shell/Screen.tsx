@@ -14,6 +14,8 @@ import { isOverlayPath, webSectionOf } from '@/components/shell/sections';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { WebPageTabs } from '@/components/shell/WebPageTabs';
 import { Colors, ContentMeasure, Spacing, type Measure } from '@/constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 type Props = {
@@ -102,6 +104,29 @@ type Props = {
    * the real router.
    */
   pathnameOverride?: string;
+  /**
+   * Draw the masthead above this page. True everywhere except the tabs that
+   * are not the YAP experience.
+   *
+   * THE MASTHEAD IS NOT APP CHROME, IT IS THE YAP TAB'S CHROME. It carries the
+   * run's hearts and the gem balance, and neither is universal: Leagues,
+   * Scores and Profile are separate experiences with no hearts riding and
+   * nothing priced in gems, so a bar stating both above them is answering a
+   * question those screens never ask. It read as app-wide furniture only
+   * because every page happened to be drawn by this component.
+   *
+   * The YAP tab itself never passes this — `FantasyFrame` draws the masthead
+   * above the whole navigator and sets `frame.header`, so the flag below is
+   * already false there. This is for the pages that draw their own, which is
+   * the three other tabs and every pushed YAP screen (packs, contests, a card,
+   * a set), and only the first group turns it off.
+   *
+   * TURNING IT OFF MOVES THE SAFE-AREA INSET. `AppHeader` owns the top inset —
+   * it is the first thing on the screen, so it pads for the notch. With no
+   * masthead nothing else does, and the page runs under the status bar. See
+   * `paddingTop` on the narrow branch.
+   */
+  masthead?: boolean;
 };
 
 export function Screen({
@@ -114,6 +139,7 @@ export function Screen({
   refreshing,
   onRefresh,
   pathnameOverride,
+  masthead = true,
 }: Props) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -136,6 +162,14 @@ export function Screen({
    */
   const frame = useFrame();
   const flush = frame.nav && !isWide;
+
+  /* WHOEVER IS FIRST ON THE SCREEN PADS FOR THE NOTCH. Normally that is the
+     masthead, which owns the inset itself. Without one this box is the first
+     thing on the page, so it takes the inset over — otherwise the content
+     starts under the status bar. Nothing to do on wide, where there is no
+     notch and the rail is the first column. */
+  const top = useSafeAreaInsets().top;
+  const bare = !isWide && !frame.header && !masthead;
 
   /* Null on a page that is a page in its own right, and on every phone: the
      narrow build still navigates these with the action bar and has no heading
@@ -203,7 +237,12 @@ export function Screen({
      * so the page reads as pressed up against the navigation. A gutter here
      * holds regardless of what the cap works out to at a given width. */
     <View
-      style={[styles.fill, isWide && styles.wideGutter, { backgroundColor: c.background }]}>
+      style={[
+        styles.fill,
+        isWide && styles.wideGutter,
+        { backgroundColor: c.background },
+        bare && { paddingTop: top },
+      ]}>
       {isWide ? (
         <>
           {/* No `banner` here — the slot is narrow-only, see the prop. */}
@@ -237,7 +276,7 @@ export function Screen({
            *
            * Skipped inside a frame, which drew it once above the navigator and
            * must keep it — see `FantasyFrame`. */}
-          {frame.header ? null : <AppHeader />}
+          {frame.header || !masthead ? null : <AppHeader />}
           {/* Immediately under it, with nothing between the two. The header
               draws on the page background now, so the strip's own surface is
               the first edge on the screen — which is the right one to be. */}

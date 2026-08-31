@@ -32,7 +32,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 
 export default function LeaguesScreen() {
   return (
-    <Screen title="Leagues" measure="form" context="Coming soon">
+    <Screen title="Leagues" measure="form" context="Coming soon" masthead={false}>
       <EmptyState
         title="Private leagues coming soon"
         body="Draft with your group, play your own schedule, and settle it between you. Your cards and your collection stay in Yap — this is the other half."

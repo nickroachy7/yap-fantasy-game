@@ -347,6 +347,7 @@ export default function ProfileScreen() {
       title="Profile"
       measure="table"
       context={`Account · ${seasonLabel}`}
+      masthead={false}
       refreshing={refreshing}
       onRefresh={onRefresh}>
       {/* ---- identity ---------------------------------------------------- */}

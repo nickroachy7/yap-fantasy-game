@@ -284,7 +284,7 @@ export default function ScoresScreen() {
 
   if (!seeded || loading) {
     return (
-      <Screen title="Scores" measure="grid" context="Loading">
+      <Screen title="Scores" measure="grid" context="Loading" masthead={false}>
         <ActivityIndicator style={styles.pad} />
       </Screen>
     );
@@ -299,6 +299,7 @@ export default function ScoresScreen() {
       title="Scores"
       measure="grid"
       context={context}
+      masthead={false}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}>
       <View style={styles.controls}>
