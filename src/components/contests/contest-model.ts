@@ -539,3 +539,190 @@ export function takeLines(
   if (lines.length === 0) lines.push({ text: s.gems === null ? 'Still settling' : 'Nothing' });
   return lines;
 }
+
+/* -------------------------------------------------------------- the tokens */
+
+/**
+ * One currency, one quantity — the foot's unit of meaning.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THE FOOT STOPPED BEING SENTENCES
+ * ---------------------------------------------------------------------------
+ *
+ * `riskLines` and `rewardLines` return strings, and a string is the wrong shape
+ * the moment a stake has more than one part. "40 gems · 1 heart" against "Up to
+ * 120 gems · +1 heart · 1 pack" is 48 characters of prose in a 317pt row that
+ * also has to carry two labels and a divider, and it does not fit. It nearly
+ * did not fit at two parts a side, which is why the old trade band was two
+ * columns with a reserved blank row in each.
+ *
+ * A glyph plus a number is four characters where the sentence was seventeen, so
+ * five of them fit on one line with room to spare. Every currency this game has
+ * or is likely to grow already owns a mark — `gem`, `heartFull`, the four
+ * `pack*` glyphs, `cardBadge`, the tier marks — so the vocabulary is drawn, not
+ * invented.
+ *
+ * ---------------------------------------------------------------------------
+ * THE UNIT WORD IS ELASTIC, AND THAT IS THE LITERACY FIX
+ * ---------------------------------------------------------------------------
+ *
+ * A bare `◆ 40` asks the reader to already know the diamond means gems. On a
+ * side carrying ONE token there is room for the word, so it is printed: `◆ 40
+ * gems`, `♥ 1 heart`, `◆ 1.5 a point`. On a side carrying two or three there is
+ * not, and it drops to bare numbers.
+ *
+ * The free contest — one risk, one reward — is the contest every new player
+ * meets first and the one with the most room. So the card teaches the glyphs in
+ * words before it ever asks anybody to read them cold. The card decides this
+ * from the length of the list, not the model; see `TokenRow`.
+ *
+ * `unit` is therefore advisory. `value` must stand alone.
+ */
+export type Token = {
+  /** Which mark is drawn. `none` is a word with no glyph — "nothing". */
+  kind: 'gem' | 'heart' | 'pack' | 'none';
+  /** The quantity as drawn: "40", "+1", "1.5", "kept", "lost", "nothing". */
+  value: string;
+  /** Names the unit. Printed only where the side has room — see above. */
+  unit?: string;
+  tone?: 'positive' | 'negative';
+  /** A heart that was taken, so `Heart` draws it torn rather than whole. */
+  killed?: boolean;
+};
+
+/**
+ * WHOSE SCORE THE DASHED LINE IS, in two or three characters.
+ *
+ * The scoring band's right-hand column is a constant — `TO BEAT` — because the
+ * win condition is the same idea in every format: there is a number, and you
+ * have to be above it. What changes is where that number comes from, and that
+ * is a chip rather than a label so the constant can stay constant.
+ *
+ * `COMMUNITY`, `THE CUT · 3RD` and a handle were three different words for one
+ * thing, and none of them said "beat this".
+ */
+export function beatSource(
+  t: Pick<ContestTerms, 'winCondition' | 'winRank'>,
+  duel?: Duel | null,
+): string {
+  if (duel) return duel.handle.toUpperCase();
+  if (t.winCondition === 'top_n' && t.winRank !== null) return ordinal(t.winRank);
+  return 'MEDIAN';
+}
+
+/** What you put up. Gems first, then hearts — the order the foot reads. */
+export function riskTokens(t: ContestTerms): Token[] {
+  const out: Token[] = [];
+  if (t.entryFeeGems > 0) out.push({ kind: 'gem', value: `${t.entryFeeGems}`, unit: 'gems' });
+  if (t.heartsAtRisk > 0) {
+    out.push({
+      kind: 'heart',
+      value: `${t.heartsAtRisk}`,
+      unit: t.heartsAtRisk === 1 ? 'heart' : 'hearts',
+    });
+  }
+  if (out.length === 0) out.push({ kind: 'none', value: 'nothing' });
+  return out;
+}
+
+/**
+ * WHAT YOU WIN. One label on this side now — `WIN` — where it used to be a
+ * modality that changed with the contest: `UP TO`, `SHARE`, `EARNS`, `PER PT`.
+ *
+ * THAT COSTS THE "UP TO", and it is worth naming rather than hiding. On a
+ * `top_n` contest `topPrize` is the largest share anybody takes, so `WIN ◆120`
+ * states a ceiling as though it were a promise. The contest's own page carries
+ * the split, and the card is not the place to spell out a prize table — but if
+ * this reads as over-claiming in the hand, the honest fix is the label, not the
+ * number.
+ *
+ * A RATE IS NOT AN AMOUNT. The free contest pays per point, so its token is
+ * `1.5` with `a point` as the unit — and because that side carries exactly one
+ * token, the unit always prints. A bare `◆ 1.5` would read as a gem and a half.
+ */
+export function winTokens(t: ContestTerms, prize: number | null = null): Token[] {
+  const out: Token[] = [];
+
+  if (prize !== null && prize > 0) {
+    out.push({ kind: 'gem', value: `${prize}`, unit: 'gems', tone: 'positive' });
+  } else if (t.entryFeeGems > 0) {
+    const top = topPrize(t);
+    if (top !== null) out.push({ kind: 'gem', value: `${top}`, unit: 'gems' });
+    else if (t.prizePool > 0) out.push({ kind: 'gem', value: `${t.prizePool}`, unit: 'gems' });
+    else out.push({ kind: 'gem', value: 'share', unit: 'of the pool' });
+  } else {
+    out.push({ kind: 'gem', value: '1.5', unit: 'a point' });
+  }
+
+  if (t.heartsOnWin > 0) {
+    out.push({
+      kind: 'heart',
+      value: `+${t.heartsOnWin}`,
+      unit: t.heartsOnWin === 1 ? 'heart' : 'hearts',
+      tone: 'positive',
+    });
+  }
+  return out;
+}
+
+/**
+ * The same left-hand side once the week is over. `STAKED`, not `RISK`.
+ *
+ * THE HEART IS THE ONLY THING THAT CHANGES SHAPE. A fee is a fee whether you
+ * won or lost, so it keeps its number; a heart either came back or did not, and
+ * "1" is no longer the interesting part of it. `killed` is what makes `Heart`
+ * draw the torn glyph — the same one the rack under the carousel uses — so the
+ * mark and the word beside it cannot disagree.
+ */
+export function stakedTokens(t: ContestTerms, s: Settlement): Token[] {
+  const out: Token[] = [];
+  if (t.entryFeeGems > 0) out.push({ kind: 'gem', value: `${t.entryFeeGems}`, unit: 'gems' });
+  if (t.heartsAtRisk > 0) {
+    const lost = s.result === 'L';
+    out.push({
+      kind: 'heart',
+      value: s.result === null ? `${t.heartsAtRisk}` : lost ? 'lost' : 'kept',
+      tone: s.result === null ? undefined : lost ? 'negative' : 'positive',
+      killed: lost,
+    });
+  }
+  if (out.length === 0) out.push({ kind: 'none', value: 'nothing' });
+  return out;
+}
+
+/**
+ * What the week actually paid. `WON`, in the past tense, and no promises left.
+ *
+ * `s.gems` IS A SEPARATE PAYMENT FROM `prize`. The pool pays the winners; the
+ * cards pay everybody by the point. A week can produce both, one, or neither,
+ * and a settled contest that produced neither says so rather than drawing an
+ * empty side — a blank there reads as still loading, which is the one state
+ * this side must not be confused with. `Still settling` is that state and it is
+ * distinct: `s.gems` is null until the payout cron has stamped the slots.
+ */
+export function wonTokens(
+  t: ContestTerms,
+  s: Settlement,
+  prize: number | null = null,
+): Token[] {
+  const out: Token[] = [];
+  const paid = prize !== null && prize > 0;
+
+  if (paid) out.push({ kind: 'gem', value: `${prize}`, unit: 'gems', tone: 'positive' });
+  if (t.heartsOnWin > 0 && s.result === 'W') {
+    out.push({
+      kind: 'heart',
+      value: `+${t.heartsOnWin}`,
+      unit: t.heartsOnWin === 1 ? 'heart' : 'hearts',
+      tone: 'positive',
+    });
+  }
+  if (s.gems !== null && s.gems > 0) {
+    out.push({ kind: 'gem', value: `${s.gems}`, unit: paid ? 'from cards' : 'gems' });
+  }
+
+  if (out.length === 0) {
+    out.push({ kind: 'none', value: s.gems === null ? 'still settling' : 'nothing' });
+  }
+  return out;
+}
