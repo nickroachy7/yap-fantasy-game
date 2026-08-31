@@ -57,11 +57,13 @@ import {
 import {
   InventoryControls,
   ResultLine,
+  SelectButton,
 } from '@/components/collection/CollectionFilters';
+import { CollectionValue } from '@/components/collection/CollectionValue';
+import { RosterAlert } from '@/components/collection/RosterAlert';
+import { RosterCount } from '@/components/collection/RosterCount';
 import { BulkBar } from '@/components/collection/BulkBar';
 import { SELECTION_MAX, sellTotal } from '@/components/collection/bulk';
-import { CollectionSummary } from '@/components/collection/CollectionSummary';
-import { RosterBar } from '@/components/collection/RosterBar';
 import { RosterCut } from '@/components/collection/RosterCut';
 import { useStarters } from '@/components/collection/use-starters';
 import { useBulk } from '@/components/collection/use-bulk';
@@ -69,19 +71,25 @@ import { EmptyCollection, EmptyFilterResult } from '@/components/collection/Empt
 import { InventoryCard } from '@/components/collection/InventoryCard';
 import {
   SortDefaultDir,
+  countByJob,
+  countByPosition,
   countByTier,
+  matchesJob,
   matchesPosition,
   matchesTier,
   sortCards,
+  spareIds,
   summarise,
   type CollectionCard,
+  type JobFilter,
+  type JobSets,
   type SortDir,
   type SortKey,
   type TierFilter,
 } from '@/components/collection/types';
 import { useCollection } from '@/components/collection/use-collection';
-import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
-import { ToggleButton } from '@/components/ui/MenuButton';
+import { useOffers } from '@/components/collection/use-offers';
+import type { PosFilter } from '@/components/cards/PositionFilter';
 import { Screen } from '@/components/shell/Screen';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
@@ -206,6 +214,10 @@ export default function InventoryScreen() {
 
   const [position, setPosition] = useState<PosFilter>('ALL');
   const [tier, setTier] = useState<TierFilter>('ALL');
+  /* WHAT YOU ARE TRYING TO DECIDE — spares, cards a set would take, cards you
+     are starting. The headline filter, and the only one on this screen that
+     narrows by anything other than an attribute of the card. See `JobFilter`. */
+  const [job, setJob] = useState<JobFilter>('ALL');
   const [sort, setSort] = useState<SortKey>('fp');
   const [dir, setDir] = useState<SortDir>(SortDefaultDir.fp);
 
@@ -258,6 +270,24 @@ export default function InventoryScreen() {
      `use-starters` for why a commit is the dangerous half of that. */
   const starters = useStarters();
   /**
+   * The other two decision sets, and they come from opposite places.
+   *
+   * `spares` is pure and free — it is the ids, grouped and ranked in the
+   * server's own burn order. `commitable` is one RPC over the whole collection,
+   * which is affordable for the reason `use-offers` spends a page on: the roster
+   * caps at thirty and `card_actions` takes an array.
+   *
+   * Bundled into one object because three sets threaded through `matchesJob`
+   * and `countByJob` separately is three chances to pass them in the wrong
+   * order — they are all `Set<string>` and the compiler could not tell.
+   */
+  const spares = useMemo(() => spareIds(all), [all]);
+  const offers = useOffers(cards);
+  const jobSets = useMemo<JobSets>(
+    () => ({ spares, commitable: offers.commitable, starters }),
+    [spares, offers.commitable, starters],
+  );
+  /**
    * Why the last blocked tap did nothing, shown on the selection bar.
    *
    * ON THE BAR RATHER THAN ON THE CELL, because a 100pt square already carries
@@ -277,22 +307,47 @@ export default function InventoryScreen() {
    * two facets left, so the tier counts are taken over whatever the position
    * chips have left and vice versa.                                        */
   const forTierCounts = useMemo(
-    () => all.filter((card) => matchesPosition(card, position)),
-    [all, position],
+    () => all.filter((card) => matchesPosition(card, position) && matchesJob(card, job, jobSets)),
+    [all, position, job, jobSets],
   );
   const tierCounts = useMemo(() => countByTier(forTierCounts), [forTierCounts]);
+
+  /* The decision chips' own counts, with THEIR filter lifted and the other two
+     applied — same rule as the tier row above, so every number on both rows
+     answers "how many would I get if I pressed this". */
+  const forJobCounts = useMemo(
+    () => all.filter((card) => matchesPosition(card, position) && matchesTier(card, tier)),
+    [all, position, tier],
+  );
+  const jobCounts = useMemo(() => countByJob(forJobCounts, jobSets), [forJobCounts, jobSets]);
+
+  /* Position's own counts, its filter lifted and the other two applied — the
+     same faceting rule as the tier and pile rows, so every number in the menu
+     answers "how many would I get if I pressed this". */
+  const positionCounts = useMemo(
+    () =>
+      countByPosition(
+        all.filter((card) => matchesTier(card, tier) && matchesJob(card, job, jobSets)),
+      ),
+    [all, tier, job, jobSets],
+  );
 
   const visible = useMemo(
     () =>
       sortCards(
-        all.filter((card) => matchesPosition(card, position) && matchesTier(card, tier)),
+        all.filter(
+          (card) =>
+            matchesPosition(card, position) &&
+            matchesTier(card, tier) &&
+            matchesJob(card, job, jobSets),
+        ),
         sort,
         dir,
       ),
-    [all, position, tier, sort, dir],
+    [all, position, tier, job, jobSets, sort, dir],
   );
 
-  const filtered = position !== 'ALL' || tier !== 'ALL';
+  const filtered = position !== 'ALL' || tier !== 'ALL' || job !== 'ALL';
 
   /**
    * The copy the roster cap falls on, or null when there is no line to draw.
@@ -351,6 +406,7 @@ export default function InventoryScreen() {
   const clearFilters = useCallback(() => {
     setPosition('ALL');
     setTier('ALL');
+    setJob('ALL');
   }, []);
 
   // Changing the key resets the direction to that key's natural one. Carrying
@@ -499,6 +555,62 @@ export default function InventoryScreen() {
   );
 
   /**
+   * The cards a "Select all" would actually add, in the order the grid shows.
+   *
+   * TWO SUBTRACTIONS, AND NEITHER IS OPTIONAL IF THE BUTTON IS TO PRINT A
+   * NUMBER. Starters cannot be ticked at all — `toggleCard` refuses them — so
+   * counting them would have the button promise twelve and deliver ten, which
+   * is the same silent shortfall the bulk confirmations were written to stop.
+   * And anything ALREADY ticked is not something this would add, so a button
+   * pressed twice cannot claim to do the same work twice.
+   *
+   * TRUNCATED AT THE SERVER'S CEILING rather than at nothing, because both bulk
+   * functions refuse past `SELECTION_MAX` and a tick that does not take is a
+   * button that lied. It is unreachable today — the roster caps at thirty and
+   * the ceiling is sixty-four — and it is a guard against the cap moving, not
+   * against a collection that exists.
+   */
+  const addable = useMemo(() => {
+    const room = SELECTION_MAX - selected.size;
+    if (room <= 0) return [];
+
+    return visible
+      .filter((card) => !starters.has(card.id) && !selected.has(card.id))
+      .slice(0, room);
+  }, [visible, starters, selected]);
+
+  /**
+   * Pressing Select, which does one of two things depending on the row.
+   *
+   * NOTHING FILTERED: opens an empty mode, exactly as the old square did.
+   * A PILE FILTERED: opens the mode with that whole pile already ticked, which
+   * is the move `SelectButton`'s count is promising. Twenty taps become one,
+   * and a player who came to the row only to narrow the grid is handed bulk
+   * selection rather than having to go looking for it.
+   *
+   * `heldOpen` is cleared for `toggleSelecting`'s reason: a mode opened this
+   * way is not about one card, so emptying the selection must not close it out
+   * from under someone who is re-picking.
+   */
+  const startSelecting = useCallback(() => {
+    if (bulk.busy) return;
+    heldOpen.current = false;
+    setBlockedNote(null);
+    setSelecting(true);
+    /* ARMED ONLY FROM A NARROWED GRID. Unfiltered, `addable` is the whole
+       roster, and opening the mode with every card you own already ticked —
+       including the ones you are playing on Sunday — is one press from a
+       confirmation to sell them. A selection you have not narrowed is one you
+       have not thought about, so the bare press opens an empty mode. */
+    if (!filtered || addable.length === 0) return;
+    setSelected((held) => {
+      const next = new Set(held);
+      for (const card of addable) next.add(card.id);
+      return next;
+    });
+  }, [bulk.busy, filtered, addable]);
+
+  /**
    * A player who owns nothing gets the packs sheet opened FOR them, once.
    *
    * The free Starter Pack is eight cards and a legal lineup — it is the whole
@@ -574,55 +686,52 @@ export default function InventoryScreen() {
           </ScrollView>
         ) : listWidth === 0 ? null : (
           <>
-            {/* THE CONTROLS ARE THE WHOLE OF WHAT IS PINNED. The summary and
-                the roster bar are both statements about the collection, and
-                both sit at the top of the scroll below — see the note at the
-                top of this file for why a statement belongs with the rows it is
-                about rather than over the chips that cut them down. */}
-            <View>
-              {/* ONE ROW, and it is the Players boards' row: the shared
-                  position chips on the left, the page's own controls on the
-                  right. Both are filters over the same grid, and side by side
-                  they read as the two of them rather than as three bands of
-                  chrome before the first card. See `CollectionFilters`.
+            {/* ONE ROW, AND IT IS EVERYTHING THAT USED TO BE FOUR.
 
-                  The chips take the room that is left and SCROLL — `ChipRow` is
-                  a horizontal ScrollView — while the buttons keep their size at
-                  every width. Which is why the buttons are the side pinned and
-                  the chips are the side that gives: a round button cannot be
-                  narrowed, where chips you can push are merely narrower. Same
-                  reasoning, same numbers, as the trend board. */}
-              <View style={styles.toolbar}>
-                <View style={styles.chips}>
-                  <PositionFilter value={position} onChange={setPosition} />
-                </View>
-                <InventoryControls
-                  tier={tier}
-                  onTier={setTier}
-                  tierTotal={forTierCounts.length}
-                  tierCounts={tierCounts}
-                  sort={sort}
-                  dir={dir}
-                  onSort={pressSort}
-                />
-                {/* LAST ON THE ROW, and it is the odd one out that earns the
-                    end: everything to its left NARROWS what you are looking
-                    at, where this changes what a tap on a card DOES. Sitting
-                    among the filters it read as another one of them. It keeps
-                    their language — a round `ToggleButton`, lit while the
-                    mode is on — because it is still a control on their row.
+                Left, what the collection is worth. Right, two round menus that
+                narrow and order, one labelled button that changes what a tap
+                DOES, and the cap at the end. Nothing on the information side
+                has a border, so the controls are the only bordered objects on
+                the row and the reader sorts it without a caption.
 
-                    A hold on any card opens the same mode with that card
-                    already picked, which is the shortcut this button is the
-                    long way round of. See `holdCard`. */}
-                <ToggleButton
-                  icon="select"
-                  label={selecting ? 'Stop selecting cards' : 'Select several cards'}
-                  on={selecting}
-                  onPress={toggleSelecting}
-                />
-              </View>
+                WHAT IS NOT HERE ANY MORE: the tier counts, the CARDS total and
+                the roster band. `Screen`'s context line already prints the
+                total; `TierBreakdown` on the account screen draws the spread as
+                a proportional bar with a legend, which is a better answer than
+                four digits in a toolbar; and the band spent 41pt on two numbers
+                that now cost 30 at the end of this row. Four bands became one.
 
+                THE SELECT BUTTON IS THE POINT OF THE ROW. See `SelectButton`:
+                the unlabelled square nobody found is now a word, and it picks
+                up the filtered count so bulk selection is handed to a player
+                who only came here to filter. */}
+            <View style={styles.toolbar}>
+              <CollectionValue sellValue={stats.sellValue} />
+              <View style={styles.spacer} />
+              <InventoryControls
+                job={job}
+                onJob={setJob}
+                jobCounts={jobCounts}
+                offersReady={offers.ready}
+                position={position}
+                onPosition={setPosition}
+                positionCounts={positionCounts}
+                tier={tier}
+                onTier={setTier}
+                tierTotal={forTierCounts.length}
+                tierCounts={tierCounts}
+                sort={sort}
+                dir={dir}
+                onSort={pressSort}
+              />
+              <SelectButton
+                on={selecting}
+                disabled={bulk.busy}
+                onPress={selecting ? toggleSelecting : startSelecting}
+              />
+              {/* AFTER the button, at the row's end — see `RosterCount` for why
+                  the margin between them is load-bearing. */}
+              <RosterCount roster={roster} />
             </View>
 
             <FlatList
@@ -673,26 +782,21 @@ export default function InventoryScreen() {
                    the wrapper with the line would close that gap and reopen it
                    the moment a chip was pressed. */
                 <View>
-                  <View style={styles.headerStrip}>
-                    <CollectionSummary stats={stats} />
-                  </View>
-                  {/* DIRECTLY UNDER THE STATS, which is where it reads: the
-                      strip counts what you hold and this says what holding that
-                      many costs you. Above the strip it was a warning with no
-                      figures near it; pinned above the chips it was a band of
-                      chrome between the section bar and the controls. Here the
-                      two numbers that belong together — CARDS and 28/30 — are
-                      one glance apart.
+                  {/* SITS ON THE GRID AND SCROLLS WITH IT. Pinned under the
+                      toolbar it was a third band of chrome the eye had to pass
+                      on every visit — and it is a STATEMENT, which this file's
+                      own rule puts inside the list rather than above it.
 
-                      Only once it is ACTIONABLE. `RosterBar` has a calm state
-                      that prints the count and nothing else, and the strip above
-                      already does that; drawing both would be the same figure
-                      twice. See RosterBar's own header. */}
-                  {roster && (roster.isNear || roster.isOver) ? (
-                    // Unwrapped: the bar carries its own 8pt below it, and a
-                    // `headerStrip` around it would double the gap.
-                    <RosterBar roster={roster} />
-                  ) : null}
+                      Scrolling away is the right behaviour here even though the
+                      state is urgent: you are over the cap for as long as it
+                      takes to sell or commit, and the cards you would act on are
+                      what you scrolled down to reach. A notice that follows you
+                      down a grid you are fixing is nagging, not helping.
+
+                      NOTHING UNTIL THE CAP IS BROKEN — `RosterAlert` renders
+                      null under it, so this costs no height on an ordinary
+                      visit. */}
+                  <RosterAlert roster={roster} />
                   <View style={styles.header}>
                     <ResultLine shown={visible.length} total={all.length} />
                   </View>
@@ -755,13 +859,19 @@ const styles = StyleSheet.create({
      gutter, one gap between the two controls, one gap before the list. Two
      screens with the same controls at different rhythms is what this was
      written to stop. */
+  /* `Spacing.one + 2` below rather than `Spacing.two`: with every control at
+     `ControlDiameter` the strip is 32pt tall, and 8pt under a 32pt strip made
+     the band read as taller than the thing in it. */
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two,
+    gap: Spacing.one + 2,
     paddingHorizontal: GUTTER,
-    paddingBottom: Spacing.two,
+    paddingBottom: Spacing.one + 2,
   },
+  /* The give in the row, and the ONLY give: the stats box shrinks into it
+     before anything is pushed off. See `InventoryStats`. */
+  spacer: { flex: 1, minWidth: 0 },
   /* `minWidth: 0` is load-bearing, and it is the trend board's note verbatim:
      without it the chips' ScrollView reports its full content width as its
      minimum and pushes the buttons off the row instead of scrolling inside what

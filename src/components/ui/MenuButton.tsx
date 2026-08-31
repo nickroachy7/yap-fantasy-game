@@ -46,6 +46,7 @@ import {
 } from 'react-native';
 
 import { ActionIcon, type ActionIconName } from '@/components/shell/ActionBar';
+import { Chip } from '@/components/ui/Chip';
 import {
   Colors,
   ControlDiameter,
@@ -191,6 +192,68 @@ export function ToggleButton({
       <ActionIcon name={icon} color={on ? c.background : c.textSecondary} focused={on} size={16} />
     </Pressable>
   );
+}
+
+/**
+ * A wrap of small toggles inside a menu, for a facet whose options are short.
+ *
+ * WHY A MENU NEEDS THIS AT ALL. `MenuItem` is one option per row, which is
+ * right for a list you READ — four piles with counts, six sort keys. It is
+ * wrong for a facet whose options are two characters long: five positions and
+ * four tiers as `MenuItem`s put eleven rows in a panel, most of them holding a
+ * two-letter word and a number, and the inventory's filter menu ran off the
+ * bottom of a phone before it reached the last of them. A reader scrolling a
+ * menu to find `PK` is a reader the menu has failed.
+ *
+ * Laid out as chips the same eleven options are two lines. The panel fits, and
+ * — the part that matters more — every option is visible at once, which is what
+ * a facet is for.
+ *
+ * IT DOES NOT CLOSE THE MENU. Position and tier are commonly set together, and
+ * a panel that shut on the first press would have to be reopened to make the
+ * second choice. The rows above it close on press because picking a pile IS the
+ * decision; these narrow it afterwards.
+ *
+ * THE CHIP IS `Chip`, not a copy of it — the same object the boards' position
+ * filters draw, so a facet does not change shape depending on whether it is on
+ * a row or in a panel.
+ */
+export function MenuChips({
+  options,
+}: {
+  options: {
+    key: string;
+    label?: string;
+    /** Drawn in the label's place — the tier chips pass their badge. */
+    glyph?: ReactNode;
+    count?: number;
+    selected: boolean;
+    onPress: () => void;
+    accessibilityLabel: string;
+  }[];
+}) {
+  return (
+    <View style={styles.chips}>
+      {options.map((o) => (
+        <Chip
+          key={o.key}
+          selected={o.selected}
+          label={o.label}
+          count={o.count}
+          onPress={o.onPress}
+          accessibilityLabel={o.accessibilityLabel}>
+          {o.glyph}
+        </Chip>
+      ))}
+    </View>
+  );
+}
+
+/** A rule between two facets in a panel. See `MenuChips`. */
+export function MenuDivider() {
+  const c = Colors[useColorScheme() === 'dark' ? 'dark' : 'light'];
+
+  return <View style={[styles.menuDivider, { backgroundColor: c.border }]} />;
 }
 
 export type MenuTrigger =
@@ -411,6 +474,17 @@ export function MenuHeading({ children }: { children: string }) {
 }
 
 const styles = StyleSheet.create({
+  /* `Spacing.two` either side matches `MenuItem`'s own horizontal padding, so a
+     chip line and a row line start on the same left edge. */
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.one + 2,
+    paddingHorizontal: Spacing.two,
+    paddingTop: Spacing.one,
+    paddingBottom: Spacing.two,
+  },
+  menuDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: Spacing.two, marginVertical: Spacing.one },
   button: {
     width: SIZE,
     height: SIZE,

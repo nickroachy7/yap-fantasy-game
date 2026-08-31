@@ -41,6 +41,7 @@ export function Chip({
   label,
   count,
   children,
+  disabled,
   onPress,
   accessibilityLabel,
 }: {
@@ -50,6 +51,16 @@ export function Chip({
   count?: number;
   /** A badge drawn before the label — the tier chips use this. */
   children?: React.ReactNode;
+  /**
+   * Shown, dimmed, and unpressable.
+   *
+   * FOR A FACET WHOSE COUNT IS ZERO, which is not the same as a facet that does
+   * not apply here. The inventory's decision chips carry counts that ARE the
+   * answer — "Spares 0" is the reader learning they hold no duplicates — so
+   * dropping the chip would take the answer with it, and leaving it pressable
+   * would walk them into an empty grid to find out the same thing.
+   */
+  disabled?: boolean;
   onPress: () => void;
   accessibilityLabel: string;
 }) {
@@ -63,13 +74,14 @@ export function Chip({
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       accessibilityRole="button"
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, disabled: disabled === true }}
       accessibilityLabel={accessibilityLabel}
       // The chip is 24pt tall so several facet rows fit above the fold; hitSlop
       // buys the touch target back without spending the pixels.
       hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-      style={({ pressed }) => [pressed && styles.pressed]}>
+      style={({ pressed }) => [disabled && styles.disabled, pressed && styles.pressed]}>
       <View
         style={[
           styles.chip,
@@ -137,6 +149,7 @@ const styles = StyleSheet.create({
   count: { fontWeight: '600' },
   divider: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', marginHorizontal: Spacing.one },
   pressed: { opacity: 0.7 },
+  disabled: { opacity: 0.4 },
 });
 
 

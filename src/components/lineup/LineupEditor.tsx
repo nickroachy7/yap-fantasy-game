@@ -51,7 +51,7 @@ import {
   View,
 } from 'react-native';
 
-import { RosterBar } from '@/components/collection/RosterBar';
+import { RosterAlert } from '@/components/collection/RosterAlert';
 import { BenchBoard } from '@/components/lineup/BenchBoard';
 import { ContestCarousel } from '@/components/lineup/ContestCarousel';
 import { WelcomeBackBanner } from '@/components/contests/WelcomeBackBanner';
@@ -1090,14 +1090,17 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
     <>
       {/* THE WALL, WHERE IT CAN BE SEEN. Over the cap nothing on this board can
           be changed — see `overCap` — so the reason sits above the slots rather
-          than arriving as a refusal after a pick. The same bar the Collection
-          grid uses, so the count and the remedy are worded once.
+          than arriving as a refusal after a pick.
 
-          Only when it is BLOCKING. `RosterBar` also draws a calm "24 of 30" and
-          a "6 slots left", and neither is this screen's business: the lineup is
-          where you find out the cap has stopped you, not where you watch it
-          approach. */}
-      {overCap ? <RosterBar roster={roster} /> : null}
+          THE SAME NOTICE THE COLLECTION GRID DRAWS, which is the whole point of
+          it being a component: a reader who has just met this wall on one screen
+          meets the same sentence on the other, rather than wondering whether
+          they have two problems. It was `RosterBar` for exactly that reason
+          until the Collection stopped using the bar — see `RosterAlert`.
+
+          It guards itself on `isOver`, so the `overCap` check here is belt and
+          braces rather than the thing keeping a calm state off this board. */}
+      {overCap ? <RosterAlert roster={roster} /> : null}
 
       {/* ONE CAPTION, AND WHICH ONE DEPENDS ON WHETHER THE WEEK HAS STARTED.
  

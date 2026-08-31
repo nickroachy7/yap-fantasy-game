@@ -80,6 +80,36 @@ export type Position = (typeof PositionOrder)[number];
 
 export type PositionFilter = 'ALL' | Position;
 export type TierFilter = 'ALL' | CardTier;
+
+/**
+ * WHAT YOU ARE TRYING TO DECIDE, as opposed to what the card happens to be.
+ *
+ * Position and tier narrow by ATTRIBUTE, and between them they were the whole
+ * of this screen's toolkit — which is the wrong toolkit for the job the screen
+ * is actually for. Nobody opens their collection thinking "show me my wide
+ * receivers". They open it holding twenty-nine cards and thirty slots, and the
+ * two questions they have are "what can I get rid of" and "what finishes a
+ * set". Neither was askable, so it was answered by scanning the grid by eye.
+ *
+ * These three are those questions. Each one is a fact the app already knows and
+ * was keeping to itself until the moment of a confirmation dialog:
+ *
+ *   spare    — you hold more than one copy of this player, and this is not the
+ *              one you would keep. Derived here, from the ids. See `spareIds`.
+ *
+ *   set      — at least one set would take this copy right now. That is
+ *              `card_actions.can_commit`, which is the server's own conjunction
+ *              and cannot be derived on the client. See `use-offers`.
+ *
+ *   starting — standing in a lineup you have not played. These are the cards
+ *              that CANNOT be acted on, and being able to see them is what
+ *              makes the rest safe to sweep. See `use-starters`.
+ *
+ * `ALL` is the absence of the filter and has no chip of its own: the three are
+ * a single value, so pressing the active one releases it. A fourth "ALL" chip
+ * beside the position row's own would have been two of them in one strip.
+ */
+export type JobFilter = 'ALL' | 'spare' | 'set' | 'starting';
 export type SortKey = 'fp' | 'tier' | 'starts' | 'name' | 'recent';
 export type SortDir = 'asc' | 'desc';
 
@@ -190,6 +220,49 @@ export function matchesPosition(c: CollectionCard, filter: PositionFilter | 'oth
 
 export function matchesTier(c: CollectionCard, filter: TierFilter): boolean {
   return filter === 'ALL' || c.tier === filter;
+}
+
+/**
+ * The sell pile, named — re-exported from `spares.ts`.
+ *
+ * IT LIVES IN A LEAF MODULE so the Deno unit runner can reach it, which this
+ * file cannot offer: `types.ts` imports `theme.ts`, `theme.ts` imports
+ * `global.css`, and the runner cannot follow a stylesheet. Same trade `bulk.ts`
+ * made, for the same reason, and worth making twice — the ranking has to agree
+ * with a SQL `ORDER BY` in `commit_candidate`, and nothing but a test keeps two
+ * files in two languages saying the same thing. See `spares.ts`.
+ */
+export { spareIds } from './spares';
+
+/** What the three decision chips are asked against. See `JobFilter`. */
+export type JobSets = {
+  spares: Set<string>;
+  /** Instance ids some set would take. Empty until the offers land. */
+  commitable: Set<string>;
+  starters: Set<string>;
+};
+
+export function matchesJob(c: CollectionCard, filter: JobFilter, sets: JobSets): boolean {
+  if (filter === 'ALL') return true;
+  if (filter === 'spare') return sets.spares.has(c.id);
+  if (filter === 'set') return sets.commitable.has(c.id);
+
+  return sets.starters.has(c.id);
+}
+
+/** How many cards each chip would leave. Zero is an answer, so all three keys. */
+export function countByJob(
+  cards: CollectionCard[],
+  sets: JobSets,
+): Record<Exclude<JobFilter, 'ALL'>, number> {
+  const counts = { spare: 0, set: 0, starting: 0 };
+  for (const c of cards) {
+    if (sets.spares.has(c.id)) counts.spare += 1;
+    if (sets.commitable.has(c.id)) counts.set += 1;
+    if (sets.starters.has(c.id)) counts.starting += 1;
+  }
+
+  return counts;
 }
 
 

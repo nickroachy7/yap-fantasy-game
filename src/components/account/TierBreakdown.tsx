@@ -36,7 +36,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  * legend's was the WORD beside the swatch. A reader who cannot separate the
  * four accents now has the mark as well as the label.
  */
-const TIER_GLYPHS: Record<CardTier, Glyph> = {
+export const TIER_GLYPHS: Record<CardTier, Glyph> = {
   bronze: tierBronze,
   silver: tierSilver,
   gold: tierGold,
