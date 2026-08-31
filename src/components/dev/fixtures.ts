@@ -17,6 +17,7 @@ import type { CollectionCard } from '@/components/collection/types';
 import type { CardActions, CardActionSet } from '@/components/cards/card-actions';
 import type { CommitPlan } from '@/components/collection/bulk';
 import type { Json } from '@/lib/database.types';
+import type { PeekSlot as PeekEntrySlot } from '@/components/contests/use-contest-field';
 
 /**
  * The four sample cards, one per tier.
@@ -774,3 +775,63 @@ export const KIT_COMMIT_PLAN: CommitPlan = {
   ],
   anySpare: true,
 };
+
+/**
+ * A settled entry, drawn as the six states its third line can be in.
+ *
+ * The line is the card's own history, and every branch of `cardStory` is here
+ * because the interesting ones cannot be reached by looking at a real week:
+ * a promotion needs a card that crossed a floor THIS contest, and the last row
+ * needs a database that has not been migrated yet.
+ *
+ * The thresholds are the real ladder — 200 silver, 750 gold, 2500 diamond (see
+ * `20260821250000_reachable_tier_ladder`) — so the arithmetic on screen is the
+ * arithmetic that will run in production rather than numbers chosen to look
+ * tidy.
+ */
+export const KIT_ENTRY_SLOTS: PeekEntrySlot[] = [
+  /* Ordinary: scored, climbed, still short of the next tier. */
+  {
+    slot: 'QB', playerId: 'e1', playerName: 'Ty Simpson', pos: 'QB', team: 'LAR',
+    tier: 'bronze', points: 9.8, started: true,
+    careerFp: 58.3, tierFloorFp: 0, nextTierAt: 200, nextTierLabel: 'silver',
+  },
+  /* The moment worth drawing: this contest carried it over the silver floor. */
+  {
+    slot: 'RB1', playerId: 'e2', playerName: 'Jeremiyah Love', pos: 'RB', team: 'ARI',
+    tier: 'silver', points: 9.8, started: true,
+    careerFp: 203.4, tierFloorFp: 200, nextTierAt: 750, nextTierLabel: 'gold',
+  },
+  /* Landed exactly ON the floor, which is still a promotion. */
+  {
+    slot: 'RB2', playerId: 'e3', playerName: 'Jonathon Brooks', pos: 'RB', team: 'CAR',
+    tier: 'silver', points: 5, started: true,
+    careerFp: 200, tierFloorFp: 200, nextTierAt: 750, nextTierLabel: 'gold',
+  },
+  /* Already inside the tier — climbed, crossed nothing. */
+  {
+    slot: 'WR1', playerId: 'e4', playerName: 'Tetairoa McMillan', pos: 'WR', team: 'CAR',
+    tier: 'silver', points: 9.8, started: true,
+    careerFp: 260, tierFloorFp: 200, nextTierAt: 750, nextTierLabel: 'gold',
+  },
+  /* A bye. No arrow: the total is a standing figure, not a movement. */
+  {
+    slot: 'WR2', playerId: 'e5', playerName: "Tre' Harris", pos: 'WR', team: 'LAC',
+    tier: 'bronze', points: 0, started: false,
+    careerFp: 48.5, tierFloorFp: 0, nextTierAt: 200, nextTierLabel: 'silver',
+  },
+  /* Top tier: nothing above it to count toward. */
+  {
+    slot: 'TE', playerId: 'e6', playerName: 'Brock Bowers', pos: 'TE', team: 'LV',
+    tier: 'diamond', points: 22.1, started: true,
+    careerFp: 2610.4, tierFloorFp: 2500, nextTierAt: null, nextTierLabel: null,
+  },
+  /* THE UNMIGRATED CLIENT. Every install is in this state until
+     20260831020000 is applied: the row draws its first two lines and no
+     third, rather than doing arithmetic on an absent zero. */
+  {
+    slot: 'FLEX', playerId: 'e7', playerName: 'Emeka Egbuka', pos: 'WR', team: 'TB',
+    tier: 'bronze', points: 12.4, started: true,
+    careerFp: null, tierFloorFp: null, nextTierAt: null, nextTierLabel: null,
+  },
+];

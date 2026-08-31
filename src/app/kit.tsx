@@ -46,6 +46,7 @@ import { SearchField, SortChips } from '@/components/ui/Controls';
 import { summarise } from '@/components/collection/types';
 import {
   KIT_COMMIT_PLAN,
+  KIT_ENTRY_SLOTS,
   KIT_SET_DAILY,
   KIT_SET_COMPLETE,
   KIT_SET_UNDER_FLOOR,
@@ -78,6 +79,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DropdownChip } from '@/components/ui/DropdownChip';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
+import { EntryLineup } from '@/components/contests/EntryLineup';
 import { PositionBadge, positionsForSlot, slotBadgeLabel } from '@/components/ui/PositionBadge';
 import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
 import { SegmentedControl } from '@/components/shell/SegmentedControl';
@@ -1468,6 +1470,14 @@ function Kit() {
                 }}
               />
             </Modal>
+          </Section>
+
+          <Section
+            title="Settled entry"
+            note="A finished lineup, read rather than built — the same component on your own settled contest and on somebody else's, opened off a row of the field. The third line is the point of it: the figure on the right is what the card SCORED, and the line under the name is what that scoring did to the card. career_fp counts this week too, so the row prints what it walked in with and what it walked out with rather than setting the same number down twice. The six rows are the six states that line can be in: an ordinary climb; a contest that carried the card over a tier floor, which replaces the distance with how far it got and turns green; the exact-boundary version of the same; a card already inside its tier so nothing was crossed; a nought and a bye, which get no arrow because nothing moved; and the top tier, which has no next threshold to count toward. THE LAST ROW HAS NO HISTORY AT ALL — that is a client talking to a database where migration 20260831020000 has not been applied, and it draws no third line rather than doing arithmetic on an absent zero. It is the state every install is in until that migration lands, which is why it is in here and not left to be imagined.">
+            <View style={styles.section}>
+              <EntryLineup slots={KIT_ENTRY_SLOTS} hint="Preseason Week 4" />
+            </View>
           </Section>
 
           <Section
