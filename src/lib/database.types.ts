@@ -1846,6 +1846,9 @@ export type Database = {
       contest_lineup: {
         Args: { p_contest: string; p_user: string }
         Returns: {
+          career_fp: number
+          next_tier_at: number
+          next_tier_label: Database["public"]["Enums"]["card_tier"]
           player_id: string
           player_name: string
           points: number
@@ -1854,6 +1857,7 @@ export type Database = {
           started: boolean
           team: string
           tier: Database["public"]["Enums"]["card_tier"]
+          tier_floor_fp: number
         }[]
       }
       contest_lobby: {
