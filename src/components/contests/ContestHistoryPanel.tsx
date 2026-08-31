@@ -38,9 +38,9 @@
  * NOTHING IS RECOMPUTED HERE. The rank, the field size, the prize and the
  * hearts are the server's, frozen at settlement; see `contest_history`.
  */
-import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { BackRow, weekLabel } from '@/components/contests/ContestRecapPanel';
 import { Gem } from '@/components/shell/AppHeader';
 import { Heart } from '@/components/runs/Hearts';
 import { useContestHistory, type HistoryEntry } from '@/components/contests/use-contest-history';
@@ -76,10 +76,15 @@ export function ContestHistoryPanel({
   error,
   more,
   onBack,
-}: ReturnType<typeof useContestHistory> & { onBack: () => void }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  const router = useRouter();
+  onOpen,
+}: ReturnType<typeof useContestHistory> & {
+  onBack: () => void;
+  /* THE ROW HANDS THE WHOLE ENTRY UP, not a code to look up again. Everything
+     the recap needs — result, score, place, prize, hearts — is already on it,
+     frozen at settlement, and the contest it names is very likely too old for
+     `contest_lobby` to answer about. See `ContestRecapPanel`. */
+  onOpen: (entry: HistoryEntry) => void;
+}) {
   const played = entries?.length ?? 0;
 
   return (
@@ -88,14 +93,7 @@ export function ContestHistoryPanel({
           control on the frame. The sheet's own ✕ still means "put the whole
           thing down"; this means "back to what I can enter", and the two must
           not be the same button wearing two meanings. */}
-      <Pressable
-        onPress={onBack}
-        accessibilityRole="button"
-        accessibilityLabel="Back to open contests"
-        style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-        <Text style={[Type.section, styles.chevron, { color: c.textTertiary }]}>‹</Text>
-        <Text style={[Type.strong, { color: c.textSecondary }]}>Open contests</Text>
-      </Pressable>
+      <BackRow label="Open contests" onPress={onBack} />
 
       {error ? <ErrorLine message={error} /> : null}
 
@@ -113,13 +111,7 @@ export function ContestHistoryPanel({
         ) : (
           <View>
             {entries?.map((e) => (
-              <HistoryRow
-                key={e.contestId}
-                entry={e}
-                onPress={() =>
-                  router.push({ pathname: '/contest/[code]', params: { code: e.code } })
-                }
-              />
+              <HistoryRow key={e.contestId} entry={e} onPress={() => onOpen(e)} />
             ))}
 
             {/* MORE IS A BUTTON, NOT A SCROLL TRIGGER. This list sits inside a
@@ -198,9 +190,7 @@ function HistoryRow({ entry, onPress }: { entry: HistoryEntry; onPress: () => vo
   const c = Colors[scheme];
   const gold = TierColors[scheme].gold.accent;
 
-  /* "Preseason Week 4", the same phrasing the recap card uses. The season type
-     arrives as the enum's own text, which is lower case and underscored. */
-  const week = `${entry.seasonType.replace(/_/g, ' ').replace(/^\w/, (m) => m.toUpperCase())} Week ${entry.week}`;
+  const week = weekLabel(entry.seasonType, entry.week);
   const place =
     entry.rank !== null && entry.entrants !== null ? `#${entry.rank} of ${entry.entrants}` : null;
 
@@ -278,19 +268,6 @@ const styles = StyleSheet.create({
   },
   markEmpty: { borderWidth: StyleSheet.hairlineWidth },
   markText: { fontSize: 13 },
-
-  /* Sits above the panel rather than inside it, so the back control is at the
-     top of the SHEET's scroll and not at the top of a list that scrolls under
-     it. 44 tall like every other target in the app. */
-  back: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
-    minHeight: 44,
-    alignSelf: 'flex-start',
-    paddingRight: Spacing.two,
-  },
-  chevron: { lineHeight: 22 },
 
   centre: { paddingVertical: Spacing.four, alignItems: 'center' },
   more: {

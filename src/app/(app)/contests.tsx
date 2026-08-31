@@ -11,7 +11,11 @@ import {
   ContestHistoryPanel,
   historySummary,
 } from '@/components/contests/ContestHistoryPanel';
-import { useContestHistory } from '@/components/contests/use-contest-history';
+import { ContestRecapPanel, weekLabel } from '@/components/contests/ContestRecapPanel';
+import {
+  useContestHistory,
+  type HistoryEntry,
+} from '@/components/contests/use-contest-history';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
 import { StatusChip } from '@/components/ui/StatusChip';
@@ -86,14 +90,20 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  * route for about an hour and it put a popup over a popup — two ✕s, and a back
  * gesture nobody expects. See the note on `ContestHistoryPanel`.
  */
-type View_ = 'open' | 'history';
+type View_ = 'open' | 'history' | 'recap';
 
 export default function ContestsScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const router = useRouter();
   const [view, setView] = useState<View_>('open');
-  const history = useContestHistory(view === 'history');
+  /* The contest being read, carried rather than looked up: a row from week two
+     is older than anything `contest_lobby` can answer about, and every figure
+     the recap needs is already on the row. See `ContestRecapPanel`. */
+  const [reading, setReading] = useState<HistoryEntry | null>(null);
+  /* Stays enabled once the archive has been opened, so coming back from a
+     recap does not refetch the season. */
+  const history = useContestHistory(view === 'history' || view === 'recap');
   const { contests, loading, error } = useContests();
   const { run } = usePlayer();
 
@@ -116,9 +126,13 @@ export default function ContestsScreen() {
   const entered = live.filter((c) => c.kind !== 'free' && c.mine !== null).length;
 
   const context =
-    view === 'history'
-      ? historySummary(history.entries, history.loading, history.done)
-      : loading
+    view === 'recap'
+      ? reading
+        ? weekLabel(reading.seasonType, reading.week)
+        : undefined
+      : view === 'history'
+        ? historySummary(history.entries, history.loading, history.done)
+        : loading
         ? undefined
         : open.length > 0
           ? `${open.length} open · one card plays one contest`
@@ -131,15 +145,37 @@ export default function ContestsScreen() {
 
   return (
     <PlayerSheetFrame
-      title={view === 'history' ? 'Recent contests' : 'Contests'}
+      title={
+        view === 'recap' ? (reading?.name ?? 'Contest') : view === 'history' ? 'Recent contests' : 'Contests'
+      }
       /* The count, or the rule when there is nothing to count. The sheet's
          subtitle is the one line a reader gets before the list, so it says
          whichever of the two is news. */
       subtitle={context}
       onClose={close}
       closeLabel="Close contests">
-      {view === 'history' ? (
-        <ContestHistoryPanel {...history} onBack={() => setView('open')} />
+      {view === 'recap' && reading ? (
+        <ContestRecapPanel
+          entry={reading}
+          onBack={() => setView('history')}
+          /* THE ONE PUSH LEFT ON THIS PATH, and it earns it: somebody else's
+             team is a different subject, not another view of this contest. */
+          onOpenEntry={(userId, name) =>
+            router.push({
+              pathname: '/entry/[contest]/[user]',
+              params: { contest: reading.contestId, user: userId, name },
+            })
+          }
+        />
+      ) : view === 'history' ? (
+        <ContestHistoryPanel
+          {...history}
+          onBack={() => setView('open')}
+          onOpen={(e) => {
+            setReading(e);
+            setView('recap');
+          }}
+        />
       ) : (
         <>
       {error ? <ErrorLine message={error} /> : null}
