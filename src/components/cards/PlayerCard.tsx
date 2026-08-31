@@ -626,46 +626,49 @@ export function PlayerCard({
   const totalH = Math.round(totalSize * 1.2);
 
   /**
-   * THE PRICE — `/50 SILVER` — as ONE run of type, at the label size.
-   *
-   * The whole phrase after the total is a single size, weight and colour end
-   * to end, threshold and tier name alike. It used to be two objects: the
-   * threshold set as a figure and the tier name set as a label, in different
-   * sizes and different inks. Split that way the line had four things
-   * competing in it and the eye had to rank them; as one run it has two — a
-   * number that is yours, and a phrase that is the price of the next one.
+   * THE PRICE — `/50 TO S` — one run of type, a point ABOVE the label size,
+   * ending in the next tier's own initial.
    *
    * ---------------------------------------------------------------------------
-   * "TO" IS GONE, AND THE HALF POINT CAME BACK WITH IT
+   * THE TIER NAME IS WHAT COST THE SIZE, NOT THE PREPOSITION
    * ---------------------------------------------------------------------------
    *
-   * This ran at `labelSize - 0.5` to buy room for the preposition, on a
-   * measurement that said a gold card's `599 /600 TO DIAMOND` needed ~94pt of
-   * a 93pt plate at the full label size and 90.3 at the half point down.
+   * Two revisions fought over the word "TO" on the assumption that the phrase
+   * was nearly fitting and the preposition was the last straw. Measured in the
+   * rendered font it was never close. The stat row is 94pt on a compact card;
+   * the tier mark takes 7, the two gaps 4, and a worst-case `599` 21.1, so the
+   * run has 61.9pt. Spelled out, `/600 TO DIAMOND` measures 70.1 at 6.5pt — over
+   * by eight, on every gold card rather than a rare one, so the card was
+   * clipping the whole time. Dropping "TO" bought one half point and left the
+   * phrase still the longest thing on the line.
    *
-   * MEASURED IN THE RENDERED FONT, THAT IS WRONG BY A WIDE MARGIN, and the
-   * shipped card was clipping. The stat row is 94pt on a compact card. The
-   * tier mark takes 7, the two gaps take 4, and a worst-case `599` takes 21.1,
-   * so the run has 61.9pt to live in. `/600 TO DIAMOND` measures 70.1 at 6.5 —
-   * over by eight, on every gold card, not a rare one. Keeping the preposition
-   * would have meant dropping to about 5.7pt, which is the wrong direction and
-   * below the floor anything is readable at.
+   * The tier NAME was the expensive token. `/600 TO D` measures 46.8 at 8pt
+   * against the same 61.9, which is enough headroom to spend on size instead:
+   * this now runs a point ABOVE `labelSize` rather than half a point below it,
+   * and it is the longest line the card can draw. Diamond is the top tier, so a
+   * diamond card has no next rung and prints nothing here.
    *
-   * Without it, `/600 DIAMOND` measures 61.4 at 7pt — inside 61.9 with half a
-   * point to spare, and it is the LONGEST line the card can draw. Diamond is
-   * the top tier, so a diamond card has no next rung and prints nothing here;
-   * every other card's threshold is at most three digits.
+   * `TO NEXT TIER` was the other candidate and it is the worst of the three at
+   * 17 characters — longer than spelling DIAMOND out.
    *
-   * The reading survives the cut better than the earlier note assumed. `413
-   * /750 GOLD` is read as "413 of 750, gold" — the slash is already doing the
-   * preposition's work, which is why the line was made a fraction in the first
-   * place. What could not survive was a bare LETTER after the number: `1,216 D`
-   * read as a quantity of D. The tier is still spelled out in full.
+   * ---------------------------------------------------------------------------
+   * A BARE LETTER WAS AMBIGUOUS. A LETTER AFTER A PREPOSITION IS NOT
+   * ---------------------------------------------------------------------------
    *
-   * This is still the smallest type on the card, and it is legible for the
-   * same reason the labels it replaces were: uppercase and tracked out.
+   * `1,216 D` shipped once and read as a quantity of D, which is why the tier
+   * was spelled out for several revisions afterwards. The fix is the grammar
+   * rather than the length: "to D" cannot be a quantity, it can only be a
+   * destination. The preposition is doing the work the extra six characters
+   * were doing, in two.
+   *
+   * And the letter is the app's own tier mark, not an abbreviation invented
+   * here. `TierMark`'s rule holds — tier is never colour alone, the INITIAL is
+   * what carries it, and the accent only makes it faster — so the line ends the
+   * way every other tier statement in the app ends. It also gives the row a
+   * symmetry it did not have: the tier you are leads it, the tier you are owed
+   * closes it.
    */
-  const priceSize = dims.labelSize;
+  const priceSize = dims.labelSize + 1;
   /* Proportional rather than the flat 0.6 the old labels used. At 6.5pt a
      fixed 0.6 is nearly a tenth of the em — open enough to cost 3pt of the
      line's margin for no legibility the tighter setting does not already have,
@@ -944,11 +947,11 @@ export function PlayerCard({
               {fmt(model.careerFp)}
             </Text>
 
-            {/* Named in full — "SILVER", not "S". A bare letter after a number
-                reads as a quantity of that letter, which is exactly how
-                `1,216 D` read two revisions ago. The PREPOSITION is what the
-                line gave up instead, and the slash had already been doing its
-                work: see `priceSize` for the measurement that settled it. */}
+            {/* THE INITIAL, IN THE NEXT TIER'S ACCENT — see `priceSize` for why
+                the name went and why a letter is safe here when `1,216 D` was
+                not. The accessible label spells the tier out in full, because
+                a screen reader announcing "D" is the ambiguity this line spent
+                three revisions removing. */}
             {threshold !== null && nextTier ? (
               <Text
                 numberOfLines={1}
@@ -965,8 +968,16 @@ export function PlayerCard({
                        small, and visible on a line this short. */
                     marginTop: priceSize * 0.12,
                   },
-                ]}>
-                {`/${fmt(threshold)} ${getTierTheme(nextTier, scheme).label}`}
+                ]}
+                accessibilityLabel={`of ${fmt(threshold)}, to ${getTierTheme(nextTier, scheme).label}`}>
+                {`/${fmt(threshold)} TO `}
+                <Text
+                  style={{
+                    color: getTierTheme(nextTier, scheme).colors.accent,
+                    fontWeight: '800',
+                  }}>
+                  {getTierTheme(nextTier, scheme).label.charAt(0)}
+                </Text>
               </Text>
             ) : null}
           </View>
