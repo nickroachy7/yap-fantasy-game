@@ -2,27 +2,26 @@
  * The floating tab pill's material, and the fade that gives it clean ground.
  *
  * ---------------------------------------------------------------------------
- * THE SCRIM IS NOT DECORATION. IT IS WHAT MAKES A FLOATING BAR READABLE
+ * THE FADE IS BELOW THE CAPSULE, NEVER BEHIND IT
  * ---------------------------------------------------------------------------
  *
- * A detached pill has content on every side of it — above, beside and beneath,
- * continuously, because the list scrolls through that ring. Without a fade you
- * get a player's name sliced in half by a capsule and avatar chips peering out
- * of the 20pt margins, which reads as a rendering fault rather than as depth.
- * The first version shipped exactly that.
+ * The first scrim ran from 44pt above the pill down to the screen's edge and
+ * was fully opaque from the capsule's top edge onward. It solved the problem it
+ * was aimed at — rows sliced by the capsule's edge — and destroyed the reason
+ * the pill exists: glass with a solid black panel behind it has nothing to
+ * refract, so the Liquid Glass rendered as a flat grey capsule. The material
+ * only exists where content passes under it.
  *
- * So a gradient sits behind the pill: transparent at the top, the page's own
- * black by the time it reaches the capsule, and solid from there down. Rows
- * dissolve into the background before they arrive rather than being cut by an
- * edge. It extends past the pill on every side — see `FADE` above it, and out
- * to the screen's edges — so the margins are clean ground rather than a window
- * onto the list.
+ * So content stays visible behind the glass, and the fade is a 20pt band
+ * BELOW the capsule, transparent at its top and the page's own black by the
+ * screen's edge. That is the one place a scrim is unambiguously worth it: the
+ * strip between the pill and the bottom of the screen is too short to show a
+ * whole row, so whatever lands in it is always a fragment, and a fragment
+ * reads as a rendering fault. Everywhere else the content showing through IS
+ * the effect.
  *
- * IT LIVES HERE RATHER THAN ON THE PAGE because `tabBarBackground` is the only
- * hook that renders between the scene and the bar's own contents. Drawing it
- * per page would mean every screen in the app owning a copy of the navigation's
- * appearance. The bar is `overflow: visible` for the same reason — a clipping
- * bar would crop this to the capsule and there would be nothing left to fade.
+ * It reaches out past the pill's own margins to the screen's edges, so the band
+ * runs the full width rather than stopping under the capsule's ends.
  *
  * ---------------------------------------------------------------------------
  * REAL GLASS WHERE THERE IS REAL GLASS, AND A DESIGNED FALLBACK WHERE NOT
@@ -40,10 +39,17 @@
  * `surfaceSheet` at 88%, the fill the bar had when it was attached, plus the
  * hairline a floating object needs and an attached one did not.
  *
- * The glass is tinted and its scheme is forced. Untinted regular glass over a
- * near-black page comes out lighter than anything else in the app, and on
- * `auto` a phone in light mode would draw light glass under white labels — this
- * app has its own theme and does not follow the system one.
+ * THE TINT IS LIGHT, AND IT WAS NOT. It went in at 55% on the argument that
+ * untinted regular glass over a near-black page comes out lighter than anything
+ * else in the app — true, but that was measured against a scrim that had
+ * already blacked out everything behind it. With the content back, a 55% wash
+ * flattens the refraction into a plain grey capsule and the tint becomes a
+ * second thing muting the effect. At 25% the app's own ramp still pulls it back
+ * from UIKit's default luminance without paying for it in transparency.
+ *
+ * The scheme is forced rather than left on `auto`, because this app has its own
+ * theme and does not follow the system one — on `auto` a phone in light mode
+ * would draw light glass under white labels.
  */
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { StyleSheet, View } from 'react-native';
@@ -61,48 +67,25 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  */
 const LIQUID = isLiquidGlassAvailable();
 
-/**
- * How far the fade reaches above the capsule.
- *
- * IT WENT IN AT 44 AND THAT WAS TOO FAR. The reasoning was that a lineup row is
- * 62 tall, so a fade a little under one row would catch a row before its type
- * reached the glass. What that missed is that the ramp is not the only thing
- * you see — everything under it is solid, so a 44pt fade darkens most of a row
- * ABOVE the capsule as well, and the bottom of the screen reads as dimmed
- * rather than as a bar sitting on a page.
- *
- * 24 keeps what the scrim is actually for. Rows still dissolve rather than
- * being sliced by the capsule's edge, because the dissolve only has to happen
- * in the few points before contact — not across a whole row.
- */
-const FADE = 24;
-
 export function TabBarGlass() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
   return (
     <>
-      {/* OUT PAST THE PILL ON EVERY SIDE. The negative insets are the pill's
-          own margins back out to the screen's edges, so the ring around the
-          capsule is clean ground rather than a view of the list. */}
+      {/* THE BAND UNDER THE CAPSULE. `top: TabPillHeight` is the bar's own
+          bottom edge, so this occupies exactly the margin between the pill and
+          the screen — nothing sits behind the glass. */}
       <View
         style={[
           styles.scrim,
-          { top: -FADE, start: -TabPillInset, end: -TabPillInset, bottom: -TabPillInset },
+          { top: TabPillHeight, height: TabPillInset, start: -TabPillInset, end: -TabPillInset },
         ]}
         pointerEvents="none">
         <Svg width="100%" height="100%">
           <Defs>
             <LinearGradient id="tabScrim" x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0" stopColor={c.background} stopOpacity="0" />
-              {/* Solid by the time it reaches the capsule's top edge, which is
-                  `FADE` down a box of `FADE + height + inset`. */}
-              <Stop
-                offset={`${FADE / (FADE + TabPillHeight + TabPillInset)}`}
-                stopColor={c.background}
-                stopOpacity="1"
-              />
               <Stop offset="1" stopColor={c.background} stopOpacity="1" />
             </LinearGradient>
           </Defs>
@@ -117,7 +100,7 @@ export function TabBarGlass() {
           <GlassView
             style={StyleSheet.absoluteFill}
             glassEffectStyle="regular"
-            tintColor={scheme === 'dark' ? 'rgba(14,16,19,0.55)' : 'rgba(255,255,255,0.55)'}
+            tintColor={scheme === 'dark' ? 'rgba(14,16,19,0.25)' : 'rgba(255,255,255,0.25)'}
             colorScheme={scheme}
             /* The pill is a container for four buttons, not a button.
                Interactive glass reacts to touches on itself, which would put a
