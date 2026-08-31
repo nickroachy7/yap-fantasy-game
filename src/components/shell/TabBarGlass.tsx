@@ -67,12 +67,52 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  */
 const LIQUID = isLiquidGlassAvailable();
 
+/**
+ * How far the fade reaches ABOVE the capsule, and how dark it gets there.
+ *
+ * This is the safe place to add weight. Above the pill's top edge is outside
+ * the glass's own footprint, so darkening it cannot flatten the refraction the
+ * way the first scrim did — that one was opaque from the capsule's top edge
+ * DOWN, which is precisely the region the glass needs to see.
+ *
+ * IT STOPS AT 0.8 RATHER THAN GOING SOLID. A fade that reaches full black
+ * exactly at the capsule's top edge draws a hard line there: black above,
+ * content visible through glass below. Stopping short keeps rows faintly
+ * present as they meet the pill, which is what the darkening around Sleeper's
+ * bar actually does — it dims its surroundings rather than erasing them.
+ *
+ * 24 against the earlier 44: that one was both too tall and fully opaque, and
+ * it made the bottom of every screen read as dimmed. This is a softening at the
+ * point of contact.
+ */
+const TOP_FADE = 24;
+const TOP_FADE_TO = 0.8;
+
 export function TabBarGlass() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
   return (
     <>
+      {/* ABOVE THE CAPSULE, so rows dim as they arrive at it rather than
+          meeting a hard edge. Outside the glass's footprint — see `TOP_FADE`. */}
+      <View
+        style={[
+          styles.scrim,
+          { top: -TOP_FADE, height: TOP_FADE, start: -TabPillInset, end: -TabPillInset },
+        ]}
+        pointerEvents="none">
+        <Svg width="100%" height="100%">
+          <Defs>
+            <LinearGradient id="tabScrimTop" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={c.background} stopOpacity="0" />
+              <Stop offset="1" stopColor={c.background} stopOpacity={`${TOP_FADE_TO}`} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#tabScrimTop)" />
+        </Svg>
+      </View>
+
       {/* THE BAND UNDER THE CAPSULE. `top: TabPillHeight` is the bar's own
           bottom edge, so this occupies exactly the margin between the pill and
           the screen — nothing sits behind the glass. */}
