@@ -86,6 +86,15 @@ export function TabBarGlass() {
           <Defs>
             <LinearGradient id="tabScrim" x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0" stopColor={c.background} stopOpacity="0" />
+              {/* SOLID BY HALFWAY, not at the very last pixel. Ramping evenly
+                  across all 20 points meant the band never actually reached
+                  black on screen — the darkest it ever got was the bottom edge
+                  itself, so a row sitting in the strip stayed legible and the
+                  fade read as absent. Reaching black at the midpoint gives a
+                  10pt dissolve and 10pt of clean ground under it, which is what
+                  makes it visible at all. Starting at zero rather than at a low
+                  opacity keeps the capsule's bottom edge seamless. */}
+              <Stop offset="0.5" stopColor={c.background} stopOpacity="1" />
               <Stop offset="1" stopColor={c.background} stopOpacity="1" />
             </LinearGradient>
           </Defs>
