@@ -73,7 +73,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { YapMark } from '@/components/brand/YapLogo';
 import { Heart } from '@/components/runs/Hearts';
-import { Colors, Spacing, TierColors } from '@/constants/theme';
+import { Colors, Radius, Spacing, TierColors } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -125,10 +125,23 @@ export function AppHeader({
         {/* Mark plus wordmark, not the stacked lockup. The lockup is two lines
             tall and this masthead is one line by design (see the header) —
             dropping it in would have doubled the height of the chrome on every
-            screen to say the same word. `ink` is the page, because that is what
-            the bot's face slots are showing through to. */}
+            screen to say the same word. */}
         <View style={styles.brand}>
-          <YapMark height={19} ink={c.background} />
+          {/* THE MARK SITS IN A TILE RATHER THAN ON THE PAGE. Free-floating, a
+              wide short glyph beside a wordmark has no left edge of its own —
+              it starts wherever its ink happens to start, so the masthead reads
+              as one ragged run of shapes rather than as a logo and a name. A
+              square gives it that edge, and it is the shape every app in this
+              category uses for exactly this slot. See `markTile`.
+
+              `ink` IS THE TILE, NOT THE PAGE. The bot's face slots are cut out
+              of the mark and show whatever is behind it — which is now the tile
+              rather than the background. Left as `c.background` the eyes came
+              out a shade darker than the square they sit in, which is the kind
+              of one-value mistake that looks like a rendering artefact. */}
+          <View style={[styles.markTile, { backgroundColor: c.backgroundElement, borderColor: c.border }]}>
+            <YapMark height={16} ink={c.backgroundElement} />
+          </View>
           <Text style={[styles.wordmark, { color: c.text }]}>YAP FANTASY</Text>
         </View>
 
@@ -189,7 +202,25 @@ const styles = StyleSheet.create({
   rowAttached: { paddingBottom: 4 },
   /* `flexShrink: 1` lives on the wordmark, not here, so the text truncates
      before the mark does — a clipped logo looks broken, clipped type does not. */
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 9, flexShrink: 1 },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
+  /* SQUARE, and the mark is centred in it rather than fitted to it. The glyph
+     is half again as wide as it is tall (`MARK_RATIO`), so a tile that hugged
+     it would not be a square — the padding is uneven by design and the box is
+     what the eye lines up on.
+
+     32 is the masthead's own line: the wordmark and the balance either side of
+     it are 14 and 17pt, so a tile much larger than this stops being chrome and
+     starts being a button nobody can press. `flexShrink: 0` because this row
+     truncates the type, never the logo — same rule as `brand` above. */
+  markTile: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.chip,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
   wordmark: {
     fontSize: 14,
     fontWeight: '800',
