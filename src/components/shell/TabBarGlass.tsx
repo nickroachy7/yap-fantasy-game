@@ -2,50 +2,44 @@
  * The floating tab pill's material, and the surround that gives it clean ground.
  *
  * ---------------------------------------------------------------------------
- * ONE SHAPE WITH A HOLE IN IT, BECAUSE FOUR RECTANGLES NEVER MEET CLEANLY
+ * THE DIMMING IS UNIFORM ACROSS THE CAPSULE'S EDGE, OR IT IS AN EDGE
  * ---------------------------------------------------------------------------
  *
- * The surround was assembled out of separate bands — one above the capsule, one
- * below — and the pieces did not join. Beside the pill, in the 20pt margins
- * either side of it, nothing was drawn at all: content there went from 80%
- * dimmed to fully lit at exactly the capsule's top edge, which put a hard
- * horizontal line across a bench row every time one scrolled past. That is not
- * a tuning problem. Any surround built from rectangles that dodge the capsule
- * has seams wherever two of them abut.
+ * This has been wrong twice in opposite directions and the two failures share a
+ * cause.
  *
- * So it is ONE rectangle covering the whole region, with the capsule punched
- * out of it by a mask. There is nothing for a seam to form between, and the
- * dimming is continuous from the top of the fade to the bottom of the screen
- * and out to both edges.
+ * First it was two rectangles, one above the pill and one below, with the 20pt
+ * margins beside the pill left undrawn — so content there jumped from dimmed to
+ * lit at the capsule's top edge and put a hard line across any row scrolling
+ * past. Then it was one rectangle with the capsule MASKED OUT, which removed
+ * that seam and created a subtler one in its place: the glass refracted
+ * undimmed content while everything around it sat at 80%, so the pill read as
+ * brighter than its surroundings and the step simply moved to the capsule's
+ * own outline.
  *
- * ---------------------------------------------------------------------------
- * THE HOLE IS WHAT KEEPS THE GLASS ALIVE
- * ---------------------------------------------------------------------------
- *
- * An earlier version blacked out everything from the capsule's top edge down.
- * It fixed rows being sliced and destroyed the reason the pill exists: glass
- * with a solid panel behind it has nothing to refract, so Liquid Glass rendered
- * as flat grey. The material only exists where content passes under it.
- *
- * The mask is the resolution. Everything around the capsule dims; the capsule's
- * own footprint stays perfectly clear, so the list runs under the glass exactly
- * as before. The pill reads as a lit window in a dimmed surround, which is what
- * Sleeper's does.
+ * ANY DIFFERENCE IN DIMMING ACROSS THAT BOUNDARY IS A VISIBLE EDGE. Masking a
+ * hole does not avoid one, it just draws it in the shape of the pill. So the
+ * gradient now runs straight through, capsule included, and there is nothing
+ * anywhere for the eye to catch on.
  *
  * ---------------------------------------------------------------------------
- * THE RAMP
+ * WHICH MEANS THE VALUE, NOT THE SHAPE, IS WHAT KEEPS THE GLASS ALIVE
  * ---------------------------------------------------------------------------
+ *
+ * The very first attempt dimmed behind the pill to SOLID, and Liquid Glass with
+ * nothing behind it renders as flat grey — the material only exists where
+ * content passes under it. That is a real constraint and it is why the mask was
+ * introduced. But solid was never the requirement; it was 100% that killed it.
+ *
+ * At `SURROUND` the page is still more than half visible, so the glass has
+ * plenty to refract and the pill sits over a dimmed page the way a frosted
+ * panel over a vignette actually would. Only the strip below the capsule goes
+ * fully solid, and that is past the glass entirely — it is too short to show a
+ * whole row, and a fragment at the screen's edge reads as a rendering fault.
  *
  *   0                    transparent, `TOP_FADE` above the capsule
- *   at the capsule top   `SURROUND`, and it holds that value down the sides
+ *   at the capsule top   `SURROUND`, held all the way to its bottom edge
  *   at the screen edge   solid
- *
- * SURROUND STOPS SHORT OF SOLID. Reaching full black at the capsule's edge
- * draws the same hard line this rewrite exists to remove, just in a different
- * place: black outside, lit content through glass inside. At 0.8 rows stay
- * faintly present as they pass, which is dimming a surround rather than erasing
- * it. Only the last strip goes solid, because it is too short to show a whole
- * row and a fragment at the screen's edge reads as a rendering fault.
  *
  * ---------------------------------------------------------------------------
  * REAL GLASS WHERE THERE IS REAL GLASS, AND A DESIGNED FALLBACK WHERE NOT
@@ -75,8 +69,8 @@
  * would draw light glass under white labels.
  */
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
-import Svg, { Defs, LinearGradient, Mask, Rect, Stop } from 'react-native-svg';
+import { StyleSheet, View } from 'react-native';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { Colors, TabPillHeight, TabPillInset } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -90,25 +84,21 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  */
 const LIQUID = isLiquidGlassAvailable();
 
-/** How far the dimming reaches above the capsule, and how dark it gets there. */
+/**
+ * How far the dimming reaches above the capsule, and how dark it gets there.
+ *
+ * 0.55 rather than 0.8, because the dimming now passes behind the glass rather
+ * than dodging it. 80% left the page barely present under the pill; a little
+ * over half keeps the surround obviously darkened while leaving the glass
+ * something with real contrast to work on.
+ */
 const TOP_FADE = 24;
-const SURROUND = 0.8;
+const SURROUND = 0.55;
 
 export function TabBarGlass() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
-  /**
-   * The surround spans the screen, and the mask needs real numbers.
-   *
-   * Percentages would do for the rectangle but not for the hole: the capsule
-   * has to be punched at a fixed inset from both edges with a fixed corner
-   * radius, and a radius cannot be expressed as a percentage of a box whose
-   * width it does not follow. The scrim box IS the screen's width — it is the
-   * bar, inset by `TabPillInset` on each side and then pushed back out by the
-   * same amount — so the window's width is the right measure.
-   */
-  const { width } = useWindowDimensions();
   const height = TOP_FADE + TabPillHeight + TabPillInset;
 
   return (
@@ -119,7 +109,7 @@ export function TabBarGlass() {
           { top: -TOP_FADE, height, start: -TabPillInset, end: -TabPillInset },
         ]}
         pointerEvents="none">
-        <Svg width={width} height={height}>
+        <Svg width="100%" height={height}>
           <Defs>
             <LinearGradient id="tabSurround" x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0" stopColor={c.background} stopOpacity="0" />
@@ -138,29 +128,8 @@ export function TabBarGlass() {
               />
               <Stop offset="1" stopColor={c.background} stopOpacity="1" />
             </LinearGradient>
-            {/* White shows the dimming, black punches it away. The black
-                capsule is the pill's exact footprint, so the glass sees the
-                page unobstructed. */}
-            <Mask id="tabHole">
-              <Rect x="0" y="0" width={width} height={height} fill="white" />
-              <Rect
-                x={TabPillInset}
-                y={TOP_FADE}
-                width={width - TabPillInset * 2}
-                height={TabPillHeight}
-                rx={TabPillHeight / 2}
-                fill="black"
-              />
-            </Mask>
           </Defs>
-          <Rect
-            x="0"
-            y="0"
-            width={width}
-            height={height}
-            fill="url(#tabSurround)"
-            mask="url(#tabHole)"
-          />
+          <Rect x="0" y="0" width="100%" height={height} fill="url(#tabSurround)" />
         </Svg>
       </View>
 
