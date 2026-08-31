@@ -17,9 +17,10 @@
  *      Both are here because "slowly, one at a time" and "just show me" are
  *      both legitimate ways to open a pack and neither should be the only one.
  *
- *   2. ALL TURNED OVER, WITH SPARES LEFT — the two sweeps. Adding eight cards
- *      to sets one at a time is eight presses of the same decision; this is one.
- *      See `pull-plan` for what each button will actually do.
+ *   2. ALL TURNED OVER, WITH TWO OR MORE SPARES LEFT — the two sweeps. Adding
+ *      eight cards to sets one at a time is eight presses of the same
+ *      decision; this is one. See `pull-plan` for what each will actually do,
+ *      and `canCommit` for why two is the floor rather than one.
  *
  * Once there is nothing left to reveal and nothing left to sweep, the row is
  * gone. It is the only part of the bar that ever is.
@@ -122,16 +123,41 @@ export function PullBar({
      spares" means, and an effect gets to draw one frame of the stale sentence
      before it corrects itself — over a button that commits to it. */
   const question: Asking =
-    (asking === 'commit' && plan.commits.length === 0) ||
-    (asking === 'sell' && plan.sells.length === 0)
+    (asking === 'commit' && plan.commits.length < 2) ||
+    (asking === 'sell' && plan.sells.length < 2)
       ? null
       : asking;
 
   const locked = busy || sweep !== null;
-  const canCommit = plan.commits.length > 0;
-  const canSell = plan.sells.length > 0;
-  /* Nothing to turn over and nothing to sweep. The pack is dealt with, however
-     the player dealt with it — including by deciding to keep the lot. */
+
+  /**
+   * A SWEEP NEEDS TWO CARDS. One is not a sweep.
+   *
+   * `Add 1 to sets ◆4` sitting under a card whose own button already reads
+   * `Add to Tennessee Titans ◆4` is the same act, on the same card, offered
+   * twice on one screen — and the bar's version is the vaguer of the two,
+   * since it does not name the set it would use. The button exists to spare
+   * you eight presses of one decision; at one card there are no presses to
+   * spare, and the card itself is the better place to make it.
+   *
+   * THE SAME RULE FOR BOTH, though only the add was noticed. `Sell 1` is the
+   * identical duplicate of the card's own `Sell`, and a bar that dropped one
+   * at a count of one while keeping the other would read as a bug rather than
+   * as a rule.
+   *
+   * THE COST, NAMED: the one card is not always the one in front of you, so
+   * this can mean scrolling the deck to reach it. That is accepted over the
+   * alternative of hiding the button only when its card happens to be focused
+   * — a control that appears and disappears under a thumb mid-swipe is worse
+   * than one that is simply, predictably absent.
+   */
+  const canCommit = plan.commits.length > 1;
+  const canSell = plan.sells.length > 1;
+
+  /* Nothing to turn over, and nothing left that a whole-pack button could do
+     better than the cards themselves. The pack is dealt with, however the
+     player dealt with it — including by keeping the lot, and including when
+     what remains is a single card wearing its own two buttons. */
   const settled = hidden === 0 && !canCommit && !canSell;
 
   /* ONE SENTENCE, AND ONLY THE ONE THAT CANNOT BE SHOWN ANY OTHER WAY. This
