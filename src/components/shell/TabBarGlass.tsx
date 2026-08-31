@@ -189,5 +189,14 @@ const styles = StyleSheet.create({
     borderRadius: TabPillHeight / 2,
     overflow: 'hidden',
   },
-  fallback: { borderWidth: StyleSheet.hairlineWidth },
+  /**
+   * IT NEEDS ITS OWN RADIUS. The border was drawn on an `absoluteFill` box with
+   * square corners inside a parent that rounds and clips, so the hairline
+   * survived along the straight edges and was cut away at both ends — an
+   * outline that stopped before the corners, which is exactly how it looked.
+   *
+   * Clipping cannot round a border; it can only remove the parts outside the
+   * shape. The border has to be drawn on the same shape it is meant to trace.
+   */
+  fallback: { borderWidth: StyleSheet.hairlineWidth, borderRadius: TabPillHeight / 2 },
 });
