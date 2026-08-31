@@ -1865,16 +1865,26 @@ export type Database = {
       contest_lineup: {
         Args: { p_contest: string; p_user: string }
         Returns: {
+          awarded: boolean
+          bonus_gems: number
           career_fp: number
+          gems: number
+          home: boolean
           next_tier_at: number
           next_tier_label: Database["public"]["Enums"]["card_tier"]
+          opp_score: number
+          opponent: string
           player_id: string
           player_name: string
           points: number
           pos: string
           slot: string
           started: boolean
+          starts_at: string
+          status_state: string
+          status_text: string
           team: string
+          team_score: number
           tier: Database["public"]["Enums"]["card_tier"]
           tier_floor_fp: number
         }[]
@@ -2054,6 +2064,7 @@ export type Database = {
           lineup_id: string
           low: number
           median: number
+          my_gems: number
           my_points: number
           my_prize: number
           my_rank: number

@@ -19,6 +19,17 @@
  *     │ ♥ 1 heart               │                    │
  *     └──────────────────────────────────────────────┘
  *
+ * THE THIRD BAND CHANGES TENSE WHEN THE WEEK IS OVER, and nothing else does:
+ *
+ *     │ STAKED                  │ EARNED             │  TRADE   56pt
+ *     │ 40 gems                 │ Won 120 gems       │
+ *     │ ♥ 1 heart kept          │ +1 heart           │
+ *
+ * Same columns, same labels' position, same reserved rows, same height. That
+ * is the card's FINISHED STATE — a band that has stopped asking for a decision
+ * — and it is what retired the bordered note the recap board used to carry
+ * between this card and the lineup under it. See `settled` and `stakeLines`.
+ *
  * ---------------------------------------------------------------------------
  * THE 2026-08-27 REWORK
  * ---------------------------------------------------------------------------
@@ -122,6 +133,9 @@ import {
   type ContestTerms,
   type Duel,
   type TradeLine,
+  stakeLines,
+  takeLines,
+  type Settlement,
 } from './contest-model';
 
 /** Dash rather than a nought: no number yet is not the same as no points. */
@@ -844,15 +858,33 @@ function TugBar({ mine, theirs }: { mine: number; theirs: number }) {
  * heart is still riding, the pool is still growing, and the reward is still
  * ahead of you.
  */
-function Trade({ terms, prize }: { terms: ContestTerms; prize: number | null }) {
+function Trade({
+  terms,
+  prize,
+  settled,
+}: {
+  terms: ContestTerms;
+  prize: number | null;
+  settled: Settlement | null;
+}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
+  /* THE SAME BAND IN THE PAST TENSE — see `stakeLines` in `contest-model`.
+     Two columns, two labels, the same fixed rows; only the tense of what is in
+     them changes, so the card's height cannot move and a reader who has looked
+     at this corner all week finds the answer where the question was. */
   return (
     <View style={[styles.band, styles.trade]}>
-      <TradeColumn label="RISK" lines={riskLines(terms)} />
+      <TradeColumn
+        label={settled ? 'STAKED' : 'RISK'}
+        lines={settled ? stakeLines(terms, settled) : riskLines(terms)}
+      />
       <View style={[styles.tradeRule, { backgroundColor: c.border }]} />
-      <TradeColumn label="REWARD" lines={rewardLines(terms, prize)} />
+      <TradeColumn
+        label={settled ? 'EARNED' : 'REWARD'}
+        lines={settled ? takeLines(terms, settled, prize) : rewardLines(terms, prize)}
+      />
     </View>
   );
 }
@@ -876,7 +908,19 @@ function TradeColumn({ label, lines }: { label: string; lines: TradeLine[] }) {
       </Text>
       {shown.map((line) => (
         <View key={line.text} style={styles.tradeLine}>
-          {line.heart ? <Heart size={10} state="free" color={c.negative} /> : null}
+          {/* A HEART THAT WAS TAKEN IS DRAWN AS TAKEN. Every other heart on
+              this card is a heart you still hold, and `Hearts` already owns
+              the two shapes — whole and torn — that tell those apart on the
+              rail directly beneath the carousel. Drawing a lost heart whole
+              here would be the one place in the app where the glyph and the
+              word beside it disagree. */}
+          {line.heart ? (
+            <Heart
+              size={10}
+              state={line.tone === 'negative' ? 'killed' : 'free'}
+              color={line.tone === 'negative' ? undefined : c.negative}
+            />
+          ) : null}
           {/* `fine`, NOT `body`, AND THAT IS A RANK FIX BEFORE IT IS A SIZE
               ONE. The win condition in the head is the line on this card a
               reader must not skim, and it is set at `fine`; the trade's values
@@ -887,7 +931,14 @@ function TradeColumn({ label, lines }: { label: string; lines: TradeLine[] }) {
             style={[
               Type.fine,
               styles.tradeText,
-              { color: line.tone === 'positive' ? c.positive : c.text },
+              {
+                color:
+                  line.tone === 'positive'
+                    ? c.positive
+                    : line.tone === 'negative'
+                      ? c.negative
+                      : c.text,
+              },
             ]}>
             {line.text}
           </Text>
@@ -980,6 +1031,7 @@ export function ContestCard({
   status,
   entry = null,
   prize = null,
+  settled = null,
   level = 'sheet',
   onPress,
 }: {
@@ -998,8 +1050,17 @@ export function ContestCard({
   status?: React.ReactNode;
   /** Your entry, or null in the lobby. */
   entry?: Entry | null;
-  /** What you were paid, once the week is settled. */
+  /** What you were paid out of the pool, once the week is settled. */
   prize?: number | null;
+  /**
+   * THE WEEK IS OVER AND THIS IS WHAT IT DID. Null while it is still an offer.
+   *
+   * It turns the trade band's tense over — `STAKED` and `EARNED` in place of
+   * `RISK` and `REWARD` — which is the card's finished state and the reason
+   * the board underneath no longer carries a note explaining that a recap
+   * cannot be edited. See `stakeLines` in `contest-model`.
+   */
+  settled?: Settlement | null;
   /** What this card is sitting on. See `CardLevel`. */
   level?: CardLevel;
   onPress?: () => void;
@@ -1017,7 +1078,7 @@ export function ContestCard({
         duel={entry?.opponent}
       />
       <Score terms={terms} entry={entry} />
-      <Trade terms={terms} prize={prize} />
+      <Trade terms={terms} prize={prize} settled={settled} />
     </>
   );
 

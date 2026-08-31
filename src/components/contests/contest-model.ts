@@ -22,7 +22,7 @@
  * descriptions of one thing.
  */
 
-import { MIN_ENTRANTS } from '@/components/lineup/field';
+import { MIN_ENTRANTS, type Result } from '@/components/lineup/field';
 
 /** How a contest decides a winner. Mirrors `public.contest_win_condition`. */
 export type WinCondition = 'median' | 'top_n';
@@ -287,7 +287,7 @@ export function formatLine(t: ContestTerms, name?: string): string {
  * stake is drawn on the row rather than left to the contest page to disclose
  * after the tap.
  */
-export type TradeLine = { text: string; heart?: boolean; tone?: 'positive' };
+export type TradeLine = { text: string; heart?: boolean; tone?: 'positive' | 'negative' };
 
 /**
  * WHAT YOU PUT UP.
@@ -395,4 +395,147 @@ export function rewardLines(t: ContestTerms, prize: number | null = null): Trade
 export function topPrize(t: ContestTerms): number | null {
   if (t.winCondition !== 'top_n' || t.winRank === null || t.prizePool <= 0) return null;
   return Math.floor((t.prizePool * 2) / (t.winRank + 1));
+}
+
+/* --------------------------------------------------------- the settlement */
+
+/**
+ * WHAT A FINISHED WEEK ACTUALLY DID, which is a different question from the
+ * trade and needs a different pair of columns.
+ *
+ * ---------------------------------------------------------------------------
+ * THE TRADE BAND WAS IN THE WRONG TENSE ON EVERY RECAP CARD
+ * ---------------------------------------------------------------------------
+ *
+ * `riskLines` and `rewardLines` describe an OFFER: what you will put up, what
+ * you could take. That is right up to the final whistle and stops being right
+ * the moment there is an answer. A settled card drew
+ *
+ *     RISK                REWARD
+ *     ♥ 1 heart           From 1.5 gems a point
+ *
+ * over a scoreboard reading 28.0 to 16.2 with the week already gone — a heart
+ * described as still riding when it had been kept, and a rate quoted as an
+ * inducement to enter a contest nobody can enter. Both facts were knowable and
+ * neither was drawn anywhere on the card.
+ *
+ * So the third band changes tense with the week. Same geometry, same two
+ * columns, same fixed rows — `STAKED` and `EARNED` where `RISK` and `REWARD`
+ * were, and past-tense values in them. THAT IS THE CARD'S FINISHED STATE, and
+ * it is why the board no longer needs a bordered note underneath saying so:
+ * a card written in the past tense is a card that has stopped asking for a
+ * decision, which is the whole of what the note was there to explain.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT IT DOES NOT REDERIVE
+ * ---------------------------------------------------------------------------
+ *
+ * `result` is settlement's own — `contest_results`, through `my_contest_cards`
+ * — for the reason at the top of this file: the median is not how every
+ * contest is won and a second opinion here would be the exact divergence this
+ * file exists to close. A NULL result is not a loss. A field too small to be a
+ * contest never settles at all, and nothing moved either way.
+ */
+export type Settlement = {
+  /** W, L, T — or null where the field was too small to be a contest. */
+  result: Result | null;
+  /**
+   * What the CARDS in this entry were paid, summed.
+   *
+   * Not the prize: this is `award_score_gems` at 1.5 a point times each card's
+   * tier multiplier, which every entry earns and which is the only payment a
+   * free contest ever makes. Null until the payout has run — never a zero, for
+   * the reason on `EntryLineup`.
+   */
+  gems: number | null;
+};
+
+/**
+ * WHAT IT COST, now that the answer is known.
+ *
+ * The gems went at submission and do not come back, so they read exactly as
+ * they did on the offer. The heart is the line that changes: `hearts_delta` is
+ * `-hearts_at_risk` on a loss and nothing at all otherwise, which is the whole
+ * of what settlement does to a run (see `20260825170000`).
+ *
+ * A NULL RESULT PASSES NO VERDICT, and this is the case to be careful about.
+ * The band turns over when the WEEK is final, and `settle_run_hearts` runs
+ * after that — so there is an interval where the games are done and nothing
+ * has been decided, and a contest whose field was too small to score never
+ * decides at all. Neither is a heart kept and neither is a heart lost, so
+ * neither gets a word: the line reverts to the bare noun the offer carried,
+ * and gains its verdict when there is one to gain.
+ *
+ * COLOURED IN BOTH DIRECTIONS, which is why `TradeLine` grew a second tone. A
+ * kept heart is the good half of this receipt and the only place the card can
+ * say so; a lost one is the whole reason a run ends, and it must not be drawn
+ * in the same ink as the entry fee beside it.
+ */
+export function stakeLines(t: ContestTerms, s: Settlement): TradeLine[] {
+  const lines: TradeLine[] = [];
+  if (t.entryFeeGems > 0) lines.push({ text: `${t.entryFeeGems} gems` });
+  if (t.heartsAtRisk > 0) {
+    const noun = t.heartsAtRisk === 1 ? '1 heart' : `${t.heartsAtRisk} hearts`;
+    if (s.result === 'L') lines.push({ text: `${noun} lost`, heart: true, tone: 'negative' });
+    else if (s.result !== null) {
+      lines.push({ text: `${noun} kept`, heart: true, tone: 'positive' });
+    } else lines.push({ text: noun, heart: true });
+  }
+  if (lines.length === 0) lines.push({ text: 'Nothing' });
+  return lines;
+}
+
+/**
+ * WHAT CAME BACK, in the order of what a reader would be sorry to lose.
+ *
+ * Three things can be paid and the band has room for two, so the order is the
+ * ranking and it is deliberate:
+ *
+ *   1. THE PRIZE, where there is one. It is specific to this contest, it is
+ *      the largest figure on the card, and it is the thing entering was for.
+ *   2. THE HEART, where the contest heals and the entry won. Hearts are the
+ *      scarcest thing in the game and the only place they come from is here.
+ *   3. THE CARD GEMS. The baseline every entry earns — and the one line that
+ *      is restated in full directly underneath, one figure per row of the
+ *      lineup, which is what makes it the safe one to drop.
+ *
+ * On the free contest, which is the contest every player is in, there is no
+ * prize and usually no heal, so the card gems are the whole of it — and they
+ * are the sum of the per-row figures below. That closure is the point: a
+ * player can read the total on the card and then see which cards made it.
+ *
+ * THE QUALIFIER APPEARS ONLY WHEN IT IS NEEDED. With a prize on the line above
+ * it, a bare "42 gems" would be a second unexplained sum next to a first one;
+ * on its own there is nothing to tell it apart from, and the shorter string is
+ * the one that cannot be clipped.
+ *
+ * AND "STILL SETTLING" IS NOT "NOTHING". `award_score_gems` runs after the
+ * week completes, so there is a real interval — minutes, and longer if a
+ * provider is slow — where the scores are final and nothing has been paid.
+ * That is the state a player refreshing on a Tuesday morning is most likely to
+ * catch, and reporting it as a week that earned nothing would be the worst
+ * available lie.
+ */
+export function takeLines(
+  t: ContestTerms,
+  s: Settlement,
+  prize: number | null = null,
+): TradeLine[] {
+  const lines: TradeLine[] = [];
+  const paid = prize !== null && prize > 0;
+
+  if (paid) lines.push({ text: `Won ${prize} gems`, tone: 'positive' });
+  if (t.heartsOnWin > 0 && s.result === 'W') {
+    lines.push({
+      text: t.heartsOnWin === 1 ? '+1 heart' : `+${t.heartsOnWin} hearts`,
+      heart: true,
+      tone: 'positive',
+    });
+  }
+  if (s.gems !== null && s.gems > 0) {
+    lines.push({ text: paid ? `${s.gems} gems from cards` : `${s.gems} gems` });
+  }
+
+  if (lines.length === 0) lines.push({ text: s.gems === null ? 'Still settling' : 'Nothing' });
+  return lines;
 }

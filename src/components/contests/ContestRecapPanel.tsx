@@ -127,7 +127,12 @@ export function ContestRecapPanel({
       <EntryLineup
         slots={slots ?? []}
         hint={weekLabel(entry.seasonType, entry.week)}
-        empty={mineLoading ? 'Loading…' : 'Nothing filed'}
+        /* Rows of reserved height rather than the word "Loading…", which was a
+           one-line empty state standing in for an eight-row board — so the
+           sheet's whole lower half jumped when the read landed. See
+           `RowSkeleton`. */
+        loading={mineLoading}
+        empty="Nothing filed"
         emptyBody={mineError ?? undefined}
       />
 

@@ -778,62 +778,125 @@ export const KIT_COMMIT_PLAN: CommitPlan = {
 };
 
 /**
- * A settled entry, drawn as the six states its third line can be in.
+ * A settled entry, drawn as every state its three lines can be in at once.
  *
- * The line is the card's own history, and every branch of `cardStory` is here
- * because the interesting ones cannot be reached by looking at a real week:
- * a promotion needs a card that crossed a floor THIS contest, and the last row
- * needs a database that has not been migrated yet.
+ * It is the board's row — `ReadOnlyRow` over `Identity` — so these fixtures
+ * have to exercise the two lines the board's own fixtures cannot:
+ *
+ *   THE FIXTURE, which on a settled row says who won. A win, a loss, a tie, a
+ *   BYE, and a card whose server sends no fixture at all. The tie is here
+ *   because it is the one result drawn in neither accent and it happens about
+ *   twice a season; the bye because it is the only line in the app coloured as
+ *   a warning; the last because it is the state every install is in until
+ *   `20260831050000` lands, and drawing it as a bye would be the row telling a
+ *   confident lie about a card that played.
+ *
+ *   THE TIER LINE, which is the card's own history. Every branch of
+ *   `cardStory`, and the interesting ones cannot be reached by looking at a
+ *   real week: a promotion needs a card that crossed a floor THIS contest.
+ *
+ * And the right column's three figures — the previous total, the gain, and the
+ * gems it paid — including the two states that are absences rather than
+ * noughts: a week settled but not yet paid, and a card with no history sent.
  *
  * The thresholds are the real ladder — 200 silver, 750 gold, 2500 diamond (see
- * `20260821250000_reachable_tier_ladder`) — so the arithmetic on screen is the
- * arithmetic that will run in production rather than numbers chosen to look
- * tidy.
+ * `20260821250000_reachable_tier_ladder`) — and the gem figures are what
+ * `award_score_gems` would actually pay at the tier each card held GOING IN, so
+ * the arithmetic on screen is the arithmetic that will run in production rather
+ * than numbers chosen to look tidy.
  */
 export const KIT_ENTRY_SLOTS: PeekEntrySlot[] = [
-  /* Ordinary: scored, climbed, still short of the next tier. */
+  /* Ordinary: scored, climbed, still short of the next tier. Paid at BRONZE
+     (1.00), which is the tier it went into the week holding — floor(9.8 × 1.5
+     × 1.00) = 14, exactly as `award_score_gems` prices it. */
   {
     slot: 'QB', playerId: 'e1', playerName: 'Ty Simpson', pos: 'QB', team: 'LAR',
     tier: 'bronze', points: 9.8, started: true,
     careerFp: 58.3, tierFloorFp: 0, nextTierAt: 200, nextTierLabel: 'silver',
+    gems: 14, bonusGems: null, awarded: true,
+    game: { opponent: 'BUF', home: true,  startsAt: null, status: 'final', statusText: 'Final', teamScore: 27, oppScore: 13 },
   },
-  /* The moment worth drawing: this contest carried it over the silver floor. */
+  /* The moment worth drawing: this contest carried it over the silver floor.
+     And it is still PAID AT BRONZE, because the multiplier is the one it held
+     going in — the promotion pays from next week. */
   {
     slot: 'RB1', playerId: 'e2', playerName: 'Jeremiyah Love', pos: 'RB', team: 'ARI',
     tier: 'silver', points: 9.8, started: true,
     careerFp: 203.4, tierFloorFp: 200, nextTierAt: 750, nextTierLabel: 'gold',
+    gems: 14, bonusGems: null, awarded: true,
+    game: { opponent: 'SF',  home: false, startsAt: null, status: 'final', statusText: 'Final/OT', teamScore: 24, oppScore: 27 },
   },
   /* Landed exactly ON the floor, which is still a promotion. */
   {
     slot: 'RB2', playerId: 'e3', playerName: 'Jonathon Brooks', pos: 'RB', team: 'CAR',
     tier: 'silver', points: 5, started: true,
     careerFp: 200, tierFloorFp: 200, nextTierAt: 750, nextTierLabel: 'gold',
+    gems: 7, bonusGems: null, awarded: true,
+    /* A TIE takes the quiet colour. Not a result anybody is pleased or
+       sorry about, and a third accent for a state that happens twice a
+       season would be a colour nobody learns. */
+    game: { opponent: 'NO',  home: true,  startsAt: null, status: 'final', statusText: 'Final', teamScore: 20, oppScore: 20 },
   },
-  /* Already inside the tier — climbed, crossed nothing. */
+  /* Already inside the tier — climbed, crossed nothing. Silver's 1.10 is what
+     makes 16 out of the same 9.8 the bronze rows were paid 14 for, which is
+     the whole argument for tier and the reason the figure is worth drawing. */
   {
     slot: 'WR1', playerId: 'e4', playerName: 'Tetairoa McMillan', pos: 'WR', team: 'CAR',
     tier: 'silver', points: 9.8, started: true,
     careerFp: 260, tierFloorFp: 200, nextTierAt: 750, nextTierLabel: 'gold',
+    gems: 16, bonusGems: null, awarded: true,
+    game: { opponent: 'ATL', home: false, startsAt: null, status: 'final', statusText: 'Final', teamScore: 31, oppScore: 17 },
   },
-  /* A bye. No arrow: the total is a standing figure, not a movement. */
+  /* A bye. No arrow: the total is a standing figure, not a movement. AND AN
+     EARNED NOUGHT, which is not the same as an unpaid row — the line is drawn,
+     quietly, because "this card made nothing" is a real answer. */
   {
     slot: 'WR2', playerId: 'e5', playerName: "Tre' Harris", pos: 'WR', team: 'LAC',
     tier: 'bronze', points: 0, started: false,
     careerFp: 48.5, tierFloorFp: 0, nextTierAt: 200, nextTierLabel: 'silver',
+    gems: 0, bonusGems: null, awarded: true,
+    /* A BYE: no game at all, so the fixture line says so in the negative
+       colour. It is the one row where that line is a warning rather than a
+       report, and the only place in the app that ever mentions a bye. */
+    game: null,
   },
-  /* Top tier: nothing above it to count toward. */
+  /* Top tier: nothing above it to count toward. The best week on the board and
+     the only one with a POSITION BONUS on it — 46 for the points at diamond's
+     1.40, plus 60 for finishing top of the tight ends, drawn as the 106 the
+     card actually made. */
   {
     slot: 'TE', playerId: 'e6', playerName: 'Brock Bowers', pos: 'TE', team: 'LV',
     tier: 'diamond', points: 22.1, started: true,
     careerFp: 2610.4, tierFloorFp: 2500, nextTierAt: null, nextTierLabel: null,
+    gems: 46, bonusGems: 60, awarded: true,
+    game: { opponent: 'KC',  home: true,  startsAt: null, status: 'final', statusText: 'Final', teamScore: 34, oppScore: 28 },
   },
-  /* THE UNMIGRATED CLIENT. Every install is in this state until
-     20260831020000 is applied: the row draws its first two lines and no
-     third, rather than doing arithmetic on an absent zero. */
+  /* SETTLED, NOT YET PAID. The state a week spends its first minutes in: the
+     scores are final and `award_score_gems` has not run, so there is no money
+     line at all. A nought here would tell a player their week paid nothing at
+     the exact moment they came to find out what it paid. */
   {
-    slot: 'FLEX', playerId: 'e7', playerName: 'Emeka Egbuka', pos: 'WR', team: 'TB',
+    slot: 'FLEX', playerId: 'e7', playerName: 'Rome Odunze', pos: 'WR', team: 'CHI',
+    tier: 'gold', points: 17.6, started: true,
+    careerFp: 812.5, tierFloorFp: 750, nextTierAt: 2500, nextTierLabel: 'diamond',
+    gems: null, bonusGems: null, awarded: false,
+    game: { opponent: 'GB',  home: false, startsAt: null, status: 'final', statusText: 'Final', teamScore: 21, oppScore: 14 },
+  },
+  /* A SERVER THAT SENDS NONE OF IT. 20260831020000 (the career), 040000 (the
+     money) and 050000 (the fixture) are all applied now, so nothing reaches
+     this state in production — it is kept because the row's contract is that
+     an absent column goes QUIET rather than being guessed at, and that
+     contract is only checkable if something exercises it. The failure it
+     guards against is specific: `game` undefined drawn as `game` null would
+     put "BYE — no game this week" in red on a card that scored 12.4. */
+  {
+    slot: 'FLEX2', playerId: 'e8', playerName: 'Emeka Egbuka', pos: 'WR', team: 'TB',
     tier: 'bronze', points: 12.4, started: true,
     careerFp: null, tierFloorFp: null, nextTierAt: null, nextTierLabel: null,
+    gems: null, bonusGems: null, awarded: false,
+    /* AND NO FIXTURE EITHER, which is the state that must not be drawn as a
+       bye: `game` is UNDEFINED rather than null, so the line is left blank
+       instead of claiming in red that a card which scored 12.4 did not play. */
   },
 ];
 

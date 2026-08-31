@@ -829,6 +829,27 @@ function Card({
 }) {
   const terms = termsOfEntry(contest);
 
+  /**
+   * THE WEEK IS OVER, SO THE TRADE BAND CHANGES TENSE. See `stakeLines`.
+   *
+   * KEYED ON THE WEEK BEING FINAL, NOT ON `recap`. `recap` means the board has
+   * moved on to a new slate, which happens days after the last whistle — so
+   * gating on it would leave a card offering a heart it had already resolved
+   * for the whole of Monday and Tuesday, which is exactly when a player is
+   * looking at it. The test is the same one `LockTag` draws FINAL from, and for
+   * the same reason: a stored nought is not a played week, so the field's best
+   * score is what proves anybody turned up.
+   *
+   * The two figures inside it are settlement's own and are never derived here —
+   * `result` from `contest_results`, `myGems` from the slots the payout stamped.
+   * Both are legitimately null for a while after the whistle, and the model
+   * words that state rather than guessing at it.
+   */
+  const settled =
+    contest.field.final && contest.field.high > 0
+      ? { result: contest.field.result, gems: contest.myGems }
+      : null;
+
   return (
     <ContestCard
       /* THE CONTEST'S OWN NAME, on every card. The free one is called
@@ -863,6 +884,7 @@ function Card({
         cut: contest.cut,
       }}
       prize={contest.myPrize}
+      settled={settled}
       /* THE PAGE, NOT A SHEET. The board is #000 with the tab bar's grey across
          the bottom, and this card is the other end of the same frame — see
          `CardLevel`. */

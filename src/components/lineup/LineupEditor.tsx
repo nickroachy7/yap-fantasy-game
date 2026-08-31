@@ -1085,7 +1085,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
    * describe the gap between them is gone with it.
    */
   const boards = current?.recap ? (
-    <RecapBoard contest={current} onCurrent={() => setSwiped(0)} />
+    <RecapBoard contest={current} />
   ) : (
     <>
       {/* THE WALL, WHERE IT CAN BE SEEN. Over the cap nothing on this board can

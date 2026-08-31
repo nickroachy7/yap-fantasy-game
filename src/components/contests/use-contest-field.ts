@@ -27,6 +27,7 @@ import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
 
 import type { Result } from '@/components/lineup/field';
+import { resolveStatus, type GameContext } from '@/components/lineup/model';
 
 export type FieldEntrant = {
   userId: string;
@@ -148,6 +149,37 @@ export type PeekSlot = {
   /** Where the next tier begins, and which one. Null on the top tier. */
   nextTierAt: number | null;
   nextTierLabel: string | null;
+  /**
+   * WHAT THE CARD WAS PAID for this week, in gems.
+   *
+   * `gems` is the score award — 1.5 a point times the multiplier of the tier
+   * the card held going INTO the week — and `bonusGems` is the position-finish
+   * bonus on top of it, which a handful of slots a week get and the rest do
+   * not. Both are stamped onto the slot at payout rather than derived here, so
+   * a row and the wallet cannot disagree about what was paid.
+   *
+   * `awarded` IS NOT `gems > 0`. A week that has been scored but not yet paid
+   * has null in both; a card that scored nothing has an earned zero. Drawn the
+   * same way, "not paid yet" would read as "earned nothing" — see the row.
+   */
+  gems: number | null;
+  bonusGems: number | null;
+  awarded: boolean;
+  /**
+   * THE FIXTURE, so a settled row can be the board's row.
+   *
+   * `started` is a boolean and was the whole of what this function knew about
+   * the game, which is enough to grey a figure and not enough to name one — a
+   * card on a bye and a card whose club lost 27–13 drew the same two-line row.
+   * `20260831050000` sends the fixture instead, in the shape `GameContext`
+   * already has, so `Identity` can draw it without a second vocabulary.
+   *
+   * NULL IS A BYE. UNDEFINED IS "THIS SERVER DOES NOT SEND FIXTURES" — an
+   * install without that migration — and the two must not be collapsed: a card
+   * that played and scored, drawn as a bye, is the row telling a confident lie
+   * about the one thing on it nobody can check from the screen. See `RowCard`.
+   */
+  game?: GameContext | null;
 };
 
 type PeekRow = {
@@ -165,6 +197,19 @@ type PeekRow = {
   tier_floor_fp: number | string | null;
   next_tier_at: number | string | null;
   next_tier_label: string | null;
+  gems: number | string | null;
+  bonus_gems: number | string | null;
+  awarded: boolean | null;
+  /* OPTIONAL for the same reason `my_gems` is on `MyContest`: CI publishes JS
+     without running `db push`, so the update has to survive landing on a
+     database where `20260831050000` has not been applied. */
+  opponent?: string | null;
+  home?: boolean | null;
+  starts_at?: string | null;
+  status_state?: string | null;
+  status_text?: string | null;
+  team_score?: number | string | null;
+  opp_score?: number | string | null;
 };
 
 /**
@@ -175,12 +220,29 @@ type PeekRow = {
  * apart from an empty lineup. That refusal is surfaced as written.
  */
 export function useContestLineup(contestId: string | null, userId: string | null) {
-  const [slots, setSlots] = useState<PeekSlot[] | null>(null);
+  /**
+   * THE ANSWER, TAGGED WITH THE QUESTION IT ANSWERS.
+   *
+   * A bare `PeekSlot[] | null` survives a change of contest: the loader only
+   * writes on success, so between "the reader swiped to another finished
+   * contest" and "that contest's lineup arrived" the state still holds the
+   * PREVIOUS one — and the board drew it, under the new contest's card. That is
+   * the exact mismatch the carousel exists to prevent (`20260825070000`), and
+   * it is reachable by anyone who played two contests in the recap week, or who
+   * opens two managers' entries in a row off the field.
+   *
+   * Keying the stored value to its request and deriving `slots` from a match
+   * closes it with no extra state and no extra render: a stale answer simply
+   * stops being an answer to the question now being asked.
+   */
+  const [held, setHeld] = useState<{ key: string; slots: PeekSlot[] } | null>(null);
+  const key = `${contestId ?? ''}:${userId ?? ''}`;
+  const slots = held !== null && held.key === key ? held.slots : null;
 
   const load = useCallback<Load>(
     async (live) => {
       if (!contestId || !userId) {
-        setSlots(null);
+        setHeld(null);
         return null;
       }
       const { data, error } = await supabase.rpc('contest_lineup', {
@@ -190,8 +252,9 @@ export function useContestLineup(contestId: string | null, userId: string | null
       if (!live()) return null;
       if (error) return error.message;
 
-      setSlots(
-        ((data ?? []) as PeekRow[]).map((r) => ({
+      setHeld({
+        key: `${contestId}:${userId}`,
+        slots: ((data ?? []) as PeekRow[]).map((r) => ({
           slot: r.slot,
           playerId: r.player_id,
           playerName: r.player_name,
@@ -210,8 +273,36 @@ export function useContestLineup(contestId: string | null, userId: string | null
              promotion that never arrives. */
           nextTierAt: num(r.next_tier_at),
           nextTierLabel: r.next_tier_label,
+          gems: num(r.gems),
+          bonusGems: num(r.bonus_gems),
+          /* THE COLUMN'S PRESENCE, not its value, is the first question. A
+             row without an `opponent` key at all is an unmigrated server and
+             cannot say anything; a row whose `opponent` is null is a BYE, and
+             that is a real answer the row draws in the negative colour. */
+          game: !('opponent' in r)
+            ? undefined
+            : r.opponent
+            ? {
+                opponent: r.opponent,
+                home: Boolean(r.home),
+                startsAt: r.starts_at ?? null,
+                /* `resolveStatus`, the same derivation the board's own
+                   schedule uses: the feed's word, promoted to `live` by the
+                   clock where the feed is still saying `scheduled` about a
+                   game that kicked off an hour ago. Two surfaces asking the
+                   same question must not answer it two ways. */
+                status: resolveStatus(r.status_state ?? null, r.starts_at ?? null),
+                statusText: r.status_text ?? null,
+                teamScore: num(r.team_score),
+                oppScore: num(r.opp_score),
+              }
+            : null,
+          /* FALSE ON AN OLD SERVER, which is the same forward-compatibility
+             `careerFp` has: `20260831040000` adds this column, and until it is
+             applied the row draws no money line rather than a paid nought. */
+          awarded: Boolean(r.awarded),
         })),
-      );
+      });
       return null;
     },
     [contestId, userId],

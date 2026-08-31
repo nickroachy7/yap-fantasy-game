@@ -96,6 +96,21 @@ export type MyContest = {
    * with more force to a number denominated in gems.
    */
   myPrize: number | null;
+  /**
+   * WHAT THE CARDS IN THIS ENTRY WERE PAID, summed — `award_score_gems` at 1.5
+   * a point times each card's tier multiplier, plus any position bonus.
+   *
+   * A different payment from `myPrize` and, on the free contest, the only one
+   * there is: a contest with no fee has no pool, so nothing can be redistributed
+   * out of it, and what a free entry actually earns is this. The settled card's
+   * EARNED column would otherwise be empty on the one contest every player is in.
+   *
+   * NULL UNTIL THE PAYOUT HAS RUN, never zero. A week is final for a while
+   * before `award_score_gems` reaches it, and a nought drawn in that window
+   * reports a week as having earned nothing at the moment a player is looking to
+   * find out what it earned. See `takeLines`.
+   */
+  myGems: number | null;
 };
 
 type Row = {
@@ -106,6 +121,11 @@ type Row = {
   cut: number | string | null;
   prize_pool: number | string | null;
   my_prize: number | string | null;
+  /* OPTIONAL, and that is the point: `20260831040000` adds this column and CI
+     ships JS without running `db push`, so the update can land on a database
+     that does not send it yet. Absent reads as null, which is the same "still
+     settling" the real pre-payout state draws. */
+  my_gems?: number | string | null;
   recap: boolean | null;
   contest_id: string;
   code: string;
@@ -206,6 +226,11 @@ export function useMyContests(includeCode?: string): MyContestsState {
         cut: num(r.cut),
         prizePool: num(r.prize_pool) ?? 0,
         myPrize: num(r.my_prize),
+        /* Absent on an install talking to a database without
+           `20260831040000`, which `num` reads as null — the same "still
+           settling" line the real pre-payout state draws, which is the right
+           thing for both. */
+        myGems: num(r.my_gems),
         recap: Boolean(r.recap),
       })),
     );

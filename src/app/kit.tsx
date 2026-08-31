@@ -27,7 +27,7 @@ import {
   type CardLevel,
   type Lock,
 } from '@/components/contests/ContestCard';
-import type { ContestTerms, Duel } from '@/components/contests/contest-model';
+import type { ContestTerms, Duel, Settlement } from '@/components/contests/contest-model';
 import { ContestAbout } from '@/components/contests/ContestAbout';
 import { ContestActions } from '@/components/contests/ContestActions';
 import { ContestFieldList } from '@/components/contests/ContestFieldPanel';
@@ -799,7 +799,7 @@ function Kit() {
 
           <Section
             title="Contest card"
-            note="ONE CARD, ONE SIZE. Head, scoring and trade — always all three, always at the same three heights, on every surface and in every phase of the week. That is the point of the 2026-08-27 rework: these are the pages of a horizontal carousel over a lineup board, so a card eleven points taller than its neighbour makes the whole screen jump on a swipe, and a card that grows when the first score lands moves the board out from under a reader mid-tap. Every text is one line and the trade columns pad to two rows rather than collapsing — a contest that risks no hearts is a shorter LIST, not a shorter card. THE HEAD is two rows: the name with the countdown at the far right, then how the contest is WON directly under it with the fill count under the countdown. The win condition led the trade band before, one rank down — it is not a term of the trade, it is what the contest IS. The countdown doubles as the phase (NEXT LOCK, then LIVE, then FINAL) and the entry count keeps it company because both are the contest's clock: how long you have, and whether enough people have turned up for the week to be scoreable. The win condition is LABELLED (`TO WIN`) rather than emphasised — it was 13pt semibold and in an argument with the contest's own name eleven points above; a reader who does not know what “Top 3 of 6 win” is a statement ABOUT cannot be told by making it bolder, only by naming it. And every string in the entry slot is counted rather than eyeballed: there is room for about eighteen characters beside it, and two drafts have already been lost to that — see `fillLine`. The season record used to sit here and is gone — it is one contest's property drawn on every card, and nothing on this screen is about the season. THE SCORING BAND IS A SCOREBOARD, which is the 2026-08-27 evening rework. Every format this game can have is one sentence with a different noun in it — you against the community's middle, you against the score at the cut, you against another manager — so the band draws two named sides and two totals, and the right-hand NAME is the only thing a format changes. `opponentOf` answers “who am I playing” where `markOf` answered “where do I draw a line”, which is why the head-to-head cards below are the same card and not a second one. Under the totals is a SLOT, not a rail: a field draws the distribution (where you sit between its worst and best, with the line to beat marked — the one thing a 26-manager contest has that a duel does not), a duel draws a tug-of-war from level, and a week with nothing to plot draws the empty rail so the first score arrives ON the scale. Only one state needs words — a week played in a contest with nobody else in it names its opponent NO FIELD YET, because a real total against a dash is otherwise unexplained. Before kickoff it reads 0–0 like any scoreboard before a game — which reverses an earlier call that 0.0 pregame was a bug. It WAS one, when a stored nought arrived under a FINAL chip on a week that had not started; a nought as one side of a scoreboard is a different claim made with the same character. The noughts are drawn tertiary so an empty scoreboard is not the loudest thing on the card. THE WHOLE CARD IS 166pt — 51 + 57 + 56 — down from 189, with nothing removed: five points of band padding a side instead of seven, the slot back to the rail's own 8, the hero back to 18/21, and the trade's values set at `fine` rather than `body`, which corrects a rank inversion as well as saving two points. A lineup row underneath is 62, so the card is under three of them. THE TRADE has its labels and its divider back — an arrow between the columns says which way a trade runs only to somebody who already knows they are looking at one. Both columns read from the LEFT: mirroring them about the divider gave the card two reading edges, so the reward lines began in a place that lined up with nothing above them. The first two here are lobby cards; the rest are entered. The ones that matter: a top-three contest where the median decides nothing and the mark is the CUT (27.1 is above that field's median and outside the places that pay, exactly the state the old card drew as winning); a field of ONE, which is its own low, mark and high; and the same card at both levels so the two fills can be compared. WHAT IS NO LONGER HERE: the lineup count. `1 SLOT TO FILL` and `7/8` are what the board's own `Starting lineup · 3/3 FILLED` heading says directly underneath, next to the rows you would fix it from."
+            note="ONE CARD, ONE SIZE. Head, scoring and trade — always all three, always at the same three heights, on every surface and in every phase of the week. That is the point of the 2026-08-27 rework: these are the pages of a horizontal carousel over a lineup board, so a card eleven points taller than its neighbour makes the whole screen jump on a swipe, and a card that grows when the first score lands moves the board out from under a reader mid-tap. Every text is one line and the trade columns pad to two rows rather than collapsing — a contest that risks no hearts is a shorter LIST, not a shorter card. THE HEAD is two rows: the name with the countdown at the far right, then how the contest is WON directly under it with the fill count under the countdown. The win condition led the trade band before, one rank down — it is not a term of the trade, it is what the contest IS. The countdown doubles as the phase (NEXT LOCK, then LIVE, then FINAL) and the entry count keeps it company because both are the contest's clock: how long you have, and whether enough people have turned up for the week to be scoreable. The win condition is LABELLED (`TO WIN`) rather than emphasised — it was 13pt semibold and in an argument with the contest's own name eleven points above; a reader who does not know what “Top 3 of 6 win” is a statement ABOUT cannot be told by making it bolder, only by naming it. And every string in the entry slot is counted rather than eyeballed: there is room for about eighteen characters beside it, and two drafts have already been lost to that — see `fillLine`. The season record used to sit here and is gone — it is one contest's property drawn on every card, and nothing on this screen is about the season. THE SCORING BAND IS A SCOREBOARD, which is the 2026-08-27 evening rework. Every format this game can have is one sentence with a different noun in it — you against the community's middle, you against the score at the cut, you against another manager — so the band draws two named sides and two totals, and the right-hand NAME is the only thing a format changes. `opponentOf` answers “who am I playing” where `markOf` answered “where do I draw a line”, which is why the head-to-head cards below are the same card and not a second one. Under the totals is a SLOT, not a rail: a field draws the distribution (where you sit between its worst and best, with the line to beat marked — the one thing a 26-manager contest has that a duel does not), a duel draws a tug-of-war from level, and a week with nothing to plot draws the empty rail so the first score arrives ON the scale. Only one state needs words — a week played in a contest with nobody else in it names its opponent NO FIELD YET, because a real total against a dash is otherwise unexplained. Before kickoff it reads 0–0 like any scoreboard before a game — which reverses an earlier call that 0.0 pregame was a bug. It WAS one, when a stored nought arrived under a FINAL chip on a week that had not started; a nought as one side of a scoreboard is a different claim made with the same character. The noughts are drawn tertiary so an empty scoreboard is not the loudest thing on the card. THE WHOLE CARD IS 166pt — 51 + 57 + 56 — down from 189, with nothing removed: five points of band padding a side instead of seven, the slot back to the rail's own 8, the hero back to 18/21, and the trade's values set at `fine` rather than `body`, which corrects a rank inversion as well as saving two points. A lineup row underneath is 62, so the card is under three of them. THE TRADE has its labels and its divider back — an arrow between the columns says which way a trade runs only to somebody who already knows they are looking at one. Both columns read from the LEFT: mirroring them about the divider gave the card two reading edges, so the reward lines began in a place that lined up with nothing above them. The first two here are lobby cards; the rest are entered. The ones that matter: a top-three contest where the median decides nothing and the mark is the CUT (27.1 is above that field's median and outside the places that pay, exactly the state the old card drew as winning); a field of ONE, which is its own low, mark and high; and the same card at both levels so the two fills can be compared. THE TRADE CHANGES TENSE WHEN THE WEEK DOES, which is the card's FINISHED STATE and the last four cards here. `RISK` and `REWARD` describe an offer — what you will put up, what you could take — and that stops being true at the final whistle; a settled card was drawing “♥ 1 heart” for a heart it had already kept and quoting a per-point rate as an inducement to enter a contest nobody could enter. So the same two columns become `STAKED` and `EARNED`, same geometry, same reserved rows, same height. It turns over on the WEEK being final rather than on the slate rolling, because the gap between those is Monday and Tuesday and that is when a player reads this. Three payments can land in EARNED and there is room for two, so the order is a ranking: the prize (specific to this contest, and what entering was for), then a healed heart (the scarcest thing in the game), then what the cards earned — which drops last because it is restated in full, one figure per row, on the lineup directly underneath. On the free contest there is no prize and the card gems ARE the receipt. AND NEITHER NULL IS ROUNDED DOWN: the last card is final-and-unpaid, where award_score_gems and settle_run_hearts have not run — EARNED says “Still settling” rather than nothing, and the heart carries no verdict rather than being claimed as kept. This is what retired the bordered four-line “This week is finished” note that used to stand between the card and the lineup; a band that has stopped asking for a decision IS the finished state. WHAT IS NO LONGER HERE: the lineup count. `1 SLOT TO FILL` and `7/8` are what the board's own `Starting lineup · 3/3 FILLED` heading says directly underneath, next to the rows you would fix it from."
           >
             <ContestCard
               name="WR Room"
@@ -908,6 +908,78 @@ function Kit() {
               terms={KIT_TERMS_FREE}
               myPoints={null}
               field={DEMO_FIELD_UNPLAYED}
+              lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
+            />
+            {/* THE FINISHED STATE, WHICH IS THE THIRD BAND IN THE PAST TENSE.
+
+                `STAKED` and `EARNED` where `RISK` and `REWARD` were, and it
+                turns over the moment the WEEK is final rather than when the
+                slate rolls — otherwise a card would spend Monday and Tuesday
+                offering a heart it had already resolved, which is exactly when
+                a player is reading it. This is what retired the bordered
+                "This week is finished" note that used to stand between the card
+                and the lineup; see `RecapBoard`.
+
+                THE FREE CONTEST WON. No pool, so no prize, and the whole of
+                what it paid is what its cards earned — 148 gems, which is the
+                sum of the per-row figures on the settled lineup above. */}
+            <KitEntered
+              name="Preseason Week 4"
+              terms={{ ...KIT_TERMS_FREE, entrants: DEMO_FIELD_AHEAD.entrants }}
+              myPoints={118.4}
+              field={{ ...DEMO_FIELD_AHEAD, final: true, result: 'W' }}
+              settled={{ result: 'W', gems: 148 }}
+              lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
+            />
+            {/* LOST, WHICH IS THE HALF THE OFFER COULD NOT SAY. The heart is
+                drawn torn and in the negative colour — `Hearts` already owns
+                that shape for the rail directly under the carousel, so the
+                glyph and the word beside it agree — and the cards were still
+                paid, because the faucet is not a prize and does not care who
+                won. */}
+            <KitEntered
+              name="Preseason Week 2"
+              terms={{ ...KIT_TERMS_FREE, entrants: DEMO_FIELD_BEHIND.entrants }}
+              myPoints={71.9}
+              field={{ ...DEMO_FIELD_BEHIND, final: true, result: 'L' }}
+              settled={{ result: 'L', gems: 96 }}
+              lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
+            />
+            {/* A PAID CONTEST, WON, WITH A HEAL. Three things were paid and the
+                band reserves two rows, so this is the card that proves the
+                ranking in `takeLines`: the prize leads because it is what
+                entering was for, the heart follows because hearts are the
+                scarcest thing in the game, and the card gems drop — they are
+                the one line restated in full one figure per row directly
+                underneath. */}
+            <KitEntered
+              name="WR Room"
+              terms={{ ...KIT_TERMS_TOP_N, heartsOnWin: 1 }}
+              myPoints={54.8}
+              /* Second of six and inside the places, which is what a W in a
+                 top-three contest has to look like. The base fixture is the
+                 LOSING side of the same cut — 27.1 in fourth — and inheriting
+                 its rank here would have drawn a prize and a kept heart over
+                 "#4 OF 6", the card contradicting itself in two bands. */
+              field={{ ...DEMO_FIELD_CUT, final: true, result: 'W', myRank: 2, ahead: 4 }}
+              cut={38.4}
+              prize={120}
+              settled={{ result: 'W', gems: 61 }}
+              lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
+            />
+            {/* FINAL AND NOT YET PAID, which is the state a week spends its
+                first minutes in and the one a fixture is the only way to see.
+                `award_score_gems` has not run, so there is no figure to report
+                and the column says so; `settle_run_hearts` has not run either,
+                so the heart carries NO VERDICT rather than being claimed as
+                kept. Both of those are nulls that mean "not yet", and the one
+                thing this card must never do is round them down to nothing. */}
+            <KitEntered
+              name="Preseason Week 4"
+              terms={{ ...KIT_TERMS_FREE, entrants: DEMO_FIELD_AHEAD.entrants }}
+              myPoints={118.4}
+              field={{ ...DEMO_FIELD_AHEAD, final: true }}
+              settled={{ result: null, gems: null }}
               lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
             />
             {/* AT `page` LEVEL, which is the fill the board uses: the same grey
@@ -1505,9 +1577,44 @@ function Kit() {
 
           <Section
             title="Settled entry"
-            note="A finished lineup, read rather than built — the same component on your own settled contest and on somebody else's, opened off a row of the field. The third line is the point of it: the figure on the right is what the card SCORED, and the line under the name is what that scoring did to the card. career_fp counts this week too, so the row prints what it walked in with and what it walked out with rather than setting the same number down twice. The six rows are the six states that line can be in: an ordinary climb; a contest that carried the card over a tier floor, which replaces the distance with how far it got and turns green; the exact-boundary version of the same; a card already inside its tier so nothing was crossed; a nought and a bye, which get no arrow because nothing moved; and the top tier, which has no next threshold to count toward. THE LAST ROW HAS NO HISTORY AT ALL — that is a client talking to a database where migration 20260831020000 has not been applied, and it draws no third line rather than doing arithmetic on an absent zero. It is the state every install is in until that migration lands, which is why it is in here and not left to be imagined.">
+            note="A finished lineup, read rather than built — the same component on your own settled contest and on somebody else's, opened off a row of the field. IT IS THE BOARD'S ROW. It was its own component, on the argument that `contest_lineup` returns none of the fields a `LineupCard` carries and should not — which was right about the INPUT and wrong to conclude anything about the output. The two are the same card in the same slot in the same eight, and a player who files a lineup on Saturday and reads it back on Tuesday is comparing them directly; drawn separately they came apart exactly where you would expect, at two lines against the board's three, with the tier mark up beside the position instead of down on the line about the card. The fix was to narrow the input rather than fork the output: `RowCard` is the nine fields a row actually reads, `LineupCard` satisfies it structurally so the board is untouched, and 20260831050000 sends the fixture that was the one thing genuinely missing. THREE DIFFERENCES AND NO MORE, all of them on the two lines that report a week rather than a card. The fixture line says WHO WON — `FINAL` is the least informative word available on a screen about a week that is over, since every row says it and the reader already knows, so that token is spent on `W 27–13 vs BUF` instead. The W and the L are their own coloured token rather than tinting the line, because `W 27–13 vs BUF` all in green would claim the opponent was good news too; a tie takes the quiet colour, being a result nobody is pleased or sorry about. The RIGHT COLUMN is a GAIN rather than a total, over what that gain PAID — one subject, the week, in the two currencies a week is worth anything in, filling the slot the board reserves for a projection it does not have. The gain is signed from the number and not prefixed, because fantasy points went signed in 20260828150000 and a hard-coded plus eventually renders `+-2.4`. It is TOP-ALIGNED and one size down (14, not the board's 15), which reverses this file's own rule about not aligning the two columns: that rule defends a figure over a dash, and it stops holding for two FILLED lines over a third that runs the full width underneath — centred, the pair floats in the middle of the row with nothing to be centred on. THE TIER LINE CARRIES THE MOVEMENT. `9.8 TFP` is where the card stands and says nothing about how it got there; `0.0 → 9.8 TFP` says this contest is where all of it came from, which is the point of reading a recap at all. The arrow is drawn only where the card actually moved — `48.5 → 48.5` on a bye invites a reader to look for a difference that is not there. An earlier draft put that `before` figure in the right-hand column beside the gain, and it was the wrong column twice over: half a movement parked next to the other half, and 20pt of width taken from the name, which truncated `Ty Simpson` to `Ty Simps…` on a 375pt phone. Moving it onto the line about the card's standing fixed both, and the column went back to the board's own 64. A column that has to grow is usually a column holding something that lives somewhere else. The CLOSING PHRASE is then a distance (`142 to Silver`) where the board prints a span (`142/200 to Silver Tier`), since the span would put a 142 beside the 142.4 two words to its left; where the movement crossed a floor it prints the promotion instead and turns green. THE ROWS ARE THE STATES: a win, a loss, a tie, a bye (the only line in the app drawn as a warning), a promotion and the exact-boundary version of it, a card already inside its tier, the top tier with nothing above it, a diamond card carrying a position bonus folded into the 106 it actually made, a week SETTLED BUT NOT YET PAID where award_score_gems has not run and a nought would tell a player their week earned nothing at the moment they came to find out what it earned, and last THE UNMIGRATED CLIENT — a database without 20260831020000, 040000 and 050000, which keeps its name, its badge and its figure and goes quiet on every line that needs a column the server is not sending. THE HEADING IS BARE on the recap board — no hint, no control. It briefly carried both, which was already smaller than the bordered four-line note it replaced, and still wrong: the carousel's promise is that swiping changes the CONTEST and not the page, so a heading that grows a subtitle and a link on one page and loses them on the next moves the rows under it by a line every time you cross that boundary. Two words of guidance are not worth a board that jumps. The entry page still passes a hint (“Locked in”), because it is a page of its own with nothing to swipe between."
+          >
             <View style={styles.section}>
-              <EntryLineup slots={KIT_ENTRY_SLOTS} hint="Preseason Week 4" />
+              {/* THE HEADING IS THE BOARD'S, BARE. The recap board passes no
+                  hint and no control: the carousel's promise is that swiping
+                  changes the contest and not the page, and a heading that
+                  grows a subtitle on one page moves the rows under it by a
+                  line every time you cross that boundary. The entry page does
+                  pass a hint — "Locked in" — because it is a page of its own
+                  with nothing to be swiped between. */}
+              <EntryLineup
+                slots={KIT_ENTRY_SLOTS}
+                /* THE GALLERY PADS BY 24, THE APP BY 16. Every real caller
+                   sits in a `Spacing.three` container and lets the rows bleed
+                   out to the screen edge, exactly as the lineup board does;
+                   bleeding 16 out of 24 here would leave them poking 8 points
+                   into this page's trough and looking like a bug. */
+                bleed={false}
+              />
+              {/* THE FRAME BEFORE THE ROWS ARRIVE, which is the state that
+                  cannot be waited for and the one that was wrong. A settled
+                  lineup is a separate read from everything else on the compete
+                  screen, so there is always a moment with nothing to draw —
+                  and drawing nothing took the board to zero height and sprang
+                  it back to eight rows, which on the carousel is the page
+                  bouncing every time you swipe onto a finished contest. The
+                  reservation is the contest's own slot count, so it is exact:
+                  the block below is the same height as the block above it, and
+                  the real rows land without moving anything. Silent rather
+                  than shimmering — a pulse is an animation the eye tracks, and
+                  a worse thing to put in front of somebody for 150ms than a
+                  quiet gap. */}
+              <EntryLineup
+                slots={[]}
+                loading
+                placeholder={KIT_ENTRY_SLOTS.length}
+                bleed={false}
+              />
             </View>
           </Section>
 
@@ -1840,6 +1947,7 @@ function KitEntered({
   opponent = null,
   lock,
   prize = null,
+  settled = null,
   level = 'sheet',
 }: {
   name: string;
@@ -1851,6 +1959,7 @@ function KitEntered({
   opponent?: Duel | null;
   lock: Lock;
   prize?: number | null;
+  settled?: Settlement | null;
   level?: CardLevel;
 }) {
   return (
@@ -1858,6 +1967,7 @@ function KitEntered({
       name={name}
       terms={terms}
       prize={prize}
+      settled={settled}
       level={level}
       lock={lock}
       entry={{ myPoints, projected: null, field, cut, opponent }}

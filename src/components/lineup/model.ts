@@ -40,6 +40,21 @@ export type GameContext = {
    * points are live and there are eleven minutes left".
    */
   statusText: string | null;
+  /**
+   * THE TWO TOTALS, from this card's side — his club's, then the other one's.
+   *
+   * OPTIONAL, AND ABSENT ALMOST EVERYWHERE. Only `contest_lineup` selects
+   * them, because only a settled row has a reason to say who won; the lineup
+   * board's own query does not, and a board row therefore keeps reading
+   * `FINAL vs BUF` exactly as it always has. That is the difference between
+   * the two surfaces and it is the ONLY one — see `resultLabel`.
+   *
+   * They are the scores rather than a verdict on purpose. A W is a comparison
+   * of these two numbers, and a server that sent both the numbers and the
+   * letter would be a server that could be caught disagreeing with itself.
+   */
+  teamScore?: number | null;
+  oppScore?: number | null;
 };
 
 /** Season production, derived from stat_lines x fantasy_points. */
@@ -324,6 +339,55 @@ export function matchupLabel(game: GameContext | null): string {
   if (!game) return 'BYE';
   if (!game.opponent) return 'BYE';
   return game.home ? `vs ${game.opponent}` : `@ ${game.opponent}`;
+}
+
+/**
+ * WHO WON, for a game that is over and whose score we hold.
+ *
+ * ---------------------------------------------------------------------------
+ * IT REPLACES `FINAL`, IT DOES NOT JOIN IT
+ * ---------------------------------------------------------------------------
+ *
+ * `liveLabel` returns `FINAL` for a finished game, and the fixture line spends
+ * a token on it: `FINAL vs BUF`. On a row about a week that is over, that is
+ * the least informative word available — every row on the board says it, and
+ * the reader already knows, because they are reading a recap.
+ *
+ * A result says the same thing and answers the actual question. `W 27–13 vs
+ * BUF` is finished, it is who won, and it is by how much, in the same space
+ * one word was using.
+ *
+ * ---------------------------------------------------------------------------
+ * NULL IS THE COMMON CASE AND MUST STAY CHEAP
+ * ---------------------------------------------------------------------------
+ *
+ * Three ways to get null and all three are ordinary:
+ *
+ *   no game            a bye, which `matchupLabel` already words
+ *   not final          scheduled or live, where the kickoff time and the game
+ *                      clock are the right things to print and `liveLabel`
+ *                      prints them
+ *   no scores selected the lineup board's query does not ask for them, so its
+ *                      rows fall back to the label they have always drawn
+ *
+ * The caller therefore treats this as an ENRICHMENT of the fixture line rather
+ * than a branch in it: take the result if there is one, otherwise carry on.
+ *
+ * THE EN DASH IS DELIBERATE. A hyphen between two numbers reads as a minus at
+ * 11pt, which on a row whose other figures are signed fantasy points is a real
+ * misreading rather than a typographic nicety.
+ */
+export function resultLabel(
+  game: GameContext | null,
+): { mark: 'W' | 'L' | 'T'; score: string } | null {
+  if (!game || game.status !== 'final') return null;
+  const mine = game.teamScore;
+  const theirs = game.oppScore;
+  if (mine === null || mine === undefined || theirs === null || theirs === undefined) return null;
+  return {
+    mark: mine > theirs ? 'W' : mine < theirs ? 'L' : 'T',
+    score: `${mine}\u2013${theirs}`,
+  };
 }
 
 /**
