@@ -100,63 +100,52 @@ void _tierParity;
  * the two-line stat stack it needed up there is exactly why the top of the
  * card carried a scrim heavy enough to read as a dark band.
  *
- * THE STAT LINE IS TWO LABELLED FIGURES, at opposite ends of the plate:
+ * THE STAT LINE IS ONE CENTRED LINE, and it says two things:
  *
- *     B 1,285            1,216
- *       TFP           TO DIAMOND
- *     ▓▓▓  ▓▓▓  ▓░░  ░░░
+ *          AJ Dillon
+ *        B 17 /50 TO SILVER
+ *       ▓▓░  ░░░  ░░░  ░░░
  *
- * What this copy has earned, and what it still owes for the next tier. Each
- * with its own name under it, which is the whole of what the previous version
- * was missing.
+ * WHAT YOU HAVE, then WHAT IT COSTS. The total is the only white thing on the
+ * line and the only 800 on it; everything after it — the threshold and the
+ * tier it buys — is ONE run of tertiary grey at one size and one weight, from
+ * the slash to the last letter. That single split is the whole design. There
+ * are three objects on the line and only two things to read.
  *
- * THE GAP, NOT THE THRESHOLD. `1,216 to Diamond` is a thing you can act on. An
- * earlier version printed `1,285/2,500`, which is a coordinate you have to
- * subtract before it means anything — and that subtraction is most of why it
- * read as arithmetic rather than as information.
+ * IT WAS TWO LABELLED FIGURES AT OPPOSITE ENDS OF THE PLATE for several
+ * revisions, which is what this replaces:
  *
- * IT TOOK THREE ARRANGEMENTS TO FIT BOTH LABELS, and the failures are worth
- * recording because each looked fine until it was measured against a compact
- * card's 93pt of plate.
+ *     B 17                34
+ *     TFP           TO SILVER
  *
- *   ONE LINE, everything on it. `1,285 TFP` beside `1,216 TO DIAMOND` measures
- *   ~99pt. Over.
+ * Four objects in two rows, spread to the edges, each figure paired with the
+ * label under it by the edge they shared. It is a defensible table and it was
+ * the wrong shape, for two separate reasons that only showed up in use.
  *
- *   ONE LINE, LABELS DROPPED, which is what shipped for a revision: `B 1,285
- *   1,216 D`. It fit, and it was a puzzle — four tokens with nothing saying
- *   which number was which. Two figures on a card with no names on them is not
- *   a saving.
+ * THE SHAPE OVERRODE THE LABELS. Two figures at opposite ends of a plate, the
+ * left one a total, are read as a fraction — whatever the words underneath
+ * say. The right-hand figure was the REMAINDER, and on a card at zero the
+ * remainder and the threshold are the same number, so a fresh card reading
+ * `0` and `50` taught everyone the fraction. Every card above zero then
+ * inherited that reading and got it wrong: 17 with 34 owed was read as "17 of
+ * 34", against a real target of 50. The fix is not a better label. The line is
+ * a fraction now, and prints the threshold (see `threshold`).
  *
- *   TWO COLUMNS, figure over label. Still over, and for a reason that is easy
- *   to miss: a column is as wide as its widest member, so the left one measured
- *   46.8pt — the width of `B 1,285`, not of `TFP` — and left 43.2 of the plate
- *   for the right. "TO DIAMOND" needs 54.5. Nothing done to the mark or the
- *   tracking closed an 11pt gap, and every shorter label that did fit ("TO
- *   NEXT", "NEEDED", "TO GO") bought the fit by dropping the one word the
- *   reader wants.
+ * IT COST A WHOLE LINE OF PICTURE to say one thing. The plate was 52pt of a
+ * 102pt card — half the square was nameplate — and the third row existed only
+ * to name the two figures above it. One line, one label run, and the plate is
+ * 41: the card is square by `artAspect`, so all 11pt go to the silhouette and
+ * the cell does not move. That is the cheapest 11pt on the square.
  *
- * TWO INDEPENDENT ROWS is what works. The figures are one row and the labels
- * another, each spread to the plate edges and each measured on its own: 78pt
- * of figures and 74 of labels, both inside 93. A label is no longer boxed by
- * the figure above it, so the long one has the whole row to spend. The pairing
- * is carried by the EDGE — each item sits on the same side as its figure —
- * rather than by a shared column, which is a weaker association on paper and an
- * indistinguishable one on the card.
- *
- * It is also the shape the rest of the app already uses for a labelled figure —
- * `StatStrip`, `DataTable`, `Type.micro` ("9pt uppercase column headers and
- * stat labels") — rather than a form invented here.
- *
- * IT COSTS THE PICTURE, NOT THE GRID. The card is square by `artAspect`, so a
- * taller nameplate takes its 9pt from the silhouette above it and a row of
- * cells is exactly as tall as it was. On a card with no licensed art to crop
- * into, that is the cheapest 9pt on the square.
- *
- * THE TARGET IS NAMED IN FULL — "TO DIAMOND", not "D". The letter was doing two
- * jobs at once in the version this replaces, sitting where a label belongs and
- * being a colour-coded mark, and it managed neither: `1,216 D` reads as a
- * quantity of something called D. The full name costs 54.5pt, which is why the
- * rows above had to stop being columns before it could be afforded.
+ * THE TARGET IS STILL NAMED IN FULL — "TO SILVER", not "S". A bare letter
+ * after a number reads as a quantity of that letter, which is exactly how
+ * `1,216 D` read in a revision before last. What it costs is the price run's
+ * type size: at `labelSize` a gold card's `599 /600 TO DIAMOND` measures 94pt
+ * against 93pt of plate and EVERY gold card draws that line. Half a point
+ * down, at `labelSize - 0.5`, it measures 90.3 and the phrase survives at
+ * every tier. The alternative that also fit was dropping "TO" — `599 /600
+ * DIAMOND` at the full label size — and it was refused because the preposition
+ * is how the line is read aloud.
  *
  * THE LADDER UNDER IT IS THE WHOLE CLIMB, NOT ONE SPAN OF IT.
  *
@@ -346,7 +335,15 @@ export type PlayerCardModel = {
    * be drawn as one.
    */
   careerFp: number | null;
-  /** What the figure IS. Defaults to the collection's 'TFP'. */
+  /**
+   * What the figure IS. Defaults to the collection's 'career fantasy points'.
+   *
+   * SPOKEN, NOT PRINTED, since the stat line lost its label row: the plate
+   * draws `B 17 /50 TO SILVER` with no unit on it, because a figure on a card
+   * in a fantasy collection is not a figure anyone asks the unit of. This
+   * still reaches a screen reader through `a11yLabel`, which is the one place
+   * the unit cannot be inferred from context.
+   */
   statLabel?: string;
   nextTierAt: number | null; // null when already diamond
   /**
@@ -395,12 +392,14 @@ export type PlayerCardProps = {
    * A mark laid over the card, low in the PICTURE and just clear of the plate.
    *
    * NOT THE CENTRE OF THE SQUARE, and that was asked for and measured before it
-   * was refused. On a compact card the nameplate is 52pt of 102 — 51% — since
-   * the stat block grew its labels, so the square's centre at y=51 sits one
-   * point BELOW the plate's top edge at y=50 and five points into the name. A
-   * badge big enough to read there covers the player's name on every cell in
-   * the grid. There is no size that fixes it: the mark would have to be 6pt
-   * across to clear the text, at which point it is not a mark.
+   * was refused. On a compact card the nameplate is 41pt of 102, so the
+   * square's centre at y=51 sits ten points BELOW the plate's top edge at y=61
+   * and squarely in the name. A badge big enough to read there covers the
+   * player's name on every cell in the grid. There is no size that fixes it:
+   * the mark would have to be 6pt across to clear the text, at which point it
+   * is not a mark. (The one-line stat block bought the picture 11pt back, and
+   * the centre still lands in type — it is nearer the edge of the name than it
+   * was, not clear of it.)
    *
    * So it goes as low in the picture as it can, which lands about 40% down the
    * card — well below the quarter-way point it sat at when it centred in the
@@ -601,18 +600,77 @@ export function PlayerCard({
      plate's height BEFORE the text has measured itself. Pinning them makes
      `plateH` exact instead of an estimate with a fudge factor in it. */
   const lineH = Math.round(dims.nameSize * 1.12);
-  const totalH = Math.round(dims.figureSize * 1.25);
+
+  /**
+   * THE TOTAL, and it is two points under `figureSize` on purpose.
+   *
+   * `figureSize` was set when the total sat alone on its own row with a label
+   * under it, and the note beside it in `theme.ts` calls 12 a floor: anything
+   * smaller made the headline number smaller than the player it belonged to.
+   * That floor was protecting a headline that had SIZE as its only claim to
+   * being one.
+   *
+   * It has two others now. It is the only white thing on a line where
+   * everything else is tertiary grey, and the only 800 among 700s. Weight and
+   * ink carry it, which is what frees the two points — and the two points are
+   * what let "TO DIAMOND" stay spelled out on the same line (see `priceSize`).
+   *
+   * The consequence is real and worth naming: at 10 the total no longer
+   * out-measures the 11pt name above it. It is no longer the biggest type on
+   * the plate; it is still the loudest.
+   */
+  const totalSize = dims.figureSize - 2;
+  /* Tightened from 1.25. The line box was 3pt taller than its 10pt text, and
+     all of that showed up as air between the name and the total — the two
+     lines are one centred block and were not reading as one. */
+  const totalH = Math.round(totalSize * 1.2);
+
+  /**
+   * THE PRICE — `/50 TO SILVER` — as ONE run of type, one point under the
+   * label size.
+   *
+   * The whole phrase after the total is a single size, weight and colour end
+   * to end, threshold and tier name alike. It used to be two objects: the
+   * threshold set as a figure and the tier name set as a label, in different
+   * sizes and different inks. Split that way the line had four things
+   * competing in it and the eye had to rank them; as one run it has two — a
+   * number that is yours, and a phrase that is the price of the next one.
+   *
+   * The HALF POINT it gives up against `labelSize` is what buys the fit, and
+   * half is all there is to give. The worst line the card can ever draw is a
+   * gold card's `599 /600 TO DIAMOND`, and every gold card draws it — this is
+   * a whole tier, not an edge case. Against 93pt of plate it measures 94.1 at
+   * 7pt even with the gap and tracking wound all the way in, 90.3 at 6.5, and
+   * 88.3 at 6. So 6.5 is the ceiling: the next half point up costs the word
+   * "TO", and the preposition is how the line is read aloud.
+   *
+   * It went in at 6 first and read as fuzz on a device — correct on paper,
+   * a size too small in the hand. The half point back came out of the row gap
+   * and the tracking rather than out of the phrase.
+   *
+   * This is the smallest type on the card, and it is legible for the same
+   * reason the labels it replaces were: uppercase and tracked out.
+   */
+  const priceSize = dims.labelSize - 0.5;
+  /* Proportional rather than the flat 0.6 the old labels used. At 6.5pt a
+     fixed 0.6 is nearly a tenth of the em — open enough to cost 3pt of the
+     line's margin for no legibility the tighter setting does not already have,
+     and the margin is what the half point above was bought with. */
+  const priceTrack = priceSize * 0.06;
+
+  /* Between the three objects on the stat line — the mark, the total, the
+     price. Scaled off the TOTAL rather than off `labelSize`, which is what it
+     borrowed from the ladder's `railGap` for a revision: those two gaps are
+     unrelated and one of them is on the critical path for the line's width.
+     2pt at compact, and the point it saves against a rounded-up 3 is a third
+     of the margin the price's half point came out of. */
+  const lineGap = Math.max(2, Math.round(totalSize * 0.2));
 
   /* The position label. Set from the LABEL size, one step below the meta type
      it used to be, because the tracking below is what carries it at that size
      and a corner token does not need body weight. */
   const browSize = dims.labelSize + 1;
   const browH = Math.round(browSize * 1.3);
-
-  /* The name under each figure. `Type.micro`'s proportions — uppercase, tracked
-     out, 1.3 leading — which is what keeps 7pt legible as a label rather than
-     as a caption. */
-  const statLabelH = Math.round(dims.labelSize * 1.3);
 
   /* The rail. Scaled off the FRAME rather than the type, because it is a rule
      rather than a word and the frame is the other rule on the card — at 1.5,
@@ -623,13 +681,16 @@ export function PlayerCard({
      still reads as one object rather than as four unrelated marks. */
   const rungGap = Math.max(2, Math.round(dims.frame));
 
-  /* The name, the two figures under it, their labels under those, and the
-     ladder under all of it. Fixed whether or not any line needs its full width
-     — and both the label line and the ladder are reserved on every card
-     whatever its tier — so a row of cells has one baseline rather than several.
-     The extra 9pt comes out of the picture, not out of the grid: the card is
-     square, so the cell does not grow. */
-  const plateH = lineH + totalH + statLabelH + railGap + railH + dims.padding * 2;
+  /* The name, ONE stat line under it, and the ladder under that. Fixed whether
+     or not the line needs its full width — and the ladder is reserved on every
+     card whatever its tier — so a row of cells has one baseline rather than
+     several.
+
+     It was 52pt of a 102pt card while the stat block was two rows. At 41 the
+     11pt it gives back goes to the PICTURE, not to the grid: the card is
+     square by `artAspect`, so the cell is exactly as tall as it was and the
+     silhouette above the plate is 22% taller. */
+  const plateH = lineH + totalH + railGap + railH + dims.padding * 2;
 
   /* The top corner holds ONE small label now. It used to hold a two-line stat
      stack as well, which is why the scrim over it was tall enough to read as a
@@ -659,31 +720,41 @@ export function PlayerCard({
     model.tier === null ? null : (TierOrder[TierOrder.indexOf(model.tier) + 1] ?? null);
 
   /**
-   * Points still needed for the next tier — the GAP, not the threshold.
+   * The THRESHOLD for the next tier, not the gap to it — the denominator of
+   * `17/50`, and a reversal of what this drew before.
    *
-   * `180 to go` is a thing you can act on; `0/200` was a coordinate you had to
-   * subtract before it meant anything, which is half of why the fraction this
-   * replaced read as arithmetic homework. Rounded UP, because 179.4 remaining
-   * is 180 points of football, and rounding down would print `0 to go` on a
-   * card that has not got there.
+   * It printed the REMAINDER for several revisions, on the argument that `33
+   * to go` is a thing you can act on where `17/50` is a coordinate you have to
+   * subtract before it means anything. The argument is still true and it was
+   * still the wrong number, because of how the pair actually got read: two
+   * figures at opposite ends of a plate, the left one a total and the right
+   * one unnamed, are read as a fraction whatever the label under them says.
+   * On a card at zero the two are indistinguishable — a fresh card owing 50
+   * shows `0` and `50`, which is a correct reading of the wrong relationship —
+   * and every card above zero then inherits that reading and gets it wrong.
+   * AJ Dillon at 17 with 33 owed was being read as "17 of 34".
+   *
+   * A fraction is what the shape says, so the shape now gets the fraction. The
+   * subtraction the remainder saved is real but small, and it is the reader's
+   * to do against a target they can also see on the ladder underneath.
    *
    * Null at diamond (nothing above it), null with no copy in hand, and null
    * when the caller supplies no ladder — `SetChecklist` sends
-   * `nextTierAt: null` for every member, and a card cannot say how far it has
-   * to go when nobody has told it where it is going.
+   * `nextTierAt: null` for every member, and a card cannot name a target when
+   * nobody has told it where it is going.
    */
-  const remaining =
+  const threshold =
     model.tier === null ||
     model.tier === 'diamond' ||
     model.careerFp === null ||
     model.nextTierAt === null
       ? null
-      : Math.max(0, Math.ceil(model.nextTierAt - model.careerFp));
+      : Math.round(model.nextTierAt);
 
-  /* The tier letter leading the stat line. Two ranks under the figure it
-     introduces: it is the sentence's first word and the total is its subject,
-     and at `figureSize` the two read as equals. */
-  const markSize = dims.figureSize - 2;
+  /* The tier letter leading the stat line. Two ranks under the total it
+     introduces — it is the sentence's first word and the total is its subject,
+     and set level with it the two read as equals. */
+  const markSize = totalSize - 2;
 
   /* Fades toward the scheme's own page colour — see the header. */
   const rgb = scheme === 'dark' ? '0, 0, 0' : '255, 255, 255';
@@ -804,22 +875,26 @@ export function PlayerCard({
         </View>
 
         {/* ---- the nameplate ------------------------------------------- *
-          * The name on ONE line, centred, with the stat block under it running to  *
-          * both plate edges. The name stays centred over an edge-aligned block for *
-          * the same reason a table's title is: it names the whole card, where the   *
-          * figures below are two specific facts that belong at opposite ends. It    *
-          * was centred over a centred total for as long as there was only one       *
-          * figure to centre. Long names ellipsise: "Christian McCaffrey" measures      *
-          * ~112pt at 11pt bold against 94pt of plate, and no arrangement of one    *
-          * line fixes that. It is the deliberate trade for a block that is two     *
-          * lines instead of three, and for every card in a grid having its name    *
-          * on the same baseline whatever the name is.                              *
+          * TWO CENTRED LINES ON ONE AXIS: the name, and under it the stat line.    *
           *                                                                          *
-          * The TOTAL sits under the name rather than in a corner because it is      *
-          * the one number the card exists to show, and a corner is where you put    *
-          * something you want out of the way. It keeps the LEFT edge on every card, *
-          * with or without a remainder opposite it, so the eye finds it in the same *
-          * place down a grid. Tabular figures, so the column lines up.              *
+          * The stat block ran to both plate edges for as long as it was two         *
+          * figures — a total at one end and what it owed at the other — and the     *
+          * edges were what paired each figure with the label beneath it. With one   *
+          * line and one figure there is nothing to pair and nothing to spread, so   *
+          * the line centres under the name and the plate becomes one block on one   *
+          * axis rather than a title over a table.                                    *
+          *                                                                          *
+          * WHAT CENTRING COSTS, since it was refused before for this reason: the    *
+          * total no longer starts at the same x down a grid. Left-aligned, the eye  *
+          * found it in one place in every cell; centred, it drifts by half the      *
+          * difference in line length — about 9pt between a bronze card and a gold   *
+          * one. The line is short enough and the name above it centred enough that  *
+          * the block reads as deliberate rather than ragged, which is the trade.    *
+          *                                                                          *
+          * Long names ellipsise: "Christian McCaffrey" measures ~112pt at 11pt bold  *
+          * against 93pt of plate, and no arrangement of one line fixes that. It is  *
+          * the deliberate trade for every card in a grid having its name on the     *
+          * same baseline whatever the name is.                                       *
           * ================================================================ */}
         <View style={[styles.plate, { padding: dims.padding }]}>
           <Text
@@ -829,79 +904,57 @@ export function PlayerCard({
             {model.playerName}
           </Text>
 
-          {/* A ROW, not one text box with inline spans, because `TierMark` is a
-              component with its own fixed box — inlining it would mean
-              reimplementing the letter here, and the two would drift.
-
-              The figure and its unit stay inline spans INSIDE that row, and
-              that part is load-bearing: as siblings the row would centre the
-              pair, which puts the figure off the card's axis by half the width
-              of "TFP". The tier letter ahead of them is allowed to, because it
-              is a fixed-width box — it shifts the total by the same amount on
-              every card, so the column stays a column. */}
-          {/* TWO ROWS, NOT TWO COLUMNS, and that is what lets the target
-              keep its name.
-
-              As columns each side is as wide as its widest member, so the left
-              one measured 46.8pt — the width of `B 1,285`, not of `TFP` — and
-              left the right column 43.2 of the plate's 93. "TO DIAMOND" needs
-              54.5. No arrangement of the mark or the tracking closed an 11pt
-              gap, and every short label that did fit ("TO NEXT", "NEEDED")
-              bought the fit by dropping the one word the reader wants.
-
-              Rowwise the two lines are independent: the figures need 78pt and
-              the labels 74, both inside 93, and each item still sits on the
-              plate edge its figure does. The association is carried by the
-              edge rather than by a shared column box. */}
-          <View style={[styles.statRow, { minHeight: totalH }]}>
-            <View style={styles.statFigure}>
-              {model.tier ? <TierMark tier={model.tier} size={markSize} /> : null}
-              <Text
-                numberOfLines={1}
-                style={[styles.figureText, NUMERIC, { color: c.text, fontSize: dims.figureSize }]}>
-                {fmt(model.careerFp)}
-              </Text>
-            </View>
-
-            {/* One rank under the total and in the secondary ink: both figures
-                are the point of this block, but only one of them is what the
-                card IS. */}
-            {remaining !== null && nextTier ? (
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.figureText,
-                  NUMERIC,
-                  styles.statEnd,
-                  { color: c.textSecondary, fontSize: dims.figureSize - 2 },
-                ]}>
-                {fmt(remaining)}
-              </Text>
-            ) : null}
-          </View>
-
-          <View style={[styles.statRow, { minHeight: statLabelH }]}>
+          {/* ---- the stat line: what you have, then what it costs ------ *
+            * `B 17 /50 TO SILVER` — three objects, and only two things to read.  *
+            *                                                                      *
+            * THE PRICE IS ONE RUN, and that is the point of this revision. The    *
+            * threshold used to be set as a figure and the tier name as a label,   *
+            * in two sizes and two inks, which put four competing objects on the   *
+            * line and left the eye to rank them. Set as a single size, weight and *
+            * colour end to end it is ONE phrase — a price — against ONE bright    *
+            * number that is the card's own. Nothing inside the price is louder    *
+            * than the rest of it.                                                  *
+            *                                                                      *
+            * A ROW, not one text box with inline spans, because `TierMark` is a   *
+            * component with its own fixed box — inlining it would mean            *
+            * reimplementing the letter here, and the two would drift. The row is  *
+            * centred, so the mark's fixed width no longer holds a column; it is   *
+            * kept because a letter free to set its own width would jitter the     *
+            * line's centre between a `B` and a `D`.                                *
+            * ============================================================ */}
+          <View style={[styles.statLine, { minHeight: totalH, gap: lineGap }]}>
+            {model.tier ? <TierMark tier={model.tier} size={markSize} /> : null}
             <Text
               numberOfLines={1}
-              style={[
-                styles.statName,
-                { color: c.textTertiary, fontSize: dims.labelSize, lineHeight: statLabelH },
-              ]}>
-              {model.statLabel ?? 'TFP'}
+              style={[styles.figureText, NUMERIC, { color: c.text, fontSize: totalSize }]}>
+              {fmt(model.careerFp)}
             </Text>
 
-            {/* Named in full — "TO DIAMOND", not "D". A bare letter beside a
+            {/* Named in full — "TO SILVER", not "S". A bare letter after a
                 number reads as a quantity of that letter, which is exactly how
-                `1,216 D` read in the version this replaces. */}
-            {remaining !== null && nextTier ? (
+                `1,216 D` read two revisions ago. Spelling it out is what the
+                price run gives up half a point of type size to afford: at the
+                label size a gold card's `599 /600 TO DIAMOND` needs ~94pt of a
+                93pt plate, and every gold card draws that line, not a rare
+                one. */}
+            {threshold !== null && nextTier ? (
               <Text
                 numberOfLines={1}
                 style={[
-                  styles.statName,
-                  styles.statEnd,
-                  { color: c.textTertiary, fontSize: dims.labelSize, lineHeight: statLabelH },
+                  styles.price,
+                  NUMERIC,
+                  {
+                    color: c.textTertiary,
+                    fontSize: priceSize,
+                    letterSpacing: priceTrack,
+                    /* Optically centred on the digits rather than box-centred.
+                       The run is uppercase and has no descenders, so its box
+                       centres about half a point high beside figures that do —
+                       small, and visible on a line this short. */
+                    marginTop: priceSize * 0.12,
+                  },
                 ]}>
-                {`TO ${getTierTheme(nextTier, scheme).label}`}
+                {`/${fmt(threshold)} TO ${getTierTheme(nextTier, scheme).label}`}
               </Text>
             ) : null}
           </View>
@@ -1065,6 +1118,8 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.sans,
     fontWeight: '800',
     letterSpacing: -0.3,
+    /* See `price`: the total is the one thing on the line that never gives way. */
+    flexShrink: 0,
   },
   plate: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   name: {
@@ -1073,41 +1128,40 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
     textAlign: 'center',
   },
-  /* The STAT LINE — tier, total over target, next tier — under the name and on
-     the same centre line.
+  /* The STAT LINE — the tier letter, the total, and the price — centred under
+     the name on the plate's own axis.
 
-     A row, because `TierMark` brings its own box. The figure and whatever
-     follows it stay inline spans of ONE text box inside that row, which is the
-     part of the old total worth keeping: as siblings they would centre the row
-     and put the figure off the card's axis by half the width of "TFP". */
-  /* The plate's full width, with what you have at one edge and what you owe
-     at the other. Two of these stacked — the figures, then their names — see
-     the note at the call site for why they are rows rather than columns. */
-  statRow: {
+     A row, because `TierMark` brings its own box. It used to run to both plate
+     edges with `space-between`, which is what paired each of two figures with
+     the label under it; there is one figure now and nothing to pair, so the
+     line centres and the plate reads as one block. */
+  statLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.one,
+    justifyContent: 'center',
   },
-  statFigure: { flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 0 },
-  /* THE TOTAL NEVER GIVES WAY, the remainder does, and that ordering is the
-     whole of how this block degrades.
+  /* THE TOTAL NEVER GIVES WAY, the price does, and that ordering is the whole
+     of how this line degrades.
    *
    * At the narrowest viewport the app can actually reach — 375pt, since the
    * project targets iOS 16.4 and the smallest device that runs it is an SE2 —
-   * the figures need ~78pt and the labels ~74 against 93pt of plate, so nothing
-   * gives way at all. Narrower than that is a browser window below the app's
-   * own floor, and there something has to: it must not be the number the card
-   * exists to show. */
-  statEnd: { flexShrink: 1, minWidth: 0, textAlign: 'right' },
+   * the widest line the card can draw is a gold card's `599 /600 TO DIAMOND`
+   * at ~88pt against 93pt of plate, so nothing gives way at all. Narrower than
+   * that is a browser window below the app's own floor, and there something
+   * has to: it must not be the number the card exists to show.
+   *
+   * `flexShrink: 0` on the total says so; the price carries the 1 and
+   * ellipsises into itself, which loses the tier's last letters before it
+   * loses a digit. */
   /* Uppercase and tracked out, `Type.micro`'s treatment, because that is what
-     holds a 7pt word together. */
-  statName: {
+     holds a 6pt phrase together. Tracking is set at the call site, off the
+     size, rather than fixed here — see `priceTrack`. */
+  price: {
     fontFamily: Fonts.sans,
     fontWeight: '700',
-    letterSpacing: 0.6,
     textTransform: 'uppercase',
-    flexShrink: 0,
+    flexShrink: 1,
+    minWidth: 0,
   },
   /* Full plate width, split into four equal rungs, so the ladder means the
      same thing on every card and a column of them can be compared at a glance.
