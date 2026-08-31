@@ -140,7 +140,7 @@ export default function PullScreen() {
   /** What this pack has paid out so far. */
   const earned = useMemo(() => {
     let total = 0;
-    for (const d of pull.disposed.values()) total += d.gems;
+    for (const d of pull.disposed.values()) total += d.coins;
     return total;
   }, [pull.disposed]);
 

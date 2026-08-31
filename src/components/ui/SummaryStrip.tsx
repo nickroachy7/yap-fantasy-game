@@ -5,7 +5,7 @@
  * WHY THIS EXISTS AS ITS OWN FILE. It was written twice — once in
  * `CollectionSummary` for the inventory and once as `SetsStrip` inside
  * `SetsList` — with the same frame weight, the same divider, the same
- * `Type.micro` label over a `Type.figure` value, and the same optional gem.
+ * `Type.micro` label over a `Type.figure` value, and the same optional coin.
  * Two copies of one object is a promise that they will drift, and they did: the
  * inventory's learned weighted columns and a label that can be a component, the
  * sets one did not, and by the time anyone looked they were visibly different
@@ -63,14 +63,14 @@ export type SummaryCell = {
   value: string;
   /** Colours the FIGURE only — the label stays quiet, in every cell. */
   tone?: string;
-  /** Drawn before the figure. A gem on anything denominated in gems. */
+  /** Drawn before the figure. A coin on anything denominated in coins. */
   mark?: ReactNode;
   /**
    * Share of the row this cell takes. Defaults to an equal share.
    *
    * NOT ALL CELLS ARE EQUAL, and the reason is arithmetic. Six equal columns on
    * a 375pt phone are ~57pt each, ~45 of it usable — which holds a two-digit
-   * count with room to spare and does NOT hold `2,142` beside a gem, which
+   * count with room to spare and does NOT hold `2,142` beside a coin, which
    * needs ~59. Weighting is safe: it changes how the width divides, never
    * whether it divides.
    */

@@ -64,7 +64,7 @@ select u.id, c.id
   join public.players p on p.external_id = 99520 + (u.n - 1) * 2 + k
   join public.cards   c on c.player_id = p.id;
 
-insert into public.gem_balances (user_id, balance)
+insert into public.coin_balances (user_id, balance)
 values ('11111111-0000-0000-0000-000000000001', 500)
 on conflict (user_id) do update set balance = 500;
 
@@ -78,7 +78,7 @@ values (995001, 2026, 95, 1, now() + interval '7 days', 'scheduled'),
 -- field and pays a heart back for winning, which is the only heart faucet in
 -- the game.
 insert into public.contests (code, kind, format_code, season, season_type, week, name,
-                             entry_fee_gems, win_condition, win_rank, hearts_at_risk, hearts_on_win)
+                             entry_fee_coins, win_condition, win_rank, hearts_at_risk, hearts_on_win)
 select 'test:median:' || w, 'lobby'::public.contest_kind, 'flex3', 2026, 1, w::integer, 'Test Median', 0, 'median'::public.contest_win_condition, null::integer, 1::smallint, 0::smallint
   from unnest(array[95,96,97]) w
 union all
@@ -407,7 +407,7 @@ end $$;
 insert into public.card_sets (code, name, family, season, required_count, sort_order)
 values ('test:set:runs', 'Test Set', 'team', 2026, 1, 1);
 
-insert into public.set_milestone_claims (user_id, set_id, committed_at_claim, reward_gems, threshold_pct)
+insert into public.set_milestone_claims (user_id, set_id, committed_at_claim, reward_coins, threshold_pct)
 select '11111111-0000-0000-0000-000000000001', id, 1, 100, 10
   from public.card_sets where code = 'test:set:runs';
 
@@ -517,8 +517,8 @@ begin
               where user_id = a and is_held and committed_at is null) then
     raise exception 'FAIL: a held card survived settlement — the wipe did not run';
   end if;
-  if (select coalesce(balance, 0) from public.gem_balances where user_id = a) <> 0 then
-    raise exception 'FAIL: gems survived settlement';
+  if (select coalesce(balance, 0) from public.coin_balances where user_id = a) <> 0 then
+    raise exception 'FAIL: coins survived settlement';
   end if;
 
   --     And every wiped copy is stamped with the run that took it, which is
@@ -542,7 +542,7 @@ begin
   -- 15. AND SETTLING AGAIN TAKES NOTHING MORE. The wipe rides on the
   --     transition to `ended_at`, so a re-run finds no run to end.
   perform public.settle_run_week(2026, 1::smallint, 97);
-  if (select count(*) from public.gems_ledger
+  if (select count(*) from public.coins_ledger
        where user_id = a and reason = 'run_wipe') <> 1 then
     raise exception 'FAIL: re-settling wiped a second time';
   end if;
@@ -632,10 +632,10 @@ begin
     raise exception 'FAIL: a restored card is still marked as wiped';
   end if;
 
-  -- 19. GEMS DO NOT COME BACK. The ladder is denominated in card slots, and a
+  -- 19. COINS DO NOT COME BACK. The ladder is denominated in card slots, and a
   --     wallet is not a card.
-  if (select coalesce(balance, 0) from public.gem_balances where user_id = a) <> 0 then
-    raise exception 'FAIL: the carry restored gems';
+  if (select coalesce(balance, 0) from public.coin_balances where user_id = a) <> 0 then
+    raise exception 'FAIL: the carry restored coins';
   end if;
 
   -- 20. A NEW RUN IS WAITING, on full hearts, and the old one is closed for
@@ -682,7 +682,7 @@ insert into public.games (external_id, season, week, season_type, starts_at, sta
 values (998001, 2026, 98, 1, now() - interval '1 day', 'final');
 
 insert into public.contests (code, kind, format_code, season, season_type, week, name,
-                             entry_fee_gems, win_condition, win_rank, hearts_at_risk, hearts_on_win)
+                             entry_fee_coins, win_condition, win_rank, hearts_at_risk, hearts_on_win)
 values ('test:top3:98', 'lobby'::public.contest_kind, 'wr_room', 2026, 1, 98, 'Test Top Three',
         0, 'top_n'::public.contest_win_condition, 3, 1::smallint, 1::smallint);
 

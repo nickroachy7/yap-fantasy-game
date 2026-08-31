@@ -47,7 +47,7 @@ export type CardIdentity = {
   committedFor: number | null;
   committedSetCode: string | null;
   committedSetName: string | null;
-  /** Gems this copy sells for, priced by the server from its tier. */
+  /** Coins this copy sells for, priced by the server from its tier. */
   sellValue: number;
   tierFloorFp: number | null;
   nextTierAt: number | null;

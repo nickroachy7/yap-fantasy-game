@@ -451,7 +451,7 @@ export function ContestCarousel({
  * same reason at different scales.
  *
  * In the MASTHEAD it stated your hearts on Collection and Players — screens
- * where a heart cannot be won or lost — beside a gem balance, with nothing
+ * where a heart cannot be won or lost — beside a coin balance, with nothing
  * linking it to the contest actually risking one.
  *
  * As a BAND OF THE CARD it was adjacent to the right thing and still lied about
@@ -840,13 +840,13 @@ function Card({
    * score is what proves anybody turned up.
    *
    * The two figures inside it are settlement's own and are never derived here —
-   * `result` from `contest_results`, `myGems` from the slots the payout stamped.
+   * `result` from `contest_results`, `myCoins` from the slots the payout stamped.
    * Both are legitimately null for a while after the whistle, and the model
    * words that state rather than guessing at it.
    */
   const settled =
     contest.field.final && contest.field.high > 0
-      ? { result: contest.field.result, gems: contest.myGems }
+      ? { result: contest.field.result, coins: contest.myCoins }
       : null;
 
   return (

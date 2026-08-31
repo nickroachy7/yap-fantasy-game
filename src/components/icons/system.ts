@@ -22,7 +22,7 @@
  *                the rotated square, concentric rings and corner ticks
  *   TierMotif    form differs per tier, so the signal survives greyscale
  *   PositionGlyph shape encodes the group; the corner radius is the cue
- *   Gem          a rotated square, "so it stays crisp everywhere"
+ *   Coin          a rotated square, "so it stays crisp everywhere"
  *
  * Everything below is those rules, made into constants and a vocabulary you
  * draw in. Nothing here is a new opinion. The one genuinely new thing is the
@@ -54,7 +54,7 @@ export const GRID = 24;
  * being drawn edge to edge.
  *
  * 1.5 rather than a rounder 2 because the DIAGONAL keyline below is 21 units
- * corner to corner, and a live area of 20 would make the house's own `Gem`
+ * corner to corner, and a live area of 20 would make the house's own `Coin`
  * mark illegal in its own system. The keyline set decides the padding, not the
  * other way round.
  */
@@ -80,7 +80,7 @@ export const LIVE = { min: 1.5, max: 22.5, size: 21 } as const;
  *   PORTRAIT   16 x 20   tall things: a card, a pack, a shield
  *   LANDSCAPE  20 x 16   wide things: a bar, a field, a fixture
  *   DIAGONAL   21        a rotated square measured corner to corner; the
- *                        house's own motif (`Gem`) and the widest of the set,
+ *                        house's own motif (`Coin`) and the widest of the set,
  *                        because a diamond's mass sits along its axes
  *
  * A glyph that ignores its keyline is the single most common way a new icon
@@ -115,7 +115,7 @@ export type StrokeWeight = keyof typeof STROKE;
  *
  * `sharp` is a true corner and is the default: this is a faceted house, and
  * `Hearts` documents at length why the soft valentine was cut into facets to
- * belong beside `Gem` and `TierMotif`. Rounding is the exception you reach for
+ * belong beside `Coin` and `TierMotif`. Rounding is the exception you reach for
  * on a glyph that depicts something genuinely soft.
  */
 export const RADIUS = { sharp: 0, soft: 2, round: 4, pill: 999 } as const;
@@ -219,7 +219,7 @@ export function disc(cx: number, cy: number, r: number): string {
 }
 
 /**
- * A rotated square, measured corner to corner — the `Gem` shape, and the
+ * A rotated square, measured corner to corner — the `Coin` shape, and the
  * house's most-repeated mark. Its keyline is `diagonal` for the reason given
  * up at KEYLINE.
  */

@@ -149,9 +149,9 @@ export function useBulk(onDone: () => void): BulkState {
             kind: 'sold',
             done: r.sold ?? 0,
             skipped: r.skipped ?? 0,
-            // The gems the server actually paid, not the total the bar
+            // The coins the server actually paid, not the total the bar
             // advertised. They agree, and the SQL suite asserts it.
-            gems: r.paid ?? 0,
+            coins: r.paid ?? 0,
             firstReason: firstRefusal(r.refusals),
           });
           // What SOLD, not what was ticked: a selection of twelve that skipped
@@ -213,7 +213,7 @@ export function useBulk(onDone: () => void): BulkState {
           reason = reason ?? firstRefusal(r.refusals);
         }
 
-        setResult({ kind: 'added', done: added, skipped, gems: paid, firstReason: reason });
+        setResult({ kind: 'added', done: added, skipped, coins: paid, firstReason: reason });
         await settle(burnt);
         /* AND THEN THE REST. The add has taken everything a set would have; what
            is left is what the player ticked and nothing can use. The plan is
@@ -270,7 +270,7 @@ export function useBulk(onDone: () => void): BulkState {
           kind: 'sold',
           done: r.sold ?? 0,
           skipped: r.skipped ?? 0,
-          gems: r.paid ?? 0,
+          coins: r.paid ?? 0,
           firstReason: firstRefusal(r.refusals),
         });
         await settle(soldIds(r.cards));

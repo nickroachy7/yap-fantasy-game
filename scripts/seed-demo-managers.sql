@@ -13,7 +13,7 @@
 --
 -- REVERSIBLE, AND THAT IS THE POINT. Every row hangs off an `auth.users` row in
 -- the `d0d0d0d0-` namespace, and every table that references a user cascades on
--- delete — profiles, card_instances, lineups, gems, set claims. So the teardown
+-- delete — profiles, card_instances, lineups, coins, set claims. So the teardown
 -- is one DELETE and it cannot leave anything behind:
 --
 --   psql "$DATABASE_URL" -f scripts/unseed-demo-managers.sql
@@ -187,7 +187,7 @@ select l.id, 'QB', (
 --
 -- Rungs on team ladders, plus dailies, plus the copies burnt to earn them. The
 -- ladders pay at 25 / 50 / 75 / 100 percent; a claim row is what "paid" means.
-insert into public.set_milestone_claims (user_id, set_id, threshold_pct, committed_at_claim, reward_gems)
+insert into public.set_milestone_claims (user_id, set_id, threshold_pct, committed_at_claim, reward_coins)
 select m.uid, s.id, t.pct, t.pct / 5, t.pct * 4
   from demo_mgr m
   join lateral (
@@ -202,7 +202,7 @@ select m.uid, s.id, t.pct, t.pct / 5, t.pct * 4
  where m.i <= 5;
 
 -- Dailies are a separate family and are counted apart from team rungs.
-insert into public.set_milestone_claims (user_id, set_id, threshold_pct, committed_at_claim, reward_gems)
+insert into public.set_milestone_claims (user_id, set_id, threshold_pct, committed_at_claim, reward_coins)
 select m.uid, s.id, 100, 3, 40
   from demo_mgr m
   join lateral (

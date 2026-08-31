@@ -53,7 +53,7 @@ export type HistoryEntry = {
    * every contest that staked none — which includes the free one, every week.
    */
   heartsDelta: number | null;
-  prizeGems: number | null;
+  prizeCoins: number | null;
   /** When the week was swept. The rail's 24-hour window is measured off this. */
   finalizedAt: string;
 };
@@ -71,7 +71,7 @@ type HistoryRow = {
   entrants: number | string | null;
   result: string | null;
   hearts_delta: number | string | null;
-  prize_gems: number | string | null;
+  prize_coins: number | string | null;
   finalized_at: string;
 };
 
@@ -98,7 +98,7 @@ function toEntry(r: HistoryRow): HistoryEntry {
     entrants: num(r.entrants),
     result: asResult(r.result),
     heartsDelta: num(r.hearts_delta),
-    prizeGems: num(r.prize_gems),
+    prizeCoins: num(r.prize_coins),
     finalizedAt: r.finalized_at,
   };
 }

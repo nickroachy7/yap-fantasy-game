@@ -50,7 +50,7 @@
  * reason: a second surface for a thing you do with your thumb on a page you are
  * scrolling is worse than a second tap.
  *
- * NOTHING HERE COMPUTES A FIGURE. The counts and the gems are the plan's, which
+ * NOTHING HERE COMPUTES A FIGURE. The counts and the coins are the plan's, which
  * are the server's. See `pull-plan` and `card-actions`.
  *
  * KEPT CARDS ARE ALREADY OUT OF THE COUNTS by the time they reach this file —
@@ -67,7 +67,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Gem } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import type { Sweep } from './pull-plan';
@@ -102,7 +102,7 @@ export function PullBar({
   sweep: Sweeping | null;
   /** A single-card write is in flight somewhere in the deck. */
   busy: boolean;
-  /** Gems this pack has paid out so far. */
+  /** Coins this pack has paid out so far. */
   earned: number;
   onRevealNext: () => void;
   onRevealAll: () => void;
@@ -189,7 +189,7 @@ export function PullBar({
     return (
       <Frame earned={earned} kept={plan.kept}>
         <Text style={[Type.fine, styles.measure, { color: c.textSecondary }]}>
-          {`Adds ${count(plan.commits.length, 'card')} to ${count(plan.setCount, 'set')} for ${plan.commitGems} gems. A card in a set is burnt and cannot be started again.`}
+          {`Adds ${count(plan.commits.length, 'card')} to ${count(plan.setCount, 'set')} for ${plan.commitCoins} coins. A card in a set is burnt and cannot be started again.`}
           {spares > 0
             ? ` ${count(spares, 'of these uses', 'of these use')} a spare copy you already hold, so ${spares === 1 ? 'that card stays' : 'those cards stay'} in your collection.`
             : ''}
@@ -204,7 +204,7 @@ export function PullBar({
           />
           <Button
             label={`Add ${plan.commits.length}`}
-            gems={plan.commitGems}
+            coins={plan.commitCoins}
             onPress={() => {
               setAsking(null);
               onCommitAll();
@@ -222,7 +222,7 @@ export function PullBar({
     return (
       <Frame earned={earned} kept={plan.kept}>
         <Text style={[Type.fine, styles.measure, { color: c.textSecondary }]}>
-          {`Sells ${count(plan.sells.length, 'card')} for ${plan.sellGems} gems. Selling is permanent — a future copy starts again at bronze. No card a set can still use is in this.`}
+          {`Sells ${count(plan.sells.length, 'card')} for ${plan.sellCoins} coins. Selling is permanent — a future copy starts again at bronze. No card a set can still use is in this.`}
           {keptNote(plan.kept)}
         </Text>
         <View style={styles.row}>
@@ -237,7 +237,7 @@ export function PullBar({
           />
           <Button
             label={`Sell ${plan.sells.length}`}
-            gems={plan.sellGems}
+            coins={plan.sellCoins}
             onPress={() => {
               setAsking(null);
               onSellAll();
@@ -279,13 +279,13 @@ export function PullBar({
           {canCommit ? (
             <Button
               label={`Add ${plan.commits.length} to sets`}
-              gems={plan.commitGems}
+              coins={plan.commitCoins}
               onPress={() => setAsking('commit')}
               tone={gold}
               ink="#17130A"
               grow
               disabled={locked}
-              a11y={`Add ${plan.commits.length} cards to sets for ${plan.commitGems} gems`}
+              a11y={`Add ${plan.commits.length} cards to sets for ${plan.commitCoins} coins`}
             />
           ) : null}
           {canSell ? (
@@ -296,16 +296,16 @@ export function PullBar({
                  wants anything — and one tap away now, since keeping all but
                  one leaves exactly that. */
               label={canCommit ? `Sell ${plan.sells.length}` : `Sell ${count(plan.sells.length, 'spare')}`}
-              gems={plan.sellGems}
+              coins={plan.sellCoins}
               onPress={() => setAsking('sell')}
               tone={c.backgroundElement}
               ink={c.text}
-              /* The gem is gold on every surface it can be — see `gemInk`. */
-              gemInk={gold}
+              /* The coin is gold on every surface it can be — see `coinInk`. */
+              coinInk={gold}
               border={c.border}
               grow={!canCommit}
               disabled={locked}
-              a11y={`Sell ${count(plan.sells.length, 'spare card')} for ${plan.sellGems} gems`}
+              a11y={`Sell ${count(plan.sells.length, 'spare card')} for ${plan.sellCoins} coins`}
             />
           ) : null}
         </View>
@@ -363,7 +363,7 @@ export function PullBar({
  * scannable, and it survives into the states where there is no hint at all —
  * including the one where every card has been kept and the sweeps are gone.
  *
- * NEITHER IS DRAWN UNTIL THERE IS ONE. "+0 gems" on an untouched pack reads as
+ * NEITHER IS DRAWN UNTIL THERE IS ONE. "+0 coins" on an untouched pack reads as
  * a reward that failed to arrive, and "0 kept" is a feature advertising itself.
  */
 function Frame({
@@ -387,9 +387,9 @@ function Frame({
             <View
               accessible
               accessibilityRole="text"
-              accessibilityLabel={`${earned} gems earned from this pack`}
+              accessibilityLabel={`${earned} coins earned from this pack`}
               style={styles.earned}>
-              <Gem size={11} color={gold} />
+              <Coin size={11} color={gold} />
               <Text style={[Type.strong, NUMERIC, { color: c.text }]}>{`+${earned}`}</Text>
               <Text style={[Type.fine, { color: c.textTertiary }]}>from this pack</Text>
             </View>
@@ -414,11 +414,11 @@ function Frame({
 
 function Button({
   label,
-  gems,
+  coins,
   onPress,
   tone,
   ink,
-  gemInk,
+  coinInk,
   border,
   grow,
   disabled,
@@ -426,19 +426,19 @@ function Button({
 }: {
   label: string;
   /** Printed to the right of the label, never inside it. See `PullDeck`. */
-  gems?: number;
+  coins?: number;
   onPress: () => void;
   tone: string;
   ink: string;
   /**
-   * The gem's own colour, when it differs from the label's.
+   * The coin's own colour, when it differs from the label's.
    *
-   * A gem is gold everywhere else in this app, and on a neutral button it
+   * A coin is gold everywhere else in this app, and on a neutral button it
    * should be here too. It cannot always be: printed ON gold it is a hole in
    * the button, and on the red sell confirm it is a colour clash rather than a
    * currency. So the default is the ink and the exception is named.
    */
-  gemInk?: string;
+  coinInk?: string;
   border?: string;
   grow?: boolean;
   disabled?: boolean;
@@ -449,7 +449,7 @@ function Button({
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      accessibilityLabel={a11y ?? (gems === undefined ? label : `${label}, ${gems} gems`)}
+      accessibilityLabel={a11y ?? (coins === undefined ? label : `${label}, ${coins} coins`)}
       accessibilityState={{ disabled: !!disabled }}
       style={({ pressed }) => [
         styles.button,
@@ -462,10 +462,10 @@ function Button({
       <Text numberOfLines={1} style={[Type.strong, styles.label, { color: ink }]}>
         {label}
       </Text>
-      {gems === undefined ? null : (
+      {coins === undefined ? null : (
         <>
-          <Gem size={10} color={gemInk ?? ink} />
-          <Text style={[Type.strong, NUMERIC, { color: ink }]}>{gems}</Text>
+          <Coin size={10} color={coinInk ?? ink} />
+          <Text style={[Type.strong, NUMERIC, { color: ink }]}>{coins}</Text>
         </>
       )}
     </Pressable>
@@ -511,7 +511,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     minHeight: 48,
   },
-  /* The label shrinks; a gem figure beside it never does. */
+  /* The label shrinks; a coin figure beside it never does. */
   label: { flexShrink: 1, minWidth: 0 },
   grow: { flex: 1, minWidth: 0 },
   progress: {

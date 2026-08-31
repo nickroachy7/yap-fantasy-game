@@ -179,7 +179,7 @@ export default function SetChecklistScreen() {
     // inside this one call, server-side. Nothing is credited here.
     const { error: err } = await supabase.rpc('claim_set_reward', { p_set_code: set.code });
     if (err) setClaimError(err.message);
-    // Both matter: the hero redraws as claimed, and the header shows the gems
+    // Both matter: the hero redraws as claimed, and the header shows the coins
     // that just landed.
     else await Promise.all([reload(), refreshPlayer()]);
     setClaiming(false);
@@ -385,7 +385,7 @@ export default function SetChecklistScreen() {
             <View style={[styles.notice, { borderColor: c.positive, backgroundColor: c.surface }]}>
               <Text style={[Type.micro, { color: c.positive }]}>ADDED</Text>
               <Text style={[Type.body, { color: c.text }]}>
-                {`${added.added} ${added.added === 1 ? 'card' : 'cards'} into the set for ${added.paid} gems.${
+                {`${added.added} ${added.added === 1 ? 'card' : 'cards'} into the set for ${added.paid} coins.${
                   added.skipped > 0
                     ? ` ${added.skipped} could not be added — check the list below.`
                     : ''
@@ -441,7 +441,7 @@ export default function SetChecklistScreen() {
         /* The one consequence that lands on a DIFFERENT screen, so it is set
            apart rather than folded into the paragraph above. See ConfirmDialog. */
         warning={lineupWarning(startingInPlan)}
-        confirmLabel={`Add ${confirmPlan.cards} for ${confirmPlan.gems}`}
+        confirmLabel={`Add ${confirmPlan.cards} for ${confirmPlan.coins}`}
         destructive
         busy={submitting}
         error={submitError}

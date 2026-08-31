@@ -442,7 +442,7 @@ export default function InventoryScreen() {
     () => all.filter((card) => selected.has(card.id) && !starters.has(card.id)),
     [all, selected, starters],
   );
-  const selectedGems = useMemo(() => sellTotal(selectedCards), [selectedCards]);
+  const selectedCoins = useMemo(() => sellTotal(selectedCards), [selectedCards]);
 
   /* Everything a CELL draws differently from one render to the next, in one
      object, because `extraData` is compared by identity and a fresh literal
@@ -830,7 +830,7 @@ export default function InventoryScreen() {
               <BulkBar
                 count={selected.size}
                 max={SELECTION_MAX}
-                sellGems={selectedGems}
+                sellCoins={selectedCoins}
                 plan={bulk.plan}
                 planning={bulk.planning}
                 stage={bulk.stage}

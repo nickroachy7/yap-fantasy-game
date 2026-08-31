@@ -88,7 +88,7 @@ export type Milestone = {
   /** Slots needed, resolved against this set's requirement by the server. */
   cards: number;
   /** What it pays today. */
-  gems: number;
+  coins: number;
   reached: boolean;
   claimed: boolean;
   paid: number | null;
@@ -109,7 +109,7 @@ function parseMilestones(raw: unknown): Milestone[] {
     .map((m) => ({
       pct: num0(m.pct),
       cards: num0(m.cards),
-      gems: num0(m.gems),
+      coins: num0(m.coins),
       reached: m.reached === true,
       claimed: m.claimed === true,
       paid: typeof m.paid === 'number' ? m.paid : null,
@@ -147,9 +147,9 @@ export type CardSet = {
   /** What the whole ladder pays, at today's prices. */
   totalReward: number;
   /** Reached and unpaid — the only figure here that is a call to action. */
-  claimableGems: number;
+  claimableCoins: number;
   /** What has actually landed. Frozen at each claim, so it can differ. */
-  claimedGems: number;
+  claimedCoins: number;
   /** Slots the next unreached rung wants. Null once the ladder is finished. */
   nextAt: number | null;
   /** What that rung pays. */
@@ -161,7 +161,7 @@ export type CardSet = {
 /**
  * Three states, and the middle one is the only one that can be acted on.
  *
- * `ready` is now "there are gems on the table" rather than "the set is
+ * `ready` is now "there are coins on the table" rather than "the set is
  * finished" — a rung crossed at a quarter of a team roster is claimable while
  * the set itself is nowhere near done, and that is the common case rather than
  * the edge one. `claimed` therefore means the whole ladder is behind you, which
@@ -194,8 +194,8 @@ export function normaliseSet(row: SetViewRow): CardSet {
     minTier: isTier(row.min_tier) ? row.min_tier : null,
     milestones: parseMilestones(row.milestones),
     totalReward: num(row.total_reward),
-    claimableGems: num(row.claimable_gems),
-    claimedGems: num(row.claimed_gems),
+    claimableCoins: num(row.claimable_coins),
+    claimedCoins: num(row.claimed_coins),
     nextAt: row.next_at == null ? null : num(row.next_at),
     nextReward: row.next_reward == null ? null : num(row.next_reward),
     complete: row.complete === true,
@@ -204,7 +204,7 @@ export function normaliseSet(row: SetViewRow): CardSet {
 }
 
 export function statusOf(set: CardSet): SetStatus {
-  if (set.claimableGems > 0) return 'ready';
+  if (set.claimableCoins > 0) return 'ready';
 
   return set.complete ? 'claimed' : 'progress';
 }
@@ -322,8 +322,8 @@ export type SetsSummary = {
   claimed: number;
   /** Sets with a rung to collect — the only number that is a call to action. */
   ready: number;
-  /** Gems sitting on the table right now, across every set. */
-  gemsWaiting: number;
+  /** Coins sitting on the table right now, across every set. */
+  coinsWaiting: number;
   /** Cards in your collection that could be committed somewhere today. */
   toCommit: number;
 };
@@ -331,7 +331,7 @@ export type SetsSummary = {
 export function summariseSets(sets: CardSet[]): SetsSummary {
   let claimed = 0;
   let ready = 0;
-  let gemsWaiting = 0;
+  let coinsWaiting = 0;
   let toCommit = 0;
 
   for (const set of sets) {
@@ -339,7 +339,7 @@ export function summariseSets(sets: CardSet[]): SetsSummary {
     if (status === 'claimed') claimed += 1;
     else if (status === 'ready') {
       ready += 1;
-      gemsWaiting += set.claimableGems;
+      coinsWaiting += set.claimableCoins;
     }
     toCommit += actionableOf(set);
   }
@@ -349,11 +349,11 @@ export function summariseSets(sets: CardSet[]): SetsSummary {
      receivers set — so this counts SLOTS you could fill, which is the number
      of actions available rather than the number of cards they would cost. The
      label on screen says "slots" for exactly that reason. */
-  return { sets: sets.length, claimed, ready, gemsWaiting, toCommit };
+  return { sets: sets.length, claimed, ready, coinsWaiting, toCommit };
 }
 
 /**
- * Every set with gems waiting, biggest first.
+ * Every set with coins waiting, biggest first.
  *
  * The claim-all button's list, and it is derived here rather than in the panel
  * for the reason everything else in this file is: `statusOf` is the definition
@@ -363,7 +363,7 @@ export function summariseSets(sets: CardSet[]): SetsSummary {
 export function claimableSets(sets: CardSet[]): CardSet[] {
   return sets
     .filter((s) => statusOf(s) === 'ready')
-    .sort((a, b) => b.claimableGems - a.claimableGems || a.sortOrder - b.sortOrder);
+    .sort((a, b) => b.claimableCoins - a.claimableCoins || a.sortOrder - b.sortOrder);
 }
 
 export type SetSection = {
@@ -405,7 +405,7 @@ const FAMILY_NOTE: Record<SetFamily, string> = {
 /**
  * The ordering, which is the whole readability of a 37-row page.
  *
- * READY FIRST, INSIDE ITS OWN SECTION. A set with gems waiting is money on the
+ * READY FIRST, INSIDE ITS OWN SECTION. A set with coins waiting is money on the
  * table and cannot be left in alphabetical position among thirty-one others —
  * but it used to be LIFTED OUT into a section of its own at the top, and that
  * bought the visibility at the cost of the thing the page is for.
@@ -456,7 +456,7 @@ export function groupSets(sets: CardSet[]): SetSection[] {
 /**
  * Inside a section: THREE BANDS, IN THE ORDER OF WHAT THE PLAYER CAN DO.
  *
- *   1. READY      gems already earned, sitting uncollected. Biggest sum first.
+ *   1. READY      coins already earned, sitting uncollected. Biggest sum first.
  *   2. CAN ADD    you are holding a card that fits an open slot. Something to
  *                 do right now, and doing it is what produces band 1.
  *   3. the rest   nothing to act on, so ordered by how close it is.
@@ -481,7 +481,7 @@ function byProgressThenOrder(a: CardSet, b: CardSet): number {
   const aReady = statusOf(a) === 'ready';
   const bReady = statusOf(b) === 'ready';
   if (aReady !== bReady) return aReady ? -1 : 1;
-  if (aReady && bReady) return b.claimableGems - a.claimableGems || a.sortOrder - b.sortOrder;
+  if (aReady && bReady) return b.claimableCoins - a.claimableCoins || a.sortOrder - b.sortOrder;
 
   const aDone = statusOf(a) === 'claimed';
   const bDone = statusOf(b) === 'claimed';
@@ -593,8 +593,8 @@ export type FillPlan = {
   /** In the order the server should process them. */
   cardIds: string[];
   cards: number;
-  /** Gems the whole batch pays back. */
-  gems: number;
+  /** Coins the whole batch pays back. */
+  coins: number;
   /** Of those, how many are the only copy you hold of that player. */
   singles: number;
   /**
@@ -622,7 +622,7 @@ export function planFor(candidates: FillCandidate[], selected: readonly string[]
   return {
     cardIds: taken.map((m) => m.card_id),
     cards: taken.length,
-    gems: taken.reduce((sum, m) => sum + m.commit_value, 0),
+    coins: taken.reduce((sum, m) => sum + m.commit_value, 0),
     singles: taken.filter((m) => m.held === 1).length,
     precious: taken
       .filter((m) => m.commit_tier !== null && m.commit_tier !== 'bronze')
@@ -651,7 +651,7 @@ export function fillWarning(set: CardSet, plan: FillPlan): string {
   const one = plan.cards === 1;
 
   const parts = [
-    `This burns ${plan.cards} ${one ? 'copy' : 'copies'} and pays ${plan.gems} gems.`,
+    `This burns ${plan.cards} ${one ? 'copy' : 'copies'} and pays ${plan.coins} coins.`,
     one
       ? 'It leaves your collection for good — it cannot be started in a lineup or sold again.'
       : 'They leave your collection for good — they cannot be started in a lineup or sold again.',
@@ -690,15 +690,15 @@ export function fillWarning(set: CardSet, plan: FillPlan): string {
   }
 
   /* The rung, and only ever the NEXT one. A team ladder totals thousands of
-     gems almost none of which is reachable this season; quoting the total
+     coins almost none of which is reachable this season; quoting the total
      beside a pile you are about to burn would be advertising a number the
      player will not see. */
   if (set.nextAt !== null && set.nextReward !== null) {
     const gap = set.nextAt - set.committed;
     parts.push(
       gap <= plan.cards
-        ? `It reaches the next reward, worth ${set.nextReward.toLocaleString()} gems.`
-        : `That leaves it ${gap - plan.cards} short of the next reward, worth ${set.nextReward.toLocaleString()} gems.`,
+        ? `It reaches the next reward, worth ${set.nextReward.toLocaleString()} coins.`
+        : `That leaves it ${gap - plan.cards} short of the next reward, worth ${set.nextReward.toLocaleString()} coins.`,
     );
   }
 

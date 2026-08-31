@@ -102,7 +102,7 @@ import { PlayerContext, type PlayerState } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const FIXTURE_PLAYER: PlayerState = {
-  gems: 1240,
+  coins: 1240,
   displayName: 'nickroachy',
   cardCount: 14,
   /* Under the warning line, so the chrome draws its calm state. `RosterBar`'s
@@ -238,55 +238,55 @@ const RECAP_FIXTURE: Recap = {
   totalPoints: 118.4,
   rank: 2,
   of: 14,
-  gemsPoints: 178,
-  gemsBonus: 305,
+  coinsPoints: 178,
+  coinsBonus: 305,
   cards: [
     {
       slot: 'QB', cardInstanceId: 'r1', playerId: 'p1', playerName: 'Patrick Mahomes',
       position: 'QB', team: 'KC', points: 31.2, awarded: true, tierAtAward: 'gold',
-      gemMultiplier: 1.25, gems: 58, positionRank: 1, bonusGems: 250, wasWeekMvp: true,
+      coinMultiplier: 1.25, coins: 58, positionRank: 1, bonusCoins: 250, wasWeekMvp: true,
       tierNow: 'gold', promoted: false, careerFp: 412.6,
     },
     {
       slot: 'RB1', cardInstanceId: 'r2', playerId: 'p2', playerName: 'Bijan Robinson',
       position: 'RB', team: 'ATL', points: 22.8, awarded: true, tierAtAward: 'silver',
-      gemMultiplier: 1.1, gems: 37, positionRank: 3, bonusGems: 40, wasWeekMvp: false,
+      coinMultiplier: 1.1, coins: 37, positionRank: 3, bonusCoins: 40, wasWeekMvp: false,
       tierNow: 'silver', promoted: false, careerFp: 188.1,
     },
     {
       slot: 'RB2', cardInstanceId: 'r3', playerId: 'p3', playerName: 'Bhayshul Tuten',
       position: 'RB', team: 'JAX', points: 14.1, awarded: true, tierAtAward: 'bronze',
-      gemMultiplier: 1, gems: 21, positionRank: 14, bonusGems: 0, wasWeekMvp: false,
+      coinMultiplier: 1, coins: 21, positionRank: 14, bonusCoins: 0, wasWeekMvp: false,
       tierNow: 'silver', promoted: true, careerFp: 52.4,
     },
     {
       slot: 'WR1', cardInstanceId: 'r4', playerId: 'p4', playerName: "Ja'Marr Chase",
       position: 'WR', team: 'CIN', points: 19.6, awarded: true, tierAtAward: 'diamond',
-      gemMultiplier: 1.4, gems: 41, positionRank: 8, bonusGems: 15, wasWeekMvp: false,
+      coinMultiplier: 1.4, coins: 41, positionRank: 8, bonusCoins: 15, wasWeekMvp: false,
       tierNow: 'diamond', promoted: false, careerFp: 921.3,
     },
     {
       slot: 'WR2', cardInstanceId: 'r5', playerId: 'p5', playerName: 'Matthew Golden',
       position: 'WR', team: 'GB', points: 8.4, awarded: true, tierAtAward: 'bronze',
-      gemMultiplier: 1, gems: 12, positionRank: 31, bonusGems: 0, wasWeekMvp: false,
+      coinMultiplier: 1, coins: 12, positionRank: 31, bonusCoins: 0, wasWeekMvp: false,
       tierNow: 'bronze', promoted: false, careerFp: 31.2,
     },
     {
       slot: 'TE', cardInstanceId: 'r6', playerId: 'p6', playerName: 'Travis Kelce',
       position: 'TE', team: 'KC', points: 0, awarded: true, tierAtAward: 'gold',
-      gemMultiplier: 1.25, gems: 0, positionRank: null, bonusGems: 0, wasWeekMvp: false,
+      coinMultiplier: 1.25, coins: 0, positionRank: null, bonusCoins: 0, wasWeekMvp: false,
       tierNow: 'gold', promoted: false, careerFp: 259.8,
     },
     {
       slot: 'FLEX', cardInstanceId: 'r7', playerId: 'p7', playerName: 'Rome Odunze',
       position: 'WR', team: 'CHI', points: 13.9, awarded: true, tierAtAward: 'bronze',
-      gemMultiplier: 1, gems: 20, positionRank: 19, bonusGems: 0, wasWeekMvp: false,
+      coinMultiplier: 1, coins: 20, positionRank: 19, bonusCoins: 0, wasWeekMvp: false,
       tierNow: 'bronze', promoted: false, careerFp: 44.7,
     },
     {
       slot: 'K', cardInstanceId: 'r8', playerId: 'p8', playerName: 'Harrison Butker',
       position: 'PK', team: 'KC', points: 8.4, awarded: true, tierAtAward: 'silver',
-      gemMultiplier: 1.1, gems: 13, positionRank: 6, bonusGems: 15, wasWeekMvp: false,
+      coinMultiplier: 1.1, coins: 13, positionRank: 6, bonusCoins: 15, wasWeekMvp: false,
       tierNow: 'silver', promoted: false, careerFp: 96.5,
     },
   ],
@@ -338,7 +338,7 @@ function SetsFixture() {
           gallery is also the place the two can be checked against each other. */}
       <ClaimAllBar
         count={summariseSets(SETS_FIXTURE).ready}
-        gems={summariseSets(SETS_FIXTURE).gemsWaiting}
+        coins={summariseSets(SETS_FIXTURE).coinsWaiting}
         busy={false}
         onPress={() => undefined}
       />
@@ -603,12 +603,12 @@ const BOARD_FIXTURES: Record<CommunityBoardId, CommunityData> = {
   collection: {
     id: 'collection',
     rows: [
-      { rank: 1, user_id: 'u2', display_name: 'dmb', value_gems: 1864, held: 61, in_sets: 22, players: 54, gold_plus: 9, diamond: 1, career_fp: 1240.5 },
-      { rank: 2, user_id: MEID, display_name: 'nickroachy', value_gems: 1208, held: 74, in_sets: 0, players: 66, gold_plus: 5, diamond: 0, career_fp: 980.2 },
-      { rank: 3, user_id: 'u3', display_name: 'a_very_long_display_name', value_gems: 742, held: 38, in_sets: 9, players: 35, gold_plus: 3, diamond: 0, career_fp: 610 },
-      { rank: 4, user_id: 'u5', display_name: 'sarah', value_gems: 416, held: 29, in_sets: 0, players: 27, gold_plus: 1, diamond: 0, career_fp: 305.4 },
+      { rank: 1, user_id: 'u2', display_name: 'dmb', value_coins: 1864, held: 61, in_sets: 22, players: 54, gold_plus: 9, diamond: 1, career_fp: 1240.5 },
+      { rank: 2, user_id: MEID, display_name: 'nickroachy', value_coins: 1208, held: 74, in_sets: 0, players: 66, gold_plus: 5, diamond: 0, career_fp: 980.2 },
+      { rank: 3, user_id: 'u3', display_name: 'a_very_long_display_name', value_coins: 742, held: 38, in_sets: 9, players: 35, gold_plus: 3, diamond: 0, career_fp: 610 },
+      { rank: 4, user_id: 'u5', display_name: 'sarah', value_coins: 416, held: 29, in_sets: 0, players: 27, gold_plus: 1, diamond: 0, career_fp: 305.4 },
       // A shelf that has never been started: FP is an em dash, not a zero.
-      { rank: 5, user_id: 'u4', display_name: 'kp', value_gems: 96, held: 12, in_sets: 3, players: 12, gold_plus: 0, diamond: 0, career_fp: 0 },
+      { rank: 5, user_id: 'u4', display_name: 'kp', value_coins: 96, held: 12, in_sets: 3, players: 12, gold_plus: 0, diamond: 0, career_fp: 0 },
     ],
   },
   cards: {
@@ -624,12 +624,12 @@ const BOARD_FIXTURES: Record<CommunityBoardId, CommunityData> = {
   sets: {
     id: 'sets',
     rows: [
-      { rank: 1, user_id: MEID, display_name: 'nickroachy', rungs: 13, sets: 4, completed: 3, dailies: 11, burned: 42, gems: 790 },
-      { rank: 2, user_id: 'u2', display_name: 'dmb', rungs: 9, sets: 3, completed: 1, dailies: 24, burned: 31, gems: 1240 },
-      { rank: 3, user_id: 'u5', display_name: 'sarah', rungs: 4, sets: 2, completed: 0, dailies: 6, burned: 14, gems: 300 },
-      { rank: 4, user_id: 'u3', display_name: 'a_very_long_display_name', rungs: 2, sets: 1, completed: 0, dailies: 3, burned: 8, gems: 150 },
+      { rank: 1, user_id: MEID, display_name: 'nickroachy', rungs: 13, sets: 4, completed: 3, dailies: 11, burned: 42, coins: 790 },
+      { rank: 2, user_id: 'u2', display_name: 'dmb', rungs: 9, sets: 3, completed: 1, dailies: 24, burned: 31, coins: 1240 },
+      { rank: 3, user_id: 'u5', display_name: 'sarah', rungs: 4, sets: 2, completed: 0, dailies: 6, burned: 14, coins: 300 },
+      { rank: 4, user_id: 'u3', display_name: 'a_very_long_display_name', rungs: 2, sets: 1, completed: 0, dailies: 3, burned: 8, coins: 150 },
       // Cards burnt, no rung reached yet — the row the union in board_sets exists for.
-      { rank: 5, user_id: 'u4', display_name: 'kp', rungs: 0, sets: 0, completed: 0, dailies: 1, burned: 3, gems: 40 },
+      { rank: 5, user_id: 'u4', display_name: 'kp', rungs: 0, sets: 0, completed: 0, dailies: 1, burned: 3, coins: 40 },
     ],
   },
 };
@@ -759,7 +759,7 @@ const CONTEST_FIXTURES: MyContest[] = [
     formatCode: 'main',
     formatName: 'Full Roster',
     slotCount: 8,
-    entryFeeGems: 0,
+    entryFeeCoins: 0,
     lineupId: 'fx-lineup-free',
     filled: 8,
     field: {
@@ -782,7 +782,7 @@ const CONTEST_FIXTURES: MyContest[] = [
     cut: null,
     prizePool: 0,
     myPrize: null,
-    myGems: null,
+    myCoins: null,
     recap: false,
     weekLabel: 'PRE 4',
   },
@@ -794,7 +794,7 @@ const CONTEST_FIXTURES: MyContest[] = [
     formatCode: 'wr_room',
     formatName: 'WR Room',
     slotCount: 3,
-    entryFeeGems: 40,
+    entryFeeCoins: 40,
     lineupId: 'fx-lineup-wr',
     filled: 3,
     field: {
@@ -820,7 +820,7 @@ const CONTEST_FIXTURES: MyContest[] = [
     cut: 38.4,
     prizePool: 240,
     myPrize: null,
-    myGems: null,
+    myCoins: null,
     recap: false,
     weekLabel: 'PRE 4',
   },

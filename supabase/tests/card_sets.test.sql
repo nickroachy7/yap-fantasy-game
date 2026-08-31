@@ -41,7 +41,7 @@ values
   ('00000000-0000-0000-0000-000000000000', '51111111-1111-1111-1111-111111111111', 'authenticated', 'authenticated', 'collector@test.local', '', now(), now(), now()),
   ('00000000-0000-0000-0000-000000000000', '52222222-2222-2222-2222-222222222222', 'authenticated', 'authenticated', 'rival@test.local',     '', now(), now(), now());
 
-insert into public.gem_balances (user_id, balance) values
+insert into public.coin_balances (user_id, balance) values
   ('51111111-1111-1111-1111-111111111111', 100),
   ('52222222-2222-2222-2222-222222222222', 100)
 on conflict (user_id) do update set balance = 100;
@@ -78,7 +78,7 @@ select '53333333-3333-3333-3333-333333333333', c.id
 -- 25% -> 1, 50% -> 2, 75% -> 3, 100% -> 4. The amounts are deliberately
 -- unequal, so a sweep that paid the WRONG pair of rungs cannot pass by adding
 -- up to the right total.
-insert into public.card_set_milestones (set_id, threshold_pct, reward_gems) values
+insert into public.card_set_milestones (set_id, threshold_pct, reward_coins) values
   ('53333333-3333-3333-3333-333333333333',  25,  10),
   ('53333333-3333-3333-3333-333333333333',  50,  20),
   ('53333333-3333-3333-3333-333333333333',  75,  30),
@@ -120,7 +120,7 @@ set local request.jwt.claims = '{"sub":"51111111-1111-1111-1111-111111111111","r
 do $$
 declare ok boolean := false; r jsonb; v record;
 begin
-  select committed, ready, total_cards, required_count, total_reward, claimable_gems,
+  select committed, ready, total_cards, required_count, total_reward, claimable_coins,
          next_at, next_reward
     into v from public.my_sets where code = 'test-set-2026';
 
@@ -134,12 +134,12 @@ begin
   if v.total_reward <> 160 then
     raise exception 'FAIL: the ladder totals %, expected 160', v.total_reward;
   end if;
-  if v.claimable_gems <> 0 then
-    raise exception 'FAIL: % gems were claimable with nothing committed', v.claimable_gems;
+  if v.claimable_coins <> 0 then
+    raise exception 'FAIL: % coins were claimable with nothing committed', v.claimable_coins;
   end if;
   -- The first rung, before anything has been done about it.
   if v.next_at <> 1 or v.next_reward <> 10 then
-    raise exception 'FAIL: the next rung reads % cards for % gems, expected 1 for 10',
+    raise exception 'FAIL: the next rung reads % cards for % coins, expected 1 for 10',
       v.next_at, v.next_reward;
   end if;
 
@@ -247,13 +247,13 @@ begin
   end if;
   -- bronze sells for 8, the set pays 50% of it.
   if (r ->> 'paid')::integer <> 4 then
-    raise exception 'FAIL: the commit paid % gems, expected 4', r ->> 'paid';
+    raise exception 'FAIL: the commit paid % coins, expected 4', r ->> 'paid';
   end if;
-  if (select balance from public.gem_balances where user_id = auth.uid()) <> 104 then
-    raise exception 'FAIL: balance is % after a 4 gem commit on 100',
-      (select balance from public.gem_balances where user_id = auth.uid());
+  if (select balance from public.coin_balances where user_id = auth.uid()) <> 104 then
+    raise exception 'FAIL: balance is % after a 4 coin commit on 100',
+      (select balance from public.coin_balances where user_id = auth.uid());
   end if;
-  if (select count(*) from public.gems_ledger where reason = 'set_commit') <> 1 then
+  if (select count(*) from public.coins_ledger where reason = 'set_commit') <> 1 then
     raise exception 'FAIL: the commit did not write exactly one ledger row';
   end if;
 
@@ -267,7 +267,7 @@ begin
 
   -- One slot filled, the two remaining copies of the same card no longer
   -- actionable, and the first rung crossed.
-  select committed, ready, claimable_gems, next_at, next_reward
+  select committed, ready, claimable_coins, next_at, next_reward
     into v from public.my_sets where code = 'test-set-2026';
   if v.committed <> 1 then
     raise exception 'FAIL: one commit read as % committed', v.committed;
@@ -275,16 +275,16 @@ begin
   if v.ready <> 0 then
     raise exception 'FAIL: a filled slot still reported % ready', v.ready;
   end if;
-  if v.claimable_gems <> 10 then
-    raise exception 'FAIL: one commit made % gems claimable, expected 10', v.claimable_gems;
+  if v.claimable_coins <> 10 then
+    raise exception 'FAIL: one commit made % coins claimable, expected 10', v.claimable_coins;
   end if;
   if v.next_at <> 2 or v.next_reward <> 20 then
-    raise exception 'FAIL: the next rung reads % cards for % gems, expected 2 for 20',
+    raise exception 'FAIL: the next rung reads % cards for % coins, expected 2 for 20',
       v.next_at, v.next_reward;
   end if;
 
   -- The same card cannot be committed twice, and the refusal costs nothing.
-  v_bal := (select balance from public.gem_balances where user_id = auth.uid());
+  v_bal := (select balance from public.coin_balances where user_id = auth.uid());
   ok := false;
   begin
     r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 1));
@@ -293,7 +293,7 @@ begin
     if not ok then raise exception 'FAIL: a second commit was blocked by the wrong rule: %', sqlerrm; end if;
   end;
   if not ok then raise exception 'FAIL: one card filled its slot twice'; end if;
-  if (select balance from public.gem_balances where user_id = auth.uid()) <> v_bal then
+  if (select balance from public.coin_balances where user_id = auth.uid()) <> v_bal then
     raise exception 'FAIL: a refused commit still paid out';
   end if;
 
@@ -319,13 +319,13 @@ begin
 
   -- ---- the first rung ----------------------------------------------------
   r := public.claim_set_reward('test-set-2026');
-  if (r ->> 'reward_gems')::integer <> 10 or (r ->> 'rungs')::integer <> 1 then
+  if (r ->> 'reward_coins')::integer <> 10 or (r ->> 'rungs')::integer <> 1 then
     raise exception 'FAIL: the first claim paid % over % rungs, expected 10 over 1',
-      r ->> 'reward_gems', r ->> 'rungs';
+      r ->> 'reward_coins', r ->> 'rungs';
   end if;
-  if (select balance from public.gem_balances where user_id = auth.uid()) <> 114 then
-    raise exception 'FAIL: balance is % after a 10 gem rung on 104',
-      (select balance from public.gem_balances where user_id = auth.uid());
+  if (select balance from public.coin_balances where user_id = auth.uid()) <> 114 then
+    raise exception 'FAIL: balance is % after a 10 coin rung on 104',
+      (select balance from public.coin_balances where user_id = auth.uid());
   end if;
 
   -- NOTHING NEW SINCE. A second press must not pay the same rung again.
@@ -337,13 +337,13 @@ begin
     if not ok then raise exception 'FAIL: a repeat claim was blocked by the wrong rule: %', sqlerrm; end if;
   end;
   if not ok then raise exception 'FAIL: the same rung was claimed twice'; end if;
-  if (select balance from public.gem_balances where user_id = auth.uid()) <> 114 then
+  if (select balance from public.coin_balances where user_id = auth.uid()) <> 114 then
     raise exception 'FAIL: a refused claim still moved the balance';
   end if;
   -- The paid rung reports what actually landed, not what it is priced at.
-  if (select claimed_gems from public.my_sets where code = 'test-set-2026') <> 10 then
+  if (select claimed_coins from public.my_sets where code = 'test-set-2026') <> 10 then
     raise exception 'FAIL: the claimed total reads %, expected 10',
-      (select claimed_gems from public.my_sets where code = 'test-set-2026');
+      (select claimed_coins from public.my_sets where code = 'test-set-2026');
   end if;
 end;
 $$;
@@ -417,26 +417,26 @@ begin
   -- ---- TWO RUNGS AT ONCE -------------------------------------------------
   -- Three committed crosses both the 50% and the 75% bars, and one press must
   -- collect both.
-  select claimable_gems into v from public.my_sets where code = 'test-set-2026';
-  if v.claimable_gems <> 50 then
-    raise exception 'FAIL: three commits made % claimable, expected 50 (20 + 30)', v.claimable_gems;
+  select claimable_coins into v from public.my_sets where code = 'test-set-2026';
+  if v.claimable_coins <> 50 then
+    raise exception 'FAIL: three commits made % claimable, expected 50 (20 + 30)', v.claimable_coins;
   end if;
 
   r := public.claim_set_reward('test-set-2026');
-  if (r ->> 'rungs')::integer <> 2 or (r ->> 'reward_gems')::integer <> 50 then
+  if (r ->> 'rungs')::integer <> 2 or (r ->> 'reward_coins')::integer <> 50 then
     raise exception 'FAIL: the sweep paid % over % rungs, expected 50 over 2',
-      r ->> 'reward_gems', r ->> 'rungs';
+      r ->> 'reward_coins', r ->> 'rungs';
   end if;
   -- 114 + 4 + 4 commits + 50.
-  if (select balance from public.gem_balances where user_id = auth.uid()) <> 172 then
+  if (select balance from public.coin_balances where user_id = auth.uid()) <> 172 then
     raise exception 'FAIL: balance is %, expected 172',
-      (select balance from public.gem_balances where user_id = auth.uid());
+      (select balance from public.coin_balances where user_id = auth.uid());
   end if;
   -- ONE LEDGER ROW PER RUNG, not one for the sweep: a 25% tranche and a 100%
   -- tranche have to stay distinguishable in the audit trail.
-  if (select count(*) from public.gems_ledger where reason = 'set_reward') <> 3 then
+  if (select count(*) from public.coins_ledger where reason = 'set_reward') <> 3 then
     raise exception 'FAIL: the ladder wrote % ledger rows, expected 3',
-      (select count(*) from public.gems_ledger where reason = 'set_reward');
+      (select count(*) from public.coins_ledger where reason = 'set_reward');
   end if;
 
   -- ---- the top rung ------------------------------------------------------
@@ -463,21 +463,21 @@ begin
   if not ok then raise exception 'FAIL: a card was burnt into an already-complete set'; end if;
 
   r := public.claim_set_reward('test-set-2026');
-  if (r ->> 'reward_gems')::integer <> 100 or (r ->> 'rungs')::integer <> 1 then
+  if (r ->> 'reward_coins')::integer <> 100 or (r ->> 'rungs')::integer <> 1 then
     raise exception 'FAIL: the top rung paid % over % rungs, expected 100 over 1',
-      r ->> 'reward_gems', r ->> 'rungs';
+      r ->> 'reward_coins', r ->> 'rungs';
   end if;
   -- 172 + 4 commit + 100.
-  if (select balance from public.gem_balances where user_id = auth.uid()) <> 276 then
+  if (select balance from public.coin_balances where user_id = auth.uid()) <> 276 then
     raise exception 'FAIL: balance is %, expected 276',
-      (select balance from public.gem_balances where user_id = auth.uid());
+      (select balance from public.coin_balances where user_id = auth.uid());
   end if;
   -- The whole ladder, and no more.
-  select claimed_gems, claimable_gems, total_reward into v
+  select claimed_coins, claimable_coins, total_reward into v
     from public.my_sets where code = 'test-set-2026';
-  if v.claimed_gems <> 160 or v.claimable_gems <> 0 or v.total_reward <> 160 then
+  if v.claimed_coins <> 160 or v.claimable_coins <> 0 or v.total_reward <> 160 then
     raise exception 'FAIL: ladder totals read claimed=% claimable=% total=%, expected 160/0/160',
-      v.claimed_gems, v.claimable_gems, v.total_reward;
+      v.claimed_coins, v.claimable_coins, v.total_reward;
   end if;
 
   ok := false;
@@ -554,15 +554,15 @@ set local request.jwt.claims = '{"sub":"52222222-2222-2222-2222-222222222222","r
 do $$
 declare ok boolean := false; r jsonb; v record;
 begin
-  select committed, ready, claimable_gems, claimed_gems into v
+  select committed, ready, claimable_coins, claimed_coins into v
     from public.my_sets where code = 'test-set-2026';
   if v.committed <> 0 or v.ready <> 0 then
     raise exception 'FAIL: my_sets showed a rival % committed / % ready out of another user''s cards',
       v.committed, v.ready;
   end if;
-  if v.claimable_gems <> 0 or v.claimed_gems <> 0 then
+  if v.claimable_coins <> 0 or v.claimed_coins <> 0 then
     raise exception 'FAIL: my_sets showed a rival somebody else''s ladder (% claimable, % claimed)',
-      v.claimable_gems, v.claimed_gems;
+      v.claimable_coins, v.claimed_coins;
   end if;
   if (select count(*) from public.set_checklist('test-set-2026') where committed) <> 0 then
     raise exception 'FAIL: the checklist showed a rival somebody else''s commits';
@@ -587,7 +587,7 @@ begin
     if not ok then raise exception 'FAIL: the rival was blocked by the wrong rule: %', sqlerrm; end if;
   end;
   if not ok then raise exception 'FAIL: a rival committed a card they do not own'; end if;
-  if (select balance from public.gem_balances where user_id = auth.uid()) <> 100 then
+  if (select balance from public.coin_balances where user_id = auth.uid()) <> 100 then
     raise exception 'FAIL: a refused commit paid the rival anyway';
   end if;
 
@@ -601,7 +601,7 @@ reset role;
 -- FILLING A SET IN ONE GO
 --
 -- Its own player and its own set, so the balances the stages above assert to
--- the gem are not disturbed by a bulk run in the middle of them.
+-- the coin are not disturbed by a bulk run in the middle of them.
 --
 -- The two things that matter: one card the rules refuse must not fail the
 -- others, and the array must stop at the requirement rather than burning
@@ -611,7 +611,7 @@ reset role;
 insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at)
 values ('00000000-0000-0000-0000-000000000000', '61111111-1111-1111-1111-111111111111', 'authenticated', 'authenticated', 'bulk@test.local', '', now(), now(), now());
 -- A wallet already exists: handle_new_user opens one on sign-up.
-insert into public.gem_balances (user_id, balance) values ('61111111-1111-1111-1111-111111111111', 0)
+insert into public.coin_balances (user_id, balance) values ('61111111-1111-1111-1111-111111111111', 0)
 on conflict (user_id) do update set balance = 0;
 
 insert into public.teams (external_id, abbreviation, full_name) values (9401, 'BLK', 'Bulk Test Club');
@@ -630,7 +630,7 @@ insert into public.card_set_members (set_id, card_id)
 select '63333333-3333-3333-3333-333333333333', c.id
   from public.cards c join public.players p on p.id = c.player_id
  where p.external_id between 9401 and 9405;
-insert into public.card_set_milestones (set_id, threshold_pct, reward_gems) values
+insert into public.card_set_milestones (set_id, threshold_pct, reward_coins) values
   ('63333333-3333-3333-3333-333333333333',  25,  5),
   ('63333333-3333-3333-3333-333333333333',  50, 10),
   ('63333333-3333-3333-3333-333333333333',  75, 15),
@@ -684,13 +684,13 @@ begin
   if (r ->> 'skipped')::integer <> 3 then
     raise exception 'FAIL: the fill skipped %, expected 3', r ->> 'skipped';
   end if;
-  -- Five bronze copies at 8 gems, half of it each.
+  -- Five bronze copies at 8 coins, half of it each.
   if (r ->> 'paid')::integer <> 12 then
     raise exception 'FAIL: the fill paid %, expected 12', r ->> 'paid';
   end if;
-  if (select balance from public.gem_balances where user_id = auth.uid()) <> 12 then
+  if (select balance from public.coin_balances where user_id = auth.uid()) <> 12 then
     raise exception 'FAIL: balance is %, expected 12',
-      (select balance from public.gem_balances where user_id = auth.uid());
+      (select balance from public.coin_balances where user_id = auth.uid());
   end if;
 
   -- EACH REFUSAL SAYS WHY. A bulk action that dropped cards silently would be
@@ -725,13 +725,13 @@ begin
     raise exception 'FAIL: the bulk fill burnt a starter without freeing its slot';
   end if;
 
-  select committed, complete, claimable_gems into v from public.my_sets where code = 'bulk-set-2026';
+  select committed, complete, claimable_coins into v from public.my_sets where code = 'bulk-set-2026';
   if v.committed <> 3 or not v.complete then
     raise exception 'FAIL: the fill left the set at % of 3, complete=%', v.committed, v.complete;
   end if;
   -- One fill crossed all four rungs at once.
-  if v.claimable_gems <> 80 then
-    raise exception 'FAIL: a filled set has % claimable, expected 80', v.claimable_gems;
+  if v.claimable_coins <> 80 then
+    raise exception 'FAIL: a filled set has % claimable, expected 80', v.claimable_coins;
   end if;
 
   -- A second fill has nothing left to do and says so per card rather than
@@ -864,7 +864,7 @@ begin
          select 1 from public.card_set_milestones ml
           where ml.set_id = s.id
             and ml.threshold_pct = d.threshold_pct
-            and ml.reward_gems = d.reward_gems
+            and ml.reward_coins = d.reward_coins
        )
   ) then
     raise exception 'FAIL: a set''s ladder does not match its family''s defaults';
@@ -890,7 +890,7 @@ declare
   v_set    uuid;
   v_prior  uuid;
   v_rungs  integer;
-  v_gems   integer;
+  v_coins   integer;
   v_req    smallint;
   v_pos    text;
 begin
@@ -934,7 +934,7 @@ begin
     raise exception 'FAIL: a daily asks for % cards, not 3', v_req;
   end if;
 
-  select count(*), coalesce(max(reward_gems), 0) into v_rungs, v_gems
+  select count(*), coalesce(max(reward_coins), 0) into v_rungs, v_coins
     from public.card_set_milestones where set_id = v_set;
   if v_rungs <> 1 then
     raise exception 'FAIL: a daily has % rungs, not 1', v_rungs;
@@ -944,11 +944,11 @@ begin
   -- into a set at 50%, and cost 60 in packs at 20 a card. A rung at or below 12
   -- is worse than selling; at or above 48 the daily can be farmed with bought
   -- packs. See the migration header.
-  if v_gems <= 12 then
-    raise exception 'FAIL: a daily pays % gems, which loses to the sell button', v_gems;
+  if v_coins <= 12 then
+    raise exception 'FAIL: a daily pays % coins, which loses to the sell button', v_coins;
   end if;
-  if v_gems >= 48 then
-    raise exception 'FAIL: a daily pays % gems, which is farmable with packs', v_gems;
+  if v_coins >= 48 then
+    raise exception 'FAIL: a daily pays % coins, which is farmable with packs', v_coins;
   end if;
 
   -- The whole position pool is the membership, so it is always clearable.

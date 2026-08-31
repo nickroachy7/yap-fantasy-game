@@ -38,20 +38,20 @@ values (994001, 2026, 94, 1, now() + interval '7 days', 'scheduled');
 --
 -- `prize_pool_bps` is not optional on anything that charges: since
 -- `20260826020000` the constraint `contests_paid_contests_pay_out` refuses a
--- paid contest with no pool, so that "if it costs gems it pays gems" is a
+-- paid contest with no pool, so that "if it costs coins it pays coins" is a
 -- property of the schema rather than a thing every seed has to remember. This
 -- suite was the first thing that constraint caught.
-insert into public.contests (code, kind, format_code, season, season_type, week, name, entry_fee_gems, prize_pool_bps)
+insert into public.contests (code, kind, format_code, season, season_type, week, name, entry_fee_coins, prize_pool_bps)
 values ('test:lobby:94', 'lobby', 'flex3', 2026, 1, 94, 'Test Flex Three', 25, 2500);
 
 -- Enough for one entry and change, but nowhere near the 999 contest below.
-insert into public.gem_balances (user_id, balance)
+insert into public.coin_balances (user_id, balance)
 values ('cccccccc-0000-0000-0000-000000000001', 60)
 on conflict (user_id) do update set balance = 60;
 
 -- Two more paid contests, each testing one refusal: `lobby2` is FULL (a rival
 -- already holds its only seat) and `lobby3` is unaffordable.
-insert into public.contests (code, kind, format_code, season, season_type, week, name, entry_fee_gems, max_entrants, prize_pool_bps)
+insert into public.contests (code, kind, format_code, season, season_type, week, name, entry_fee_coins, max_entrants, prize_pool_bps)
 values ('test:lobby2:94', 'lobby', 'flex3', 2026, 1, 94, 'Test Full House', 25, 2, 2500),
        ('test:lobby3:94', 'lobby', 'flex3', 2026, 1, 94, 'Test Rich Only', 999, null, 2500);
 
@@ -215,12 +215,12 @@ begin
   --
   --    Entering `test:lobby:94` above cost 25 of the 60 seeded, and the ledger
   --    line is keyed on the entry so no retry can double it.
-  select balance into v_n from public.gem_balances where user_id = a;
+  select balance into v_n from public.coin_balances where user_id = a;
   if v_n <> 35 then
-    raise exception 'FAIL: expected 35 gems after one 25-gem entry, found %', v_n;
+    raise exception 'FAIL: expected 35 coins after one 25-coin entry, found %', v_n;
   end if;
 
-  select count(*) into v_n from public.gems_ledger
+  select count(*) into v_n from public.coins_ledger
    where user_id = a and reason = 'contest_entry';
   if v_n <> 1 then
     raise exception 'FAIL: expected one contest_entry ledger row, found %', v_n;
@@ -233,7 +233,7 @@ begin
     jsonb_build_array(jsonb_build_object('slot','FLEX3','card_instance_id',wr2)),
     'test:lobby:94');
 
-  select balance into v_n from public.gem_balances where user_id = a;
+  select balance into v_n from public.coin_balances where user_id = a;
   if v_n <> 35 then
     raise exception 'FAIL: editing an entry charged again — balance is now %', v_n;
   end if;
@@ -257,9 +257,9 @@ begin
     perform public.set_lineup(2026, 1::smallint, wk,
       jsonb_build_array(jsonb_build_object('slot','FLEX1','card_instance_id',wr1)),
       'test:lobby3:94');
-    raise exception 'FAIL: entered a contest with too few gems';
+    raise exception 'FAIL: entered a contest with too few coins';
   exception when sqlstate '22023' then
-    if sqlerrm not like '%costs 999 gems and you have 35%' then
+    if sqlerrm not like '%costs 999 coins and you have 35%' then
       raise exception 'FAIL: refused, but not for affordability: %', sqlerrm;
     end if;
   end;
@@ -282,25 +282,25 @@ begin
     end if;
   end;
 
-  select balance into v_n from public.gem_balances where user_id = a;
+  select balance into v_n from public.coin_balances where user_id = a;
   if v_n <> 35 then
-    raise exception 'FAIL: a refused entry moved gems: %', v_n;
+    raise exception 'FAIL: a refused entry moved coins: %', v_n;
   end if;
 
   -- 13. THE FREE CONTEST IS STILL FREE. Every refusal above is a property of a
   --     PAID contest, and the one everybody is in must have gained none of them.
   perform public.set_lineup(2026, 1::smallint, wk,
     jsonb_build_array(jsonb_build_object('slot','WR2','card_instance_id',wr1)));
-  select balance into v_n from public.gem_balances where user_id = a;
+  select balance into v_n from public.coin_balances where user_id = a;
   if v_n <> 35 then
     raise exception 'FAIL: the free contest charged something: %', v_n;
   end if;
 
-  -- 14. LEAVING GIVES THE GEMS BACK AND FREES THE CARDS.
-  select balance into v_n from public.gem_balances where user_id = a;
+  -- 14. LEAVING GIVES THE COINS BACK AND FREES THE CARDS.
+  select balance into v_n from public.coin_balances where user_id = a;
   perform public.leave_contest('test:lobby:94');
 
-  select balance into v_n from public.gem_balances where user_id = a;
+  select balance into v_n from public.coin_balances where user_id = a;
   if v_n <> 60 then
     raise exception 'FAIL: leaving did not refund the entry — balance is %', v_n;
   end if;
@@ -312,12 +312,12 @@ begin
 
   -- 15. AND RE-ENTERING CHARGES AGAIN. The entry charge used to be keyed on
   --     (user, contest), which cannot tell a retry from a re-entry — so this
-  --     call failed on a ledger constraint rather than taking the gems.
+  --     call failed on a ledger constraint rather than taking the coins.
   perform public.set_lineup(2026, 1::smallint, wk,
     jsonb_build_array(jsonb_build_object('slot','FLEX1','card_instance_id',wr2)),
     'test:lobby:94');
 
-  select balance into v_n from public.gem_balances where user_id = a;
+  select balance into v_n from public.coin_balances where user_id = a;
   if v_n <> 35 then
     raise exception 'FAIL: re-entering did not charge again — balance is %', v_n;
   end if;
@@ -370,7 +370,7 @@ end $$;
 -- THE SEASON'S STANDINGS ARE THE FREE CONTEST (20260825060000).
 --
 -- The suite's user now holds TWO scored lineups in week 94 — the free one and a
--- paid lobby entry. Before that migration `leaderboard` summed both, so gems
+-- paid lobby entry. Before that migration `leaderboard` summed both, so coins
 -- bought rank; this is the assertion that says they no longer do.
 -- ---------------------------------------------------------------------------
 do $$
@@ -419,7 +419,7 @@ end $$;
 do $$
 begin
   begin
-    insert into public.contests (code, kind, format_code, season, season_type, week, name, entry_fee_gems)
+    insert into public.contests (code, kind, format_code, season, season_type, week, name, entry_fee_coins)
     values ('test:paid-free', 'free', 'main', 2026, 1, 95, 'Should not exist', 10);
     raise exception 'FAIL: a free contest was given an entry fee';
   exception when sqlstate '23514' then null;

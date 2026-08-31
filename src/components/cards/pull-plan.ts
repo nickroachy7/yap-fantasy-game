@@ -7,7 +7,7 @@
  * about cards that are all the same decision. So the bar offers two buttons
  * that act on the whole pack — and the moment a button acts on eight cards, the
  * player has to be told what it is about to do in one sentence BEFORE it does
- * it. That sentence is this file: it names the count and the gems, and the
+ * it. That sentence is this file: it names the count and the coins, and the
  * sweep that follows is exactly the plan it described.
  *
  * IT ALSO HAS TO NOT ASK FOR THE IMPOSSIBLE. `card_actions` answers about each
@@ -66,16 +66,16 @@ export type PlannedCommit = {
 export type PlannedSell = {
   cardInstanceId: string;
   player: string;
-  gems: number;
+  coins: number;
 };
 
 export type Sweep = {
   commits: PlannedCommit[];
   sells: PlannedSell[];
   /** What the commits pay, in total. */
-  commitGems: number;
+  commitCoins: number;
   /** What the sells pay, in total. */
-  sellGems: number;
+  sellCoins: number;
   /** How many distinct sets the commits touch — the sentence needs it. */
   setCount: number;
   /**
@@ -91,8 +91,8 @@ export type Sweep = {
 export const EMPTY_SWEEP: Sweep = {
   commits: [],
   sells: [],
-  commitGems: 0,
-  sellGems: 0,
+  commitCoins: 0,
+  sellCoins: 0,
   setCount: 0,
   kept: 0,
 };
@@ -178,15 +178,15 @@ export function planSweep(
     sells.push({
       cardInstanceId: p.card_instance_id,
       player: p.player_name ?? 'This card',
-      gems: action.sellValue,
+      coins: action.sellValue,
     });
   }
 
   return {
     commits,
     sells,
-    commitGems: commits.reduce((n, x) => n + x.pays, 0),
-    sellGems: sells.reduce((n, x) => n + x.gems, 0),
+    commitCoins: commits.reduce((n, x) => n + x.pays, 0),
+    sellCoins: sells.reduce((n, x) => n + x.coins, 0),
     setCount: new Set(commits.map((x) => x.setCode)).size,
     /* Only the ones still in hand. A card kept and then sold by hand is spent,
        and the bar must not say it is being held back from anything. */

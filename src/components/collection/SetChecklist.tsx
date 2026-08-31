@@ -54,7 +54,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 
 import { PlayerCard } from '@/components/cards';
 import { SheetToneBand } from '@/components/players/PlayerSheetFrame';
-import { Gem } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
 import { Tabs } from '@/components/ui/Tabs';
 import {
   Colors,
@@ -92,7 +92,7 @@ export type SetMember = {
   committed: boolean;
   /** Copies you still hold and could burn into the slot. 0 means you cannot. */
   held: number;
-  /** Gems the commit would pay, from the copy that would actually be burnt. */
+  /** Coins the commit would pay, from the copy that would actually be burnt. */
   commit_value: number;
   /** That copy's tier, so the row can say what it is about to destroy. */
   commit_tier: CardTier | null;
@@ -286,7 +286,7 @@ export function SetActions({
               onPress={onSubmit}
               disabled={submitting}
               accessibilityRole="button"
-              accessibilityLabel={`Add the ${plan.cards} selected cards to the set, paying ${plan.gems} gems`}
+              accessibilityLabel={`Add the ${plan.cards} selected cards to the set, paying ${plan.coins} coins`}
               accessibilityState={{ disabled: submitting, busy: submitting }}
               style={({ pressed }) => [
                 styles.submit,
@@ -301,9 +301,9 @@ export function SetActions({
                   <Text style={[Type.strong, { color: '#17130A' }]}>
                     {plan.cards === 1 ? 'Add 1 card' : `Add ${plan.cards} cards`}
                   </Text>
-                  <View style={styles.gemRow}>
-                    <Gem color="#17130A" size={9} />
-                    <Text style={[Type.fine, NUMERIC, { color: '#17130A' }]}>{plan.gems}</Text>
+                  <View style={styles.coinRow}>
+                    <Coin color="#17130A" size={9} />
+                    <Text style={[Type.fine, NUMERIC, { color: '#17130A' }]}>{plan.coins}</Text>
                   </View>
                 </>
               )}
@@ -546,7 +546,7 @@ export function SetChecklist({
               onPress={onClaim}
               disabled={claiming}
               accessibilityRole="button"
-              accessibilityLabel={`Claim ${set.claimableGems} gems for ${set.name}`}
+              accessibilityLabel={`Claim ${set.claimableCoins} coins for ${set.name}`}
               accessibilityState={{ disabled: claiming, busy: claiming }}
               style={({ pressed }) => [
                 styles.claim,
@@ -558,9 +558,9 @@ export function SetChecklist({
                 <ActivityIndicator />
               ) : (
                 <>
-                  <Gem color="#17130A" size={10} />
+                  <Coin color="#17130A" size={10} />
                   <Text style={[Type.strong, { color: '#17130A' }]}>
-                    {`Claim ${set.claimableGems.toLocaleString()} gems`}
+                    {`Claim ${set.claimableCoins.toLocaleString()} coins`}
                   </Text>
                 </>
               )}
@@ -572,10 +572,10 @@ export function SetChecklist({
                 { borderColor: c.border, backgroundColor: c.surfaceSheet },
               ]}>
               <Text style={[Type.micro, { color: c.textTertiary }]}>SET FINISHED</Text>
-              <View style={styles.gemRow}>
-                <Gem color={c.textTertiary} size={9} />
+              <View style={styles.coinRow}>
+                <Coin color={c.textTertiary} size={9} />
                 <Text style={[Type.strong, NUMERIC, { color: c.textTertiary }]}>
-                  {set.claimedGems.toLocaleString()}
+                  {set.claimedCoins.toLocaleString()}
                 </Text>
               </View>
             </View>
@@ -592,8 +592,8 @@ export function SetChecklist({
                   return gap === 1 ? '1 MORE CARD PAYS' : `${gap} MORE CARDS PAY`;
                 })()}
               </Text>
-              <View style={styles.gemRow}>
-                <Gem color={gold} size={9} />
+              <View style={styles.coinRow}>
+                <Coin color={gold} size={9} />
                 <Text style={[Type.strong, NUMERIC, { color: c.text }]}>
                   {(set.nextReward ?? 0).toLocaleString()}
                 </Text>
@@ -739,10 +739,10 @@ function Rung({
       accessibilityRole="text"
       accessibilityLabel={`${milestone.pct} per cent, ${milestone.cards} cards. ${
         milestone.claimed
-          ? `Collected ${milestone.paid ?? milestone.gems} gems.`
+          ? `Collected ${milestone.paid ?? milestone.coins} coins.`
           : milestone.reached
-            ? `Ready to claim ${milestone.gems} gems.`
-            : `${gap} more cards for ${milestone.gems} gems.`
+            ? `Ready to claim ${milestone.coins} coins.`
+            : `${gap} more cards for ${milestone.coins} coins.`
       }`}
       style={[
         styles.rungRow,
@@ -757,10 +757,10 @@ function Rung({
       <Text numberOfLines={1} style={[Type.fine, styles.rungState, { color: c.textTertiary }]}>
         {milestone.claimed ? 'collected' : milestone.reached ? 'ready' : `${gap} to go`}
       </Text>
-      <View style={styles.gemRow}>
-        <Gem color={milestone.claimed ? c.textTertiary : gold} size={8} />
+      <View style={styles.coinRow}>
+        <Coin color={milestone.claimed ? c.textTertiary : gold} size={8} />
         <Text style={[Type.fine, NUMERIC, { color: milestone.claimed ? c.textTertiary : c.text }]}>
-          {(milestone.claimed ? (milestone.paid ?? milestone.gems) : milestone.gems).toLocaleString()}
+          {(milestone.claimed ? (milestone.paid ?? milestone.coins) : milestone.coins).toLocaleString()}
         </Text>
       </View>
       <Text style={[Type.strong, styles.rungMark, { color: tone }]}>
@@ -975,7 +975,7 @@ function MemberCard({
       accessibilityRole="button"
       accessibilityLabel={
         `Add ${member.player_name} to this set now. Burns your ` +
-        `${member.commit_tier ?? 'lowest'} copy for ${member.commit_value} gems.`
+        `${member.commit_tier ?? 'lowest'} copy for ${member.commit_value} coins.`
       }
       hitSlop={8}
       style={({ pressed }) => [pressed && styles.pressed]}>
@@ -991,7 +991,7 @@ function MemberCard({
         addable
           ? `${member.player_name}, ${member.position_abbreviation ?? 'no position'}, ` +
             `${member.team_abbreviation ?? 'no club'}. ${state}. Adding burns your ` +
-            `${member.commit_tier ?? 'lowest'} copy for ${member.commit_value} gems.`
+            `${member.commit_tier ?? 'lowest'} copy for ${member.commit_value} coins.`
           : `${member.player_name}, ${member.position_abbreviation ?? 'no position'}, ` +
             `${member.team_abbreviation ?? 'no club'}. ${state}.`
       }
@@ -1098,7 +1098,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two + 2,
     paddingVertical: Spacing.two,
   },
-  gemRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  coinRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   claim: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,5 +1,5 @@
 /**
- * The signed-in player's headline state: gems, hearts and identity.
+ * The signed-in player's headline state: coins, hearts and identity.
  *
  * Lives in context because the header renders on every tab — without this each
  * screen would fetch the balance separately and they would drift apart after a
@@ -7,7 +7,7 @@
  *
  * THE RUN IS HERE FOR THE SAME REASON THE BALANCE IS. Hearts are the second
  * resource this game asks a player to spend, they are drawn in the same strip
- * of chrome, and they move on the same events — entering a contest costs gems
+ * of chrome, and they move on the same events — entering a contest costs coins
  * and puts a heart at risk in one action. Loading them separately would let the
  * header show a fee it can afford next to a run that has already ended.
  *
@@ -47,7 +47,7 @@ import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
 
 export type PlayerState = {
-  gems: number;
+  coins: number;
   displayName: string;
   /** Held cards. The same figure as `roster.held`, kept for the header. */
   cardCount: number;
@@ -66,7 +66,7 @@ export type PlayerState = {
   run: Run | null;
   loading: boolean;
   error: string | null;
-  /** Call after anything that spends or earns gems, or moves a heart. */
+  /** Call after anything that spends or earns coins, or moves a heart. */
   refresh: () => Promise<void>;
   /**
    * Move the held-card count NOW, by this many, without waiting for a read.
@@ -95,7 +95,7 @@ export type PlayerState = {
 
 /**
  * Exported so the dev galleries can supply a fixture player without a session.
- * The whole shell — rail, header, gem balance — reads this, so there is no way
+ * The whole shell — rail, header, coin balance — reads this, so there is no way
  * to render the chrome for design work without either signing in or providing
  * the context directly. Product code should use <PlayerProvider>.
  */
@@ -103,7 +103,7 @@ export const PlayerContext = createContext<PlayerState | null>(null);
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
-  const [gems, setGems] = useState(0);
+  const [coins, setCoins] = useState(0);
   const [displayName, setDisplayName] = useState('player');
   const [roster, setRoster] = useState<RosterStatus | null>(null);
   const [run, setRun] = useState<Run | null>(null);
@@ -117,7 +117,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
        *
        * These three reads used to go out unfiltered, on the stated grounds that
        * "all three are RLS-scoped to the caller". Two of them are.
-       * `gem_balances` and `card_instances` both have policies of the form
+       * `coin_balances` and `card_instances` both have policies of the form
        * `auth.uid() = user_id`, so an unfiltered select returns exactly the
        * caller's row and `.single()` is honest.
        *
@@ -142,7 +142,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
        */
       const [profile, balance, rosterRow, runRow] = await Promise.all([
         supabase.from('profiles').select('display_name').eq('id', session.user.id).single(),
-        supabase.from('gem_balances').select('balance').single(),
+        supabase.from('coin_balances').select('balance').single(),
         /* THE COUNT AND THE CAP IN ONE CALL. This was a `count(*)` on
            `card_instances where is_held` and the cap facts were a second read
            from a hook of their own — see the note at the top of this file for
@@ -161,7 +161,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const failure = profile.error ?? balance.error ?? rosterRow.error ?? runRow.error;
       if (failure) return failure.message;
       setDisplayName(profile.data?.display_name ?? 'player');
-      setGems(balance.data?.balance ?? 0);
+      setCoins(balance.data?.balance ?? 0);
       setRoster(parseRoster(rosterRow.data));
       setRun(parseRun(runRow.data));
     },
@@ -184,7 +184,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     // this stays loading — the header draws an em dash rather than a confident
     // balance of zero, which is what it did before the read was extracted.
     () => ({
-      gems,
+      coins,
       displayName,
       cardCount: roster?.held ?? 0,
       roster,
@@ -194,7 +194,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       refresh,
       applyCardDelta,
     }),
-    [gems, displayName, roster, run, loading, error, refresh, applyCardDelta, session],
+    [coins, displayName, roster, run, loading, error, refresh, applyCardDelta, session],
   );
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;

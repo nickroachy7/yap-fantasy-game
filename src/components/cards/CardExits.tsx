@@ -29,7 +29,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Gem } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { commitBlockedBy, type CardActionSet } from './card-actions';
@@ -89,7 +89,7 @@ export function CardExits({
             accessibilityRole="button"
             accessibilityLabel={
               commitable.length === 1
-                ? `Add ${playerName} to ${commitable[0].name} for ${commitable[0].pays} gems`
+                ? `Add ${playerName} to ${commitable[0].name} for ${commitable[0].pays} coins`
                 : `Choose one of ${commitable.length} sets to add ${playerName} to`
             }
             accessibilityState={{ disabled: busy, expanded: picking }}
@@ -104,15 +104,15 @@ export function CardExits({
             </Text>
             {commitable.length === 1 ? (
               <>
-                <Gem color={gold} size={10} />
+                <Coin color={gold} size={10} />
                 <Text style={[Type.strong, NUMERIC, { color: c.text }]}>
                   {commitable[0].pays}
                 </Text>
               </>
             ) : (
-              /* A COUNT, WITHOUT THE GEM. These sets are priced separately, so
+              /* A COUNT, WITHOUT THE COIN. These sets are priced separately, so
                  there is no single figure this button could print — and a bare
-                 number beside a gem would read as gems. */
+                 number beside a coin would read as coins. */
               <Text style={[Type.strong, NUMERIC, { color: c.textSecondary }]}>
                 {commitable.length}
               </Text>
@@ -162,7 +162,7 @@ export function CardExits({
           onPress={onSell}
           disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel={`Sell this ${tier} card for ${sellValue} gems`}
+          accessibilityLabel={`Sell this ${tier} card for ${sellValue} coins`}
           accessibilityState={{ disabled: busy }}
           style={({ pressed }) => [
             styles.exit,
@@ -173,7 +173,7 @@ export function CardExits({
           <Text numberOfLines={1} style={[Type.strong, styles.label, { color: c.textSecondary }]}>
             SELL THIS COPY
           </Text>
-          <Gem color={gold} size={10} />
+          <Coin color={gold} size={10} />
           <Text style={[Type.strong, NUMERIC, { color: c.text }]}>{sellValue}</Text>
         </Pressable>
       </View>

@@ -40,7 +40,7 @@ export type FieldEntrant = {
   rank: number;
   /** Null until the week is final and the field is big enough to be a contest. */
   result: Result | null;
-  /** Gems won, once settled. Null before that — never a projection. */
+  /** Coins won, once settled. Null before that — never a projection. */
   prize: number | null;
   isMe: boolean;
   /**
@@ -150,20 +150,20 @@ export type PeekSlot = {
   nextTierAt: number | null;
   nextTierLabel: string | null;
   /**
-   * WHAT THE CARD WAS PAID for this week, in gems.
+   * WHAT THE CARD WAS PAID for this week, in coins.
    *
-   * `gems` is the score award — 1.5 a point times the multiplier of the tier
-   * the card held going INTO the week — and `bonusGems` is the position-finish
+   * `coins` is the score award — 1.5 a point times the multiplier of the tier
+   * the card held going INTO the week — and `bonusCoins` is the position-finish
    * bonus on top of it, which a handful of slots a week get and the rest do
    * not. Both are stamped onto the slot at payout rather than derived here, so
    * a row and the wallet cannot disagree about what was paid.
    *
-   * `awarded` IS NOT `gems > 0`. A week that has been scored but not yet paid
+   * `awarded` IS NOT `coins > 0`. A week that has been scored but not yet paid
    * has null in both; a card that scored nothing has an earned zero. Drawn the
    * same way, "not paid yet" would read as "earned nothing" — see the row.
    */
-  gems: number | null;
-  bonusGems: number | null;
+  coins: number | null;
+  bonusCoins: number | null;
   awarded: boolean;
   /**
    * THE FIXTURE, so a settled row can be the board's row.
@@ -197,10 +197,10 @@ type PeekRow = {
   tier_floor_fp: number | string | null;
   next_tier_at: number | string | null;
   next_tier_label: string | null;
-  gems: number | string | null;
-  bonus_gems: number | string | null;
+  coins: number | string | null;
+  bonus_coins: number | string | null;
   awarded: boolean | null;
-  /* OPTIONAL for the same reason `my_gems` is on `MyContest`: CI publishes JS
+  /* OPTIONAL for the same reason `my_coins` is on `MyContest`: CI publishes JS
      without running `db push`, so the update has to survive landing on a
      database where `20260831050000` has not been applied. */
   opponent?: string | null;
@@ -273,8 +273,8 @@ export function useContestLineup(contestId: string | null, userId: string | null
              promotion that never arrives. */
           nextTierAt: num(r.next_tier_at),
           nextTierLabel: r.next_tier_label,
-          gems: num(r.gems),
-          bonusGems: num(r.bonus_gems),
+          coins: num(r.coins),
+          bonusCoins: num(r.bonus_coins),
           /* THE COLUMN'S PRESENCE, not its value, is the first question. A
              row without an `opponent` key at all is an unmigrated server and
              cannot say anything; a row whose `opponent` is null is a BYE, and

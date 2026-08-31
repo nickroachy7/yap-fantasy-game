@@ -40,7 +40,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { YapMark } from '@/components/brand/YapLogo';
 import { ActionIcon } from '@/components/shell/ActionBar';
 import { Hearts } from '@/components/runs/Hearts';
-import { Gem, initialsOf } from '@/components/shell/AppHeader';
+import { Coin, initialsOf } from '@/components/shell/AppHeader';
 import {
   isWebNavActive,
   WEB_NAV,
@@ -65,7 +65,7 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
   const accent = TierColors[scheme].gold.accent;
   const realPathname = usePathname();
   const pathname = pathnameOverride ?? realPathname;
-  const { gems, displayName, run, loading } = usePlayer();
+  const { coins, displayName, run, loading } = usePlayer();
 
   return (
     <View style={[styles.rail, { backgroundColor: ChromeBand }]}>
@@ -78,7 +78,7 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
           <Text style={styles.wordmark}>YAP FANTASY</Text>
         </View>
         {/* TWO PILLS, NOT ONE, and the hearts get their own because they are a
-            different resource with a different failure — running out of gems
+            different resource with a different failure — running out of coins
             means you cannot buy, running out of hearts means the run is over.
             Sharing a pill would read as one balance with a decorative prefix.
 
@@ -86,10 +86,10 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
             suppressed at this breakpoint, so anything the masthead shows has to
             be shown here too or it simply does not exist on desktop. */}
         <View style={styles.resources}>
-          <View style={[styles.gems, { borderColor: accent }]}>
-            <Gem color={accent} size={10} />
-            <Text style={[styles.balance, NUMERIC]}>{loading ? '—' : gems.toLocaleString()}</Text>
-            <Text style={styles.gemsLabel}>gems</Text>
+          <View style={[styles.coins, { borderColor: accent }]}>
+            <Coin color={accent} size={10} />
+            <Text style={[styles.balance, NUMERIC]}>{loading ? '—' : coins.toLocaleString()}</Text>
+            <Text style={styles.coinsLabel}>coins</Text>
           </View>
           {/* Hidden while a death is unanswered, exactly as in the masthead:
               an empty rack repeated on every screen is the death screen's line
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   brand: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   wordmark: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', letterSpacing: 1.8 },
   /* Wraps, so a five-heart run on a narrow rail drops to a second line rather
-     than squeezing the gem figure. */
+     than squeezing the coin figure. */
   resources: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   hearts: {
     flexDirection: 'row',
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
-  gems: {
+  coins: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
   balance: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
-  gemsLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '600' },
+  coinsLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: '600' },
   /* 3pt between rows rather than the 8 the old rail put between GROUPS: six
      peers want one rhythm, and the only break in it is the one `WEB_NAV`
      draws before Scores. */

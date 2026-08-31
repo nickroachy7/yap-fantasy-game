@@ -5,10 +5,10 @@ import { cardBadge, runCashout, runCleared, runStreak } from '@/components/icons
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { GemLedger, type LedgerEntry } from '@/components/account/GemLedger';
+import { CoinLedger, type LedgerEntry } from '@/components/account/CoinLedger';
 import { StatStrip, type StatItem } from '@/components/account/StatStrip';
 import { TierBreakdown } from '@/components/account/TierBreakdown';
-import { Gem, initialsOf } from '@/components/shell/AppHeader';
+import { Coin, initialsOf } from '@/components/shell/AppHeader';
 import { Screen } from '@/components/shell/Screen';
 import { DASH, DataTable, type Column } from '@/components/ui/DataTable';
 import { Panel } from '@/components/ui/Panel';
@@ -74,7 +74,7 @@ export default function ProfileScreen() {
   const accent = TierColors[scheme].gold.accent;
 
   const { session, signOut } = useAuth();
-  const { gems, displayName, cardCount, refresh } = usePlayer();
+  const { coins, displayName, cardCount, refresh } = usePlayer();
 
   const [tab, setTab] = useState<TabKey>('overview');
   const [slate, setSlate] = useState<Slate | null>(null);
@@ -119,7 +119,7 @@ export default function ProfileScreen() {
     try {
       const [ledgerRes, weekRes, boardRes, collection] = await Promise.all([
         supabase
-          .from('gems_ledger')
+          .from('coins_ledger')
           .select('id, amount, reason, created_at')
           // created_at alone is not unique — two grants can land in the same
           // transaction — so id breaks the tie and keeps the order stable.
@@ -211,7 +211,7 @@ export default function ProfileScreen() {
     return { counts, careerFp, starts };
   }, [owned]);
 
-  const gemFlow = useMemo(() => {
+  const coinFlow = useMemo(() => {
     let earned = 0;
     let spent = 0;
     for (const row of ledger ?? []) {
@@ -339,7 +339,7 @@ export default function ProfileScreen() {
 
   return (
     /* 'table' rather than the settings-form 720: the screen is now mostly rows
-     * of numbers — a week-by-week table, a gem ledger, a six-tile strip — and
+     * of numbers — a week-by-week table, a coin ledger, a six-tile strip — and
      * 720 squeezed the ledger's label column into two lines. The one thing that
      * genuinely wanted a short measure, the name field, caps its own width
      * below instead of the whole page paying for it. */
@@ -368,10 +368,10 @@ export default function ProfileScreen() {
             it should not be the one place it is missing. */}
         <View style={styles.balance}>
           <View style={styles.balanceRow}>
-            <Gem size={10} color={accent} />
-            <Text style={[Type.figure, NUMERIC, { color: c.text }]}>{gems.toLocaleString()}</Text>
+            <Coin size={10} color={accent} />
+            <Text style={[Type.figure, NUMERIC, { color: c.text }]}>{coins.toLocaleString()}</Text>
           </View>
-          <Text style={[Type.micro, { color: c.textTertiary }]}>GEM BALANCE</Text>
+          <Text style={[Type.micro, { color: c.textTertiary }]}>COIN BALANCE</Text>
         </View>
       </View>
 
@@ -432,31 +432,31 @@ export default function ProfileScreen() {
       {tab === 'activity' ? (
         <>
           <Panel
-            title="Gem flow"
+            title="Coin flow"
             hint={ledger ? `Across the last ${ledger.length} entries` : undefined}>
             <StatStrip
               items={[
                 {
                   label: 'Balance',
-                  value: gems.toLocaleString(),
-                  glyph: <Gem size={9} color={accent} />,
+                  value: coins.toLocaleString(),
+                  glyph: <Coin size={9} color={accent} />,
                 },
                 {
                   label: 'Earned',
-                  value: `+${gemFlow.earned.toLocaleString()}`,
+                  value: `+${coinFlow.earned.toLocaleString()}`,
                   tone: 'positive',
                   glyph: <Icon glyph={runCashout} color={c.positive} size={9} focused />,
                 },
-                { label: 'Spent', value: `-${gemFlow.spent.toLocaleString()}`, tone: 'negative' },
+                { label: 'Spent', value: `-${coinFlow.spent.toLocaleString()}`, tone: 'negative' },
               ]}
             />
           </Panel>
 
-          <Panel title="Gem activity" hint={`Most recent ${LEDGER_LIMIT}`}>
+          <Panel title="Coin activity" hint={`Most recent ${LEDGER_LIMIT}`}>
             {ledger === null ? (
               <ActivityIndicator style={styles.pad} />
             ) : (
-              <GemLedger entries={ledgerEntries} />
+              <CoinLedger entries={ledgerEntries} />
             )}
           </Panel>
         </>

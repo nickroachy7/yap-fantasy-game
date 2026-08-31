@@ -12,7 +12,7 @@
  * So the delta is production, not popularity: what a player scored in the most
  * recent completed week against what he scored in the one before. That is a
  * real, checkable fact, it is what a card owner actually wants before spending
- * gems, and it needs no data we do not already hold.
+ * coins, and it needs no data we do not already hold.
  *
  * WHAT IT REFUSES TO SAY
  *

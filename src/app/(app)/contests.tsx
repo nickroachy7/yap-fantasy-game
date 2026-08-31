@@ -54,12 +54,12 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  * The free contest never appears. Nobody chose it and nobody can leave it, so
  * it is not a thing to browse.
  *
- * THERE IS ONE LOBBY CONTEST AND IT COSTS GEMS. The fee is not flavour: a
- * second contest is a second source of score gems (`award_score_gems` pays 1.5
+ * THERE IS ONE LOBBY CONTEST AND IT COSTS COINS. The fee is not flavour: a
+ * second contest is a second source of score coins (`award_score_coins` pays 1.5
  * a point on every slot in every lineup filed), so a free-to-enter lobby is a
  * faucet with no tap. `20260825050000` sets out how 40 was arrived at.
  *
- * IF IT COSTS GEMS IT PAYS GEMS, and the database will not let a contest exist
+ * IF IT COSTS COINS IT PAYS COINS, and the database will not let a contest exist
  * otherwise (`contests_paid_contests_pay_out`, 20260826020000). The pool is 25%
  * of the fees that contest has collected — redistribution, never a grant — so
  * it is genuinely small in a four-tester week and grows with the field. The
@@ -68,13 +68,13 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  *
  * WHAT AN ENTRY IS ACTUALLY FOR IS STILL TIER. career_fp on cards that were
  * earning nothing is the reason to enter and the pool is the chase — the
- * expected prize is deliberately below what the entry costs net of score gems,
+ * expected prize is deliberately below what the entry costs net of score coins,
  * which is what stops the lobby becoming an arbitrage run with three bad cards.
- * That is why the reward column names the career_fp as well as the gems.
+ * That is why the reward column names the career_fp as well as the coins.
  *
  * WHICH IS THE OTHER THING THIS SCREEN HAS TO SAY. Some of these contests can
  * end your run (`hearts_at_risk`, 20260825130000) and some cannot, and nothing
- * about a fee or a format tells them apart — both cost the same 40 gems. A
+ * about a fee or a format tells them apart — both cost the same 40 coins. A
  * player who enters a run-ending contest without being told it was one has been
  * ambushed by their own lobby, so the stake is drawn on the card itself rather
  * than left to the contest page to disclose after the tap.
@@ -351,9 +351,9 @@ function ContestEntry({ contest, onPress }: { contest: Contest; onPress: () => v
      contest is neither, so collapsing any of them would hide a real one behind
      a wrong word. */
   const status = !entered
-    ? contest.entryFeeGems > 0 && !contest.affordable
-      ? { label: 'Not enough gems', tone: 'neutral' as const }
-      : { label: contest.entryFeeGems > 0 ? 'Enter' : 'Not set', tone: 'warning' as const }
+    ? contest.entryFeeCoins > 0 && !contest.affordable
+      ? { label: 'Not enough coins', tone: 'neutral' as const }
+      : { label: contest.entryFeeCoins > 0 ? 'Enter' : 'Not set', tone: 'warning' as const }
     : filled < contest.slotCount
       ? { label: `${filled} of ${contest.slotCount}`, tone: 'warning' as const }
       : { label: 'Lineup in', tone: 'positive' as const };

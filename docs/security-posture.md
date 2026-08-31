@@ -65,7 +65,7 @@ one is revoked from `anon` and pinned to `search_path = public, pg_temp`.
 
 | Function | Why it must be definer |
 | :--- | :--- |
-| `open_pack` | Mints cards and debits gems. There is **no INSERT policy** on `card_instances`, `gems_ledger` or `gem_balances`, so this function is the only path a card is ever created. RNG and gem maths never leave the server. |
+| `open_pack` | Mints cards and debits coins. There is **no INSERT policy** on `card_instances`, `coins_ledger` or `coin_balances`, so this function is the only path a card is ever created. RNG and coin maths never leave the server. |
 | `set_lineup` | Computes the lock time server-side and writes `lineup_slots`. A client-trusted clock is the attack. |
 | `sell_card` | The only call that destroys an asset and creates currency in one transaction. |
 | `leaderboard` | A *global* board has to read every user's score across RLS. Reading one row per user is exactly what the function is narrowed to. |
@@ -75,14 +75,14 @@ one is revoked from `anon` and pinned to `search_path = public, pg_temp`.
 | `card_profile` | One card instance wide, and it reads the same rank matview `player_profile` does. |
 | `player_market` | Counts copies of one player across `card_instances`, which is RLS-scoped to its owner — so an invoker-rights version would report every count as 1. Counts and one maximum; nothing that names an owner. |
 | `player_card_market` | The same answer for the whole directory in one scan, deliberately narrower than `player_market`. Same boundary. |
-| `claim_set_reward` | Pays a set reward. Like `open_pack`, it is the only path that writes `set_completions`, `gem_balances` and `gems_ledger`, none of which has an INSERT policy. |
+| `claim_set_reward` | Pays a set reward. Like `open_pack`, it is the only path that writes `set_completions`, `coin_balances` and `coins_ledger`, none of which has an INSERT policy. |
 | `commit_card_to_set` | Burns a card permanently and pays for it. Same reasoning: the burn and the payout must be one server-side transaction. |
 | `commit_cards_to_set` | The batch form of the same call, and the same boundary. |
 | `board_best_week` | Reads every user's `lineups` rows to find each one's highest week. RLS scopes that table to its owner, so an invoker-rights version would rank the caller alone — and would look completely normal doing it. Exposes a display name, a week and a score, which is what `leaderboard` already publishes. |
 | `board_record` | Grades every user against the field's weekly median. It computes the same medians `median_record` does, across the same RLS-scoped rows, and differs only in publishing names against results rather than the caller's own line. |
-| `board_collection` | Aggregates `card_instances`, which is RLS-scoped to its owner, so an invoker-rights version would report the caller's shelf as the whole community's. Counts and a gem valuation; nothing about which specific cards anybody holds. |
+| `board_collection` | Aggregates `card_instances`, which is RLS-scoped to its owner, so an invoker-rights version would report the caller's shelf as the whole community's. Counts and a coin valuation; nothing about which specific cards anybody holds. |
 | `board_cards` | The highest-scoring held copies across every user's `card_instances`. Exposes the owner's display name, the player, the tier and the score. It also returns `card_instances.id`, which is inert to anyone but the owner — `card_profile` filters on `auth.uid()`, so another user's id opens nothing. |
-| `board_sets` | Aggregates `set_milestone_claims` and committed `card_instances`, both RLS-scoped. Counts and gem totals only. |
+| `board_sets` | Aggregates `set_milestone_claims` and committed `card_instances`, both RLS-scoped. Counts and coin totals only. |
 | `contest_lobby` | Counts entries in every contest on the slate, which means counting other people's `lineups` rows, and prices each one against the caller's wallet. An invoker-rights version would show a lobby where every contest looked empty. Returns aggregates and one boolean per row; no user is ever named. |
 | `my_contest_cards` | The same boundary for the contests you are in, plus each one's own distribution (`low`, `median`, `average`, `high`) and cut. Keyed on `auth.uid()`. |
 | `contest_field` | Names the field: display name, score, place, result, prize, and whether that lineup has locked. This is the one definer here whose *purpose* is publishing other people's rows, so the column list is the access control — nothing about anybody's collection, wallet, run or hearts crosses it. |
@@ -91,8 +91,8 @@ one is revoked from `anon` and pinned to `search_path = public, pg_temp`.
 | `contest_entrants`, `contest_payouts`, `contest_prize_pool`, `locked_cards`, `game_config_value` | Helpers the functions above call. A nested call runs as the DEFINER, so `authenticated` holds the grant only because the client reads two of them directly. |
 
 Twenty-two further definer functions (`apply_injuries`, `assign_card_rarity`,
-`award_contest_prizes`, `award_position_bonuses`, `award_score_gems`,
-`backfill_week`, `contest_results`, `gameday_sweep`, `grant_weekly_gems`,
+`award_contest_prizes`, `award_position_bonuses`, `award_score_coins`,
+`backfill_week`, `contest_results`, `gameday_sweep`, `grant_weekly_coins`,
 `handle_new_user`, `rebuild_card_sets`, `rebuild_daily_set`,
 `rebuild_weekly_set`, `refresh_player_season_ranks`, `rotate_daily_set`,
 `rotate_weekly_set`, `score_week`, `settle_run_week`, `settle_week_payouts`,

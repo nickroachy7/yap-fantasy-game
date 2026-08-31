@@ -136,7 +136,7 @@ export default function EntryLineupScreen() {
                   accessibilityLabel: `${entrant.filled} cards filed`,
                 },
                 /* THE PRIZE REPLACES THE RESULT once there is one, because a
-                   number of gems already implies the W. Before settlement
+                   number of coins already implies the W. Before settlement
                    there is neither, and the cell says so rather than
                    disappearing — the strip cannot wrap, so a cell that comes
                    and goes re-divides the whole row. */
@@ -155,7 +155,7 @@ export default function EntryLineupScreen() {
                         : undefined,
                   accessibilityLabel:
                     entrant.prize !== null && entrant.prize > 0
-                      ? `Won ${entrant.prize} gems`
+                      ? `Won ${entrant.prize} coins`
                       : entrant.result === null
                         ? 'Not settled yet'
                         : `Result ${entrant.result}`,

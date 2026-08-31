@@ -26,7 +26,7 @@ export type StatItem = {
   /** Quiet third line: a pool size, a unit, "of 118". */
   hint?: string;
   tone?: StatTone;
-  /** Drawn before the value — the gem glyph on a balance. */
+  /** Drawn before the value — the coin glyph on a balance. */
   glyph?: ReactNode;
 };
 

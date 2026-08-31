@@ -97,7 +97,7 @@ import { useState } from 'react';
 import { StyleSheet, Pressable, Text, View } from 'react-native';
 
 import { TierMark } from '@/components/cards/TierMark';
-import { Gem } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
 import type { GameStatus } from '@/components/scores/scoreboard';
 import { DASH } from '@/components/ui/DataTable';
 import { PositionBadge, positionsForSlot, slotBadgeLabel } from '@/components/ui/PositionBadge';
@@ -876,7 +876,7 @@ export function ReadOnlyRow({
  * has a figure over a dash. Wrong, and the note at the head of this file had
  * already said why: the left column is a paragraph about a card and the right
  * is a pair of numbers about a Sunday. Aligned, the eye reads a correspondence
- * between rows that only half holds — the gems are not "about" the fixture —
+ * between rows that only half holds — the coins are not "about" the fixture —
  * and the whole column ends up hanging off the top of a three-line block.
  *
  * So it centres, and its box is the board's box to the point: 19 for the
@@ -901,13 +901,13 @@ export function ReadOnlyRow({
 export function SettledFigure({
   points,
   started,
-  gems,
+  coins,
 }: {
   points: number;
   /** His game kicked off. False on a bye, which cannot score and cannot pay. */
   started: boolean;
-  /** Gems this card earned, or null before the payout has run. */
-  gems: number | null;
+  /** Coins this card earned, or null before the payout has run. */
+  coins: number | null;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -940,13 +940,13 @@ export function SettledFigure({
           would sit four points lower than the figure on every paid row beside
           it. An empty box is invisible; a column that jogs is not. */}
       <View style={styles.projLine}>
-        {gems === null ? null : (
+        {coins === null ? null : (
           <>
-            <Gem size={8} color={gems > 0 ? gold : c.textTertiary} />
+            <Coin size={8} color={coins > 0 ? gold : c.textTertiary} />
             <Text
               numberOfLines={1}
-              style={[styles.projValue, NUMERIC, { color: gems > 0 ? c.text : c.textTertiary }]}>
-              {gems.toLocaleString()}
+              style={[styles.projValue, NUMERIC, { color: coins > 0 ? c.text : c.textTertiary }]}>
+              {coins.toLocaleString()}
             </Text>
           </>
         )}

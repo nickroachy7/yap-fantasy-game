@@ -67,7 +67,7 @@ Deno.test('groups a mixed selection into one leg per set', () => {
 
   assertEquals(plan.legs.length, 2);
   assertEquals(plan.cards, 3);
-  assertEquals(plan.gems, 12);
+  assertEquals(plan.coins, 12);
   // Alphabetical by set name, so the confirmation reads the same way twice.
   assertEquals(plan.legs[0].setName, 'Buffalo Bills');
   assertEquals(plan.legs[0].cardIds.sort(), ['c1', 'c2']);
@@ -88,7 +88,7 @@ Deno.test('a card in two sets goes to the first the server listed', () => {
 
   assertEquals(plan.legs.length, 1);
   assertEquals(plan.legs[0].setName, 'Receiver of the day');
-  assertEquals(plan.gems, 40);
+  assertEquals(plan.coins, 40);
 });
 
 Deno.test('three copies of one player fill his slot once', () => {
@@ -143,7 +143,7 @@ Deno.test('keeps the cheapest copy when deduping a player', () => {
 
   assertEquals(plan.cards, 1);
   // Priced off the copy that is actually going.
-  assertEquals(plan.gems, 4);
+  assertEquals(plan.coins, 4);
   assertEquals(plan.duplicate, 1);
 });
 

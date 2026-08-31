@@ -27,7 +27,7 @@ export type MyContest = {
   formatCode: string;
   formatName: string;
   slotCount: number;
-  entryFeeGems: number;
+  entryFeeCoins: number;
   /**
    * Null while the entry is being COMPOSED — the contest is chosen and no
    * lineup exists yet, because the fee is taken by the first submission.
@@ -63,7 +63,7 @@ export type MyContest = {
   winRank: number | null;
   cut: number | null;
 
-  /** Gems collected by this contest that will be paid back out. */
+  /** Coins collected by this contest that will be paid back out. */
   prizePool: number;
   /**
    * This contest belongs to a week the board has already moved past, and is
@@ -93,11 +93,11 @@ export type MyContest = {
    *
    * Deliberately not a running "you would win 60". That is a projection, and
    * the same rule that keeps `PROJ` a dash on every card in this app applies
-   * with more force to a number denominated in gems.
+   * with more force to a number denominated in coins.
    */
   myPrize: number | null;
   /**
-   * WHAT THE CARDS IN THIS ENTRY WERE PAID, summed — `award_score_gems` at 1.5
+   * WHAT THE CARDS IN THIS ENTRY WERE PAID, summed — `award_score_coins` at 1.5
    * a point times each card's tier multiplier, plus any position bonus.
    *
    * A different payment from `myPrize` and, on the free contest, the only one
@@ -106,11 +106,11 @@ export type MyContest = {
    * EARNED column would otherwise be empty on the one contest every player is in.
    *
    * NULL UNTIL THE PAYOUT HAS RUN, never zero. A week is final for a while
-   * before `award_score_gems` reaches it, and a nought drawn in that window
+   * before `award_score_coins` reaches it, and a nought drawn in that window
    * reports a week as having earned nothing at the moment a player is looking to
    * find out what it earned. See `takeLines`.
    */
-  myGems: number | null;
+  myCoins: number | null;
 };
 
 type Row = {
@@ -125,7 +125,7 @@ type Row = {
      ships JS without running `db push`, so the update can land on a database
      that does not send it yet. Absent reads as null, which is the same "still
      settling" the real pre-payout state draws. */
-  my_gems?: number | string | null;
+  my_coins?: number | string | null;
   recap: boolean | null;
   contest_id: string;
   code: string;
@@ -134,7 +134,7 @@ type Row = {
   format_code: string;
   format_name: string;
   slot_count: number;
-  entry_fee_gems: number;
+  entry_fee_coins: number;
   season_type: number;
   week: number;
   lineup_id: string | null;
@@ -202,7 +202,7 @@ export function useMyContests(includeCode?: string): MyContestsState {
         formatCode: r.format_code,
         formatName: r.format_name,
         slotCount: Number(r.slot_count),
-        entryFeeGems: r.entry_fee_gems,
+        entryFeeCoins: r.entry_fee_coins,
         weekLabel: weekLabelOf(Number(r.season_type), Number(r.week)),
         lineupId: r.lineup_id,
         filled: Number(r.filled ?? 0),
@@ -230,7 +230,7 @@ export function useMyContests(includeCode?: string): MyContestsState {
            `20260831040000`, which `num` reads as null — the same "still
            settling" line the real pre-payout state draws, which is the right
            thing for both. */
-        myGems: num(r.my_gems),
+        myCoins: num(r.my_coins),
         recap: Boolean(r.recap),
       })),
     );
@@ -261,7 +261,7 @@ export function termsOfEntry(c: MyContest): ContestTerms {
   return {
     formatName: c.formatName,
     slotCount: c.slotCount,
-    entryFeeGems: c.entryFeeGems,
+    entryFeeCoins: c.entryFeeCoins,
     heartsAtRisk: c.heartsAtRisk,
     heartsOnWin: c.heartsOnWin,
     winCondition: c.winCondition,

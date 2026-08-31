@@ -78,8 +78,8 @@ import type { Pulled } from './PackShelf';
  * flag on the re-read is what actually decides whether it is still actionable.
  */
 export type Disposition =
-  | { kind: 'sold'; gems: number }
-  | { kind: 'committed'; setName: string; gems: number; burnedThisCopy: boolean };
+  | { kind: 'sold'; coins: number }
+  | { kind: 'committed'; setName: string; coins: number; burnedThisCopy: boolean };
 
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 
@@ -238,7 +238,7 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
         }
         foldInto(at, (held) => ({
           ...held,
-          disposed: new Map(held.disposed).set(cardInstanceId, { kind: 'sold', gems: value }),
+          disposed: new Map(held.disposed).set(cardInstanceId, { kind: 'sold', coins: value }),
         }));
         // A sale always takes the copy that was pressed, so there is nothing to
         // read back — unlike the commit below.
@@ -271,7 +271,7 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
           return;
         }
 
-        /* The gems the server actually paid, not the figure the button
+        /* The coins the server actually paid, not the figure the button
            advertised. They agree today and the SQL suite asserts it; reading it
            back is what keeps that true if the payout rule ever moves. */
         const answer = data as { paid?: number; card_instance_id?: string } | null;
@@ -286,7 +286,7 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
           disposed: new Map(held.disposed).set(cardInstanceId, {
             kind: 'committed',
             setName: target.name,
-            gems: paid,
+            coins: paid,
             burnedThisCopy: action.burnsThisCopy,
           }),
         }));
@@ -345,7 +345,7 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
               refused += 1;
               lastRefusal = sellErrorMessage(error.message);
             } else {
-              stamped.set(sale.cardInstanceId, { kind: 'sold', gems: sale.gems });
+              stamped.set(sale.cardInstanceId, { kind: 'sold', coins: sale.coins });
               burnt.push(sale.cardInstanceId);
             }
           } else {
@@ -367,7 +367,7 @@ export function usePullActions(pulled: Pulled[] | null): PullActionsState {
                 stamped.set(add.cardInstanceId, {
                   kind: 'committed',
                   setName: add.setName,
-                  gems: num(answer?.paid),
+                  coins: num(answer?.paid),
                   burnedThisCopy: !add.spare,
                 });
                 if (typeof answer?.card_instance_id === 'string') {

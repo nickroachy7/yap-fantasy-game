@@ -367,14 +367,14 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
    * editing is free, the server is the record, and a button to confirm each
    * change would be furniture. But the FIRST submission into a paid contest is
    * not an edit, it is a purchase — `set_lineup` takes the fee on the create
-   * path — and spending somebody's gems because they stopped typing for 700ms
+   * path — and spending somebody's coins because they stopped typing for 700ms
    * is not a thing to do on a timer.
    *
    * It is only ever true before the entry exists. Once the fee is paid the
    * board goes back to autosaving like any other, because from then on it IS
    * only editing.
    */
-  const needsEntry = Boolean(contest?.unentered && contest.entryFeeGems > 0);
+  const needsEntry = Boolean(contest?.unentered && contest.entryFeeCoins > 0);
 
   /**
    * OVER THE ROSTER CAP, which is the one refusal that is about none of the
@@ -1209,7 +1209,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
 
           IT WANTS A FULL LINEUP. A partial one is legal and the caption below
           says so, but that is the rule for a free contest you are already in;
-          paying forty gems for two of three slots is a mistake somebody makes
+          paying forty coins for two of three slots is a mistake somebody makes
           once and cannot undo, and the server will not stop them. */}
       {needsEntry && !allLocked ? (
         <Pressable
@@ -1230,7 +1230,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
               { color: filled === slots.length ? c.background : c.textTertiary },
             ]}>
             {filled === slots.length
-              ? `Enter for ${contest?.entryFeeGems} gems`
+              ? `Enter for ${contest?.entryFeeCoins} coins`
               : `Fill all ${slots.length} slots to enter`}
           </Text>
         </Pressable>

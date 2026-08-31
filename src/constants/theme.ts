@@ -399,7 +399,7 @@ export const ChromeBand = '#0E0F12';
  *
  * `lime` is close to but NOT `TierColors.dark.gold.accent` (#E3BE4A). They are
  * allowed to coexist because they never mean the same thing: gold prices
- * things in gems inside the content, lime only ever says Yap in the chrome.
+ * things in coins inside the content, lime only ever says Yap in the chrome.
  */
 export const Brand = {
   lime: '#C7F53D',
@@ -673,7 +673,7 @@ export function getTierTheme(tier: CardTier, scheme: 'light' | 'dark'): TierThem
  * which is a lot of furniture to say one word, and neither could be changed
  * without the other quietly disagreeing.
  *
- * It is the app's own gold: the rail's active marker, the gem, the avatar ring.
+ * It is the app's own gold: the rail's active marker, the coin, the avatar ring.
  * A selected page is now the only warm thing in a grey bar, which reads faster
  * than a box AND survives being small, where a few points of lightness between
  * two greys does not.

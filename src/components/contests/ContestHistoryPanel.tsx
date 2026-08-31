@@ -41,7 +41,7 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BackRow, weekLabel } from '@/components/contests/ContestRecapPanel';
-import { Gem } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
 import { Heart } from '@/components/runs/Hearts';
 import { useContestHistory, type HistoryEntry } from '@/components/contests/use-contest-history';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -212,16 +212,16 @@ function HistoryRow({ entry, onPress }: { entry: HistoryEntry; onPress: () => vo
           </Text>
         </View>
         {/* WHAT IT PAID AND WHAT IT COST, on their own line and only when there
-            is one. A contest that staked no heart and paid no gems — which is
+            is one. A contest that staked no heart and paid no coins — which is
             the free one, every week — should not draw two empty slots to say
             so. */}
-        {entry.prizeGems || entry.heartsDelta ? (
+        {entry.prizeCoins || entry.heartsDelta ? (
           <View style={styles.meta}>
-            {entry.prizeGems ? (
+            {entry.prizeCoins ? (
               <View style={styles.pair}>
-                <Gem size={10} color={gold} />
+                <Coin size={10} color={gold} />
                 <Text style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
-                  {`+${entry.prizeGems}`}
+                  {`+${entry.prizeCoins}`}
                 </Text>
               </View>
             ) : null}

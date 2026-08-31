@@ -110,9 +110,9 @@ type Props = {
    * are not the YAP experience.
    *
    * THE MASTHEAD IS NOT APP CHROME, IT IS THE YAP TAB'S CHROME. It carries the
-   * run's hearts and the gem balance, and neither is universal: Leagues,
+   * run's hearts and the coin balance, and neither is universal: Leagues,
    * Scores and Profile are separate experiences with no hearts riding and
-   * nothing priced in gems, so a bar stating both above them is answering a
+   * nothing priced in coins, so a bar stating both above them is answering a
    * question those screens never ask. It read as app-wide furniture only
    * because every page happened to be drawn by this component.
    *

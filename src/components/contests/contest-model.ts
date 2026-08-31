@@ -37,12 +37,12 @@ export type WinCondition = 'median' | 'top_n';
 export type ContestTerms = {
   formatName: string;
   slotCount: number;
-  entryFeeGems: number;
+  entryFeeCoins: number;
   heartsAtRisk: number;
   heartsOnWin: number;
   winCondition: WinCondition;
   winRank: number | null;
-  /** Gems collected so far that will be paid back out. Grows with the field. */
+  /** Coins collected so far that will be paid back out. Grows with the field. */
   prizePool: number;
   entrants: number;
   maxEntrants?: number | null;
@@ -206,7 +206,7 @@ function ordinal(n: number): string {
  *
  * IT SAYS "ENTRIES" BECAUSE "IN" DID NOT SAY ANYTHING. This read "12 in" and
  * "1 in · 1 more to play", and at a glance nobody could tell what was in what —
- * twelve cards? twelve gems? twelve minutes? The noun costs six characters in a
+ * twelve cards? twelve coins? twelve minutes? The noun costs six characters in a
  * slot that has room for them and turns a number into a fact.
  *
  * AND EVERY STRING IS UNDER ~18 CHARACTERS, WHICH IS A REQUIREMENT RATHER THAN
@@ -292,13 +292,13 @@ export type TradeLine = { text: string; heart?: boolean; tone?: 'positive' | 'ne
 /**
  * WHAT YOU PUT UP.
  *
- * Ordered gems-then-hearts because that is the order they are felt: the gems
+ * Ordered coins-then-hearts because that is the order they are felt: the coins
  * go the moment you file, the heart only if you lose. A contest that risks
  * neither says so in a word rather than showing an empty column.
  */
 export function riskLines(t: ContestTerms): TradeLine[] {
   const lines: TradeLine[] = [];
-  if (t.entryFeeGems > 0) lines.push({ text: `${t.entryFeeGems} gems` });
+  if (t.entryFeeCoins > 0) lines.push({ text: `${t.entryFeeCoins} coins` });
   if (t.heartsAtRisk > 0) {
     lines.push({ text: t.heartsAtRisk === 1 ? '1 heart' : `${t.heartsAtRisk} hearts`, heart: true });
   }
@@ -307,7 +307,7 @@ export function riskLines(t: ContestTerms): TradeLine[] {
 }
 
 /**
- * WHAT YOU CAN TAKE, DENOMINATED IN GEMS.
+ * WHAT YOU CAN TAKE, DENOMINATED IN COINS.
  *
  * ---------------------------------------------------------------------------
  * A REWARD HAS TO BE IN A CURRENCY THE PLAYER KEEPS SCORE IN
@@ -317,30 +317,30 @@ export function riskLines(t: ContestTerms): TradeLine[] {
  * tier is the real reason to enter — which it is, and which is why the fee is
  * priced the way it is. But career_fp is not a thing anybody has a balance of.
  * It accrues invisibly, it pays off weeks later in a tier threshold, and next
- * to "40 gems" on the risk side it read as the small print rather than as the
+ * to "40 coins" on the risk side it read as the small print rather than as the
  * other half of a trade. A reward column where the risk is a number and the
  * reward is a concept is not a comparison a reader can make.
  *
- * So: gems, always, and the tier argument moved to the contest sheet's prose
+ * So: coins, always, and the tier argument moved to the contest sheet's prose
  * where there is room to actually make it.
  *
  * ---------------------------------------------------------------------------
- * WHERE THE GEMS COME FROM, AND WHY IT CANNOT BE A FLAT PRIZE
+ * WHERE THE COINS COME FROM, AND WHY IT CANNOT BE A FLAT PRIZE
  * ---------------------------------------------------------------------------
  *
  * Where there is an entry fee, from the POOL those fees collected — 25% of
  * them, see `20260826020000`. That is redistribution and it is safe.
  *
  * Where there is no fee there is no pool, and this is the line to be careful
- * about: a fixed gem prize on a contest that collects nothing could only ever
+ * about: a fixed coin prize on a contest that collects nothing could only ever
  * be MINTED, which is the one thing the economy forbids outright and the exact
- * inversion the entry fee exists to prevent. The free contest still pays gems —
- * every entry does — but through `award_score_gems`, at 1.5 a point times the
- * card's tier multiplier (1.0 bronze to 1.4 diamond). "From 1.5 gems a point"
+ * inversion the entry fee exists to prevent. The free contest still pays coins —
+ * every entry does — but through `award_score_coins`, at 1.5 a point times the
+ * card's tier multiplier (1.0 bronze to 1.4 diamond). "From 1.5 coins a point"
  * is the floor and it is a real, earned number rather than an advertised one.
  *
  * A PAID CONTEST EARNS THAT TOO and does not say so here. Naming both would put
- * two gem lines in a column that is trying to answer one question, and the pool
+ * two coin lines in a column that is trying to answer one question, and the pool
  * is the part that is specific to THIS contest. The score rate is the baseline
  * every entry gets, worth naming only where there is nothing more specific.
  */
@@ -354,23 +354,23 @@ export function rewardLines(t: ContestTerms, prize: number | null = null): Trade
      EVERY LINE HERE FITS ON ONE. The trade band reserves a fixed number of
      single-line rows so the card's height cannot move — see `TRADE_LINES` in
      `ContestCard` — so a string that needs two is a string that gets clipped.
-     "Gem pool, once entries start" was that string, and it is "Share of the
+     "Coin pool, once entries start" was that string, and it is "Share of the
      pool" now: the same sentence as the funded case rather than a separate
      apology for an empty one. */
   if (prize !== null && prize > 0) {
-    lines.push({ text: `Won ${prize} gems`, tone: 'positive' });
-  } else if (t.entryFeeGems > 0) {
+    lines.push({ text: `Won ${prize} coins`, tone: 'positive' });
+  } else if (t.entryFeeCoins > 0) {
     const top = topPrize(t);
     lines.push({
       text:
         t.prizePool > 0
           ? top !== null
-            ? `Up to ${top} gems`
-            : `Share of ${t.prizePool} gems`
+            ? `Up to ${top} coins`
+            : `Share of ${t.prizePool} coins`
           : 'Share of the pool',
     });
   } else {
-    lines.push({ text: 'From 1.5 gems a point' });
+    lines.push({ text: 'From 1.5 coins a point' });
   }
 
   if (t.heartsOnWin > 0) {
@@ -412,7 +412,7 @@ export function topPrize(t: ContestTerms): number | null {
  * the moment there is an answer. A settled card drew
  *
  *     RISK                REWARD
- *     ♥ 1 heart           From 1.5 gems a point
+ *     ♥ 1 heart           From 1.5 coins a point
  *
  * over a scoreboard reading 28.0 to 16.2 with the week already gone — a heart
  * described as still riding when it had been kept, and a rate quoted as an
@@ -442,18 +442,18 @@ export type Settlement = {
   /**
    * What the CARDS in this entry were paid, summed.
    *
-   * Not the prize: this is `award_score_gems` at 1.5 a point times each card's
+   * Not the prize: this is `award_score_coins` at 1.5 a point times each card's
    * tier multiplier, which every entry earns and which is the only payment a
    * free contest ever makes. Null until the payout has run — never a zero, for
    * the reason on `EntryLineup`.
    */
-  gems: number | null;
+  coins: number | null;
 };
 
 /**
  * WHAT IT COST, now that the answer is known.
  *
- * The gems went at submission and do not come back, so they read exactly as
+ * The coins went at submission and do not come back, so they read exactly as
  * they did on the offer. The heart is the line that changes: `hearts_delta` is
  * `-hearts_at_risk` on a loss and nothing at all otherwise, which is the whole
  * of what settlement does to a run (see `20260825170000`).
@@ -473,7 +473,7 @@ export type Settlement = {
  */
 export function stakeLines(t: ContestTerms, s: Settlement): TradeLine[] {
   const lines: TradeLine[] = [];
-  if (t.entryFeeGems > 0) lines.push({ text: `${t.entryFeeGems} gems` });
+  if (t.entryFeeCoins > 0) lines.push({ text: `${t.entryFeeCoins} coins` });
   if (t.heartsAtRisk > 0) {
     const noun = t.heartsAtRisk === 1 ? '1 heart' : `${t.heartsAtRisk} hearts`;
     if (s.result === 'L') lines.push({ text: `${noun} lost`, heart: true, tone: 'negative' });
@@ -495,21 +495,21 @@ export function stakeLines(t: ContestTerms, s: Settlement): TradeLine[] {
  *      the largest figure on the card, and it is the thing entering was for.
  *   2. THE HEART, where the contest heals and the entry won. Hearts are the
  *      scarcest thing in the game and the only place they come from is here.
- *   3. THE CARD GEMS. The baseline every entry earns — and the one line that
+ *   3. THE CARD COINS. The baseline every entry earns — and the one line that
  *      is restated in full directly underneath, one figure per row of the
  *      lineup, which is what makes it the safe one to drop.
  *
  * On the free contest, which is the contest every player is in, there is no
- * prize and usually no heal, so the card gems are the whole of it — and they
+ * prize and usually no heal, so the card coins are the whole of it — and they
  * are the sum of the per-row figures below. That closure is the point: a
  * player can read the total on the card and then see which cards made it.
  *
  * THE QUALIFIER APPEARS ONLY WHEN IT IS NEEDED. With a prize on the line above
- * it, a bare "42 gems" would be a second unexplained sum next to a first one;
+ * it, a bare "42 coins" would be a second unexplained sum next to a first one;
  * on its own there is nothing to tell it apart from, and the shorter string is
  * the one that cannot be clipped.
  *
- * AND "STILL SETTLING" IS NOT "NOTHING". `award_score_gems` runs after the
+ * AND "STILL SETTLING" IS NOT "NOTHING". `award_score_coins` runs after the
  * week completes, so there is a real interval — minutes, and longer if a
  * provider is slow — where the scores are final and nothing has been paid.
  * That is the state a player refreshing on a Tuesday morning is most likely to
@@ -524,7 +524,7 @@ export function takeLines(
   const lines: TradeLine[] = [];
   const paid = prize !== null && prize > 0;
 
-  if (paid) lines.push({ text: `Won ${prize} gems`, tone: 'positive' });
+  if (paid) lines.push({ text: `Won ${prize} coins`, tone: 'positive' });
   if (t.heartsOnWin > 0 && s.result === 'W') {
     lines.push({
       text: t.heartsOnWin === 1 ? '+1 heart' : `+${t.heartsOnWin} hearts`,
@@ -532,11 +532,11 @@ export function takeLines(
       tone: 'positive',
     });
   }
-  if (s.gems !== null && s.gems > 0) {
-    lines.push({ text: paid ? `${s.gems} gems from cards` : `${s.gems} gems` });
+  if (s.coins !== null && s.coins > 0) {
+    lines.push({ text: paid ? `${s.coins} coins from cards` : `${s.coins} coins` });
   }
 
-  if (lines.length === 0) lines.push({ text: s.gems === null ? 'Still settling' : 'Nothing' });
+  if (lines.length === 0) lines.push({ text: s.coins === null ? 'Still settling' : 'Nothing' });
   return lines;
 }
 
@@ -550,15 +550,15 @@ export function takeLines(
  * ---------------------------------------------------------------------------
  *
  * `riskLines` and `rewardLines` return strings, and a string is the wrong shape
- * the moment a stake has more than one part. "40 gems · 1 heart" against "Up to
- * 120 gems · +1 heart · 1 pack" is 48 characters of prose in a 317pt row that
+ * the moment a stake has more than one part. "40 coins · 1 heart" against "Up to
+ * 120 coins · +1 heart · 1 pack" is 48 characters of prose in a 317pt row that
  * also has to carry two labels and a divider, and it does not fit. It nearly
  * did not fit at two parts a side, which is why the old trade band was two
  * columns with a reserved blank row in each.
  *
  * A glyph plus a number is four characters where the sentence was seventeen, so
  * five of them fit on one line with room to spare. Every currency this game has
- * or is likely to grow already owns a mark — `gem`, `heartFull`, the four
+ * or is likely to grow already owns a mark — `coin`, `heartFull`, the four
  * `pack*` glyphs, `cardBadge`, the tier marks — so the vocabulary is drawn, not
  * invented.
  *
@@ -566,9 +566,9 @@ export function takeLines(
  * THE UNIT WORD IS ELASTIC, AND THAT IS THE LITERACY FIX
  * ---------------------------------------------------------------------------
  *
- * A bare `◆ 40` asks the reader to already know the diamond means gems. On a
+ * A bare `◆ 40` asks the reader to already know the diamond means coins. On a
  * side carrying ONE token there is room for the word, so it is printed: `◆ 40
- * gems`, `♥ 1 heart`, `◆ 1.5 a point`. On a side carrying two or three there is
+ * coins`, `♥ 1 heart`, `◆ 1.5 a point`. On a side carrying two or three there is
  * not, and it drops to bare numbers.
  *
  * The free contest — one risk, one reward — is the contest every new player
@@ -580,7 +580,7 @@ export function takeLines(
  */
 export type Token = {
   /** Which mark is drawn. `none` is a word with no glyph — "nothing". */
-  kind: 'gem' | 'heart' | 'pack' | 'none';
+  kind: 'coin' | 'heart' | 'pack' | 'none';
   /** The quantity as drawn: "40", "+1", "1.5", "kept", "lost", "nothing". */
   value: string;
   /** Names the unit. Printed only where the side has room — see above. */
@@ -610,10 +610,10 @@ export function beatSource(
   return 'MEDIAN';
 }
 
-/** What you put up. Gems first, then hearts — the order the foot reads. */
+/** What you put up. Coins first, then hearts — the order the foot reads. */
 export function riskTokens(t: ContestTerms): Token[] {
   const out: Token[] = [];
-  if (t.entryFeeGems > 0) out.push({ kind: 'gem', value: `${t.entryFeeGems}`, unit: 'gems' });
+  if (t.entryFeeCoins > 0) out.push({ kind: 'coin', value: `${t.entryFeeCoins}`, unit: 'coins' });
   if (t.heartsAtRisk > 0) {
     out.push({
       kind: 'heart',
@@ -638,20 +638,20 @@ export function riskTokens(t: ContestTerms): Token[] {
  *
  * A RATE IS NOT AN AMOUNT. The free contest pays per point, so its token is
  * `1.5` with `a point` as the unit — and because that side carries exactly one
- * token, the unit always prints. A bare `◆ 1.5` would read as a gem and a half.
+ * token, the unit always prints. A bare `◆ 1.5` would read as a coin and a half.
  */
 export function winTokens(t: ContestTerms, prize: number | null = null): Token[] {
   const out: Token[] = [];
 
   if (prize !== null && prize > 0) {
-    out.push({ kind: 'gem', value: `${prize}`, unit: 'gems', tone: 'positive' });
-  } else if (t.entryFeeGems > 0) {
+    out.push({ kind: 'coin', value: `${prize}`, unit: 'coins', tone: 'positive' });
+  } else if (t.entryFeeCoins > 0) {
     const top = topPrize(t);
-    if (top !== null) out.push({ kind: 'gem', value: `${top}`, unit: 'gems' });
-    else if (t.prizePool > 0) out.push({ kind: 'gem', value: `${t.prizePool}`, unit: 'gems' });
-    else out.push({ kind: 'gem', value: 'share', unit: 'of the pool' });
+    if (top !== null) out.push({ kind: 'coin', value: `${top}`, unit: 'coins' });
+    else if (t.prizePool > 0) out.push({ kind: 'coin', value: `${t.prizePool}`, unit: 'coins' });
+    else out.push({ kind: 'coin', value: 'share', unit: 'of the pool' });
   } else {
-    out.push({ kind: 'gem', value: '1.5', unit: 'a point' });
+    out.push({ kind: 'coin', value: '1.5', unit: 'a point' });
   }
 
   if (t.heartsOnWin > 0) {
@@ -676,7 +676,7 @@ export function winTokens(t: ContestTerms, prize: number | null = null): Token[]
  */
 export function stakedTokens(t: ContestTerms, s: Settlement): Token[] {
   const out: Token[] = [];
-  if (t.entryFeeGems > 0) out.push({ kind: 'gem', value: `${t.entryFeeGems}`, unit: 'gems' });
+  if (t.entryFeeCoins > 0) out.push({ kind: 'coin', value: `${t.entryFeeCoins}`, unit: 'coins' });
   if (t.heartsAtRisk > 0) {
     const lost = s.result === 'L';
     out.push({
@@ -693,12 +693,12 @@ export function stakedTokens(t: ContestTerms, s: Settlement): Token[] {
 /**
  * What the week actually paid. `WON`, in the past tense, and no promises left.
  *
- * `s.gems` IS A SEPARATE PAYMENT FROM `prize`. The pool pays the winners; the
+ * `s.coins` IS A SEPARATE PAYMENT FROM `prize`. The pool pays the winners; the
  * cards pay everybody by the point. A week can produce both, one, or neither,
  * and a settled contest that produced neither says so rather than drawing an
  * empty side — a blank there reads as still loading, which is the one state
  * this side must not be confused with. `Still settling` is that state and it is
- * distinct: `s.gems` is null until the payout cron has stamped the slots.
+ * distinct: `s.coins` is null until the payout cron has stamped the slots.
  */
 export function wonTokens(
   t: ContestTerms,
@@ -708,7 +708,7 @@ export function wonTokens(
   const out: Token[] = [];
   const paid = prize !== null && prize > 0;
 
-  if (paid) out.push({ kind: 'gem', value: `${prize}`, unit: 'gems', tone: 'positive' });
+  if (paid) out.push({ kind: 'coin', value: `${prize}`, unit: 'coins', tone: 'positive' });
   if (t.heartsOnWin > 0 && s.result === 'W') {
     out.push({
       kind: 'heart',
@@ -717,12 +717,12 @@ export function wonTokens(
       tone: 'positive',
     });
   }
-  if (s.gems !== null && s.gems > 0) {
-    out.push({ kind: 'gem', value: `${s.gems}`, unit: paid ? 'from cards' : 'gems' });
+  if (s.coins !== null && s.coins > 0) {
+    out.push({ kind: 'coin', value: `${s.coins}`, unit: paid ? 'from cards' : 'coins' });
   }
 
   if (out.length === 0) {
-    out.push({ kind: 'none', value: s.gems === null ? 'still settling' : 'nothing' });
+    out.push({ kind: 'none', value: s.coins === null ? 'still settling' : 'nothing' });
   }
   return out;
 }

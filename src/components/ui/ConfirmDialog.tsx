@@ -7,7 +7,7 @@
  * both resolve to, so every accidental dismissal fails safe.
  *
  * `destructive` is not decoration. It is the difference between "you are about
- * to spend gems" and "you are about to destroy something you cannot get back",
+ * to spend coins" and "you are about to destroy something you cannot get back",
  * and selling a card is the second kind — the copy carries its earned tier and
  * its start history with it.
  *

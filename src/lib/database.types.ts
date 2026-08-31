@@ -148,17 +148,17 @@ export type Database = {
       card_set_ladder_defaults: {
         Row: {
           family: string
-          reward_gems: number
+          reward_coins: number
           threshold_pct: number
         }
         Insert: {
           family: string
-          reward_gems: number
+          reward_coins: number
           threshold_pct: number
         }
         Update: {
           family?: string
-          reward_gems?: number
+          reward_coins?: number
           threshold_pct?: number
         }
         Relationships: []
@@ -209,17 +209,17 @@ export type Database = {
       }
       card_set_milestones: {
         Row: {
-          reward_gems: number
+          reward_coins: number
           set_id: string
           threshold_pct: number
         }
         Insert: {
-          reward_gems: number
+          reward_coins: number
           set_id: string
           threshold_pct: number
         }
         Update: {
-          reward_gems?: number
+          reward_coins?: number
           set_id?: string
           threshold_pct?: number
         }
@@ -336,6 +336,54 @@ export type Database = {
           },
         ]
       }
+      coin_balances: {
+        Row: {
+          balance: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      coins_ledger: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          idempotency_key: string | null
+          reason: Database["public"]["Enums"]["coin_reason"]
+          reference_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          idempotency_key?: string | null
+          reason: Database["public"]["Enums"]["coin_reason"]
+          reference_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          idempotency_key?: string | null
+          reason?: Database["public"]["Enums"]["coin_reason"]
+          reference_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       contest_format_slots: {
         Row: {
           display_order: number
@@ -390,7 +438,7 @@ export type Database = {
         Row: {
           code: string
           created_at: string
-          entry_fee_gems: number
+          entry_fee_coins: number
           format_code: string
           hearts_at_risk: number
           hearts_on_win: number
@@ -408,7 +456,7 @@ export type Database = {
         Insert: {
           code: string
           created_at?: string
-          entry_fee_gems?: number
+          entry_fee_coins?: number
           format_code: string
           hearts_at_risk?: number
           hearts_on_win?: number
@@ -426,7 +474,7 @@ export type Database = {
         Update: {
           code?: string
           created_at?: string
-          entry_fee_gems?: number
+          entry_fee_coins?: number
           format_code?: string
           hearts_at_risk?: number
           hearts_on_win?: number
@@ -625,60 +673,12 @@ export type Database = {
           },
         ]
       }
-      gem_balances: {
-        Row: {
-          balance: number
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          balance?: number
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          balance?: number
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      gems_ledger: {
-        Row: {
-          amount: number
-          created_at: string
-          id: string
-          idempotency_key: string | null
-          reason: Database["public"]["Enums"]["gem_reason"]
-          reference_id: string | null
-          user_id: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          id?: string
-          idempotency_key?: string | null
-          reason: Database["public"]["Enums"]["gem_reason"]
-          reference_id?: string | null
-          user_id: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          id?: string
-          idempotency_key?: string | null
-          reason?: Database["public"]["Enums"]["gem_reason"]
-          reference_id?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
       lineup_slots: {
         Row: {
-          bonus_gems: number | null
+          bonus_coins: number | null
           card_instance_id: string
-          gem_multiplier: number | null
-          gems_awarded: number | null
+          coin_multiplier: number | null
+          coins_awarded: number | null
           id: string
           lineup_id: string
           points: number
@@ -688,10 +688,10 @@ export type Database = {
           was_week_mvp: boolean | null
         }
         Insert: {
-          bonus_gems?: number | null
+          bonus_coins?: number | null
           card_instance_id: string
-          gem_multiplier?: number | null
-          gems_awarded?: number | null
+          coin_multiplier?: number | null
+          coins_awarded?: number | null
           id?: string
           lineup_id: string
           points?: number
@@ -701,10 +701,10 @@ export type Database = {
           was_week_mvp?: boolean | null
         }
         Update: {
-          bonus_gems?: number | null
+          bonus_coins?: number | null
           card_instance_id?: string
-          gem_multiplier?: number | null
-          gems_awarded?: number | null
+          coin_multiplier?: number | null
+          coins_awarded?: number | null
           id?: string
           lineup_id?: string
           points?: number
@@ -803,21 +803,21 @@ export type Database = {
       }
       pack_openings: {
         Row: {
-          gems_spent: number
+          coins_spent: number
           id: string
           opened_at: string
           pack_id: string
           user_id: string
         }
         Insert: {
-          gems_spent: number
+          coins_spent: number
           id?: string
           opened_at?: string
           pack_id: string
           user_id: string
         }
         Update: {
-          gems_spent?: number
+          coins_spent?: number
           id?: string
           opened_at?: string
           pack_id?: string
@@ -837,9 +837,9 @@ export type Database = {
         Row: {
           card_count: number
           code: string
+          coin_cost: number
           created_at: string
           daily_limit: number | null
-          gem_cost: number
           guaranteed_positions: Json
           id: string
           is_active: boolean
@@ -850,9 +850,9 @@ export type Database = {
         Insert: {
           card_count: number
           code: string
+          coin_cost: number
           created_at?: string
           daily_limit?: number | null
-          gem_cost: number
           guaranteed_positions?: Json
           id?: string
           is_active?: boolean
@@ -863,9 +863,9 @@ export type Database = {
         Update: {
           card_count?: number
           code?: string
+          coin_cost?: number
           created_at?: string
           daily_limit?: number | null
-          gem_cost?: number
           guaranteed_positions?: Json
           id?: string
           is_active?: boolean
@@ -995,17 +995,17 @@ export type Database = {
         Row: {
           label: string
           max_rank: number
-          reward_gems: number
+          reward_coins: number
         }
         Insert: {
           label: string
           max_rank: number
-          reward_gems: number
+          reward_coins: number
         }
         Update: {
           label?: string
           max_rank?: number
-          reward_gems?: number
+          reward_coins?: number
         }
         Relationships: []
       }
@@ -1170,7 +1170,7 @@ export type Database = {
         Row: {
           committed_at_claim: number
           completed_at: string
-          reward_gems: number
+          reward_coins: number
           set_id: string
           threshold_pct: number
           user_id: string
@@ -1178,7 +1178,7 @@ export type Database = {
         Insert: {
           committed_at_claim: number
           completed_at?: string
-          reward_gems: number
+          reward_coins: number
           set_id: string
           threshold_pct: number
           user_id: string
@@ -1186,7 +1186,7 @@ export type Database = {
         Update: {
           committed_at_claim?: number
           completed_at?: string
-          reward_gems?: number
+          reward_coins?: number
           set_id?: string
           threshold_pct?: number
           user_id?: string
@@ -1424,21 +1424,21 @@ export type Database = {
       }
       tier_thresholds: {
         Row: {
-          gem_multiplier: number
+          coin_multiplier: number
           min_career_fp: number
           sell_value: number
           sort_order: number
           tier: Database["public"]["Enums"]["card_tier"]
         }
         Insert: {
-          gem_multiplier?: number
+          coin_multiplier?: number
           min_career_fp: number
           sell_value?: number
           sort_order: number
           tier: Database["public"]["Enums"]["card_tier"]
         }
         Update: {
-          gem_multiplier?: number
+          coin_multiplier?: number
           min_career_fp?: number
           sell_value?: number
           sort_order?: number
@@ -1574,8 +1574,8 @@ export type Database = {
       }
       my_sets: {
         Row: {
-          claimable_gems: number | null
-          claimed_gems: number | null
+          claimable_coins: number | null
+          claimed_coins: number | null
           code: string | null
           commit_payout_pct: number | null
           committed: number | null
@@ -1715,7 +1715,7 @@ export type Database = {
         Args: { p_season: number; p_season_type: number; p_week: number }
         Returns: Json
       }
-      award_score_gems: {
+      award_score_coins: {
         Args: {
           p_per_point?: number
           p_season: number
@@ -1765,11 +1765,11 @@ export type Database = {
           gold_plus: number
           held: number
           in_sets: number
-          in_sets_gems: number
+          in_sets_coins: number
           players: number
           rank: number
           user_id: string
-          value_gems: number
+          value_coins: number
         }[]
       }
       board_record: {
@@ -1790,10 +1790,10 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: {
           burned: number
+          coins: number
           completed: number
           dailies: number
           display_name: string
-          gems: number
           rank: number
           rungs: number
           sets: number
@@ -1854,7 +1854,7 @@ export type Database = {
           kind: string
           name: string
           points: number
-          prize_gems: number
+          prize_coins: number
           result: string
           rnk: number
           season: number
@@ -1866,9 +1866,9 @@ export type Database = {
         Args: { p_contest: string; p_user: string }
         Returns: {
           awarded: boolean
-          bonus_gems: number
+          bonus_coins: number
           career_fp: number
-          gems: number
+          coins: number
           home: boolean
           next_tier_at: number
           next_tier_label: Database["public"]["Enums"]["card_tier"]
@@ -1895,7 +1895,7 @@ export type Database = {
           affordable: boolean
           code: string
           entrants: number
-          entry_fee_gems: number
+          entry_fee_coins: number
           format_code: string
           format_name: string
           hearts_at_risk: number
@@ -1921,7 +1921,7 @@ export type Database = {
       contest_payouts: {
         Args: { p_contest: string }
         Returns: {
-          gems: number
+          coins: number
           lineup_id: string
           rnk: number
           user_id: string
@@ -1985,7 +1985,7 @@ export type Database = {
         Returns: boolean
       }
       gameday_sweep: { Args: never; Returns: Json }
-      grant_weekly_gems: {
+      grant_weekly_coins: {
         Args: {
           p_amount?: number
           p_season: number
@@ -2052,7 +2052,7 @@ export type Database = {
           contest_id: string
           cut: number
           entrants: number
-          entry_fee_gems: number
+          entry_fee_coins: number
           filled: number
           final: boolean
           format_code: string
@@ -2064,7 +2064,7 @@ export type Database = {
           lineup_id: string
           low: number
           median: number
-          my_gems: number
+          my_coins: number
           my_points: number
           my_prize: number
           my_rank: number
@@ -2213,9 +2213,7 @@ export type Database = {
     Enums: {
       acquisition_source: "pack" | "grant" | "admin"
       card_tier: "bronze" | "silver" | "gold" | "diamond"
-      contest_kind: "free" | "lobby"
-      contest_win_condition: "median" | "top_n"
-      gem_reason:
+      coin_reason:
         | "signup_bonus"
         | "weekly_grant"
         | "weekly_score_reward"
@@ -2230,6 +2228,8 @@ export type Database = {
         | "contest_refund"
         | "run_wipe"
         | "contest_prize"
+      contest_kind: "free" | "lobby"
+      contest_win_condition: "median" | "top_n"
       rarity: "common" | "uncommon" | "rare" | "epic" | "legendary"
     }
     CompositeTypes: {
@@ -2363,9 +2363,7 @@ export const Constants = {
     Enums: {
       acquisition_source: ["pack", "grant", "admin"],
       card_tier: ["bronze", "silver", "gold", "diamond"],
-      contest_kind: ["free", "lobby"],
-      contest_win_condition: ["median", "top_n"],
-      gem_reason: [
+      coin_reason: [
         "signup_bonus",
         "weekly_grant",
         "weekly_score_reward",
@@ -2381,6 +2379,8 @@ export const Constants = {
         "run_wipe",
         "contest_prize",
       ],
+      contest_kind: ["free", "lobby"],
+      contest_win_condition: ["median", "top_n"],
       rarity: ["common", "uncommon", "rare", "epic", "legendary"],
     },
   },

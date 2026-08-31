@@ -17,7 +17,7 @@
  * me choose — is an informed one.
  *
  * THE ROW IS ORDERED TO BE READ LEFT TO RIGHT AS A SENTENCE: who, what they did,
- * what it was worth. The multiplier sits against the gems it multiplied rather
+ * what it was worth. The multiplier sits against the coins it multiplied rather
  * than against the tier badge, because it is a fact about the payout and not
  * about the card.
  *

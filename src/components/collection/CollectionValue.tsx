@@ -5,9 +5,9 @@
  * THE LABEL IS THE POINT OF THIS COMPONENT
  * ---------------------------------------------------------------------------
  *
- * There are TWO gem figures on this screen and they mean opposite things. The
- * header carries the player's wallet — gems they have, to spend. This one is
- * gems they could GET, by destroying the collection it is measured over. Same
+ * There are TWO coin figures on this screen and they mean opposite things. The
+ * header carries the player's wallet — coins they have, to spend. This one is
+ * coins they could GET, by destroying the collection it is measured over. Same
  * glyph, same gold, eight points apart, and nothing but a word between them.
  *
  * An unlabelled `◆ 232` under an unlabelled `◆ 1,501` reads as a second balance,
@@ -32,14 +32,14 @@
  *
  * IT CANNOT TRUNCATE. Diamond sells for 500 and the roster caps at thirty, so
  * this can reach five digits. An earlier version let its container shrink and a
- * collection worth 2142 gems rendered as `214` — not clipped, not ellipsised, a
+ * collection worth 2142 coins rendered as `214` — not clipped, not ellipsised, a
  * DIFFERENT NUMBER in identical styling. Every figure here is a bare integer, so
  * every truncation is a plausible smaller one. Nothing in this component shrinks
  * or caps its lines; the row's give is the spacer beside it.
  */
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Gem } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
 import { Colors, NUMERIC, Spacing, Type, getTierTheme } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -54,10 +54,10 @@ export function CollectionValue({ sellValue }: { sellValue: number }) {
       accessibilityRole="text"
       /* Spoken as the sentence the label is short for. "Value 232" would leave
          a screen reader with the same ambiguity the glyph leaves an eye. */
-      accessibilityLabel={`Collection value, ${sellValue} gems if every card were sold`}
+      accessibilityLabel={`Collection value, ${sellValue} coins if every card were sold`}
       style={styles.row}>
       <Text style={[Type.label, styles.label, { color: c.textTertiary }]}>Value</Text>
-      <Gem size={10} color={gold.accent} />
+      <Coin size={10} color={gold.accent} />
       {/* `Type.section`, not `Type.figure`.
 
           `figure` is "the one number a panel exists to show" and this is not in

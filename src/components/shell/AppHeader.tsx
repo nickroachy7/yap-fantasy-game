@@ -1,5 +1,5 @@
 /**
- * The app header: the wordmark, the hearts, and the gem balance.
+ * The app header: the wordmark, the hearts, and the coin balance.
  *
  * NO BAND. It used to paint itself `#0E0F12` — a shade off the page, plus a
  * gold bloom in the corner — so the chrome read as a fixed branded strip
@@ -34,8 +34,8 @@
  * THE HEARTS ARE GONE FROM HERE, and where they went is the argument.
  *
  * They sat next to the balance on the reasoning that both are "what you have to
- * spend", and that entering a contest costs gems and risks a heart in one
- * action. The first half held; the second is what broke it. The gems are spent
+ * spend", and that entering a contest costs coins and risks a heart in one
+ * action. The first half held; the second is what broke it. The coins are spent
  * from every screen — packs, sets, contests — so the balance belongs to the
  * chrome. A heart is only ever risked by ONE object, the contest, and that
  * object has a card of its own on the board where the risking happens.
@@ -52,8 +52,8 @@
  * carousel.
  *
  * THE BALANCE IS A NUMBER, NOT A WIDGET. The pill it used to sit in — border,
- * inset fill, a 8pt "GEMS" label above the figure — was three pieces of
- * decoration around one fact, stacked into two lines to fit. The gem glyph
+ * inset fill, a 8pt "COINS" label above the figure — was three pieces of
+ * decoration around one fact, stacked into two lines to fit. The coin glyph
  * already says what the number counts, so the label was reading it out twice.
  *
  * ONE PROP, AND IT IS ABOUT THE GAP BELOW. `attached` says another row of
@@ -63,10 +63,26 @@
  * label — measured, on the Fantasy tab, which is where it was found. The row
  * below owns that space now; this one just stops adding to it.
  *
- * The gem is a rotated square rather than an icon font so it stays crisp
- * everywhere and costs no dependency. It is exported: the shop, the collection
- * summary and the card profile all price things in gems and must use this
- * exact mark.
+ * The coin is drawn from two Views rather than an icon font or an SVG, which
+ * is the rule `Icon.tsx` sets out: that set is faceted — chamfers, chevrons,
+ * shields — and earns `react-native-svg`, while a circle does not. A disc and a
+ * concentric rim are a circle twice, so they are Views, and stay crisp at every
+ * size for no dependency.
+ *
+ * IT IS DRAWN FOR 8pt, NOT FOR 12. The header shows it at 12, but the set
+ * checklist and the collection summary show it at 8, and a mark that only
+ * survives at its largest use is the wrong mark. So the rim is struck at a
+ * fixed FRACTION of the size rather than a fixed width: it thins with the coin
+ * instead of swallowing it, and at 8pt it lands on a hairline and reads as one
+ * disc rather than as mud.
+ *
+ * The rim is a translucent black, so it reads on the gold the balance uses and
+ * on the grey a spent milestone uses, and simply disappears into the near-black
+ * coin the claim chips put on a gold plate — which is the correct failure. It
+ * goes quiet; it never goes wrong.
+ *
+ * It is exported: the shop, the collection summary and the card profile all
+ * price things in coins and must use this exact mark.
  */
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -95,17 +111,28 @@ export function initialsOf(name: string): string {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
-export function Gem({ size = 11, color }: { size?: number; color: string }) {
+export function Coin({ size = 11, color }: { size?: number; color: string }) {
   return (
     <View
       style={{
         width: size,
         height: size,
+        borderRadius: size / 2,
         backgroundColor: color,
-        transform: [{ rotate: '45deg' }],
-        borderRadius: 1.5,
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
-    />
+    >
+      <View
+        style={{
+          width: size * 0.52,
+          height: size * 0.52,
+          borderRadius: size * 0.26,
+          borderWidth: Math.max(StyleSheet.hairlineWidth, size * 0.07),
+          borderColor: 'rgba(0, 0, 0, 0.32)',
+        }}
+      />
+    </View>
   );
 }
 
@@ -117,7 +144,7 @@ export function AppHeader({
   const c = Colors[scheme];
   const accent = TierColors[scheme].gold.accent;
   const top = useSafeAreaInsets().top;
-  const { gems, run, loading } = usePlayer();
+  const { coins, run, loading } = usePlayer();
 
   return (
     <View style={[styles.base, { paddingTop: top, backgroundColor: c.background }]}>
@@ -133,9 +160,9 @@ export function AppHeader({
         </View>
 
         <View style={styles.right}>
-          {/* HEARTS BESIDE GEMS, because they are the same KIND of fact: a
+          {/* HEARTS BESIDE COINS, because they are the same KIND of fact: a
               balance you spend, that the game gives back, and that you check
-              before deciding anything. Gems buy cards; hearts buy entries.
+              before deciding anything. Coins buy cards; hearts buy entries.
               Keeping one in the masthead and the other buried under a carousel
               made the second look like a property of the lineup screen rather
               than of the account.
@@ -145,7 +172,7 @@ export function AppHeader({
               with the count up here the row is free to draw only the hearts
               that are actually in a contest — see `RunRail`.
 
-              ONE GLYPH AND A NUMBER, exactly as the gem is. Not a rack: five
+              ONE GLYPH AND A NUMBER, exactly as the coin is. Not a rack: five
               pips in a masthead would out-weigh the wordmark beside them, and
               the shape of the run — what is staked, what is lost — is the
               rail's job on the screen where it matters. */}
@@ -158,9 +185,9 @@ export function AppHeader({
             </View>
           ) : null}
           <View style={styles.balance}>
-            <Gem size={12} color={accent} />
+            <Coin size={12} color={accent} />
             <Text style={[styles.figure, NUMERIC, { color: c.text }]}>
-              {loading ? '—' : gems.toLocaleString()}
+              {loading ? '—' : coins.toLocaleString()}
             </Text>
           </View>
         </View>

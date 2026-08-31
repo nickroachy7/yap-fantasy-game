@@ -20,7 +20,7 @@
 --   5. an unfloored set is completely unchanged by any of it.
 --
 -- Plus the team ladder's new shape, which is a redistribution and has to be
--- provable as one: six rungs, the same 9,100 gems, and no two rungs landing on
+-- provable as one: six rungs, the same 9,100 coins, and no two rungs landing on
 -- the same card count at any roster size the league actually has.
 --
 -- THE ROLE SWITCHING IS NOT DECORATION. Every read runs as `authenticated`,
@@ -38,7 +38,7 @@ insert into auth.users (instance_id, id, aud, role, email, encrypted_password, e
 values
   ('00000000-0000-0000-0000-000000000000', '71111111-1111-1111-1111-111111111111', 'authenticated', 'authenticated', 'weekly@test.local', '', now(), now(), now());
 
-insert into public.gem_balances (user_id, balance) values
+insert into public.coin_balances (user_id, balance) values
   ('71111111-1111-1111-1111-111111111111', 100)
 on conflict (user_id) do update set balance = 100;
 
@@ -87,7 +87,7 @@ select s.id, c.id
  where s.code in ('test-weekly-2026', 'test-open-2026')
    and p.external_id between 9401 and 9405;
 
-insert into public.card_set_milestones (set_id, threshold_pct, reward_gems) values
+insert into public.card_set_milestones (set_id, threshold_pct, reward_coins) values
   ('73333333-3333-3333-3333-333333333333', 100, 250),
   ('74444444-4444-4444-4444-444444444444', 100, 100);
 
@@ -288,7 +288,7 @@ begin
     raise exception 'FAIL: the inventory offered a live weekly commit for a bronze-only holding';
   end if;
   if (v_offer ->> 'pays')::integer <> 0 then
-    raise exception 'FAIL: the weekly quoted % gems for a copy it would not accept',
+    raise exception 'FAIL: the weekly quoted % coins for a copy it would not accept',
       (v_offer ->> 'pays')::integer;
   end if;
   if (v_offer ->> 'min_tier') <> 'silver' then
@@ -307,7 +307,7 @@ begin
     raise exception 'FAIL: the unfloored set refused a bronze it should accept';
   end if;
   if (v_offer ->> 'pays')::integer <> 4 then
-    raise exception 'FAIL: the unfloored set quoted % gems for a bronze, expected 4',
+    raise exception 'FAIL: the unfloored set quoted % coins for a bronze, expected 4',
       (v_offer ->> 'pays')::integer;
   end if;
 
@@ -326,7 +326,7 @@ begin
     raise exception 'FAIL: the weekly refused a silver';
   end if;
   if (v_offer ->> 'pays')::integer <> 20 then
-    raise exception 'FAIL: the weekly quoted % gems for a silver, expected 20',
+    raise exception 'FAIL: the weekly quoted % coins for a silver, expected 20',
       (v_offer ->> 'pays')::integer;
   end if;
 end;
@@ -371,7 +371,7 @@ declare
 begin
   -- The production ladder, which this suite reads rather than sets: the point
   -- of the change is the SHAPE, and a fixture ladder could not assert it.
-  select count(*), sum(reward_gems), min(threshold_pct)
+  select count(*), sum(reward_coins), min(threshold_pct)
     into v_rungs, v_total, v_first
     from public.card_set_ladder_defaults
    where family = 'team';
@@ -384,18 +384,18 @@ begin
   -- own rather than folded into the total.
   --
   -- The 10% and 25% rungs are the only two a season actually reaches, and the
-  -- FREE daily pack reaches both on all 32 clubs at zero gem cost — 360 cards a
+  -- FREE daily pack reaches both on all 32 clubs at zero coin cost — 360 cards a
   -- season is 9.5 distinct from every club against the 8 that 25% wants. So
   -- this band has no cost side at all: whatever it pays, it pays for turning
-  -- up, 32 times over. At 160 a club that is 5,120 gems a season against the
+  -- up, 32 times over. At 160 a club that is 5,120 coins a season against the
   -- weekly grant's 4,500, which is the faucet it is priced beside. See
   -- 20260825000000_close_reachable_band.sql.
-  select coalesce(sum(reward_gems), 0) into v_band
+  select coalesce(sum(reward_coins), 0) into v_band
     from public.card_set_ladder_defaults
    where family = 'team' and threshold_pct <= 25;
 
   if v_band <> 160 then
-    raise exception 'FAIL: the reachable team band pays % a club, expected 160 — that is % gems a season across 32 clubs, free',
+    raise exception 'FAIL: the reachable team band pays % a club, expected 160 — that is % coins a season across 32 clubs, free',
       v_band, v_band * 32;
   end if;
 
@@ -404,7 +404,7 @@ begin
   -- 240 back onto the 75% and 100% rungs would satisfy the check above while
   -- parking the money behind rungs nobody reaches.
   if v_total <> 8860 then
-    raise exception 'FAIL: the team ladder totals % gems, expected 8,860', v_total;
+    raise exception 'FAIL: the team ladder totals % coins, expected 8,860', v_total;
   end if;
 
   if v_first <> 10 then
@@ -430,8 +430,8 @@ begin
   -- The weekly's own bracket. Three silver sell for 120 and pay 60 into a set
   -- at 50%, so a reward at or under 60 loses to the sell button and the set has
   -- no reason to exist. There is no farming ceiling to assert against: packs
-  -- deal bronze, so no amount of gems buys a silver. See the migration header.
-  select reward_gems into v_reward
+  -- deal bronze, so no amount of coins buys a silver. See the migration header.
+  select reward_coins into v_reward
     from public.card_set_ladder_defaults
    where family = 'weekly' and threshold_pct = 100;
 
@@ -439,7 +439,7 @@ begin
     raise exception 'FAIL: the weekly family has no ladder default';
   end if;
   if v_reward <= 60 then
-    raise exception 'FAIL: the weekly pays % gems, which loses to selling the three copies', v_reward;
+    raise exception 'FAIL: the weekly pays % coins, which loses to selling the three copies', v_reward;
   end if;
 end;
 $$;

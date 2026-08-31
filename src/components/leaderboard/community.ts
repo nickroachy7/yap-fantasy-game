@@ -96,7 +96,7 @@ export type CollectionEntry = {
   rank: number;
   user_id: string;
   display_name: string;
-  value_gems: number;
+  value_coins: number;
   held: number;
   /** Copies committed to sets: still counted, frozen at the tier they went in at. */
   in_sets: number;
@@ -131,7 +131,7 @@ export type SetsEntry = {
   completed: number;
   dailies: number;
   burned: number;
-  gems: number;
+  coins: number;
 };
 
 /**
@@ -178,7 +178,7 @@ export type DetailPart = {
    *
    * The same rule the rest of the app follows: colour is the second signal and
    * never the only one. A green `2` is always followed by the word `W`, a gold
-   * `790` by `GEMS` — so the line survives greyscale and a red/green reader
+   * `790` by `COINS` — so the line survives greyscale and a red/green reader
    * loses nothing. Do not colour a figure whose unit does not already name it.
    */
   accent?: string;
@@ -213,8 +213,8 @@ export type BoardRowModel = {
    * collection it is at a glance.
    */
   tier?: CardTier;
-  /** Leads line 3 with the gem glyph, where the line is about currency. */
-  gem?: boolean;
+  /** Leads line 3 with the coin glyph, where the line is about currency. */
+  coin?: boolean;
   /** Line 3: everything that used to be a dropped column, as value/unit pairs. */
   detail: DetailPart[];
   /**
@@ -343,7 +343,7 @@ export const BOARD_META: Record<BoardId, BoardMeta> = {
     emptyTitle: 'Nobody holds a card yet',
     emptyBody: 'Every card enters the game through a pack. The first one is still out there.',
     absent: 'You hold no cards yet. Open a pack and you will appear here.',
-    unit: 'gems',
+    unit: 'coins',
   },
   cards: {
     label: 'Cards',
@@ -462,7 +462,7 @@ export async function fetchCommunityBoard(
           rank: num(r.rank),
           user_id: r.user_id,
           display_name: r.display_name,
-          value_gems: num(r.value_gems),
+          value_coins: num(r.value_coins),
           held: num(r.held),
           in_sets: num(r.in_sets),
           players: num(r.players),
@@ -513,7 +513,7 @@ export async function fetchCommunityBoard(
           completed: num(r.completed),
           dailies: num(r.dailies),
           burned: num(r.burned),
-          gems: num(r.gems),
+          coins: num(r.coins),
         })),
       };
     }
@@ -630,8 +630,8 @@ function collectionRows(
           : undefined,
       ),
     ],
-    figure: whole(r.value_gems),
-    figureLabel: 'GEMS',
+    figure: whole(r.value_coins),
+    figureLabel: 'COINS',
   }));
 }
 
@@ -669,7 +669,7 @@ function cardRows(rows: CardEntry[], scheme: 'light' | 'dark'): BoardRowModel[] 
 }
 
 function setRows(rows: SetsEntry[], scheme: 'light' | 'dark'): BoardRowModel[] {
-  const gemAccent = selectionAccent(scheme);
+  const coinAccent = selectionAccent(scheme);
   return rows.map((r) => ({
     key: r.user_id,
     rank: r.rank,
@@ -681,13 +681,13 @@ function setRows(rows: SetsEntry[], scheme: 'light' | 'dark'): BoardRowModel[] {
         : 'No team set started yet',
     // Dailies are counted apart from rungs everywhere, including here — see
     // the note on board_sets.
-    // Gems are the app's one currency and they are gold wherever they appear —
-    // the masthead balance, the profile's gem flow, and now here.
-    gem: true,
+    // Coins are the app's one currency and they are gold wherever they appear —
+    // the masthead balance, the profile's coin flow, and now here.
+    coin: true,
     detail: [
       part('daily', whole(r.dailies), 'dailies'),
       part('burned', whole(r.burned), 'burnt'),
-      part('gems', whole(r.gems), 'gems', r.gems > 0 ? gemAccent : undefined),
+      part('coins', whole(r.coins), 'coins', r.coins > 0 ? coinAccent : undefined),
     ],
     figure: whole(r.rungs),
     figureLabel: 'RUNGS',

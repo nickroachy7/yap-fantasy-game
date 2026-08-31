@@ -43,7 +43,7 @@ export type OwnedCard = {
   tierFloorFp: number | null;
   nextTierAt: number | null;
   nextTierLabel: string | null;
-  /** Gems this copy sells for, priced by the server from its tier. */
+  /** Coins this copy sells for, priced by the server from its tier. */
   sellValue: number;
 };
 

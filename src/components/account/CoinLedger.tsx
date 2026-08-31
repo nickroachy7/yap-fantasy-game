@@ -1,5 +1,5 @@
 /**
- * The gem ledger: date, what happened, how much.
+ * The coin ledger: date, what happened, how much.
  *
  * Deliberately not `DataTable`, which is otherwise the right component and is
  * used for the weekly results on the same screen. A ledger's whole content is
@@ -9,7 +9,7 @@
  * (22pt head, 30pt rows, hairline rules, tabular figures) so the two tables on
  * this screen line up, with a per-row colour it cannot express.
  *
- * The rows are domain-free on purpose — the caller maps the `gem_reason` enum
+ * The rows are domain-free on purpose — the caller maps the `coin_reason` enum
  * to a label, so this component never has to know the enum exists.
  */
 import { StyleSheet, Text, View } from 'react-native';
@@ -25,9 +25,9 @@ export type LedgerEntry = {
   amount: number;
 };
 
-export function GemLedger({
+export function CoinLedger({
   entries,
-  emptyLabel = 'No gem activity yet.',
+  emptyLabel = 'No coin activity yet.',
 }: {
   entries: LedgerEntry[];
   emptyLabel?: string;
@@ -44,7 +44,7 @@ export function GemLedger({
       <View style={[styles.headRow, { borderColor: c.border }]}>
         <Text style={[Type.micro, styles.date, { color: c.textTertiary }]}>DATE</Text>
         <Text style={[Type.micro, styles.label, { color: c.textTertiary }]}>ACTIVITY</Text>
-        <Text style={[Type.micro, styles.amount, { color: c.textTertiary }]}>GEMS</Text>
+        <Text style={[Type.micro, styles.amount, { color: c.textTertiary }]}>COINS</Text>
       </View>
       {entries.map((entry) => (
         <View key={entry.id} style={[styles.row, { borderColor: c.border }]}>

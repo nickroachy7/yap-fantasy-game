@@ -12,7 +12,7 @@
  *
  * IT ALSO CARRIES THE STAKES. A contest that can end a run and one that cannot
  * are not the same product, and the difference is invisible from the fee — both
- * cost 40 gems. `hearts_at_risk`, `hearts_on_win` and the win condition come
+ * cost 40 coins. `hearts_at_risk`, `hearts_on_win` and the win condition come
  * down with the row so a lobby can never draw the two identically; entering
  * something that kills a run without being told it could is the worst surprise
  * this feature can hand somebody.
@@ -39,7 +39,7 @@ export type Contest = {
   formatName: string;
   /** How many cards the format asks for. Drawn as "3 cards". */
   slotCount: number;
-  entryFeeGems: number;
+  entryFeeCoins: number;
   maxEntrants: number | null;
   entrants: number;
   season: number;
@@ -73,7 +73,7 @@ export type Contest = {
   myHearts: number | null;
 
   /**
-   * Gems this contest has collected that it will pay back out.
+   * Coins this contest has collected that it will pay back out.
    *
    * LIVE, AND SMALL EARLY. The pool is funded by entries — 25% of the fees
    * taken, see `20260826020000` — so it is genuinely nought before the first
@@ -101,7 +101,7 @@ type Row = {
   format_code: string;
   format_name: string;
   slot_count: number;
-  entry_fee_gems: number;
+  entry_fee_coins: number;
   max_entrants: number | null;
   entrants: number;
   season: number;
@@ -144,7 +144,7 @@ export function useContests(): ContestsState {
         formatCode: r.format_code,
         formatName: r.format_name,
         slotCount: Number(r.slot_count),
-        entryFeeGems: r.entry_fee_gems,
+        entryFeeCoins: r.entry_fee_coins,
         maxEntrants: r.max_entrants,
         entrants: Number(r.entrants ?? 0),
         season: r.season,
@@ -190,7 +190,7 @@ export function termsOfContest(c: Contest): ContestTerms {
   return {
     formatName: c.formatName,
     slotCount: c.slotCount,
-    entryFeeGems: c.entryFeeGems,
+    entryFeeCoins: c.entryFeeCoins,
     heartsAtRisk: c.heartsAtRisk,
     heartsOnWin: c.heartsOnWin,
     winCondition: c.winCondition,

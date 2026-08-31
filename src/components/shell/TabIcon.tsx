@@ -1,7 +1,7 @@
 /**
  * Bottom-tab icons, drawn rather than imported.
  *
- * No icon font and no SVG. That is the house rule already set by `Gem`
+ * No icon font and no SVG. That is the house rule already set by `Coin`
  * ("a rotated square rather than an icon font so it stays crisp everywhere and
  * costs no dependency"), `PositionGlyph` and `TierMotif`: adding an icon font
  * for five glyphs would ship a thousand icons to draw five.

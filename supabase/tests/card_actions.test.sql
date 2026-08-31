@@ -16,7 +16,7 @@
 --      and neither is a signed-out caller's anything;
 --   2. `sell_value` is the price sell_card actually pays, and `sellable`
 --      tracks its three refusals;
---   3. `pays` is the gems commit_card_to_set actually pays, to the gem;
+--   3. `pays` is the coins commit_card_to_set actually pays, to the coin;
 --   4. `burns_this_copy` names the copy `commit_candidate` would really take;
 --   5. `slot_filled` and `set_complete` each predict the specific refusal the
 --      commit raises, and `can_commit` is their conjunction.
@@ -33,7 +33,7 @@ values
   ('00000000-0000-0000-0000-000000000000', '61111111-1111-1111-1111-111111111111', 'authenticated', 'authenticated', 'opener@test.local', '', now(), now(), now()),
   ('00000000-0000-0000-0000-000000000000', '62222222-2222-2222-2222-222222222222', 'authenticated', 'authenticated', 'other@test.local',  '', now(), now(), now());
 
-insert into public.gem_balances (user_id, balance) values
+insert into public.coin_balances (user_id, balance) values
   ('61111111-1111-1111-1111-111111111111', 100),
   ('62222222-2222-2222-2222-222222222222', 100)
 on conflict (user_id) do update set balance = 100;
@@ -206,7 +206,7 @@ begin
 end;
 $$;
 
--- ---------------------------------------- the advertised gems are the gems paid
+-- ---------------------------------------- the advertised coins are the coins paid
 do $$
 declare
   e         jsonb;
@@ -221,16 +221,16 @@ begin
   select (value -> 'sets' -> 0 ->> 'pays')::integer into v_advert
     from jsonb_array_elements(public.card_actions(array[v_cheap])) value;
 
-  select balance into v_before from public.gem_balances
+  select balance into v_before from public.coin_balances
    where user_id = '61111111-1111-1111-1111-111111111111';
 
   r := public.commit_card_to_set('actions-set-2026', (select id from act_cards where n = 1));
 
-  select balance into v_after from public.gem_balances
+  select balance into v_after from public.coin_balances
    where user_id = '61111111-1111-1111-1111-111111111111';
 
   if v_after - v_before <> v_advert then
-    raise exception 'FAIL: the button promised % gems and % landed', v_advert, v_after - v_before;
+    raise exception 'FAIL: the button promised % coins and % landed', v_advert, v_after - v_before;
   end if;
   -- And it took the copy the report named.
   if (r ->> 'card_instance_id')::uuid <> v_cheap then

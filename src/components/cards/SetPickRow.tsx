@@ -20,7 +20,7 @@
  */
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Gem } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import type { CardActionSet } from './card-actions';
@@ -46,7 +46,7 @@ export function SetPickRow({
       onPress={onPress}
       disabled={busy}
       accessibilityRole="button"
-      accessibilityLabel={`Add to ${set.name}, ${set.committed} of ${set.required} filled, pays ${set.pays} gems`}
+      accessibilityLabel={`Add to ${set.name}, ${set.committed} of ${set.required} filled, pays ${set.pays} coins`}
       style={({ pressed }) => [
         styles.row,
         { backgroundColor: c.surface, borderColor: c.border },
@@ -64,7 +64,7 @@ export function SetPickRow({
         </Text>
       </View>
       <View style={styles.pay}>
-        <Gem size={10} color={gold} />
+        <Coin size={10} color={gold} />
         <Text style={[Type.strong, NUMERIC, { color: c.text }]}>{set.pays}</Text>
       </View>
     </Pressable>

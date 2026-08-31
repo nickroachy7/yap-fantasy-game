@@ -47,7 +47,7 @@ select cron.schedule(
 -- WEEKLY PAYOUTS
 -- ---------------------------------------------------------------------------
 --
--- The faucet was written months before anything called it: `gems_ledger` held
+-- The faucet was written months before anything called it: `coins_ledger` held
 -- ZERO 'weekly_grant' and ZERO 'weekly_score_reward' rows because no job here
 -- ever ran them. This is that job.
 --
@@ -72,7 +72,7 @@ select cron.schedule(
 --   select * from cron.job_run_details
 --    where jobid = (select jobid from cron.job where jobname = 'settle-week-payouts')
 --    order by start_time desc limit 5;
---   select reason, count(*), sum(amount) from public.gems_ledger group by reason;
+--   select reason, count(*), sum(amount) from public.coins_ledger group by reason;
 
 -- ---------------------------------------------------------------------------
 -- NOT HERE: rotate-daily-set

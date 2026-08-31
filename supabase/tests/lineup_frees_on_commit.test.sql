@@ -20,7 +20,7 @@
 --
 -- `finalized_at` is the test rather than `scored_at` because it is the one that
 -- means history: `settle_week_payouts` sets it when every game is final and the
--- gems have been paid, which is the point after which rewriting a lineup would
+-- coins have been paid, which is the point after which rewriting a lineup would
 -- take back a payout. A `scored_at` can be stamped on a week nobody has played.
 --
 -- THE ROLE SWITCHING IS NOT DECORATION. Every write under test runs as
@@ -38,7 +38,7 @@ insert into auth.users (instance_id, id, aud, role, email, encrypted_password, e
 values ('00000000-0000-0000-0000-000000000000', '81111111-1111-1111-1111-111111111111',
         'authenticated', 'authenticated', 'freed@test.local', '', now(), now(), now());
 
-insert into public.gem_balances (user_id, balance) values
+insert into public.coin_balances (user_id, balance) values
   ('81111111-1111-1111-1111-111111111111', 100)
 on conflict (user_id) do update set balance = 100;
 
@@ -89,7 +89,7 @@ select '84444444-4444-4444-4444-444444444444', c.id
   from public.cards c join public.players p on p.id = c.player_id
  where p.external_id = 9501;
 
-insert into public.card_set_milestones (set_id, threshold_pct, reward_gems)
+insert into public.card_set_milestones (set_id, threshold_pct, reward_coins)
 values ('84444444-4444-4444-4444-444444444444', 100, 10);
 
 -- ------------------------------------------------------------ the fixture is real
@@ -216,7 +216,7 @@ select '86666666-6666-6666-6666-666666666666', c.id
   from public.cards c join public.players p on p.id = c.player_id
  where p.external_id = 9502;
 
-insert into public.card_set_milestones (set_id, threshold_pct, reward_gems)
+insert into public.card_set_milestones (set_id, threshold_pct, reward_coins)
 values ('86666666-6666-6666-6666-666666666666', 100, 10);
 
 set local role authenticated;

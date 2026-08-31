@@ -50,7 +50,7 @@
  * See `20260825050000`.
  *
  * So this screen has no enter button at all: you fill the lineup below and the
- * fee goes with the first submission that names a card. Saying "Pay 40 gems" on
+ * fee goes with the first submission that names a card. Saying "Pay 40 coins" on
  * a control would be describing a charge that has not happened, and a separate
  * confirm step would be a second thing to press for one decision.
  *
@@ -157,7 +157,7 @@ export default function ContestSheet() {
   const barred = full || broke;
 
   /**
-   * LEAVING GIVES THE GEMS BACK, so this is not a destructive act in the sense
+   * LEAVING GIVES THE COINS BACK, so this is not a destructive act in the sense
    * the dialog means — but it does delete a lineup somebody built, which is
    * why it asks at all rather than acting on one press.
    *
@@ -200,7 +200,7 @@ export default function ContestSheet() {
       footer={
         contest && entered ? (
           <ContestActions
-            entryFeeGems={contest.entryFeeGems}
+            entryFeeCoins={contest.entryFeeCoins}
             locked={Boolean(myRow?.locked)}
             canLeave={contest.kind === 'lobby'}
             busy={busy}
@@ -250,9 +250,9 @@ export default function ContestSheet() {
             prize={entry?.myPrize ?? null}
           />
 
-          {contest.entryFeeGems > 0 && !entered && !barred ? (
+          {contest.entryFeeCoins > 0 && !entered && !barred ? (
             <Text style={[Type.fine, { color: c.textSecondary }]}>
-              The {contest.entryFeeGems} gems are taken when you submit your first
+              The {contest.entryFeeCoins} coins are taken when you submit your first
               lineup, not now.
             </Text>
           ) : null}
@@ -261,7 +261,7 @@ export default function ContestSheet() {
             <Text style={[Type.body, { color: c.textSecondary }]}>
               {full
                 ? 'This contest is full.'
-                : `You need ${contest.entryFeeGems} gems to enter.`}
+                : `You need ${contest.entryFeeCoins} coins to enter.`}
             </Text>
           ) : null}
 
@@ -326,8 +326,8 @@ export default function ContestSheet() {
         visible={leaving}
         title={`Leave ${contest?.name ?? 'this contest'}?`}
         body={
-          contest && contest.entryFeeGems > 0
-            ? `Your lineup is deleted and ${contest.entryFeeGems} gems go back to your balance. You can enter again while the games are still ahead.`
+          contest && contest.entryFeeCoins > 0
+            ? `Your lineup is deleted and ${contest.entryFeeCoins} coins go back to your balance. You can enter again while the games are still ahead.`
             : 'Your lineup for this contest is deleted.'
         }
         warning="The cards go back to your bench and can be played somewhere else this week."
@@ -349,20 +349,20 @@ export default function ContestSheet() {
  * The lobby's chip, in the lobby's own four states.
  *
  * The same function the lobby row runs, and it has to stay the same: a contest
- * that says "Not enough gems" in the list and something else on its own page is
+ * that says "Not enough coins" in the list and something else on its own page is
  * the two-surfaces-one-fact bug `contest-model` exists to close. It lives here
  * rather than being imported because `contests.tsx` derives it inside its row
  * component; if a third surface ever needs it, it moves to `contest-model`.
  */
 function lobbyStatus(
   mine: { filled: number } | null | undefined,
-  contest: { entryFeeGems: number; affordable: boolean; slotCount: number },
+  contest: { entryFeeCoins: number; affordable: boolean; slotCount: number },
 ): { label: string; tone: 'positive' | 'warning' | 'neutral' } {
   if (!mine) {
-    if (contest.entryFeeGems > 0 && !contest.affordable) {
-      return { label: 'Not enough gems', tone: 'neutral' };
+    if (contest.entryFeeCoins > 0 && !contest.affordable) {
+      return { label: 'Not enough coins', tone: 'neutral' };
     }
-    return { label: contest.entryFeeGems > 0 ? 'Enter' : 'Not set', tone: 'warning' };
+    return { label: contest.entryFeeCoins > 0 ? 'Enter' : 'Not set', tone: 'warning' };
   }
   return mine.filled < contest.slotCount
     ? { label: `${mine.filled} of ${contest.slotCount}`, tone: 'warning' }

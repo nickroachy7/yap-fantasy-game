@@ -36,7 +36,7 @@ export default function PrivacyScreen() {
               leaderboard. You can change it.
             </P>
             <P>
-              <B>Your gameplay.</B> The cards you own, the lineups you set, your gem balance and
+              <B>Your gameplay.</B> The cards you own, the lineups you set, your coin balance and
               transaction history, and the fantasy points you score.
             </P>
           </Section>
@@ -44,7 +44,7 @@ export default function PrivacyScreen() {
           <Section title="What we do not collect">
             <P>
               No advertising identifiers, no third-party analytics or tracking SDKs, no location,
-              no contacts, no payment information. Yap Fantasy has no in-app purchases — gems are
+              no contacts, no payment information. Yap Fantasy has no in-app purchases — coins are
               earned in-game and cannot be bought.
             </P>
           </Section>
@@ -60,7 +60,7 @@ export default function PrivacyScreen() {
             </P>
             <P>
               Other players see your display name and your score on the leaderboard. Nobody can
-              see your email, your collection, your lineups or your gem balance; access is
+              see your email, your collection, your lineups or your coin balance; access is
               enforced per-row in the database, not merely hidden in the app.
             </P>
             <P>We do not sell your data, and we do not share it for advertising.</P>
@@ -69,7 +69,7 @@ export default function PrivacyScreen() {
           <Section title="Deleting your data">
             <P>
               Email us and we will delete your account and everything attached to it. Deletion
-              cascades: profile, cards, lineups, gem ledger and score history all go with it, and
+              cascades: profile, cards, lineups, coin ledger and score history all go with it, and
               it cannot be undone.
             </P>
           </Section>

@@ -128,9 +128,9 @@ begin
   update public.profiles set display_name = 'zzboards_c' where id = v_c;
 
   -- ---- collections, fixtured so VALUE and COUNT disagree ------------------
-  -- A: ten bronze (0 fp)      -> 10 cards,  80 gems
-  -- B: two gold (800 fp)      ->  2 cards, 300 gems
-  -- C: one diamond (3000 fp)  ->  1 card,  500 gems
+  -- A: ten bronze (0 fp)      -> 10 cards,  80 coins
+  -- B: two gold (800 fp)      ->  2 cards, 300 coins
+  -- C: one diamond (3000 fp)  ->  1 card,  500 coins
   -- Value ranks C > B > A. Count ranks A > B > C. Exactly inverted.
   -- BOTH POINT COLUMNS. `card_instances_sync_tier` derives tier from `settled_fp`
   -- (20260821140000), not career_fp, so that a live in-game swing cannot promote a
@@ -205,7 +205,7 @@ begin
   -- card burnt — the row that only exists because board_sets unions claimers
   -- with committers.
   insert into public.set_milestone_claims (user_id, set_id, threshold_pct,
-                                           committed_at_claim, reward_gems)
+                                           committed_at_claim, reward_coins)
   values (v_a, v_set_t, 25, 1, 100),
          (v_a, v_set_t, 50, 2, 200),
          (v_b, v_set_d, 100, 3, 40);
@@ -258,9 +258,9 @@ begin
   end if;
 
   select * into v_row from public.board_collection(v_season, 500) where user_id = v_a;
-  if v_row.held <> 10 or v_row.players <> 1 or v_row.value_gems <> 80 then
+  if v_row.held <> 10 or v_row.players <> 1 or v_row.value_coins <> 80 then
     raise exception 'FAIL 2: A held=% players=% value=%, expected 10/1/80',
-      v_row.held, v_row.players, v_row.value_gems;
+      v_row.held, v_row.players, v_row.value_coins;
   end if;
 
   -- C HOLDS ONE DIAMOND AND HAS BURNT ANOTHER, and since 20260824200600 both
@@ -270,19 +270,19 @@ begin
   -- and `in_sets` carries the other, which is the distinction that lets the
   -- board show how much of a shelf can still grow.
   select * into v_row from public.board_collection(v_season, 500) where user_id = v_c;
-  if v_row.value_gems <> 1000 or v_row.held <> 1 or v_row.in_sets <> 1 then
+  if v_row.value_coins <> 1000 or v_row.held <> 1 or v_row.in_sets <> 1 then
     raise exception 'FAIL 2: C value=% held=% in_sets=%, expected 1000/1/1 (a committed copy still counts)',
-      v_row.value_gems, v_row.held, v_row.in_sets;
+      v_row.value_coins, v_row.held, v_row.in_sets;
   end if;
-  if v_row.in_sets_gems <> 500 then
-    raise exception 'FAIL 2: C in_sets_gems=%, expected 500', v_row.in_sets_gems;
+  if v_row.in_sets_coins <> 500 then
+    raise exception 'FAIL 2: C in_sets_coins=%, expected 500', v_row.in_sets_coins;
   end if;
 
   -- A's SOLD copy is the other half of the same rule and must still be absent.
   select * into v_row from public.board_collection(v_season, 500) where user_id = v_a;
-  if v_row.in_sets <> 0 or v_row.value_gems <> 80 then
+  if v_row.in_sets <> 0 or v_row.value_coins <> 80 then
     raise exception 'FAIL 2: A value=% in_sets=%, expected 80/0 (a sold copy must not count)',
-      v_row.value_gems, v_row.in_sets;
+      v_row.value_coins, v_row.in_sets;
   end if;
   raise notice 'PASS 2: collections rank by sell value; sold copies are gone, committed copies are frozen';
 
@@ -406,9 +406,9 @@ begin
   ------------------------------------------------- 6. sets
   select * into v_row from public.board_sets(500) where user_id = v_a;
   if v_row.rungs <> 2 or v_row.sets <> 1 or v_row.completed <> 0 or v_row.dailies <> 0
-     or v_row.gems <> 300 then
-    raise exception 'FAIL 6: A rungs=% sets=% done=% daily=% gems=%, expected 2/1/0/0/300',
-      v_row.rungs, v_row.sets, v_row.completed, v_row.dailies, v_row.gems;
+     or v_row.coins <> 300 then
+    raise exception 'FAIL 6: A rungs=% sets=% done=% daily=% coins=%, expected 2/1/0/0/300',
+      v_row.rungs, v_row.sets, v_row.completed, v_row.dailies, v_row.coins;
   end if;
 
   -- A daily is not a rung. Folding the two together would rank attendance above
@@ -421,9 +421,9 @@ begin
 
   -- The committer with no claim: present, with a cost and nothing bought.
   select * into v_row from public.board_sets(500) where user_id = v_c;
-  if v_row.rungs <> 0 or v_row.burned <> 1 or v_row.gems <> 0 then
-    raise exception 'FAIL 6: C rungs=% burned=% gems=%, expected 0/1/0',
-      v_row.rungs, v_row.burned, v_row.gems;
+  if v_row.rungs <> 0 or v_row.burned <> 1 or v_row.coins <> 0 then
+    raise exception 'FAIL 6: C rungs=% burned=% coins=%, expected 0/1/0',
+      v_row.rungs, v_row.burned, v_row.coins;
   end if;
   raise notice 'PASS 6: team rungs, dailies and burnt cards are counted separately';
 

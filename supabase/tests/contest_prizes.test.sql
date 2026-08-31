@@ -1,6 +1,6 @@
 -- Yap Fantasy — contest prizes and the field (20260826010000 .. 20260826030000)
 --
--- A paid contest pays gems back, and every assertion here is about the one
+-- A paid contest pays coins back, and every assertion here is about the one
 -- property that makes that safe: THE POOL IS COLLECTED FEES AND NEVER A GRANT.
 -- Redistribution cannot inflate the economy; a prize funded from anywhere else
 -- inverts the arithmetic that set the entry fee in the first place, and does it
@@ -81,7 +81,7 @@ select u.id, c.id
   join public.players p on p.external_id = 98830 + u.n * 3 + k
   join public.cards   c on c.player_id = p.id;
 
-insert into public.gem_balances (user_id, balance)
+insert into public.coin_balances (user_id, balance)
 values ('88888888-0000-0000-0000-000000000001', 500),
        ('88888888-0000-0000-0000-000000000002', 500),
        ('88888888-0000-0000-0000-000000000003', 500)
@@ -97,10 +97,10 @@ select 988002, 2026, 88, 1, now() + interval '9 days', 'scheduled', l.id, l.id
   from public.teams l where l.external_id = 9882;
 
 -- Even money, and a top-two so the weighted split has two distinct shares to
--- get wrong. No hearts on either: this suite is about gems, and a run in the
+-- get wrong. No hearts on either: this suite is about coins, and a run in the
 -- middle of it would be a second thing failing for a different reason.
 insert into public.contests (code, kind, format_code, season, season_type, week, name,
-                             entry_fee_gems, prize_pool_bps, win_condition, win_rank,
+                             entry_fee_coins, prize_pool_bps, win_condition, win_rank,
                              hearts_at_risk, hearts_on_win)
 values ('test:pool:88', 'lobby', 'flex3', 2026, 1, 88, 'Test Pool', 40, 2500, 'median', null, 0, 0),
        ('test:top2:88', 'lobby', 'wr_room', 2026, 1, 88, 'Test Top Two', 40, 2500, 'top_n', 2, 0, 0);
@@ -111,11 +111,11 @@ values ('test:pool:88', 'lobby', 'flex3', 2026, 1, 88, 'Test Pool', 40, 2500, 'm
 do $$
 declare v_ok boolean;
 begin
-  -- 1. IF IT COSTS GEMS IT PAYS GEMS. The whole reason this is a constraint and
+  -- 1. IF IT COSTS COINS IT PAYS COINS. The whole reason this is a constraint and
   --    not a convention is that a seed can forget; the schema cannot.
   begin
     insert into public.contests (code, kind, format_code, season, season_type, week, name,
-                                 entry_fee_gems, prize_pool_bps)
+                                 entry_fee_coins, prize_pool_bps)
     values ('test:nopool:88', 'lobby', 'flex3', 2026, 1, 88, 'No Pool', 40, 0);
     raise exception 'FAIL: a paid contest with no prize pool was accepted';
   exception when check_violation then null;
@@ -125,7 +125,7 @@ begin
   --    it could only ever be minted, which is the one thing forbidden outright.
   begin
     insert into public.contests (code, kind, format_code, season, season_type, week, name,
-                                 entry_fee_gems, prize_pool_bps)
+                                 entry_fee_coins, prize_pool_bps)
     values ('test:freepool:88', 'free', 'main', 2026, 1, 88, 'Free With Pool', 0, 2500);
     raise exception 'FAIL: the free contest was allowed a prize pool';
   exception when check_violation then null;
@@ -188,13 +188,13 @@ begin
 
     -- 4. THE POOL IS 25% OF WHAT HAS BEEN TAKEN, and it moves with every entry.
     --    Read back per entrant rather than once at the end, because the failure
-    --    this guards against — a pool computed from `entry_fee_gems × entrants`
+    --    this guards against — a pool computed from `entry_fee_coins × entrants`
     --    rather than from the ledger — only diverges once somebody leaves, and
     --    a single end-state check would agree with it right up until then.
     select public.contest_prize_pool(id) into v_pool
       from public.contests where code = 'test:pool:88';
     if v_pool <> n * 10 then
-      raise exception 'FAIL: after % entries at 40 gems the pool was % , expected %',
+      raise exception 'FAIL: after % entries at 40 coins the pool was % , expected %',
         n, v_pool, n * 10;
     end if;
   end loop;
@@ -215,7 +215,7 @@ begin
   perform set_config('role', 'postgres', true);
 
   -- 5. Three entries less one refund is two, and the pool says so. A pool that
-  --    kept the departed entry's share would be promising gems that are back in
+  --    kept the departed entry's share would be promising coins that are back in
   --    somebody's wallet — the exact overdraft the ledger read exists to make
   --    impossible.
   select public.contest_prize_pool(id) into v_pool
@@ -232,16 +232,16 @@ end $$;
 --
 -- THIS IS THE ASSERTION THAT PROVES THE LEDGER READ, and it was missing until a
 -- mutation test went looking. The obvious wrong implementation is
--- `entry_fee_gems × entrants`, and it agrees with the right one everywhere
+-- `entry_fee_coins × entrants`, and it agrees with the right one everywhere
 -- except here: leaving deletes the lineup, so an entrant COUNT falls with a
 -- refund too, and every other case in this file passed under both. Raise the
 -- price after people have paid and the two answers finally diverge — the naive
--- one inflating a pool with gems nobody handed over.
+-- one inflating a pool with coins nobody handed over.
 -- ---------------------------------------------------------------------------
 do $$
 declare v_pool integer;
 begin
-  update public.contests set entry_fee_gems = 60 where code = 'test:pool:88';
+  update public.contests set entry_fee_coins = 60 where code = 'test:pool:88';
 
   select public.contest_prize_pool(id) into v_pool
     from public.contests where code = 'test:pool:88';
@@ -249,7 +249,7 @@ begin
     raise exception 'FAIL: re-pricing moved a collected pool to %, expected 20', v_pool;
   end if;
 
-  update public.contests set entry_fee_gems = 40 where code = 'test:pool:88';
+  update public.contests set entry_fee_coins = 40 where code = 'test:pool:88';
   raise notice 'contest prizes: a re-priced contest keeps its pool passed';
 end $$;
 
@@ -391,10 +391,10 @@ begin
 
   -- 11. THE SPLIT NEVER EXCEEDS THE POOL. The single most important assertion
   --     in this file: everything else is presentation, and this is the one that
-  --     stops the contest minting gems. Ties share a place under `contest_
+  --     stops the contest minting coins. Ties share a place under `contest_
   --     results`, so a fixed denominator would overpay — the weights are
   --     normalised by the weights that exist, and this is what proves it.
-  select coalesce(sum(gems), 0) into v_paid
+  select coalesce(sum(coins), 0) into v_paid
     from public.contest_payouts(v_contest);
   if v_paid > v_pool then
     raise exception 'FAIL: payouts of % exceed a pool of %', v_paid, v_pool;
@@ -406,7 +406,7 @@ begin
   if v_paid <> 1 then
     raise exception 'FAIL: % players were paid, expected the 1 above the median', v_paid;
   end if;
-  select gems into v_top from public.contest_payouts(v_contest);
+  select coins into v_top from public.contest_payouts(v_contest);
   if v_top <> v_pool then
     raise exception 'FAIL: the lone winner took % of a % pool', v_top, v_pool;
   end if;
@@ -416,17 +416,17 @@ begin
   --     result of entering two of them and not an edge case. Paid as two ledger
   --     rows and ONE wallet move — the first version wrote two of each and
   --     Postgres refused, taking the whole week's settlement down with it:
-  --     score gems, positional bonuses and every run's hearts. See
+  --     score coins, positional bonuses and every run's hearts. See
   --     `20260826040000`.
   --
   -- 13b. PAYING IS EXACTLY ONCE. `settle_week_payouts` is on a schedule AND run
   --     by hand during gameday, so a second call is not an edge case — it is
   --     Sunday evening. The key is the lineup, the same key the entry charge
   --     uses, because the lineup IS the entry.
-  select balance into v_before from public.gem_balances
+  select balance into v_before from public.coin_balances
    where user_id = '88888888-0000-0000-0000-000000000001';
   perform public.award_contest_prizes(2026, 1::smallint, 88);
-  select balance into v_after from public.gem_balances
+  select balance into v_after from public.coin_balances
    where user_id = '88888888-0000-0000-0000-000000000001';
   -- The pool contest pays them the whole 20; the top-two contest pays them 20
   -- of its 30. Both land in one balance move.
@@ -436,7 +436,7 @@ begin
   end if;
 
   perform public.award_contest_prizes(2026, 1::smallint, 88);
-  select balance into v_again from public.gem_balances
+  select balance into v_again from public.coin_balances
    where user_id = '88888888-0000-0000-0000-000000000001';
   if v_again <> v_after then
     raise exception 'FAIL: a second settlement paid again — % then %', v_after, v_again;
@@ -445,7 +445,7 @@ begin
   -- 14. AND THE LEDGER KEEPS BOTH PRIZES SEPARATE. One row per entry, because
   --     which contest paid what is the only way to audit that a pool balanced —
   --     the wallet is where they are allowed to merge, not the ledger.
-  select count(*) into v_paid from public.gems_ledger
+  select count(*) into v_paid from public.coins_ledger
    where reason = 'contest_prize'
      and user_id = '88888888-0000-0000-0000-000000000001';
   if v_paid <> 2 then
@@ -470,7 +470,7 @@ begin
   select id into v_contest from public.contests where code = 'test:top2:88';
   v_pool := public.contest_prize_pool(v_contest);
   if v_pool <> 30 then
-    raise exception 'FAIL: three entries at 40 gems gave a pool of %, expected 30', v_pool;
+    raise exception 'FAIL: three entries at 40 coins gave a pool of %, expected 30', v_pool;
   end if;
 
   -- 15. TWO PLACES PAY OUT OF THREE ENTRANTS, and the third gets nothing. Under
@@ -485,14 +485,14 @@ begin
   -- 16. WEIGHTED `win_rank + 1 - rnk`, so top two is 2:1 — not an even split,
   --     and not a hardcoded percentage that would drift the moment `win_rank`
   --     changed. 20 and 10 out of 30.
-  select gems into v_first  from public.contest_payouts(v_contest) where rnk = 1;
-  select gems into v_second from public.contest_payouts(v_contest) where rnk = 2;
+  select coins into v_first  from public.contest_payouts(v_contest) where rnk = 1;
+  select coins into v_second from public.contest_payouts(v_contest) where rnk = 2;
   if v_first <> 20 or v_second <> 10 then
     raise exception 'FAIL: top-two split was %/%, expected 20/10', v_first, v_second;
   end if;
 
   -- 17. And it still cannot exceed the pool.
-  select coalesce(sum(gems), 0) into v_total from public.contest_payouts(v_contest);
+  select coalesce(sum(coins), 0) into v_total from public.contest_payouts(v_contest);
   if v_total > v_pool then
     raise exception 'FAIL: weighted payouts of % exceed a pool of %', v_total, v_pool;
   end if;

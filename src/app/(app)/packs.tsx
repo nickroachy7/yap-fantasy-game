@@ -31,14 +31,14 @@
  * and the deck; this screen still runs the `open_pack` loop and publishes each
  * pack as it lands — see `pull-session`. A page that opened packs on mount is a
  * page that opens packs when a browser tab is reloaded, and the button that
- * spends gems has to be the thing that spends them.
+ * spends coins has to be the thing that spends them.
  *
  * A BULK BUY IS STILL ONE PULL. Opening ten packs runs ten `open_pack` calls
  * and publishes everything they dealt as a single deck, so the pull page means
  * "what this press produced" rather than "what one pack produced". See `open`
  * for the loop and what it does when the fourth of ten is refused.
  *
- * THE TONE IS GOLD, which is the app's own: the gem, the rail's active marker,
+ * THE TONE IS GOLD, which is the app's own: the coin, the rail's active marker,
  * the Open button. The frame's note asks that every sheet carry a colour rather
  * than reinstating the hairline it replaced, and for this one the answer is
  * easy — the sheet is about the thing you spend.
@@ -51,7 +51,7 @@ import { PackShelf, type Pack, type Pulled } from '@/components/cards/PackShelf'
 import { advancePull, beginPull, endPull, finishPull } from '@/components/cards/pull-session';
 import { invalidateCollection } from '@/components/collection/use-collection';
 import { invalidateSets } from '@/components/collection/use-sets';
-import { Gem } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
 import { PlayerSheetFrame, SheetToneBand } from '@/components/players/PlayerSheetFrame';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
@@ -67,7 +67,7 @@ export default function PacksScreen() {
 
   // Single source of truth for the balance: the header reads the same value, so
   // fetching it separately here is how the two drift apart.
-  const { gems, refresh, applyCardDelta } = usePlayer();
+  const { coins, refresh, applyCardDelta } = usePlayer();
 
   const [packs, setPacks] = useState<Pack[] | null>(null);
   const [dailyAvailable, setDailyAvailable] = useState<boolean | null>(null);
@@ -89,9 +89,9 @@ export default function PacksScreen() {
         // is_active is filtered here rather than displayed: open_pack() rejects
         // an inactive pack outright, so listing one is offering a button whose
         // only possible outcome is an error.
-        .select('id, code, name, gem_cost, card_count, once_per_user, daily_limit, guaranteed_positions')
+        .select('id, code, name, coin_cost, card_count, once_per_user, daily_limit, guaranteed_positions')
         .eq('is_active', true)
-        .order('gem_cost'),
+        .order('coin_cost'),
       // RLS scopes this to the caller, so it is exactly "packs I have opened".
       supabase.from('pack_openings').select('pack_id'),
       // Whether today's free pack is still there. Asked of the server rather
@@ -146,7 +146,7 @@ export default function PacksScreen() {
    * IT STOPS AT THE FIRST REFUSAL rather than pressing on. Unlike the set sweep
    * — where five independent sets can fail independently — every open here is
    * the same pack against the same balance, so whatever refused the fourth will
-   * refuse the fifth. The overwhelmingly likely cause is that the gems ran out,
+   * refuse the fifth. The overwhelmingly likely cause is that the coins ran out,
    * and firing six more doomed calls to prove it is six round trips of nothing.
    *
    * PARTIAL SUCCESS IS SHOWN AND SAID. What was dealt goes to the pull page;
@@ -192,7 +192,7 @@ export default function PacksScreen() {
       let refusal: string | null = null;
 
       for (let i = 0; i < runs; i += 1) {
-        // All RNG, gem math and minting happen inside this one call, server-side.
+        // All RNG, coin math and minting happen inside this one call, server-side.
         const { data, error: err } = await supabase.rpc('open_pack', { p_pack_code: code });
         if (err) {
           refusal = err.message;
@@ -249,8 +249,8 @@ export default function PacksScreen() {
    * on /packs, a link straight to it, or a cold deep link — left the close
    * button dead and the player with no way out of the sheet at all. It looked
    * like the shelf had jammed, which is why it got reported alongside not
-   * having the gems to buy anything: the two happen to co-occur, since a player
-   * short on gems is the one who lingers here long enough to try to leave.
+   * having the coins to buy anything: the two happen to co-occur, since a player
+   * short on coins is the one who lingers here long enough to try to leave.
    *
    * `dismissTo` rather than `replace`, and the difference is the whole fix.
    * `replace` swapped the route UNDERNEATH and left the sheet sitting on top of
@@ -272,7 +272,7 @@ export default function PacksScreen() {
       /* The hero below carries whichever of these is current at full size; the
          frame fades the small copy in once that has scrolled away. */
       title="Packs"
-      subtitle={`${gems.toLocaleString()} gems`}
+      subtitle={`${coins.toLocaleString()} coins`}
       tone={gold}
       onClose={close}
       closeLabel="Close packs">
@@ -280,8 +280,8 @@ export default function PacksScreen() {
         <View style={styles.hero}>
           <Text style={[Type.micro, { color: c.textTertiary }]}>YOUR BALANCE</Text>
           <View style={styles.balance}>
-            <Gem size={16} color={gold} />
-            <Text style={[Type.page, NUMERIC, { color: c.text }]}>{gems.toLocaleString()}</Text>
+            <Coin size={16} color={gold} />
+            <Text style={[Type.page, NUMERIC, { color: c.text }]}>{coins.toLocaleString()}</Text>
           </View>
           <Text style={[Type.bodyRelaxed, styles.measure, { color: c.textSecondary }]}>
             Cards arrive from packs. Every one starts at bronze and climbs a tier by scoring
@@ -297,7 +297,7 @@ export default function PacksScreen() {
             <Text style={[Type.body, { color: c.text }]}>{error}</Text>
           </View>
           {/* Only when the shelf itself failed to load. Offering "try again"
-              after "insufficient gems" invites the player to retry something
+              after "insufficient coins" invites the player to retry something
               that cannot succeed until the balance changes. */}
           {packs === null ? (
             <Pressable
@@ -317,7 +317,7 @@ export default function PacksScreen() {
       <PackShelf
         packs={packs}
         dailyAvailable={dailyAvailable}
-        gems={gems}
+        coins={coins}
         openings={openings}
         openingCode={openingCode}
         progress={progress}

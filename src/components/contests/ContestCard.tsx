@@ -102,7 +102,7 @@
 import { Pressable, StyleSheet, Text, View, type DimensionValue } from 'react-native';
 
 import { Icon } from '@/components/icons/Icon';
-import { formatFlex3, formatRoster, formatWr, gem, packStandard } from '@/components/icons/glyphs';
+import { formatFlex3, formatRoster, formatWr, coin, packStandard } from '@/components/icons/glyphs';
 import type { Glyph } from '@/components/icons/system';
 
 import { Heart } from '@/components/runs/Hearts';
@@ -385,7 +385,7 @@ function Head({
           </Text>
           <Rule />
           {/* THE STATE NEVER GIVES. A caller's chip can be as long as "Not
-              enough gems", and a truncated status is the one string here that
+              enough coins", and a truncated status is the one string here that
               becomes actively wrong when it is clipped — `NOT ENOUGH G…` reads
               as a different sentence. The entry count is what shortens. */}
           <View style={styles.status}>{right}</View>
@@ -762,7 +762,7 @@ function Side({
  * ---------------------------------------------------------------------------
  *
  * The band this replaces was two columns, each reserving two blank rows so the
- * card's height could not move. It reserved them because "Up to 120 gems · ♥ +1
+ * card's height could not move. It reserved them because "Up to 120 coins · ♥ +1
  * heart" does not fit in half a card's width — and it fits easily as `◆120 ♥+1`
  * alongside a third token, on one line. See `Token` in `contest-model`.
  *
@@ -818,11 +818,11 @@ function Foot({
  * so the card teaches its glyphs in words before it asks anybody to read them
  * cold. See `Token`.
  *
- * THE GLYPHS CARRY THE HUE, NOT THE NUMBERS. A green `120` reads as gems you
- * already hold; a green gem beside a white `120` reads as a promise denominated
- * in gems, which is what it is. On the risk side the heart is `negative`
+ * THE GLYPHS CARRY THE HUE, NOT THE NUMBERS. A green `120` reads as coins you
+ * already hold; a green coin beside a white `120` reads as a promise denominated
+ * in coins, which is what it is. On the risk side the heart is `negative`
  * because losing one is the actual damage, while a fee is `textSecondary` —
- * full red on a 40-gem entry price reads as an error.
+ * full red on a 40-coin entry price reads as an error.
  */
 function TokenRow({
   label,
@@ -890,7 +890,7 @@ function Mark({ token, side }: { token: Token; side: 'risk' | 'win' }) {
       />
     );
   }
-  if (token.kind === 'gem') return <Icon glyph={gem} color={tint} size={11} focused />;
+  if (token.kind === 'coin') return <Icon glyph={coin} color={tint} size={11} focused />;
   if (token.kind === 'pack') return <Icon glyph={packStandard} color={tint} size={11} focused />;
   return null;
 }

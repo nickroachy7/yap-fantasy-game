@@ -68,19 +68,19 @@
  * the first render. That is what sent the tier labels to their initials rather
  * than any judgement about brevity. "CARDS" (36.2) and "VALUE" (34.2) fit their
  * wider cells; VALUE's fuller sense — "what this would sell for" — stays in the
- * accessibility label, where the gem beside the figure does the visible half of
+ * accessibility label, where the coin beside the figure does the visible half of
  * the job.
  *
  * DUPLICATES ARE THE OMISSION I WOULD RECONSIDER FIRST. Sets are filled by
  * burning spare copies, so "how many spares am I sitting on" is the one dropped
  * fact that is genuinely actionable. It is out because a seventh cell puts each
  * at ~49pt on a 375pt phone, and a four-figure sell value needs ~51 with its
- * gem. If the strip ever earns more width — a wider phone floor, a shorter
+ * coin. If the strip ever earns more width — a wider phone floor, a shorter
  * label — that is the cell to add back.
  */
 
 
-import { Gem } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
 import { TierMark } from '@/components/cards/TierMark';
 import { SummaryStrip, type SummaryCell } from '@/components/ui/SummaryStrip';
 import { getTierTheme, TierColors, TierOrder } from '@/constants/theme';
@@ -89,7 +89,7 @@ import type { CollectionStats } from './types';
 
 /**
  * Row shares. A tier cell holds one letter over a two-digit count; the sell
- * value holds five digits and a gem. Giving them the same width means one of
+ * value holds five digits and a coin. Giving them the same width means one of
  * them is wrong, and it is always the same one.
  */
 const TIER_WEIGHT = 0.8;
@@ -141,7 +141,7 @@ export function CollectionSummary({
     }),
 
     /* What the whole collection is worth if sold. It earns its place twice: it
-       is the only figure here denominated in gems rather than cards, and it is
+       is the only figure here denominated in coins rather than cards, and it is
        how anyone finds out selling exists at all — the action itself lives on
        the card page, where there is room to show what a copy has earned before
        you give it up. Last, because it is the one cell that is not a count of
@@ -154,9 +154,9 @@ export function CollectionSummary({
       key: 'value',
       label: 'VALUE',
       value: stats.sellValue.toLocaleString(),
-      mark: <Gem color={gold} size={8} />,
+      mark: <Coin color={gold} size={8} />,
       weight: VALUE_WEIGHT,
-      accessibilityLabel: `Worth ${stats.sellValue} gems if every card were sold`,
+      accessibilityLabel: `Worth ${stats.sellValue} coins if every card were sold`,
     },
   ];
 

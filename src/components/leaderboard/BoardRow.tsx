@@ -63,7 +63,7 @@ import { Fragment, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TierMark } from '@/components/cards/TierMark';
-import { Gem } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
 import { Colors, NUMERIC, selectionAccent, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { MovementMark } from './Movement';
@@ -190,7 +190,7 @@ export function BoardRow({
             groups without a separator character doing the work. */}
         <View style={styles.detailLine}>
           {row.tier ? <TierMark tier={row.tier} /> : null}
-          {row.gem ? <Gem size={9} color={selectionAccent(scheme)} /> : null}
+          {row.coin ? <Coin size={9} color={selectionAccent(scheme)} /> : null}
           {row.detail.map((p, i) => (
             <Fragment key={p.key}>
               <Text

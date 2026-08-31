@@ -13,7 +13,7 @@
  *
  * It was a route inside the tab navigator, which meant it inherited the app
  * header and the tab bar — so a screen whose whole claim is "nothing here but
- * the field and its results" shipped with a wordmark, a gem balance and five
+ * the field and its results" shipped with a wordmark, a coin balance and five
  * tabs still on it. A takeover with a tab bar is not a takeover; it is a page
  * with the section nav removed, which is strictly worse than the page it
  * replaced because it lost the navigation without gaining the focus.

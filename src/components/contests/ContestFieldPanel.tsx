@@ -146,7 +146,7 @@ export function ContestFieldList({
  * still being edited.
  */
 function subLine(e: FieldEntrant, slotCount: number): string {
-  if (e.prize !== null && e.prize > 0) return `Won ${e.prize} gems`;
+  if (e.prize !== null && e.prize > 0) return `Won ${e.prize} coins`;
   if (e.filled < slotCount) return `${e.filled} of ${slotCount} cards`;
   return e.locked ? 'Locked in' : 'Still editing';
 }

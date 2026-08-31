@@ -41,9 +41,9 @@ begin
   select count(*) into visible_total   from public.card_instances;
   select count(*) into visible_foreign from public.card_instances
     where user_id = '22222222-2222-2222-2222-222222222222';
-  select count(*) into ledger_foreign  from public.gems_ledger
+  select count(*) into ledger_foreign  from public.coins_ledger
     where user_id = '22222222-2222-2222-2222-222222222222';
-  select count(*) into balance_foreign from public.gem_balances
+  select count(*) into balance_foreign from public.coin_balances
     where user_id = '22222222-2222-2222-2222-222222222222';
 
   if visible_total <> 1 then
@@ -53,16 +53,16 @@ begin
     raise exception 'FAIL: user A can read % of user B''s card_instances', visible_foreign;
   end if;
   if ledger_foreign <> 0 then
-    raise exception 'FAIL: user A can read user B''s gems_ledger';
+    raise exception 'FAIL: user A can read user B''s coins_ledger';
   end if;
   if balance_foreign <> 0 then
-    raise exception 'FAIL: user A can read user B''s gem_balance';
+    raise exception 'FAIL: user A can read user B''s coin_balance';
   end if;
 
   begin
-    insert into public.gems_ledger (user_id, amount, reason)
+    insert into public.coins_ledger (user_id, amount, reason)
     values ('11111111-1111-1111-1111-111111111111', 999999, 'admin_adjust');
-    raise exception 'FAIL: user A minted their own gems';
+    raise exception 'FAIL: user A minted their own coins';
   exception
     when insufficient_privilege then null;
   end;

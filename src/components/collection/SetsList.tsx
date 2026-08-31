@@ -15,7 +15,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Gem } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
 
 import { Icon } from '@/components/icons/Icon';
 import { setDaily, setPosition, setTeam, setWeekly } from '@/components/icons/glyphs';
@@ -90,14 +90,14 @@ export function SetsList({
  * same component, not the same design copied.
  *
  * It was a copy for a while, and the copy is why this note exists: the frame
- * weight, the divider, the label-over-figure cell and the gem slot were written
+ * weight, the divider, the label-over-figure cell and the coin slot were written
  * out again here, so when the inventory's strip learned weighted columns and a
  * label that can be a component, this one silently did not. Two tabs of one
  * section had visibly different objects in the same position. `SummaryStrip`
  * owns all of that now and this function is only the four numbers.
  *
  * FOUR CELLS, ALWAYS THE SAME FOUR: a strip whose columns appear and vanish
- * would make the two numbers that matter — slots you can fill, gems you can
+ * would make the two numbers that matter — slots you can fill, coins you can
  * claim — move around the page between visits. A zero is worth its cell here,
  * because "0 ready" is an answer to the question this screen exists to ask.
  * The inventory's strip is fixed at six for the same reason.
@@ -107,7 +107,7 @@ export function SetsList({
  * genuinely larger than the number of cards they would cost.
  *
  * EQUAL WIDTHS, unlike the inventory's. Weighting is there for a cell that
- * holds five figures beside a gem; the widest thing here is a four-figure gem
+ * holds five figures beside a coin; the widest thing here is a four-figure coin
  * total in a cell whose label is "CLAIMED", so an even split has room and the
  * default is the honest choice.
  */
@@ -199,16 +199,16 @@ export function SetsStrip({ stats, action }: { stats: SetsSummary; action?: Reac
     {
       /* The one tinted figure on either strip, and it earns it: this is the
          only cell on either that reports MONEY WAITING rather than a count of
-         things you have. The gem rides with the tint so the number cannot be
+         things you have. The coin rides with the tint so the number cannot be
          read as a count of sets. */
       key: 'ready',
       label: 'READY',
-      value: stats.ready > 0 ? stats.gemsWaiting.toLocaleString() : '0',
+      value: stats.ready > 0 ? stats.coinsWaiting.toLocaleString() : '0',
       tone: stats.ready > 0 ? c.positive : undefined,
-      mark: stats.ready > 0 ? <Gem color={gold} size={8} /> : undefined,
+      mark: stats.ready > 0 ? <Coin color={gold} size={8} /> : undefined,
       accessibilityLabel:
         stats.ready > 0
-          ? `${stats.ready} sets ready to claim, worth ${stats.gemsWaiting} gems`
+          ? `${stats.ready} sets ready to claim, worth ${stats.coinsWaiting} coins`
           : 'No sets ready to claim',
     },
   ];
@@ -217,7 +217,7 @@ export function SetsStrip({ stats, action }: { stats: SetsSummary; action?: Reac
 }
 
 /**
- * Collect everything that has gems waiting, in one press.
+ * Collect everything that has coins waiting, in one press.
  *
  * WHY IT IS A BAR AND NOT A CELL ON THE STRIP. The strip reports; this acts.
  * Its READY cell already says how much is waiting, and making that figure
@@ -226,7 +226,7 @@ export function SetsStrip({ stats, action }: { stats: SetsSummary; action?: Reac
  * under the chips is unmistakably a button and sits directly above the rows it
  * is about.
  *
- * IT NAMES THE MONEY, NOT THE COUNT, in the loud position. "Claim 1,240 gems"
+ * IT NAMES THE MONEY, NOT THE COUNT, in the loud position. "Claim 1,240 coins"
  * is the reason to press it; "across 3 sets" is the detail. A button labelled
  * "Claim 3 sets" would be asking the player to remember what those three were
  * worth from the cell above.
@@ -236,12 +236,12 @@ export function SetsStrip({ stats, action }: { stats: SetsSummary; action?: Reac
  */
 export function ClaimAllBar({
   count,
-  gems,
+  coins,
   busy,
   onPress,
 }: {
   count: number;
-  gems: number;
+  coins: number;
   busy: boolean;
   onPress: () => void;
 }) {
@@ -257,8 +257,8 @@ export function ClaimAllBar({
       accessibilityState={{ disabled: busy }}
       accessibilityLabel={
         count === 1
-          ? `Claim ${gems} gems from 1 set`
-          : `Claim ${gems} gems from ${count} sets`
+          ? `Claim ${coins} coins from 1 set`
+          : `Claim ${coins} coins from ${count} sets`
       }
       style={({ pressed }) => [
         styles.claimAll,
@@ -269,10 +269,10 @@ export function ClaimAllBar({
       {busy ? (
         <ActivityIndicator size="small" color={c.positive} />
       ) : (
-        <Gem color={gold} size={11} />
+        <Coin color={gold} size={11} />
       )}
       <Text style={[Type.strong, NUMERIC, { color: c.text }]}>
-        {busy ? 'Claiming…' : `Claim ${gems.toLocaleString()} gems`}
+        {busy ? 'Claiming…' : `Claim ${coins.toLocaleString()} coins`}
       </Text>
       <Text style={[Type.fine, { color: c.textTertiary }]}>
         {count === 1 ? 'from 1 set' : `across ${count} sets`}
@@ -346,11 +346,11 @@ function SetRow({
         accessibilityRole="button"
         accessibilityLabel={`${set.name}. ${counted} of ${set.required} slots filled. ${
           status === 'claimed'
-            ? `Finished, ${set.claimedGems} gems collected.`
+            ? `Finished, ${set.claimedCoins} coins collected.`
             : status === 'ready'
-              ? `${set.claimableGems} gems ready to claim.`
+              ? `${set.claimableCoins} coins ready to claim.`
               : set.nextAt !== null
-                ? `Next reward at ${set.nextAt} cards, worth ${set.nextReward} gems.`
+                ? `Next reward at ${set.nextAt} cards, worth ${set.nextReward} coins.`
                 : ''
         }${actionable > 0 ? ` You hold cards for ${actionable} more slots.` : ''}`}
         style={({ pressed }) => [styles.rowBody, pressed && styles.pressed]}>
@@ -449,7 +449,7 @@ function SetRow({
             onPress={onClaim}
             disabled={locked}
             accessibilityRole="button"
-            accessibilityLabel={`Claim ${set.claimableGems} gems for ${set.name}`}
+            accessibilityLabel={`Claim ${set.claimableCoins} coins for ${set.name}`}
             accessibilityState={{ disabled: locked, busy }}
             style={({ pressed }) => [
               styles.claim,
@@ -461,9 +461,9 @@ function SetRow({
               <ActivityIndicator />
             ) : (
               <>
-                <Gem color="#17130A" size={9} />
+                <Coin color="#17130A" size={9} />
                 <Text style={[Type.strong, { color: '#17130A' }]}>
-                  {set.claimableGems.toLocaleString()}
+                  {set.claimableCoins.toLocaleString()}
                 </Text>
               </>
             )}
@@ -472,12 +472,12 @@ function SetRow({
           <View style={styles.claimedTag}>
             <Text style={[Type.label, { color: c.textTertiary }]}>FINISHED</Text>
             <Text style={[Type.fine, NUMERIC, { color: c.textTertiary }]}>
-              {`+${set.claimedGems.toLocaleString()}`}
+              {`+${set.claimedCoins.toLocaleString()}`}
             </Text>
           </View>
         ) : (
           /* THE NEXT RUNG's price, not the whole ladder's. A team ladder totals
-             7,100 gems and almost none of it is reachable this season; printing
+             7,100 coins and almost none of it is reachable this season; printing
              the total beside a bar at 9% would be advertising a number nobody
              gets. What is one rung away is the true and useful one.
              Hidden from the reader: the row's own label already says it. */
@@ -485,7 +485,7 @@ function SetRow({
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
             style={styles.reward}>
-            <Gem color={c.textTertiary} size={8} />
+            <Coin color={c.textTertiary} size={8} />
             <Text style={[Type.fine, NUMERIC, { color: c.textTertiary }]}>
               {(set.nextReward ?? 0).toLocaleString()}
             </Text>

@@ -254,12 +254,12 @@ export function EntryLineup({
                      on the week recap, which is the screen for it.
 
                      NULL UNTIL THE PAYOUT HAS RUN, never zero: `awarded` is
-                     false between settlement and `award_score_gems`, and false
+                     false between settlement and `award_score_coins`, and false
                      on any install talking to a database without
                      `20260831040000`. A nought drawn in either case tells a
                      player who has just won that their week paid nothing, at
                      the moment they came to find out what it paid. */
-                  gems={s.awarded ? (s.gems ?? 0) + (s.bonusGems ?? 0) : null}
+                  coins={s.awarded ? (s.coins ?? 0) + (s.bonusCoins ?? 0) : null}
                 />
               }
             />

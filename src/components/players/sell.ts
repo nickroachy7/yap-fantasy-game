@@ -27,7 +27,7 @@ export function sellErrorMessage(raw: string | null | undefined): string {
     return 'Your session has expired. Sign in again to sell.';
   }
   if (s.includes('no wallet')) {
-    return 'Your gem wallet is missing, so there is nowhere to pay the sale into. Contact support.';
+    return 'Your coin wallet is missing, so there is nowhere to pay the sale into. Contact support.';
   }
   // Anything unmapped is surfaced verbatim rather than replaced by a shrug:
   // a wrong-but-friendly message is harder to debug than an ugly true one.

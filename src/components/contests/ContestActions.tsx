@@ -19,7 +19,7 @@
  * LEAVING IS OUTLINED, NOT FILLED, AND IT IS NOT THE PRIMARY
  * ---------------------------------------------------------------------------
  *
- * The gems come back in full and you can enter again while the games are still
+ * The coins come back in full and you can enter again while the games are still
  * ahead, so a solid red button would be shouting a warning about a completely
  * reversible act. It sits beside the primary rather than under it, at its own
  * width, because it is the smaller of the two decisions on this bar.
@@ -40,14 +40,14 @@ import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export function ContestActions({
-  entryFeeGems,
+  entryFeeCoins,
   locked,
   canLeave,
   busy = false,
   onLineup,
   onLeave,
 }: {
-  entryFeeGems: number;
+  entryFeeCoins: number;
   /** Every card in your lineup has kicked off. Nothing can be changed or undone. */
   locked: boolean;
   /** False on the free contest — nobody joined it and nobody can leave it. */
@@ -91,8 +91,8 @@ export function ContestActions({
             disabled={busy}
             accessibilityRole="button"
             accessibilityLabel={
-              entryFeeGems > 0
-                ? `Leave this contest and take back ${entryFeeGems} gems`
+              entryFeeCoins > 0
+                ? `Leave this contest and take back ${entryFeeCoins} coins`
                 : 'Leave this contest'
             }
             accessibilityState={{ disabled: busy, busy }}
@@ -107,9 +107,9 @@ export function ContestActions({
             ) : (
               <>
                 <Text style={[Type.strong, { color: c.negative }]}>Leave</Text>
-                {entryFeeGems > 0 ? (
+                {entryFeeCoins > 0 ? (
                   <Text style={[Type.fine, { color: c.textTertiary }]}>
-                    {entryFeeGems} gems back
+                    {entryFeeCoins} coins back
                   </Text>
                 ) : null}
               </>

@@ -157,7 +157,7 @@ export const OWNED_MANY: CollectionCard[] = Array.from({ length: 14 }, (_, i) =>
  *
  * The numbers mirror the real 2026 build — a team's whole roster on the
  * six-rung 100/300/500/700/2500/5000 ladder, a daily's three cards on its
- * single 40-gem rung, a weekly's three silvers on its single 250-gem one, 50%
+ * single 40-coin rung, a weekly's three silvers on its single 250-coin one, 50%
  * of sell value on a commit — so the layout is exercised at the widths those
  * figures actually produce. Fixtures may restate the server's numbers; product
  * code reads `my_sets`.
@@ -190,10 +190,10 @@ export const SETS_FIXTURE: CardSet[] = [
     complete: true,
     // ONE RUNG. A daily pays on the third card and not before — the whole
     // point of the family is that it does not trickle.
-    milestones: [{ pct: 100, cards: 3, gems: 40, reached: true, claimed: false, paid: null }],
+    milestones: [{ pct: 100, cards: 3, coins: 40, reached: true, claimed: false, paid: null }],
     totalReward: 40,
-    claimableGems: 40,
-    claimedGems: 0,
+    claimableCoins: 40,
+    claimedCoins: 0,
     nextAt: null,
     nextReward: null,
     sortOrder: 0,
@@ -215,10 +215,10 @@ export const SETS_FIXTURE: CardSet[] = [
     commitPayoutPct: 50,
     minTier: null,
     complete: true,
-    milestones: [{ pct: 100, cards: 3, gems: 40, reached: true, claimed: true, paid: 40 }],
+    milestones: [{ pct: 100, cards: 3, coins: 40, reached: true, claimed: true, paid: 40 }],
     totalReward: 40,
-    claimableGems: 0,
-    claimedGems: 40,
+    claimableCoins: 0,
+    claimedCoins: 40,
     nextAt: null,
     nextReward: null,
     sortOrder: 0,
@@ -239,10 +239,10 @@ export const SETS_FIXTURE: CardSet[] = [
     commitPayoutPct: 50,
     minTier: null,
     complete: false,
-    milestones: [{ pct: 100, cards: 3, gems: 40, reached: false, claimed: false, paid: null }],
+    milestones: [{ pct: 100, cards: 3, coins: 40, reached: false, claimed: false, paid: null }],
     totalReward: 40,
-    claimableGems: 0,
-    claimedGems: 0,
+    claimableCoins: 0,
+    claimedCoins: 0,
     nextAt: 3,
     nextReward: 40,
     sortOrder: 0,
@@ -263,10 +263,10 @@ export const SETS_FIXTURE: CardSet[] = [
     commitPayoutPct: 50,
     minTier: null,
     complete: false,
-    milestones: [{ pct: 100, cards: 3, gems: 40, reached: false, claimed: false, paid: null }],
+    milestones: [{ pct: 100, cards: 3, coins: 40, reached: false, claimed: false, paid: null }],
     totalReward: 40,
-    claimableGems: 0,
-    claimedGems: 0,
+    claimableCoins: 0,
+    claimedCoins: 0,
     nextAt: 3,
     nextReward: 40,
     sortOrder: 0,
@@ -288,22 +288,22 @@ export const SETS_FIXTURE: CardSet[] = [
     minTier: null,
     complete: false,
     milestones: [
-      { pct: 10, cards: 4, gems: 60, reached: true, claimed: true, paid: 100 },
-      { pct: 25, cards: 8, gems: 100, reached: true, claimed: true, paid: 300 },
-      { pct: 40, cards: 13, gems: 500, reached: false, claimed: false, paid: null },
-      { pct: 50, cards: 16, gems: 700, reached: false, claimed: false, paid: null },
-      { pct: 75, cards: 24, gems: 2500, reached: false, claimed: false, paid: null },
-      { pct: 100, cards: 32, gems: 5000, reached: false, claimed: false, paid: null },
+      { pct: 10, cards: 4, coins: 60, reached: true, claimed: true, paid: 100 },
+      { pct: 25, cards: 8, coins: 100, reached: true, claimed: true, paid: 300 },
+      { pct: 40, cards: 13, coins: 500, reached: false, claimed: false, paid: null },
+      { pct: 50, cards: 16, coins: 700, reached: false, claimed: false, paid: null },
+      { pct: 75, cards: 24, coins: 2500, reached: false, claimed: false, paid: null },
+      { pct: 100, cards: 32, coins: 5000, reached: false, claimed: false, paid: null },
     ],
     totalReward: 8860,
-    claimableGems: 0,
-    /* 400, NOT 160, AND THE GAP IS THE POINT. `my_sets.claimed_gems` sums the
-       FROZEN `paid` on each rung — what actually landed — while `gems` is what
+    claimableCoins: 0,
+    /* 400, NOT 160, AND THE GAP IS THE POINT. `my_sets.claimed_coins` sums the
+       FROZEN `paid` on each rung — what actually landed — while `coins` is what
        the rung costs today. These two were collected before
        20260825000000_close_reachable_band.sql took the band from 400 to 160, so
        this row reads 400 collected against a ladder that would now pay 160.
        That is the honest answer and the only fixture that exercises it. */
-    claimedGems: 400,
+    claimedCoins: 400,
     nextAt: 13,
     nextReward: 500,
     sortOrder: 21,
@@ -326,18 +326,18 @@ export const SETS_FIXTURE: CardSet[] = [
     minTier: null,
     complete: false,
     milestones: [
-      { pct: 10, cards: 3, gems: 60, reached: true, claimed: true, paid: 100 },
-      { pct: 25, cards: 8, gems: 100, reached: true, claimed: false, paid: null },
-      { pct: 40, cards: 12, gems: 500, reached: false, claimed: false, paid: null },
-      { pct: 50, cards: 15, gems: 700, reached: false, claimed: false, paid: null },
-      { pct: 75, cards: 22, gems: 2500, reached: false, claimed: false, paid: null },
-      { pct: 100, cards: 29, gems: 5000, reached: false, claimed: false, paid: null },
+      { pct: 10, cards: 3, coins: 60, reached: true, claimed: true, paid: 100 },
+      { pct: 25, cards: 8, coins: 100, reached: true, claimed: false, paid: null },
+      { pct: 40, cards: 12, coins: 500, reached: false, claimed: false, paid: null },
+      { pct: 50, cards: 15, coins: 700, reached: false, claimed: false, paid: null },
+      { pct: 75, cards: 22, coins: 2500, reached: false, claimed: false, paid: null },
+      { pct: 100, cards: 29, coins: 5000, reached: false, claimed: false, paid: null },
     ],
     totalReward: 8860,
     /* Today's price for the 25% rung, which is what an unclaimed rung is worth:
        100, where the same rung paid this player's rivals 300 last week. */
-    claimableGems: 100,
-    claimedGems: 100,
+    claimableCoins: 100,
+    claimedCoins: 100,
     nextAt: 12,
     nextReward: 500,
     sortOrder: 9,
@@ -367,16 +367,16 @@ export const SETS_FIXTURE: CardSet[] = [
     minTier: null,
     complete: false,
     milestones: [
-      { pct: 10, cards: 4, gems: 60, reached: false, claimed: false, paid: null },
-      { pct: 25, cards: 8, gems: 100, reached: false, claimed: false, paid: null },
-      { pct: 40, cards: 13, gems: 500, reached: false, claimed: false, paid: null },
-      { pct: 50, cards: 16, gems: 700, reached: false, claimed: false, paid: null },
-      { pct: 75, cards: 24, gems: 2500, reached: false, claimed: false, paid: null },
-      { pct: 100, cards: 31, gems: 5000, reached: false, claimed: false, paid: null },
+      { pct: 10, cards: 4, coins: 60, reached: false, claimed: false, paid: null },
+      { pct: 25, cards: 8, coins: 100, reached: false, claimed: false, paid: null },
+      { pct: 40, cards: 13, coins: 500, reached: false, claimed: false, paid: null },
+      { pct: 50, cards: 16, coins: 700, reached: false, claimed: false, paid: null },
+      { pct: 75, cards: 24, coins: 2500, reached: false, claimed: false, paid: null },
+      { pct: 100, cards: 31, coins: 5000, reached: false, claimed: false, paid: null },
     ],
     totalReward: 8860,
-    claimableGems: 0,
-    claimedGems: 0,
+    claimableCoins: 0,
+    claimedCoins: 0,
     nextAt: 4,
     nextReward: 100,
     sortOrder: 2,
@@ -397,16 +397,16 @@ export const SETS_FIXTURE: CardSet[] = [
     minTier: null,
     complete: false,
     milestones: [
-      { pct: 10, cards: 3, gems: 60, reached: false, claimed: false, paid: null },
-      { pct: 25, cards: 7, gems: 100, reached: false, claimed: false, paid: null },
-      { pct: 40, cards: 11, gems: 500, reached: false, claimed: false, paid: null },
-      { pct: 50, cards: 14, gems: 700, reached: false, claimed: false, paid: null },
-      { pct: 75, cards: 21, gems: 2500, reached: false, claimed: false, paid: null },
-      { pct: 100, cards: 27, gems: 5000, reached: false, claimed: false, paid: null },
+      { pct: 10, cards: 3, coins: 60, reached: false, claimed: false, paid: null },
+      { pct: 25, cards: 7, coins: 100, reached: false, claimed: false, paid: null },
+      { pct: 40, cards: 11, coins: 500, reached: false, claimed: false, paid: null },
+      { pct: 50, cards: 14, coins: 700, reached: false, claimed: false, paid: null },
+      { pct: 75, cards: 21, coins: 2500, reached: false, claimed: false, paid: null },
+      { pct: 100, cards: 27, coins: 5000, reached: false, claimed: false, paid: null },
     ],
     totalReward: 8860,
-    claimableGems: 0,
-    claimedGems: 0,
+    claimableCoins: 0,
+    claimedCoins: 0,
     nextAt: 3,
     nextReward: 100,
     sortOrder: 13,
@@ -438,10 +438,10 @@ export const SETS_FIXTURE: CardSet[] = [
     minTier: 'silver',
     complete: false,
     // ONE REWARD, at completion, for the same reason the daily has one.
-    milestones: [{ pct: 100, cards: 3, gems: 250, reached: false, claimed: false, paid: null }],
+    milestones: [{ pct: 100, cards: 3, coins: 250, reached: false, claimed: false, paid: null }],
     totalReward: 250,
-    claimableGems: 0,
-    claimedGems: 0,
+    claimableCoins: 0,
+    claimedCoins: 0,
     nextAt: 3,
     nextReward: 250,
     sortOrder: 0,
@@ -499,9 +499,9 @@ export const PULLED_FIXTURE: PulledFixture[] = [
  * A shelf holding one of each kind of pack row.
  *
  * THE POINT OF THE THIRD ROW is the bulk control: a repeatable pack you spend
- * gems on is the only kind that carries ×1/×5/×10, because it is the only kind
+ * coins on is the only kind that carries ×1/×5/×10, because it is the only kind
  * you could buy twice anyway — see `PackShelf`. Priced at 200 against the kit's
- * 1,240 gem balance so that ×5 is affordable and ×10 is not, which is the pair
+ * 1,240 coin balance so that ×5 is affordable and ×10 is not, which is the pair
  * of states the row's dimming and the money line's shortfall both need.
  *
  * `guaranteed_positions` is jsonb in the database and `unknown` until parsed,
@@ -512,7 +512,7 @@ export const SHELF_FIXTURE: ShelfPack[] = [
     id: 'pk-starter',
     code: 'starter',
     name: 'Starter Pack',
-    gem_cost: 0,
+    coin_cost: 0,
     card_count: 8,
     once_per_user: true,
     daily_limit: null,
@@ -522,7 +522,7 @@ export const SHELF_FIXTURE: ShelfPack[] = [
     id: 'pk-daily',
     code: 'daily',
     name: 'Daily Pack',
-    gem_cost: 0,
+    coin_cost: 0,
     card_count: 3,
     once_per_user: false,
     daily_limit: 1,
@@ -532,7 +532,7 @@ export const SHELF_FIXTURE: ShelfPack[] = [
     id: 'pk-standard',
     code: 'standard',
     name: 'Standard Pack',
-    gem_cost: 200,
+    coin_cost: 200,
     card_count: 5,
     once_per_user: false,
     daily_limit: null,
@@ -547,7 +547,7 @@ type ShelfPack = {
   id: string;
   code: string;
   name: string;
-  gem_cost: number;
+  coin_cost: number;
   card_count: number;
   once_per_user: boolean;
   daily_limit: number | null;
@@ -594,7 +594,7 @@ export const PULL_ACTIONS_FIXTURE = new Map<string, CardActions>([
       burnsThisCopy: false,
       // THE LONGEST NAME IN THE LEAGUE, on purpose. 'Add to Washington
       // Commanders' plus a price overruns a 257pt card, so this is the fixture
-      // that proves the label shrinks and the gem figure does not.
+      // that proves the label shrinks and the coin figure does not.
       sets: [teamSet('team-wsh-2026', 'Washington Commanders', 12, 32)],
     },
   ],
@@ -751,17 +751,17 @@ export const KIT_SET_FILLED: CardActionSet = {
  */
 export const KIT_COMMIT_PLAN: CommitPlan = {
   legs: [
-    { setCode: 'team-buf-2026', setName: 'Buffalo Bills', cardIds: ['c1', 'c2', 'c3'], gems: 12 },
-    { setCode: 'team-cin-2026', setName: 'Cincinnati Bengals', cardIds: ['c4', 'c5'], gems: 8 },
+    { setCode: 'team-buf-2026', setName: 'Buffalo Bills', cardIds: ['c1', 'c2', 'c3'], coins: 12 },
+    { setCode: 'team-cin-2026', setName: 'Cincinnati Bengals', cardIds: ['c4', 'c5'], coins: 8 },
     {
       setCode: 'daily-wr-2026-08-24',
       setName: 'Receiver of the day',
       cardIds: ['c6', 'c7', 'c8'],
-      gems: 120,
+      coins: 120,
     },
   ],
   cards: 8,
-  gems: 140,
+  coins: 140,
   // All three reasons a copy stays behind, so the dialog has to say all three.
   alreadyIn: 1,
   noSet: 1,
@@ -796,24 +796,24 @@ export const KIT_COMMIT_PLAN: CommitPlan = {
  *   real week: a promotion needs a card that crossed a floor THIS contest.
  *
  * And the right column's three figures — the previous total, the gain, and the
- * gems it paid — including the two states that are absences rather than
+ * coins it paid — including the two states that are absences rather than
  * noughts: a week settled but not yet paid, and a card with no history sent.
  *
  * The thresholds are the real ladder — 200 silver, 750 gold, 2500 diamond (see
- * `20260821250000_reachable_tier_ladder`) — and the gem figures are what
- * `award_score_gems` would actually pay at the tier each card held GOING IN, so
+ * `20260821250000_reachable_tier_ladder`) — and the coin figures are what
+ * `award_score_coins` would actually pay at the tier each card held GOING IN, so
  * the arithmetic on screen is the arithmetic that will run in production rather
  * than numbers chosen to look tidy.
  */
 export const KIT_ENTRY_SLOTS: PeekEntrySlot[] = [
   /* Ordinary: scored, climbed, still short of the next tier. Paid at BRONZE
      (1.00), which is the tier it went into the week holding — floor(9.8 × 1.5
-     × 1.00) = 14, exactly as `award_score_gems` prices it. */
+     × 1.00) = 14, exactly as `award_score_coins` prices it. */
   {
     slot: 'QB', playerId: 'e1', playerName: 'Ty Simpson', pos: 'QB', team: 'LAR',
     tier: 'bronze', points: 9.8, started: true,
     careerFp: 58.3, tierFloorFp: 0, nextTierAt: 200, nextTierLabel: 'silver',
-    gems: 14, bonusGems: null, awarded: true,
+    coins: 14, bonusCoins: null, awarded: true,
     game: { opponent: 'BUF', home: true,  startsAt: null, status: 'final', statusText: 'Final', teamScore: 27, oppScore: 13 },
   },
   /* The moment worth drawing: this contest carried it over the silver floor.
@@ -823,7 +823,7 @@ export const KIT_ENTRY_SLOTS: PeekEntrySlot[] = [
     slot: 'RB1', playerId: 'e2', playerName: 'Jeremiyah Love', pos: 'RB', team: 'ARI',
     tier: 'silver', points: 9.8, started: true,
     careerFp: 203.4, tierFloorFp: 200, nextTierAt: 750, nextTierLabel: 'gold',
-    gems: 14, bonusGems: null, awarded: true,
+    coins: 14, bonusCoins: null, awarded: true,
     game: { opponent: 'SF',  home: false, startsAt: null, status: 'final', statusText: 'Final/OT', teamScore: 24, oppScore: 27 },
   },
   /* Landed exactly ON the floor, which is still a promotion. */
@@ -831,7 +831,7 @@ export const KIT_ENTRY_SLOTS: PeekEntrySlot[] = [
     slot: 'RB2', playerId: 'e3', playerName: 'Jonathon Brooks', pos: 'RB', team: 'CAR',
     tier: 'silver', points: 5, started: true,
     careerFp: 200, tierFloorFp: 200, nextTierAt: 750, nextTierLabel: 'gold',
-    gems: 7, bonusGems: null, awarded: true,
+    coins: 7, bonusCoins: null, awarded: true,
     /* A TIE takes the quiet colour. Not a result anybody is pleased or
        sorry about, and a third accent for a state that happens twice a
        season would be a colour nobody learns. */
@@ -844,7 +844,7 @@ export const KIT_ENTRY_SLOTS: PeekEntrySlot[] = [
     slot: 'WR1', playerId: 'e4', playerName: 'Tetairoa McMillan', pos: 'WR', team: 'CAR',
     tier: 'silver', points: 9.8, started: true,
     careerFp: 260, tierFloorFp: 200, nextTierAt: 750, nextTierLabel: 'gold',
-    gems: 16, bonusGems: null, awarded: true,
+    coins: 16, bonusCoins: null, awarded: true,
     game: { opponent: 'ATL', home: false, startsAt: null, status: 'final', statusText: 'Final', teamScore: 31, oppScore: 17 },
   },
   /* A bye. No arrow: the total is a standing figure, not a movement. AND AN
@@ -854,7 +854,7 @@ export const KIT_ENTRY_SLOTS: PeekEntrySlot[] = [
     slot: 'WR2', playerId: 'e5', playerName: "Tre' Harris", pos: 'WR', team: 'LAC',
     tier: 'bronze', points: 0, started: false,
     careerFp: 48.5, tierFloorFp: 0, nextTierAt: 200, nextTierLabel: 'silver',
-    gems: 0, bonusGems: null, awarded: true,
+    coins: 0, bonusCoins: null, awarded: true,
     /* A BYE: no game at all, so the fixture line says so in the negative
        colour. It is the one row where that line is a warning rather than a
        report, and the only place in the app that ever mentions a bye. */
@@ -868,18 +868,18 @@ export const KIT_ENTRY_SLOTS: PeekEntrySlot[] = [
     slot: 'TE', playerId: 'e6', playerName: 'Brock Bowers', pos: 'TE', team: 'LV',
     tier: 'diamond', points: 22.1, started: true,
     careerFp: 2610.4, tierFloorFp: 2500, nextTierAt: null, nextTierLabel: null,
-    gems: 46, bonusGems: 60, awarded: true,
+    coins: 46, bonusCoins: 60, awarded: true,
     game: { opponent: 'KC',  home: true,  startsAt: null, status: 'final', statusText: 'Final', teamScore: 34, oppScore: 28 },
   },
   /* SETTLED, NOT YET PAID. The state a week spends its first minutes in: the
-     scores are final and `award_score_gems` has not run, so there is no money
+     scores are final and `award_score_coins` has not run, so there is no money
      line at all. A nought here would tell a player their week paid nothing at
      the exact moment they came to find out what it paid. */
   {
     slot: 'FLEX', playerId: 'e7', playerName: 'Rome Odunze', pos: 'WR', team: 'CHI',
     tier: 'gold', points: 17.6, started: true,
     careerFp: 812.5, tierFloorFp: 750, nextTierAt: 2500, nextTierLabel: 'diamond',
-    gems: null, bonusGems: null, awarded: false,
+    coins: null, bonusCoins: null, awarded: false,
     game: { opponent: 'GB',  home: false, startsAt: null, status: 'final', statusText: 'Final', teamScore: 21, oppScore: 14 },
   },
   /* A SERVER THAT SENDS NONE OF IT. 20260831020000 (the career), 040000 (the
@@ -893,7 +893,7 @@ export const KIT_ENTRY_SLOTS: PeekEntrySlot[] = [
     slot: 'FLEX2', playerId: 'e8', playerName: 'Emeka Egbuka', pos: 'WR', team: 'TB',
     tier: 'bronze', points: 12.4, started: true,
     careerFp: null, tierFloorFp: null, nextTierAt: null, nextTierLabel: null,
-    gems: null, bonusGems: null, awarded: false,
+    coins: null, bonusCoins: null, awarded: false,
     /* AND NO FIXTURE EITHER, which is the state that must not be drawn as a
        bye: `game` is UNDEFINED rather than null, so the line is left blank
        instead of claiming in red that a card which scored 12.4 did not play. */
@@ -935,7 +935,7 @@ const settled = (
   entrants: result === null ? 1 : 26,
   result,
   heartsDelta: result === 'W' ? 1 : result === 'L' ? -1 : 0,
-  prizeGems: result === 'W' ? 120 : null,
+  prizeCoins: result === 'W' ? 120 : null,
   finalizedAt: '2026-08-31T10:00:00.000Z',
 });
 

@@ -183,8 +183,8 @@ export default function RunOverScreen() {
             one thing a player might then try to act on. */}
         <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
           {slots > 0
-            ? `The run took ${run?.lostCards ?? 0} card${run?.lostCards === 1 ? '' : 's'} and your gems. ${run?.wins} win${run?.wins === 1 ? '' : 's'} brings ${slots} card${slots === 1 ? '' : 's'} back.`
-            : `The run took ${run?.lostCards ?? 0} card${run?.lostCards === 1 ? '' : 's'} and your gems. Under three wins brings nothing back.`}
+            ? `The run took ${run?.lostCards ?? 0} card${run?.lostCards === 1 ? '' : 's'} and your coins. ${run?.wins} win${run?.wins === 1 ? '' : 's'} brings ${slots} card${slots === 1 ? '' : 's'} back.`
+            : `The run took ${run?.lostCards ?? 0} card${run?.lostCards === 1 ? '' : 's'} and your coins. Under three wins brings nothing back.`}
         </Text>
 
         {/* SET PROGRESS SURVIVING IS THE PROMISE, so it is stated on the screen

@@ -10,7 +10,7 @@
  * discipline behind it — every number below comes off `my_sets`, and nothing
  * here states a rule the server does not enforce.
  *
- * THE DECISION IT WAS HOLDING OPEN, RESOLVED TWICE OVER. Completion pays GEMS,
+ * THE DECISION IT WAS HOLDING OPEN, RESOLVED TWICE OVER. Completion pays COINS,
  * once, on an explicit claim — of the three candidates that was the only one
  * that changes nothing about what a card is. And a card has to be COMMITTED to
  * a set, which burns it: the set takes the card out of the collection for good
@@ -22,7 +22,7 @@
  *
  * A set is completed by committing a THRESHOLD of its cards, not all of them —
  * six, whatever the group's size. The old screen said "all of them"; the pack
- * maths says a named five-card set costs ~44,000 gems against a season's income
+ * maths says a named five-card set costs ~44,000 coins against a season's income
  * of ~6,000, which is not a hard set but an impossible one. The arithmetic is
  * in the migration header. What matters here is that the screen never implies
  * otherwise: every row reads "4/6", and the set's full size is named beside it
@@ -34,7 +34,7 @@
  *     button follows it. A client that decides for itself when a set is done
  *     will eventually disagree with the server, and the disagreement is a
  *     player pressing Claim and reading a raw Postgres error.
- *  2. Claim on your behalf. The gems land on an explicit press, so the reward
+ *  2. Claim on your behalf. The coins land on an explicit press, so the reward
  *     is something you collect rather than something that happened while you
  *     were on another tab.
  *  3. Burn anything from here. Adding a card destroys it, so the act belongs on
@@ -111,7 +111,7 @@ export function SetsPanel({
   /** The last claim's failure. Shared with nothing — it is about one press. */
   const [claimError, setClaimError] = useState<string | null>(null);
   /** The last claim that worked, kept until the next press. */
-  const [claimed, setClaimed] = useState<{ name: string; gems: number } | null>(null);
+  const [claimed, setClaimed] = useState<{ name: string; coins: number } | null>(null);
   /** Set while the sweep is running, so the bar can say so and refuse a second. */
   const [claimingAll, setClaimingAll] = useState(false);
 
@@ -137,9 +137,9 @@ export function SetsPanel({
       if (err) {
         setClaimError(err.message);
       } else {
-        setClaimed({ name: set.name, gems: set.claimableGems });
+        setClaimed({ name: set.name, coins: set.claimableCoins });
         // Both matter: the list has to redraw the row as claimed, and the
-        // header has to show the gems that just landed.
+        // header has to show the coins that just landed.
         await Promise.all([reload(), refreshPlayer()]);
       }
       setClaiming(null);
@@ -148,7 +148,7 @@ export function SetsPanel({
   );
 
   /**
-   * Collect every set with gems waiting, in one press.
+   * Collect every set with coins waiting, in one press.
    *
    * WHY THIS EXISTS. The list used to lift claimable sets out into a section of
    * their own at the top, which made them findable at the cost of taking a
@@ -165,7 +165,7 @@ export function SetsPanel({
    * PARTIAL SUCCESS IS REPORTED, NOT SWALLOWED — the same posture as
    * `sell_cards` and `commit_cards_to_set`, which both hand back what worked
    * and what did not. A sweep that claimed four of five and said "claimed"
-   * would be lying about the fifth, and the gems would be the evidence.
+   * would be lying about the fifth, and the coins would be the evidence.
    *
    * ONE RELOAD AT THE END rather than one per set: the list is redrawn from the
    * server once the whole sweep is done, so the rows do not shuffle under a
@@ -178,7 +178,7 @@ export function SetsPanel({
     setClaimError(null);
     setClaimed(null);
 
-    let gems = 0;
+    let coins = 0;
     let done = 0;
     let firstFailure: string | null = null;
 
@@ -190,7 +190,7 @@ export function SetsPanel({
            problem is a notice nobody reads. */
         firstFailure ??= err.message;
       } else {
-        gems += set.claimableGems;
+        coins += set.claimableCoins;
         done += 1;
       }
     }
@@ -198,7 +198,7 @@ export function SetsPanel({
     if (done > 0) {
       setClaimed({
         name: done === 1 ? ready[0].name : `${done} sets`,
-        gems,
+        coins,
       });
     }
     if (firstFailure) {
@@ -210,7 +210,7 @@ export function SetsPanel({
     }
 
     // Both matter: the list has to redraw the rows as claimed, and the header
-    // has to show the gems that just landed.
+    // has to show the coins that just landed.
     await Promise.all([reload(), refreshPlayer()]);
     setClaimingAll(false);
   }, [ready, reload, refreshPlayer]);
@@ -271,7 +271,7 @@ export function SetsPanel({
           {ready.length > 0 ? (
             <ClaimAllBar
               count={ready.length}
-              gems={summary.gemsWaiting}
+              coins={summary.coinsWaiting}
               busy={claimingAll}
               onPress={() => void claimAll()}
             />
@@ -318,7 +318,7 @@ export function SetsPanel({
               <View style={[styles.notice, { borderColor: c.positive, backgroundColor: c.surface }]}>
                 <Text style={[Type.micro, { color: c.positive }]}>CLAIMED</Text>
                 <Text style={[Type.body, { color: c.text }]}>
-                  {`${claimed.name} — ${claimed.gems.toLocaleString()} gems added to your balance.`}
+                  {`${claimed.name} — ${claimed.coins.toLocaleString()} coins added to your balance.`}
                 </Text>
               </View>
             ) : null}

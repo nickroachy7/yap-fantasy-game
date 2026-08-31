@@ -2,14 +2,14 @@
  * The week, per player — shape, parsing and the small amount of arithmetic the
  * screen is allowed to do.
  *
- * EVERY FIGURE HERE IS A READ. `award_score_gems` and `award_position_bonuses`
+ * EVERY FIGURE HERE IS A READ. `award_score_coins` and `award_position_bonuses`
  * stamp what they paid onto `lineup_slots` at the moment they pay it, so this
  * module never recomputes a payout. That is not tidiness: a recap that derived
- * gems from today's tier would print a different number than the wallet
+ * coins from today's tier would print a different number than the wallet
  * received the instant a card is promoted — which is precisely the week a
  * player is looking hardest at it.
  *
- * `awarded` IS NOT `gems > 0`. A week that has been scored but not yet paid, and
+ * `awarded` IS NOT `coins > 0`. A week that has been scored but not yet paid, and
  * a start that was paid nothing because the player scored nothing, are different
  * states and the screen draws them differently. The RPC sends the flag rather
  * than letting the client infer it from a nullable number.
@@ -28,11 +28,11 @@ export type RecapCard = {
   awarded: boolean;
   /** The tier the card held GOING INTO the week — what it was paid at. */
   tierAtAward: CardTier | null;
-  gemMultiplier: number | null;
-  gems: number | null;
+  coinMultiplier: number | null;
+  coins: number | null;
   /** Finish among everyone who scored at this position. Null if they scored nothing. */
   positionRank: number | null;
-  bonusGems: number | null;
+  bonusCoins: number | null;
   wasWeekMvp: boolean;
   tierNow: CardTier;
   /** Climbed since it was paid. The forward-looking half of the row. */
@@ -73,8 +73,8 @@ export type Recap = {
   rank: number | null;
   of: number | null;
   cards: RecapCard[];
-  gemsPoints: number;
-  gemsBonus: number;
+  coinsPoints: number;
+  coinsBonus: number;
   closestSets: ClosestSet[];
   roster: RosterStatus | null;
 };
@@ -151,10 +151,10 @@ export function parseRecap(raw: unknown): Recap | null {
           points: num(c.points),
           awarded: c.awarded === true,
           tierAtAward: (c.tier_at_award as CardTier | null) ?? null,
-          gemMultiplier: nullableNum(c.gem_multiplier),
-          gems: nullableNum(c.gems),
+          coinMultiplier: nullableNum(c.coin_multiplier),
+          coins: nullableNum(c.coins),
           positionRank: nullableNum(c.position_rank),
-          bonusGems: nullableNum(c.bonus_gems),
+          bonusCoins: nullableNum(c.bonus_coins),
           wasWeekMvp: c.was_week_mvp === true,
           tierNow: (c.tier_now as CardTier) ?? 'bronze',
           promoted: c.promoted === true,
@@ -189,8 +189,8 @@ export function parseRecap(raw: unknown): Recap | null {
     rank: nullableNum(r.rank),
     of: nullableNum(r.of),
     cards,
-    gemsPoints: num(r.gems_points),
-    gemsBonus: num(r.gems_bonus),
+    coinsPoints: num(r.coins_points),
+    coinsBonus: num(r.coins_bonus),
     closestSets,
     roster: parseRoster(r.roster),
   };

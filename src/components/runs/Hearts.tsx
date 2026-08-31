@@ -52,7 +52,7 @@
  * ---------------------------------------------------------------------------
  *
  * It was a valentine — round lobes, deep soft notch — which was the only soft
- * shape in an app whose icon language is a rotated square (`Gem`), concentric
+ * shape in an app whose icon language is a rotated square (`Coin`), concentric
  * rings and corner ticks (`TierMotif`). Cut into facets it belongs to that
  * family, and two practical things follow:
  *
@@ -63,7 +63,7 @@
  *   Straight edges hold at 12pt. The old lobes fought the rasteriser at their
  *   tangents and went mushy in the sidebar.
  *
- * Drawn as a path rather than an icon font for the reason `Gem` gives: crisp
+ * Drawn as a path rather than an icon font for the reason `Coin` gives: crisp
  * everywhere, and no dependency to ship a thousand glyphs to draw one.
  */
 

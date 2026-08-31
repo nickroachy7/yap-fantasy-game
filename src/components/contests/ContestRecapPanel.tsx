@@ -44,7 +44,7 @@ import { ContestFieldPanel } from '@/components/contests/ContestFieldPanel';
 import { ResultMark } from '@/components/contests/ContestHistoryPanel';
 import type { HistoryEntry } from '@/components/contests/use-contest-history';
 import { useContestField, useContestLineup } from '@/components/contests/use-contest-field';
-import { Gem } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
 import { Heart } from '@/components/runs/Hearts';
 import { useAuth } from '@/context/AuthContext';
 import { Colors, NUMERIC, Spacing, TierColors, Type } from '@/constants/theme';
@@ -95,13 +95,13 @@ export function ContestRecapPanel({
           <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
             {[weekLabel(entry.seasonType, entry.week), place].filter(Boolean).join(' · ')}
           </Text>
-          {entry.prizeGems || entry.heartsDelta ? (
+          {entry.prizeCoins || entry.heartsDelta ? (
             <View style={styles.tallies}>
-              {entry.prizeGems ? (
+              {entry.prizeCoins ? (
                 <View style={styles.pair}>
-                  <Gem size={10} color={gold} />
+                  <Coin size={10} color={gold} />
                   <Text style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
-                    {`+${entry.prizeGems}`}
+                    {`+${entry.prizeCoins}`}
                   </Text>
                 </View>
               ) : null}

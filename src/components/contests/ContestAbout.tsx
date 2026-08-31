@@ -100,22 +100,22 @@ export function ContestAbout({
 
         <Fact term="Winning" body={winLine(terms)}>
           {terms.winCondition === 'top_n' && terms.winRank !== null
-            ? `Only the first ${terms.winRank} places are paid, and the pool is weighted by place — first takes roughly twice what last of the paying places takes${top !== null ? `, about ${top} gems as the pool stands` : ''}. Most of this field loses.`
+            ? `Only the first ${terms.winRank} places are paid, and the pool is weighted by place — first takes roughly twice what last of the paying places takes${top !== null ? `, about ${top} coins as the pool stands` : ''}. Most of this field loses.`
             : `Every entry that beats the middle score of the field wins, and the winners split the pool equally. It is close to even money: what you are being paid for is finishing above half the people who filed.`}
         </Fact>
 
         <Fact
           term="The pool"
           body={
-            terms.entryFeeGems > 0
+            terms.entryFeeCoins > 0
               ? terms.prizePool > 0
-                ? `${terms.prizePool} gems so far`
+                ? `${terms.prizePool} coins so far`
                 : 'Nothing in it yet'
               : 'No pool — this one is free'
           }>
-          {terms.entryFeeGems > 0
+          {terms.entryFeeCoins > 0
             ? `${share}% of every entry fee goes into the pool and the rest leaves the economy. It is funded by the people in it, so it is genuinely small in a young contest and grows with every entry. Nothing is ever minted to make it look bigger.`
-            : `A free contest collects nothing, so there is nothing to split. It pays on what you score instead — from 1.5 gems a point, multiplied by the tier of the card that scored them.`}
+            : `A free contest collects nothing, so there is nothing to split. It pays on what you score instead — from 1.5 coins a point, multiplied by the tier of the card that scored them.`}
         </Fact>
 
         {terms.heartsAtRisk > 0 || terms.heartsOnWin > 0 ? (
@@ -156,12 +156,12 @@ export function ContestAbout({
         </Fact>
 
         {leavable ? (
-          <Fact term="Leaving" body={terms.entryFeeGems > 0 ? 'Full refund' : 'Any time'}>
+          <Fact term="Leaving" body={terms.entryFeeCoins > 0 ? 'Full refund' : 'Any time'}>
             You can leave while every card in your lineup is still ahead of its
             kickoff. The lineup is deleted, the cards go back to your bench free
             to play elsewhere
-            {terms.entryFeeGems > 0
-              ? `, and the ${terms.entryFeeGems} gems return in full`
+            {terms.entryFeeCoins > 0
+              ? `, and the ${terms.entryFeeCoins} coins return in full`
               : ''}
             . Once one of your players has started, the entry stands.
           </Fact>
@@ -193,17 +193,17 @@ export function ContestAbout({
         </Pressable>
 
         {/* WHY YOU ACTUALLY ENTER, and it is deliberately last: it is an
-            argument rather than a rule. The reward column on the card is gems
-            because gems are a balance a reader keeps score in; career FP is the
-            real return and had nowhere to be made, because next to "40 gems" in
+            argument rather than a rule. The reward column on the card is coins
+            because coins are a balance a reader keeps score in; career FP is the
+            real return and had nowhere to be made, because next to "40 coins" in
             a fixed-width column it read as small print. */}
         <View style={[styles.fact, styles.last]}>
           <View style={styles.head}>
             <Text style={[Type.micro, { color: c.textTertiary }]}>WHY BOTHER</Text>
-            <Text style={[Type.strong, { color: c.text }]}>The gems are not the point</Text>
+            <Text style={[Type.strong, { color: c.text }]}>The coins are not the point</Text>
           </View>
           <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
-            The gems are the chase. What an entry actually buys is career FP on
+            The coins are the chase. What an entry actually buys is career FP on
             cards that were earning nothing — every start moves a card up its
             tier ladder, and the tier those cards climb is the one thing packs
             cannot sell you.
@@ -218,7 +218,7 @@ export function ContestAbout({
  * One rule: a label, the short answer, and the sentence that qualifies it.
  *
  * THE SHORT ANSWER IS THE LINE PEOPLE READ. Somebody skimming this panel gets
- * "Beat the median / 240 gems so far / 1 heart on the line" down the left of the
+ * "Beat the median / 240 coins so far / 1 heart on the line" down the left of the
  * page and can stop there; the paragraph under it is for the reader who has
  * stopped on that row. Both are always drawn, because a rule that hides its own
  * explanation behind a tap is a rule nobody reads.

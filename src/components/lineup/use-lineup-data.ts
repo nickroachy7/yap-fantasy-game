@@ -234,7 +234,7 @@ type ContestRow = {
   name: string;
   kind: 'free' | 'lobby';
   format_code: string;
-  entry_fee_gems: number;
+  entry_fee_coins: number;
 };
 
 /** One of the caller's lineups on this slate, with its slots. */
@@ -254,7 +254,7 @@ export type LineupContest = {
   name: string;
   kind: 'free' | 'lobby';
   formatCode: string;
-  entryFeeGems: number;
+  entryFeeCoins: number;
   /** True until the entry exists — the fee has not been taken yet. */
   unentered: boolean;
 };
@@ -404,7 +404,7 @@ export function useLineupData(contestCode?: string): LineupData {
       s
         ? supabase
             .from('contests')
-            .select('id, code, name, kind, format_code, entry_fee_gems')
+            .select('id, code, name, kind, format_code, entry_fee_coins')
             .eq('season', s.season)
             .eq('season_type', s.season_type)
             .eq('week', s.week)
@@ -536,7 +536,7 @@ export function useLineupData(contestCode?: string): LineupData {
       name: row.name,
       kind: row.kind,
       formatCode: row.format_code,
-      entryFeeGems: row.entry_fee_gems,
+      entryFeeCoins: row.entry_fee_coins,
       /* An entry exists exactly when a lineup row does — which is also what
          makes the fee idempotent server-side. See `20260825050000`. */
       unentered: !myLineups.some((l) => l.contest_id === row.id),

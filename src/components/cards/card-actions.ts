@@ -28,7 +28,7 @@ export type CardActionSet = {
   name: string;
   family: string;
   subtitle: string | null;
-  /** Gems this commit pays, priced by the server off the copy that would burn. */
+  /** Coins this commit pays, priced by the server off the copy that would burn. */
   pays: number;
   committed: number;
   required: number;

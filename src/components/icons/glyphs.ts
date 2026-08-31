@@ -51,9 +51,9 @@ import type { Glyph } from './system';
  * THE ECONOMY AND CONTENT MARKS. Cut from one generated sheet, so the five
  * agree with each other by construction rather than by luck.
  *
- * THESE ARE THE KEYLINES DOING THEIR JOB. A gem is a diamond and takes the
+ * THESE ARE THE KEYLINES DOING THEIR JOB. A coin is a diamond and takes the
  * `diagonal` keyline, so it is drawn WIDER than the square-keyline marks beside
- * it. Set them all to one size and the gem reads small — the failure the
+ * it. Set them all to one size and the coin reads small — the failure the
  * keyline exists to prevent, and one impossible to name by eye until you see
  * the row together.
  *
@@ -66,8 +66,8 @@ import type { Glyph } from './system';
  * complex mark in the set and the first to check if the row ever stops holding
  * up at 16pt.
  */
-export const gem: Glyph = {
-  name: 'gem',
+export const coin: Glyph = {
+  name: 'coin',
   keyline: 'diagonal',
   source: 1000,
   parts: [
@@ -549,7 +549,7 @@ export const navProfileIdle: Glyph = {
 
 /** The whole set, in the order the gallery and the lint walk it. */
 export const GLYPHS: Glyph[] = [
-  gem,
+  coin,
   collection,
   sets,
   shop,

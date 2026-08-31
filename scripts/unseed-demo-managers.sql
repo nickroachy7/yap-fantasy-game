@@ -2,7 +2,7 @@
 --
 -- One DELETE is the whole teardown. Every table that references a user cascades
 -- on delete — profiles, card_instances, lineups (and lineup_slots through
--- them), gems_ledger, gem_balances, set_milestone_claims — so nothing can be
+-- them), coins_ledger, coin_balances, set_milestone_claims — so nothing can be
 -- left orphaned by removing the `auth.users` rows.
 --
 -- The predicate is the demo namespace and nothing else. It cannot reach a real

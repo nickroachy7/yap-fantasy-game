@@ -19,7 +19,7 @@
  *
  * Behaviour carried across verbatim where it was already right: a claimed
  * one-per-player pack must render as a disabled "Claimed" button rather than
- * letting the user fire the RPC and read a raw Postgres error, and a zero gem
+ * letting the user fire the RPC and read a raw Postgres error, and a zero coin
  * cost reads as "Free".
  *
  * BUYING SEVERAL AT ONCE is the card's one control beyond the button. See
@@ -41,7 +41,7 @@ import { Icon } from '@/components/icons/Icon';
 import { packDaily, packPro, packStandard, packStarter } from '@/components/icons/glyphs';
 import type { Glyph } from '@/components/icons/system';
 
-import { Gem } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import type { Json } from '@/lib/database.types';
@@ -50,7 +50,7 @@ export type Pack = {
   id: string;
   code: string;
   name: string;
-  gem_cost: number;
+  coin_cost: number;
   card_count: number;
   once_per_user: boolean;
   /** Opens allowed per day, or null for a pack with no daily limit. */
@@ -130,7 +130,7 @@ export function countPositions(cards: Pulled[]): Coverage[] {
 export function PackShelf({
   packs,
   dailyAvailable,
-  gems,
+  coins,
   openings,
   openingCode,
   progress,
@@ -146,7 +146,7 @@ export function PackShelf({
    * dead one that should work.
    */
   dailyAvailable: boolean | null;
-  gems: number;
+  coins: number;
   /** pack_id -> how many times this player has opened it. */
   openings: Map<string, number>;
   /** The pack currently being opened, if any. */
@@ -182,7 +182,7 @@ export function PackShelf({
           <PackCard
             key={p.id}
             pack={p}
-            gems={gems}
+            coins={coins}
             opened={openings.get(p.id) ?? 0}
             dailyAvailable={dailyAvailable}
             busy={openingCode === p.code}
@@ -247,7 +247,7 @@ const PACK_GLYPHS: Record<string, Glyph | undefined> = {
 
 function PackCard({
   pack,
-  gems,
+  coins,
   opened,
   dailyAvailable,
   busy,
@@ -256,7 +256,7 @@ function PackCard({
   onOpen,
 }: {
   pack: Pack;
-  gems: number;
+  coins: number;
   opened: number;
   dailyAvailable: boolean | null;
   busy: boolean;
@@ -281,7 +281,7 @@ function PackCard({
    */
   const claimedToday = isDaily && dailyAvailable !== true;
   const claimed = (pack.once_per_user && opened > 0) || claimedToday;
-  const free = pack.gem_cost === 0;
+  const free = pack.coin_cost === 0;
 
   /**
    * WHICH PACKS MAY BE BOUGHT IN BULK: the ones you could buy twice anyway.
@@ -293,17 +293,17 @@ function PackCard({
    * something that costs nothing is a quantity picker for a thing there is no
    * decision to make about.
    *
-   * So the row appears on a repeatable pack you spend gems on, which today is
+   * So the row appears on a repeatable pack you spend coins on, which today is
    * the standard pack and whatever is priced beside it later.
    */
-  const bulkable = !pack.once_per_user && !isDaily && pack.gem_cost > 0;
+  const bulkable = !pack.once_per_user && !isDaily && pack.coin_cost > 0;
   const [count, setCount] = useState(1);
   /* Never trust the state over the pack: a row that stops being repeatable
      between renders must not keep a 10 the button would then fire. */
   const buying = bulkable ? count : 1;
-  const total = pack.gem_cost * buying;
+  const total = pack.coin_cost * buying;
 
-  const affordable = gems >= total;
+  const affordable = coins >= total;
   const blocked = locked || claimed || !affordable;
   const coverage = coverageOf(pack.guaranteed_positions);
 
@@ -318,7 +318,7 @@ function PackCard({
           : 'Open';
   /**
    * The one line that answers "can I press this, and what happens to my
-   * balance if I do". Stating the shortfall beats "Not enough gems", which
+   * balance if I do". Stating the shortfall beats "Not enough coins", which
    * leaves the player to do the subtraction against a number in the header.
    *
    * THE TOTAL LEADS ON A BULK BUY, because the figure printed at the top of the
@@ -334,9 +334,9 @@ function PackCard({
         ? 'Free · does not touch your balance'
         : affordable
           ? buying > 1
-            ? `${total.toLocaleString()} gems · ${gems.toLocaleString()} → ${(gems - total).toLocaleString()}`
-            : `${gems.toLocaleString()} → ${(gems - total).toLocaleString()} gems`
-          : `${(total - gems).toLocaleString()} more gems needed`;
+            ? `${total.toLocaleString()} coins · ${coins.toLocaleString()} → ${(coins - total).toLocaleString()}`
+            : `${coins.toLocaleString()} → ${(coins - total).toLocaleString()} coins`
+          : `${(total - coins).toLocaleString()} more coins needed`;
 
   const packGlyph = PACK_GLYPHS[pack.code];
 
@@ -372,9 +372,9 @@ function PackCard({
           </Text>
         ) : (
           <View style={styles.price}>
-            <Gem size={9} color={accent} />
+            <Coin size={9} color={accent} />
             <Text style={[Type.figure, NUMERIC, { color: c.text }]}>
-              {pack.gem_cost.toLocaleString()}
+              {pack.coin_cost.toLocaleString()}
             </Text>
           </View>
         )}
@@ -423,7 +423,7 @@ function PackCard({
           accessibilityLabel="How many packs to open">
           {BULK_COUNTS.map((n) => {
             const on = buying === n;
-            const reach = pack.gem_cost * n <= gems;
+            const reach = pack.coin_cost * n <= coins;
             return (
               <Pressable
                 key={n}
@@ -432,8 +432,8 @@ function PackCard({
                 accessibilityRole="radio"
                 accessibilityState={{ selected: on, disabled: locked }}
                 accessibilityLabel={`Open ${n === 1 ? 'one pack' : `${n} packs`}, ${(
-                  pack.gem_cost * n
-                ).toLocaleString()} gems`}
+                  pack.coin_cost * n
+                ).toLocaleString()} coins`}
                 style={({ pressed }) => [
                   styles.countChip,
                   {

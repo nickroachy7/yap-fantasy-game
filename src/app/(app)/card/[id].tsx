@@ -303,7 +303,7 @@ export default function CardDetailScreen() {
             {k.soldAt ? (
               <View style={[styles.note, { backgroundColor: c.backgroundElement }]}>
                 <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
-                  {`You sold this copy on ${dateLabel(k.soldAt)}${k.soldFor === null ? '' : ` for ${k.soldFor} gems`}. It still counts in the lineups it started, but you no longer hold it.`}
+                  {`You sold this copy on ${dateLabel(k.soldAt)}${k.soldFor === null ? '' : ` for ${k.soldFor} coins`}. It still counts in the lineups it started, but you no longer hold it.`}
                 </Text>
               </View>
             ) : k.committedAt ? (
@@ -312,7 +312,7 @@ export default function CardDetailScreen() {
                  there to look at. */
               <View style={[styles.note, { backgroundColor: c.backgroundElement }]}>
                 <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
-                  {`You added this copy to ${k.committedSetName ?? 'a set'} on ${dateLabel(k.committedAt)}${k.committedFor === null ? '' : ` for ${k.committedFor} gems`}. It is part of that set now — it still counts in the lineups it started, but it cannot be started or sold again.`}
+                  {`You added this copy to ${k.committedSetName ?? 'a set'} on ${dateLabel(k.committedAt)}${k.committedFor === null ? '' : ` for ${k.committedFor} coins`}. It is part of that set now — it still counts in the lineups it started, but it cannot be started or sold again.`}
                 </Text>
                 {k.committedSetCode ? (
                   <Pressable
@@ -421,7 +421,7 @@ export default function CardDetailScreen() {
           * COMMITTING IS DESTRUCTIVE AND GETS A DIALOG, exactly as the set
           * checklist gives it. This is NOT the pack reveal, where the same act
           * resolves with a second tap: there every card is seconds old, bronze
-          * and worth single-figure gems, and there are eight of them. Here
+          * and worth single-figure coins, and there are eight of them. Here
           * there is one card, you came to this screen to look at it, and it may
           * carry a season of scoring — which is the case the checklist's dialog
           * was written for.
@@ -431,7 +431,7 @@ export default function CardDetailScreen() {
           title={pendingSet ? `Add ${k.playerName} to ${pendingSet.name}?` : ''}
           body={
             pendingSet
-              ? `A committed card is burnt: it leaves your collection for good, cannot be started or sold again, and pays back ${pendingSet.pays} gems. That fills ${pendingSet.committed + 1} of ${pendingSet.required} slots.`
+              ? `A committed card is burnt: it leaves your collection for good, cannot be started or sold again, and pays back ${pendingSet.pays} coins. That fills ${pendingSet.committed + 1} of ${pendingSet.required} slots.`
               : undefined
           }
           /* THE ONE THING THE TITLE DOES NOT PREDICT, and on this screen it is
@@ -459,7 +459,7 @@ export default function CardDetailScreen() {
         <ConfirmDialog
           visible={selling}
           title={`Sell this ${k.tier} card?`}
-          body={`${k.playerName} · ${k.season ?? '—'} card. You will receive ${k.sellValue} gems. The copy and everything it has earned — ${k.careerFp.toFixed(0)} FP over ${k.lineupStarts} start${k.lineupStarts === 1 ? '' : 's'} — are gone for good, and pulling him again starts a new card at bronze.`}
+          body={`${k.playerName} · ${k.season ?? '—'} card. You will receive ${k.sellValue} coins. The copy and everything it has earned — ${k.careerFp.toFixed(0)} FP over ${k.lineupStarts} start${k.lineupStarts === 1 ? '' : 's'} — are gone for good, and pulling him again starts a new card at bronze.`}
           confirmLabel={`Sell for ${k.sellValue}`}
           destructive
           busy={busy}

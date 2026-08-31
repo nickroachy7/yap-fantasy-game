@@ -33,7 +33,7 @@
  */
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Gem } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -56,7 +56,7 @@ export type BulkResult = {
   kind: 'sold' | 'added';
   done: number;
   skipped: number;
-  gems: number;
+  coins: number;
   /** The first refusal's reason, verbatim from the server. */
   firstReason: string | null;
 };
@@ -64,7 +64,7 @@ export type BulkResult = {
 export function BulkBar({
   count,
   max,
-  sellGems,
+  sellCoins,
   plan,
   planning,
   stage,
@@ -84,7 +84,7 @@ export function BulkBar({
   count: number;
   max: number;
   /** What selling the ticked copies pays, summed from their own prices. */
-  sellGems: number;
+  sellCoins: number;
   /** Null until the offers for this selection have been read. */
   plan: CommitPlan | null;
   planning: boolean;
@@ -135,7 +135,7 @@ export function BulkBar({
               pressed && styles.pressed,
             ]}>
             <Text style={[Type.fine, { color: c.text }]}>
-              {`${result.done} ${result.kind === 'sold' ? 'sold' : 'added'} for ${result.gems} gems.`}
+              {`${result.done} ${result.kind === 'sold' ? 'sold' : 'added'} for ${result.coins} coins.`}
               {result.skipped > 0
                 ? ` ${result.skipped} skipped${result.firstReason ? ` — ${result.firstReason}` : ''}.`
                 : ''}
@@ -214,7 +214,7 @@ export function BulkBar({
             onPress={onSell}
             disabled={busy || count === 0}
             accessibilityRole="button"
-            accessibilityLabel={`Sell ${count} selected cards for ${sellGems} gems`}
+            accessibilityLabel={`Sell ${count} selected cards for ${sellCoins} coins`}
             style={({ pressed }) => [
               styles.action,
               { borderColor: c.border, backgroundColor: c.backgroundElement },
@@ -224,8 +224,8 @@ export function BulkBar({
             <Text numberOfLines={1} style={[Type.strong, { color: c.textSecondary }]}>
               Sell
             </Text>
-            <Gem size={10} color={gold} />
-            <Text style={[Type.strong, NUMERIC, { color: c.text }]}>{sellGems}</Text>
+            <Coin size={10} color={gold} />
+            <Text style={[Type.strong, NUMERIC, { color: c.text }]}>{sellCoins}</Text>
           </Pressable>
         </View>
       </View>
@@ -233,12 +233,12 @@ export function BulkBar({
       <ConfirmDialog
         visible={stage === 'selling'}
         title={count === 1 ? 'Sell 1 card?' : `Sell ${count} cards?`}
-        body={`You will receive ${sellGems} gems. Every copy and everything it has earned goes for good, and pulling those players again starts new cards at bronze.`}
+        body={`You will receive ${sellCoins} coins. Every copy and everything it has earned goes for good, and pulling those players again starts new cards at bronze.`}
         /* The one refusal a grid cannot show. A card that went into a lineup
            since this screen was drawn is skipped rather than sold, and saying so
            here is cheaper than explaining it afterwards. */
         warning="Any copy standing in a lineup that has not been scored yet will be skipped."
-        confirmLabel={`Sell for ${sellGems}`}
+        confirmLabel={`Sell for ${sellCoins}`}
         destructive
         busy={busy}
         error={error}
@@ -264,7 +264,7 @@ export function BulkBar({
             ? 'For players you hold more than one of, the least valuable copy is the one that burns — which may not be the copy you ticked.'
             : null
         }
-        confirmLabel={plan ? `Add for ${plan.gems}` : ''}
+        confirmLabel={plan ? `Add for ${plan.coins}` : ''}
         destructive
         busy={busy}
         error={error}
@@ -277,7 +277,7 @@ export function BulkBar({
         visible={stage === 'leftovers'}
         title={plan ? leftoverTitle(plan) : ''}
         body={plan ? leftoverBody(plan) : undefined}
-        confirmLabel={plan ? `Sell for ${leftoverGems(plan)}` : ''}
+        confirmLabel={plan ? `Sell for ${leftoverCoins(plan)}` : ''}
         /* NOT "Cancel". There is nothing here to cancel — the add has already
            happened, or there was never anything to add — so the quiet button is
            the other real choice, which is to keep them. */
@@ -292,7 +292,7 @@ export function BulkBar({
   );
 }
 
-const leftoverGems = (plan: CommitPlan): number =>
+const leftoverCoins = (plan: CommitPlan): number =>
   plan.leftovers.reduce((n, x) => n + x.sellValue, 0);
 
 /**
@@ -340,7 +340,7 @@ function leftoverBody(plan: CommitPlan): string {
   }
 
   const why = parts.length > 0 ? `${parts.join('; ')}. ` : '';
-  return `${why}They are still yours — selling them pays ${leftoverGems(plan)} gems, and everything they have earned goes with them.`;
+  return `${why}They are still yours — selling them pays ${leftoverCoins(plan)} coins, and everything they have earned goes with them.`;
 }
 
 /**
@@ -358,7 +358,7 @@ function addBody(plan: CommitPlan): string {
         ? `${names[0]} and ${names[1]}`
         : `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
 
-  const lead = `Going into ${where}, paying ${plan.gems} gems. A committed card is burnt: it leaves your collection for good and cannot be started or sold again.`;
+  const lead = `Going into ${where}, paying ${plan.coins} coins. A committed card is burnt: it leaves your collection for good and cannot be started or sold again.`;
 
   const left: string[] = [];
   if (plan.alreadyIn > 0) {

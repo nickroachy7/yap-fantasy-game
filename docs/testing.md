@@ -57,9 +57,9 @@ its own and be useless.
 
 | Suite | What it proves |
 |---|---|
-| `rls_isolation` | User A cannot read B's roster, wallet, or ledger, cannot mint gems, and cannot write game state at all. |
+| `rls_isolation` | User A cannot read B's roster, wallet, or ledger, cannot mint coins, and cannot write game state at all. |
 | `lineup_abuse` | `set_lineup()` blocks 6/6 attacks (locked week, foreign card, wrong position, duplicate card, invented slot, kicker in FLEX), **and** the legitimate path writes 8 slots and replaces them on resubmit rather than adding a second lineup. |
-| `economy_abuse` | Gems and minting are unreachable from a client: 5/5 attacks blocked, the ledger reconciles against the balance, and all 25 minted cards trace back to a pack opening — no orphan mints. |
+| `economy_abuse` | Coins and minting are unreachable from a client: 5/5 attacks blocked, the ledger reconciles against the balance, and all 25 minted cards trace back to a pack opening — no orphan mints. |
 | `sell_card` | The only call that destroys an asset and creates currency. Eight assertions, each on the *specific* refusal reason — an earlier version "passed" because the intruder was stopped by a missing-wallet check before ownership was ever tested, which proves nothing about ownership. |
 | `slate_transition` | Walks a week through approaching → kicked off → finished → cold and pins the two inversions that cost money or trust: no provider call before kickoff, and no standing down for 6h after the last one while corrections land. |
 | `view_security` | Asserts the *property*, not a list, so a view added next month is covered the moment it lands: every view in `public` carries `security_invoker`, anon holds no privileges on them, no matview is directly readable, the app's own reads still work — and, with SELECT granted back inside the transaction, RLS alone still hides another user's cards. `CREATE OR REPLACE VIEW` keeps the name and the grants but drops the reloptions, which silently turned `player_directory` into SECURITY DEFINER for a day. |

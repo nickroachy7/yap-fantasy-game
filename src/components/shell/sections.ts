@@ -506,7 +506,7 @@ function allChildren(): NavChild[] {
  *
  *   PACKS COMES OUT OF COLLECTION. On a phone it is the shop on the corner
  *   reached from the collection's action bar; on a desktop rail there is room
- *   to put the shop on the street, and burying the one screen that spends gems
+ *   to put the shop on the street, and burying the one screen that spends coins
  *   two levels down was costing it every impression.
  *
  * AND SECTIONS FOLD RATHER THAN SPLIT. Inventory/Sets and Search/Trend/

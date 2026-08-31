@@ -7,7 +7,7 @@
  * already have a name in mind and the wrong one to open on, because opening on
  * it makes the section's first impression an empty box and a keyboard. Trend
  * has an answer before you do anything, and it is the answer that precedes
- * spending gems: who changed.
+ * spending coins: who changed.
  *
  * ONE COLUMN OF FIFTY, WITH A TOGGLE. This screen used to draw risers and
  * fallers side by side, twelve each, on the argument that hiding either behind

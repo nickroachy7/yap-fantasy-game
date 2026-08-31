@@ -177,14 +177,14 @@ have been a lottery on named individuals and 0.5% would have been too tight.
 200,000 simulated standard packs against the realised bands, plus the closed
 form. They agree. Read-only — no cards were minted.
 
-Per pack (5 cards, 100 gems):
+Per pack (5 cards, 100 coins):
 
 - **41.0%** contain at least one rare-or-better
 - **14.2%** contain at least one epic-or-better
-- **2.45%** contain a legendary → **~41 packs (4,100 gems) to expect one**
+- **2.45%** contain a legendary → **~41 packs (4,100 coins) to expect one**
 - 59.0% are entirely common/uncommon
 
-Cumulatively, against the real faucet (500-gem signup grant, 250/week):
+Cumulatively, against the real faucet (500-coin signup grant, 250/week):
 
 | after | seen rare+ | seen epic+ | seen legendary | expected legendaries |
 | :-- | --: | --: | --: | --: |
@@ -235,7 +235,7 @@ Now:
 | | per card | ≥1 legendary | ≥1 epic+ |
 | :-- | --: | --: | --: |
 | Starter pack (free, 8 cards, uniform) | 2.32% | **17.2%** | 41.8% |
-| Standard pack (100 gems, 5 cards, weighted) | 0.50% | 2.45% | 14.2% |
+| Standard pack (100 coins, 5 cards, weighted) | 0.50% | 2.45% | 14.2% |
 
 The free once-per-user pack is **4.6× more generous per card** than the pack you
 pay for. Arguments both ways: it is a strong onboarding hook and cannot be

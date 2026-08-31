@@ -51,7 +51,7 @@ export type CollectionCard = {
   season: number | null;
   /** Epoch ms. 0 when the view gave us nothing, which sorts oldest-last. */
   acquiredAt: number;
-  /** Gems this copy sells for. Priced by the server from its tier. */
+  /** Coins this copy sells for. Priced by the server from its tier. */
   sellValue: number;
   /**
    * The PLAYER's fantasy points per scored game this season — NOT the card's.

@@ -86,7 +86,7 @@ function SetRow({
 function Header({ recap }: { recap: Recap }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const total = recap.gemsPoints + recap.gemsBonus;
+  const total = recap.coinsPoints + recap.coinsBonus;
   return (
     <View style={[styles.header, { backgroundColor: c.surface, borderColor: c.borderStrong }]}>
       <View style={styles.headerCell}>
@@ -102,12 +102,12 @@ function Header({ recap }: { recap: Recap }) {
       </View>
       <View style={[styles.headerDivider, { backgroundColor: c.border }]} />
       <View style={styles.headerCell}>
-        <Text style={[Type.label, { color: c.textTertiary }]}>GEMS</Text>
+        <Text style={[Type.label, { color: c.textTertiary }]}>COINS</Text>
         <Text style={[Type.page, NUMERIC, { color: c.text }]}>{total.toLocaleString()}</Text>
         {/* Split out only when there is a bonus: "+0 bonus" is noise. */}
         <Text style={[Type.fine, { color: c.textSecondary }]}>
-          {recap.gemsBonus > 0
-            ? `${recap.gemsPoints} points · ${recap.gemsBonus} bonus`
+          {recap.coinsBonus > 0
+            ? `${recap.coinsPoints} points · ${recap.coinsBonus} bonus`
             : recap.scored && total === 0
               ? 'not paid yet'
               : 'from points'}
@@ -118,15 +118,15 @@ function Header({ recap }: { recap: Recap }) {
 }
 
 /**
- * One player. The gem column is deliberately the only bold figure on the right:
- * points are why it was earned, gems are what the row is FOR.
+ * One player. The coin column is deliberately the only bold figure on the right:
+ * points are why it was earned, coins are what the row is FOR.
  */
 function CardRow({ card, onPress }: { card: RecapCard; onPress: () => void }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const mult = multiplierText(card.gemMultiplier);
+  const mult = multiplierText(card.coinMultiplier);
   const finish = finishLabel(card.positionRank, card.position);
-  const paid = (card.gems ?? 0) + (card.bonusGems ?? 0);
+  const paid = (card.coins ?? 0) + (card.bonusCoins ?? 0);
 
   return (
     <Pressable
@@ -149,7 +149,7 @@ function CardRow({ card, onPress }: { card: RecapCard; onPress: () => void }) {
         <Text style={[Type.body, NUMERIC, styles.points, { color: c.textSecondary }]}>
           {card.points.toFixed(1)}
         </Text>
-        <View style={styles.gems}>
+        <View style={styles.coins}>
           {card.awarded ? (
             <>
               <Text style={[Type.figure, NUMERIC, { color: c.text }]}>{paid}</Text>
@@ -167,10 +167,10 @@ function CardRow({ card, onPress }: { card: RecapCard; onPress: () => void }) {
 
       {/* The two things that make a row worth reading twice. Both are rare, so
           neither reserves space when it is absent. */}
-      {finish && (card.bonusGems ?? 0) > 0 ? (
+      {finish && (card.bonusCoins ?? 0) > 0 ? (
         <Text style={[Type.fine, styles.note, { color: c.positive }]}>
           {card.wasWeekMvp ? '★ Week MVP · ' : ''}
-          {finish} +{card.bonusGems}
+          {finish} +{card.bonusCoins}
         </Text>
       ) : null}
       {card.promoted ? (
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   rowTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   slot: { width: 34 },
   points: { width: 44, textAlign: 'right' },
-  gems: { width: 56, alignItems: 'flex-end' },
+  coins: { width: 56, alignItems: 'flex-end' },
   // Indented past the slot label and tier mark so a note reads as belonging to
   // the row above rather than as a new one.
   note: { marginTop: Spacing.half, marginLeft: 34 + Spacing.two },

@@ -3,7 +3,7 @@
 -- Covers the one thing `open_pack` learned when the Daily Pack shipped: a
 -- per-UTC-day claim limit. The rest of that function is already proved by
 -- economy_abuse.test.sql; this exists because a limit that can be claimed twice
--- is a gem printer, and because a limit that can never be claimed again is a
+-- is a coin printer, and because a limit that can never be claimed again is a
 -- broken retention mechanic. Both failures are silent.
 --
 -- Rolled back, so it is safe anywhere.
@@ -23,7 +23,7 @@ declare
   v_pack uuid;
   blocked int := 0;
 begin
-  select balance into v_start from public.gem_balances where user_id = auth.uid();
+  select balance into v_start from public.coin_balances where user_id = auth.uid();
 
   -- 1. it is claimable before it is claimed, and says so
   v_status := public.daily_pack_status();
@@ -39,16 +39,16 @@ begin
   if n <> 3 then raise exception 'FAIL: daily returned % cards, expected 3', n; end if;
 
   -- 3. IT IS FREE. The whole point, and the thing a copy-pasted pack row would
-  --    quietly get wrong: a non-zero gem_cost here would take gems from someone
+  --    quietly get wrong: a non-zero coin_cost here would take coins from someone
   --    who was told the pack was a gift.
-  select balance into v_after from public.gem_balances where user_id = auth.uid();
+  select balance into v_after from public.coin_balances where user_id = auth.uid();
   if v_after <> v_start then
-    raise exception 'FAIL: daily cost % gems, expected 0', v_start - v_after;
+    raise exception 'FAIL: daily cost % coins, expected 0', v_start - v_after;
   end if;
 
   -- 4. and writes no ledger row, for the same reason
   if exists (
-    select 1 from public.gems_ledger
+    select 1 from public.coins_ledger
      where user_id = auth.uid() and reason = 'pack_purchase'
   ) then
     raise exception 'FAIL: free pack wrote a pack_purchase ledger row';
@@ -89,9 +89,9 @@ begin
   --    claimed the free one.
   select count(*) into n from public.open_pack('standard');
   if n <> 5 then raise exception 'FAIL: standard returned % cards after a daily claim', n; end if;
-  select balance into v_after from public.gem_balances where user_id = auth.uid();
+  select balance into v_after from public.coin_balances where user_id = auth.uid();
   if v_after <> v_start - 100 then
-    raise exception 'FAIL: standard cost % gems, expected 100', v_start - v_after;
+    raise exception 'FAIL: standard cost % coins, expected 100', v_start - v_after;
   end if;
 
   if blocked <> 1 then raise exception 'FAIL: the second same-day claim was not blocked'; end if;

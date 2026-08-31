@@ -63,7 +63,7 @@
 export type PlannableSet = {
   code: string;
   name: string;
-  /** Gems the commit pays. The server's figure; never recomputed here. */
+  /** Coins the commit pays. The server's figure; never recomputed here. */
   pays: number;
   /** The server's own conjunction: not full, not already holding this player. */
   canCommit: boolean;
@@ -93,8 +93,8 @@ export type CommitLeg = {
   setName: string;
   /** `cards.id` values, cheapest first. What `commit_cards_to_set` takes. */
   cardIds: string[];
-  /** Gems this leg pays, summed from the server's per-card figures. */
-  gems: number;
+  /** Coins this leg pays, summed from the server's per-card figures. */
+  coins: number;
 };
 
 export type CommitPlan = {
@@ -102,7 +102,7 @@ export type CommitPlan = {
   /** Distinct players going in. NOT the number of copies ticked. */
   cards: number;
   /** What the whole plan pays at today's prices. */
-  gems: number;
+  coins: number;
   /**
    * Selected copies the plan cannot use, and it is THREE numbers because they
    * are three different pieces of news. Reported separately because collapsing
@@ -174,10 +174,10 @@ export function planCommits(
       setCode: target.code,
       setName: target.name,
       cardIds: [],
-      gems: 0,
+      coins: 0,
     };
     leg.cardIds.push(card.cardId);
-    leg.gems += target.pays;
+    leg.coins += target.pays;
     byCode.set(target.code, leg);
   }
 
@@ -186,7 +186,7 @@ export function planCommits(
   return {
     legs,
     cards: legs.reduce((n, l) => n + l.cardIds.length, 0),
-    gems: legs.reduce((n, l) => n + l.gems, 0),
+    coins: legs.reduce((n, l) => n + l.coins, 0),
     alreadyIn,
     noSet,
     duplicate,

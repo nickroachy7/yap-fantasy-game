@@ -5,7 +5,7 @@
  * cannot share a fetch — the header draws it on every tab, the lobby prices
  * contests against it, and the death screen is a route of its own — so the
  * shape lives here and each caller brings its own load. `PlayerContext` owns
- * the one the chrome uses; see the note there about why gems and hearts are
+ * the one the chrome uses; see the note there about why coins and hearts are
  * the same kind of state.
  *
  * `my_run()` returns a single JSON object rather than a row, so there is no

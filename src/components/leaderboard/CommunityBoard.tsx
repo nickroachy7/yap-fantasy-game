@@ -18,7 +18,7 @@
  *      visible, so the answer to the only question the reader actually came
  *      with cannot scroll away — which is what it used to do.
  *   4. The table, under one line saying what this board ranks. Without that
- *      line "GEMS" and "RUNGS" are column headers with no referent and the
+ *      line "COINS" and "RUNGS" are column headers with no referent and the
  *      reader has to infer the game's rules from four letters.
  *
  * Every board's empty state says WHICH empty it is. "No rows" is
@@ -129,7 +129,7 @@ export function CommunityBoard({
    * "Standings" heading — is now pinned outside the list, so the ONE thing
    * left is the one thing that should scroll away: a sentence you read once
    * per board. It sits directly over the rows it describes, which is where a
-   * caption belongs; without it "GEMS" and "RUNGS" are four letters with no
+   * caption belongs; without it "COINS" and "RUNGS" are four letters with no
    * referent and the reader has to infer the game's rules from a column.
    */
   const header = (

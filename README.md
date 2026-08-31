@@ -19,7 +19,7 @@ One codebase, two targets: iOS and web, from the same expo-router routes.
 | Data | balldontlie NFL API, ingested server-side only |
 
 Everything the client can do to its own data is an RPC. There are no write
-policies on `lineups`, `card_instances` or `gems_ledger` — `set_lineup`,
+policies on `lineups`, `card_instances` or `coins_ledger` — `set_lineup`,
 `open_pack`, `sell_card` and `score_week` are the only paths in, and each has an
 abuse suite in `supabase/tests/`.
 

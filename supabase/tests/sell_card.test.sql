@@ -1,6 +1,6 @@
 -- Yap Fantasy — sell_card guards
 --
--- Selling is the only path that turns an owned card back into gems, and it is
+-- Selling is the only path that turns an owned card back into coins, and it is
 -- the only path that can both destroy an asset and create currency in one call.
 -- Every refusal below is therefore worth a test, and each asserts on the SPECIFIC
 -- reason — an earlier run of this suite "passed" because an intruder with no
@@ -27,7 +27,7 @@ values ((select id from public.players where external_id = 9101), 2026, 'common'
 
 -- Both users are funded, so an ownership refusal cannot be mistaken for a
 -- missing-wallet refusal.
-insert into public.gem_balances (user_id, balance) values
+insert into public.coin_balances (user_id, balance) values
   ('31111111-1111-1111-1111-111111111111', 100),
   ('32222222-2222-2222-2222-222222222222', 100)
 on conflict (user_id) do update set balance = 100;
@@ -86,7 +86,7 @@ begin
     if not ok then raise exception 'FAIL: stranger blocked by the wrong rule: %', sqlerrm; end if;
   end;
   if not ok then raise exception 'FAIL: a stranger sold a card they do not own'; end if;
-  if (select balance from public.gem_balances where user_id = v_other) <> 100 then
+  if (select balance from public.coin_balances where user_id = v_other) <> 100 then
     raise exception 'FAIL: a failed sale still paid the caller';
   end if;
 
@@ -115,10 +115,10 @@ begin
   if (r->>'sold_for')::integer <> v_price then
     raise exception 'FAIL: paid % for a silver card, expected %', r->>'sold_for', v_price;
   end if;
-  if (select balance from public.gem_balances where user_id = v_owner) <> 100 + v_price then
+  if (select balance from public.coin_balances where user_id = v_owner) <> 100 + v_price then
     raise exception 'FAIL: balance did not move by the sale price';
   end if;
-  if (select count(*) from public.gems_ledger
+  if (select count(*) from public.coins_ledger
        where reason = 'card_sale' and reference_id = v_card) <> 1 then
     raise exception 'FAIL: sale was not written to the ledger exactly once';
   end if;
@@ -209,12 +209,12 @@ begin
   perform public.set_lineup(v_season, v_type, v_week,
     jsonb_build_array(jsonb_build_object('slot', 'QB', 'card_instance_id', v_locked)));
 
-  select balance into v_before from public.gem_balances
+  select balance into v_before from public.coin_balances
    where user_id = '31111111-1111-1111-1111-111111111111';
 
   r := public.sell_cards(array[v_a, v_locked, v_b]);
 
-  select balance into v_after from public.gem_balances
+  select balance into v_after from public.coin_balances
    where user_id = '31111111-1111-1111-1111-111111111111';
 
   if (r ->> 'sold')::integer <> 2 then
@@ -232,7 +232,7 @@ begin
     raise exception 'FAIL: the starter was refused for the wrong reason: %',
       r -> 'refusals' -> 0 ->> 'reason';
   end if;
-  -- The gems reported are the gems that landed.
+  -- The coins reported are the coins that landed.
   if v_after - v_before <> (r ->> 'paid')::integer then
     raise exception 'FAIL: reported % paid, wallet moved %',
       r ->> 'paid', v_after - v_before;

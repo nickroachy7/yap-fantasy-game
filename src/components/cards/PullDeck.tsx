@@ -74,7 +74,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { YapMark } from '@/components/brand/YapLogo';
-import { Gem } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
 import { horizontalStrip } from '@/components/ui/scroll-strip';
 import { rgba } from '@/components/ui/gradient';
 import {
@@ -633,7 +633,7 @@ type Stage = 'idle' | 'picking' | 'selling';
  * `ConfirmDialog` in front of that: there, the act is a batch of up to thirty
  * cards chosen off a grid, and half of them may be copies with a season of
  * scoring on them. Here every card is seconds old, bronze, and worth
- * single-figure gems — and there are eight of them. A modal per card would make
+ * single-figure coins — and there are eight of them. A modal per card would make
  * clearing a pack eight modals, which is how a feature intended to save a trip
  * to the inventory becomes slower than the trip.
  *
@@ -754,10 +754,10 @@ function CardActionPanel({
           </Text>
           <Text style={[Type.fine, styles.stampText, { color: c.textSecondary }]}>
             {became.kind === 'sold'
-              ? `${player} left your collection for ${became.gems} gems.`
+              ? `${player} left your collection for ${became.coins} coins.`
               : became.burnedThisCopy
-                ? `${player} is in ${became.setName}. This copy was used, and paid ${became.gems} gems.`
-                : `${player} is in ${became.setName} for ${became.gems} gems — a spare copy was used, so this one is still yours.`}
+                ? `${player} is in ${became.setName}. This copy was used, and paid ${became.coins} coins.`
+                : `${player} is in ${became.setName} for ${became.coins} coins — a spare copy was used, so this one is still yours.`}
           </Text>
         </View>
       ) : null}
@@ -801,7 +801,7 @@ function CardActionPanel({
               }}
               disabled={busy}
               accessibilityRole="button"
-              accessibilityLabel={`Confirm: sell ${player} for ${action?.sellValue ?? 0} gems`}
+              accessibilityLabel={`Confirm: sell ${player} for ${action?.sellValue ?? 0} coins`}
               accessibilityState={{ busy }}
               style={({ pressed }) => [
                 styles.button,
@@ -860,7 +860,7 @@ function CardActionPanel({
               accessibilityRole="button"
               accessibilityLabel={
                 commitable.length === 1
-                  ? `Add ${player} to ${commitable[0].name} for ${commitable[0].pays} gems`
+                  ? `Add ${player} to ${commitable[0].name} for ${commitable[0].pays} coins`
                   : `Choose one of ${commitable.length} sets to add ${player} to`
               }
               accessibilityState={{ busy, disabled: locked || busy }}
@@ -879,7 +879,7 @@ function CardActionPanel({
                  * and the reason is what an ellipsis eats first. As one string,
                  * `Add to Washington Commanders · 4` overruns the card and
                  * `numberOfLines={1}` takes the END of it — so the longest club
-                 * names in the league lost the gem figure and the button read
+                 * names in the league lost the coin figure and the button read
                  * `Add to Washington Comm…`. The one number on it, gone, on
                  * exactly the sets where the label is least readable.
                  */
@@ -892,7 +892,7 @@ function CardActionPanel({
                            separately — `pays` follows each set's own
                            `commit_payout_pct` — so there is no single figure
                            this button could print, and a bare `2` in the slot
-                           where the other state prints gems reads as two gems.
+                           where the other state prints coins reads as two coins.
                            And it has a second job the price does not: this
                            button opens a LIST where the other one commits on
                            the tap, and "one of" is what warns you. */
@@ -900,9 +900,9 @@ function CardActionPanel({
                   </Text>
                   {commitable.length === 1 ? (
                     <>
-                      {/* The gem in the button's own ink rather than the tone it
+                      {/* The coin in the button's own ink rather than the tone it
                           is printed ON — gold on gold is a hole in the button. */}
-                      <Gem size={10} color="#17130A" />
+                      <Coin size={10} color="#17130A" />
                       <Text style={[Type.strong, NUMERIC, { color: '#17130A' }]}>
                         {commitable[0].pays}
                       </Text>
@@ -928,7 +928,7 @@ function CardActionPanel({
                   onPress={() => setStage('selling')}
                   disabled={locked || busy}
                   accessibilityRole="button"
-                  accessibilityLabel={`Sell ${player} for ${action.sellValue} gems`}
+                  accessibilityLabel={`Sell ${player} for ${action.sellValue} coins`}
                   accessibilityState={{ disabled: locked || busy }}
                   style={({ pressed }) => [
                     styles.button,
@@ -948,7 +948,7 @@ function CardActionPanel({
                           word doing nothing, in the one place a word costs
                           width. */}
                       <Text style={[Type.strong, { color: c.text }]}>Sell</Text>
-                      <Gem size={10} color={gold} />
+                      <Coin size={10} color={gold} />
                       <Text style={[Type.strong, NUMERIC, { color: c.text }]}>
                         {action.sellValue}
                       </Text>
