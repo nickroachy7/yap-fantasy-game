@@ -44,11 +44,29 @@ export type PositionColorSet = {
 };
 
 /**
- * Hues follow Sleeper's assignment (QB magenta, RB green, WR blue, TE orange)
- * because a large number of the people this app is for already have those four
- * mappings memorised, and inventing our own would spend that for nothing. PK
- * is ours — Sleeper leaves kickers grey, but a kicker is a real starting slot
- * here and grey reads as "disabled" next to four saturated chips.
+ * Hues follow Sleeper's assignment (QB magenta, WR blue, TE orange) because a
+ * large number of the people this app is for already have those mappings
+ * memorised, and inventing our own would spend that for nothing. PK is ours —
+ * Sleeper leaves kickers grey, but a kicker is a real starting slot here and
+ * grey reads as "disabled" next to four saturated chips.
+ *
+ * RB IS THE ONE THAT BREAKS FROM SLEEPER, AND IT COST SOMETHING TO DO IT.
+ * It was #4CC38A — the SAME HEX as `positive`, the app's "you won" colour, on
+ * rows that print both. Zero degrees apart, one meaning each. Once selection
+ * became green too, green was speaking three times and the eye cannot rank
+ * three. RB moved because it is the cheapest of the three to move: `positive`
+ * is green by a convention older than this app, and a selection accent is the
+ * whole chrome.
+ *
+ * TEAL IS NOT A FREE CHOICE, IT IS THE ONLY GAP LEFT. The wheel is already
+ * spoken for — magenta 330, negative 357, orange 30, gold 45, lime 75,
+ * selection 126, positive 152, diamond 190, WR/live 210, PK 265. At ~173 this
+ * clears `positive` by 21 degrees and the diamond tier by 17. Diamond is the
+ * tight one and it is accepted deliberately: a tier paints a card's FRAME and
+ * badge, a position paints a two-letter chip in a different place and shape,
+ * so the two never have to be told apart at the same glance. Putting RB in the
+ * other real gap (~300, magenta-purple) would have read as a second QB pink at
+ * badge size, which is the confusion that actually costs a lineup decision.
  *
  * The light values are dark enough to carry white text; the dark values are
  * bright enough to carry near-black text and to be read as text themselves on
@@ -58,7 +76,7 @@ export type PositionColorSet = {
 export const PositionColors: Record<'light' | 'dark', Record<PositionKey, PositionColorSet>> = {
   light: {
     QB: { accent: '#A8005C', onAccent: '#FFFFFF', soft: '#FBE9F2' },
-    RB: { accent: '#1A7F49', onAccent: '#FFFFFF', soft: '#E4F4EA' },
+    RB: { accent: '#0F7A6E', onAccent: '#FFFFFF', soft: '#E0F3F0' },
     WR: { accent: '#14568F', onAccent: '#FFFFFF', soft: '#E5EFF9' },
     TE: { accent: '#9A4E00', onAccent: '#FFFFFF', soft: '#FBECDD' },
     PK: { accent: '#5B3E9E', onAccent: '#FFFFFF', soft: '#EDE8F8' },
@@ -66,7 +84,7 @@ export const PositionColors: Record<'light' | 'dark', Record<PositionKey, Positi
   },
   dark: {
     QB: { accent: '#FF8ACB', onAccent: '#2B0018', soft: '#2A0F1F' },
-    RB: { accent: '#4CC38A', onAccent: '#052416', soft: '#0E2619' },
+    RB: { accent: '#2FD1BE', onAccent: '#04211D', soft: '#0C2723' },
     WR: { accent: '#6FB4F5', onAccent: '#04203D', soft: '#0D2035' },
     TE: { accent: '#F2A65A', onAccent: '#2E1700', soft: '#2A1B0B' },
     PK: { accent: '#B79CF0', onAccent: '#1B0F3A', soft: '#1D1730' },
