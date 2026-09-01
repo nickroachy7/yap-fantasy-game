@@ -43,6 +43,12 @@ export const Colors = {
     border: '#E4E4E4',
     /** Around a panel, where the edge is doing real work. */
     borderStrong: '#D0D0D0',
+    /**
+     * The outline of something RAISED. See the dark value — this is dark's
+     * problem, since on paper a shadow does the lifting. `borderStrong`, so a
+     * light build draws an ordinary panel.
+     */
+    borderRaised: '#D0D0D0',
     /** A panel sitting on the page background. */
     surface: '#FFFFFF',
     /** A row inside a panel that needs to separate from it. */
@@ -86,6 +92,59 @@ export const Colors = {
     textTertiary: '#808080',
     border: '#272727',
     borderStrong: '#363636',
+    /**
+     * THE OUTLINE OF SOMETHING RAISED — the silhouette of an object sitting on
+     * top of the page, rather than an edge lying flat in it.
+     *
+     * ---------------------------------------------------------------------
+     * WHY IT IS NOT `border` OR `borderStrong`
+     * ---------------------------------------------------------------------
+     *
+     * Those two are for edges INSIDE the page's plane: a hairline between rows,
+     * the outline of a panel lying flat. At #272727 and #363636 they are meant
+     * to be found rather than seen, which is right for a divider and wrong for
+     * the line that states the shape of a card. Drawn at `borderStrong` the
+     * contest card's edge was reported as something you could *just about* make
+     * out, which for that one line is a failure.
+     *
+     * 40 points over `borderStrong`, and read against the card's own #212121
+     * face rather than against the page: this is the edge of the material, so
+     * what it has to clear is the material.
+     *
+     * ---------------------------------------------------------------------
+     * A SHADOW DOES NOT WORK HERE, AND IT WAS TRIED
+     * ---------------------------------------------------------------------
+     *
+     * A shadow is how a LIGHT interface says "above": there is a whole page of
+     * white to darken, so a soft grey halo reads instantly as depth. On a
+     * #080808 page there are eight points between the ground and black, and a
+     * shadow spends all of them in its first few pixels. What it actually
+     * produces is a patch of slightly different near-black around the card —
+     * legible not as depth but as a smudge, which is exactly what it was
+     * reported as the first time it reached a screen.
+     *
+     * ---------------------------------------------------------------------
+     * NEITHER DOES A LIT TOP EDGE, WHICH IS THE OTHER OBVIOUS ANSWER
+     * ---------------------------------------------------------------------
+     *
+     * A plane tilted up toward the light catches it on its TOP edge, so the
+     * standard dark-interface move is a brighter hairline along the top and the
+     * ordinary colour on the other three. There was a `borderLit` token for
+     * exactly that and it is gone, because of how iOS draws it.
+     *
+     * A view with ONE border colour is a `CALayer` with `borderColor` and
+     * `cornerRadius` set, and the corner is drawn by the compositor — clean at
+     * any radius. Give any side a different colour and React Native cannot use
+     * that path: it draws the border itself, side by side, and joins them at
+     * the corners. On a rounded corner those joins are a mitre across a curve,
+     * which comes out chunky and stepped, and it is at its worst where the
+     * colours differ most. The card's corners were reported as "messed up"
+     * twice, and this was the half that survived filling the card in.
+     *
+     * So the outline is ONE colour, all four sides, and the lift is carried by
+     * the card's own material instead — see the zone fills on `ContestCard`.
+     */
+    borderRaised: '#5E5E5E',
     /**
      * A panel has to clear the sheet it sits ON as well as the page, which is
      * why this sits where it does: 15 steps above the page and 7 above the

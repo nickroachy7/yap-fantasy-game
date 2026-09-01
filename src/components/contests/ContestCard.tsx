@@ -3,18 +3,18 @@
  * SIZE, in every state it can be in.
  *
  * ---------------------------------------------------------------------------
- * THREE ZONES, AND THE MIDDLE ONE IS THE ONLY LIT ONE
+ * THREE ZONES: A LIT PLANE WITH A WELL CUT INTO IT
  * ---------------------------------------------------------------------------
  *
  *     ┌──────────────────────────────────────────────────┐
- *     │ ▤ WR Room │ Top 3 of 24 win   24 entries │ LIVE  │  HEAD   34pt  sunken
+ *     │ ▤ WR Room │ Top 3 of 24 win   24 entries │ LIVE  │  HEAD   34pt  plane
  *     ├──────────────────────────────────────────────────┤
- *     │ YOU [6TH]              VS         [3RD] TO BEAT  │  SCORE  90pt  lit
+ *     │ YOU [6TH]              VS         [3RD] TO BEAT  │  SCORE  90pt  well
  *     │ 88.1                  −9.4                 97.5  │
  *     │ PROJ —                                    PROJ — │
  *     │ ▬▬▬▬▬▬▬(6)▬▬▬┊▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬  │
  *     ├──────────────────────────────────────────────────┤
- *     │ RISK  ◆40  ♥1        │        ◆120  ♥+1  ▣1  WIN │  FOOT   29pt  sunken
+ *     │ RISK  ◆40  ♥1        │        ◆120  ♥+1  ▣1  WIN │  FOOT   29pt  plane
  *     └──────────────────────────────────────────────────┘
  *
  * Each zone answers exactly one question, and that is the organising idea of
@@ -26,11 +26,33 @@
  *           where the two sit on one scale.
  *   FOOT    the trade. What you put up, what you take.
  *
- * The head and foot are `surface`; the middle is `backgroundElement`, one step
- * lighter. So the card's structure is drawn in material rather than in
- * hairlines, and the band a reader came for is literally the lit one. Three
+ * The card's structure is drawn in MATERIAL rather than in hairlines: three
  * near-invisible dividers on one flat fill was what made the previous card read
  * as six loose rows — see the surface note on `ContestCard` below.
+ *
+ * WHICH BAND IS THE LIT ONE WAS THE OTHER WAY ROUND, and turning it over is
+ * what made the card read as a raised object rather than a drawn box.
+ *
+ * The middle used to be the light one, on the argument that the band a reader
+ * came for should be the lit one. That is a true thing to want and it was being
+ * paid for in the wrong currency, because the head and foot are the card's
+ * SILHOUETTE — the first and last 34 and 29 points of it, the edge the eye uses
+ * to separate the card from the page. Keeping them at `surface` meant the
+ * outline of the card was its darkest part, only fifteen points off the page,
+ * with the light band buried in the middle where no edge could use it. The card
+ * sat IN the page instead of ON it.
+ *
+ * So the head and foot take `backgroundElement` and the score band takes
+ * `surface`: a lit plane with a well cut into it. The scoring band still reads
+ * as its own thing — it is a step of material either way, and a recessed well
+ * is if anything the more literal shape for a figure you are reading OUT of the
+ * card. What changed is that the lift is now on the edge, where it does work.
+ *
+ * Together with the outline — a full point of `borderRaised`, one colour on all
+ * four sides — that is the whole of the card's elevation. There is no shadow
+ * and no lit top edge; `Colors.dark.borderRaised` explains why neither of the
+ * two obvious ways to raise a dark panel works on this one, and `styles.card`
+ * explains why the outline is not a hairline.
  *
  * ---------------------------------------------------------------------------
  * SEPARATORS HAVE A VOCABULARY, AND IT HAS TWO WORDS
@@ -365,7 +387,7 @@ function Head({
   const formatMark = formatGlyphOf(terms.formatName);
 
   return (
-    <View style={[styles.zone, styles.head, { backgroundColor: c.surface }]}>
+    <View style={[styles.zone, styles.head, { backgroundColor: c.backgroundElement }]}>
       <View style={styles.headRow}>
         <View style={styles.headLeft}>
           {formatMark ? (
@@ -617,7 +639,7 @@ function Score({
   const markAt = beat === null ? 0 : Math.min(MARK_MAX, Math.max(MARK_MIN, at(beat)));
 
   return (
-    <View style={[styles.zone, styles.score, { backgroundColor: c.backgroundElement }]}>
+    <View style={[styles.zone, styles.score, { backgroundColor: c.surface }]}>
       <View style={styles.cmp}>
         <Side
           label="YOU"
@@ -792,7 +814,7 @@ function Foot({
   const c = Colors[scheme];
 
   return (
-    <View style={[styles.zone, styles.foot, { backgroundColor: c.surface }]}>
+    <View style={[styles.zone, styles.foot, { backgroundColor: c.backgroundElement }]}>
       <TokenRow
         label={settled ? 'STAKED' : 'RISK'}
         tokens={settled ? stakedTokens(terms, settled) : riskTokens(terms)}
@@ -908,12 +930,16 @@ function Mark({ token, side }: { token: Token; side: 'risk' | 'win' }) {
  * that fill had to be chosen against whatever it was placed on: `surfaceSheet`
  * on the board, `surface` inside a sheet, so the ramp kept stacking either way.
  *
- * It does not draw as one fill any more. The zones are `surface` and the middle
- * is `backgroundElement`, which is a ramp that works on both grounds without
- * being told which one it is on:
+ * It does not draw as one fill any more. The head and foot are
+ * `backgroundElement` and the middle is `surface`, which is a ramp that works
+ * on both grounds without being told which one it is on:
  *
- *     on the page    #080808 → #171717 zones → #212121 middle
- *     on a sheet     #101010  → #171717 zones → #212121 middle
+ *     on the page    #080808 → #212121 head/foot → #171717 well
+ *     on a sheet     #101010 → #212121 head/foot → #171717 well
+ *
+ * Every step is positive from either ground, which is the property that made
+ * `level` unnecessary: the well is still 15 points above the page and 7 above a
+ * sheet, so the middle never sinks INTO whatever the card is lying on.
  *
  * It also fixes a real inversion. On the lineup board the hearts tray under the
  * carousel is `surface`, and the card was `surfaceSheet` — one step DARKER — so
@@ -984,8 +1010,37 @@ export function ContestCard({
     </>
   );
 
+  /**
+   * THE EDGE, on both branches.
+   *
+   * ONE COLOUR ON ALL FOUR SIDES, and that is a constraint rather than a
+   * preference. A brighter top edge is the standard way to make a dark panel
+   * look lit from above, it was tried, and iOS draws a mixed-colour border by
+   * hand and mitres it across the corners — which is what made them look
+   * chewed. `Colors.dark.borderRaised` has the whole account.
+   */
+  const edge = {
+    borderColor: c.borderRaised,
+    /**
+     * THE CARD'S OWN FILL, under three zones that already paint their own.
+     *
+     * It is not redundant, and the corners are why. `overflow: 'hidden'` clips
+     * the zones to the rounded outline, and a clip is antialiased — so along
+     * each corner's curve the fill fades out over about a pixel while the
+     * border is drawn at full strength on top of it. Between the two there was
+     * a hair of TRANSPARENCY, and what showed through it was the page: four
+     * corners with a dark bite taken out of the material just inside the line.
+     * Barely visible at rest, and obvious the moment the card moved.
+     *
+     * One opaque fill behind the whole card and there is nothing to show
+     * through. It is `backgroundElement` because that is what the head and foot
+     * are — the corners belong to them — so nothing changes anywhere else.
+     */
+    backgroundColor: c.backgroundElement,
+  };
+
   if (!onPress) {
-    return <View style={[styles.card, { borderColor: c.borderStrong }]}>{body}</View>;
+    return <View style={[styles.card, edge]}>{body}</View>;
   }
 
   /* `Pressable` around the whole card rather than a control on it. The card is
@@ -996,21 +1051,39 @@ export function ContestCard({
       accessibilityRole="button"
       accessibilityLabel={`Open ${name}`}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.card,
-        { borderColor: c.borderStrong },
-        pressed && styles.pressed,
-      ]}>
+      style={({ pressed }) => [styles.card, edge, pressed && styles.pressed]}>
       {body}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  /* NO `backgroundColor`. Every zone paints its own, and the card is only a
-     border and a clip — which is what lets the middle read as lit rather than
-     as a panel with a stripe on it. */
-  card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.panel, overflow: 'hidden' },
+  /**
+   * THE FILL IS SET WHERE THIS IS RENDERED, not here, because it is the same
+   * colour as two of the three zones and belongs next to them. What lives here
+   * is the geometry: every zone still paints its own fill, and the card is a
+   * border and a clip — which is what lets the middle read as a WELL rather
+   * than as a panel with a stripe on it.
+   *
+   * ---------------------------------------------------------------------------
+   * A WHOLE POINT, NOT A HAIRLINE, AND IT IS NOT ONLY A TASTE CALL
+   * ---------------------------------------------------------------------------
+   *
+   * `StyleSheet.hairlineWidth` is one PHYSICAL pixel — a third of a point on a
+   * 3x phone. That is the right width for a divider between two rows, which is
+   * a line you are meant to stop noticing. It is the wrong width for the one
+   * line that states the shape of the card.
+   *
+   * It also could not survive the carousel. Pages recede as they leave (see
+   * `ContestCarousel.Page`), and a 0.33pt border under a 0.94 scale lands at
+   * 0.31 — sub-pixel, so it flickers in and out along the edge as the card
+   * moves. That was reported as the border "glitching" on a swipe, and it is
+   * the same defect as it being too faint: there was not enough line there to
+   * draw. A whole point scales to 0.94pt, which is three physical pixels on a
+   * 3x screen and two on a 2x — enough for the compositor to antialias rather
+   * than to guess.
+   */
+  card: { borderWidth: 1, borderRadius: Radius.panel, overflow: 'hidden' },
   pressed: { opacity: 0.7 },
 
   /* EVERY ZONE, ONE GEOMETRY. The gutter is `Spacing.three`, which is the lineup
