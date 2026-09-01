@@ -386,11 +386,16 @@ export const RailWidth = 236;
  * Fixed rather than themed, like the rail always was. The app is dark-only
  * today (see `use-color-scheme`); when that changes this becomes a pair.
  *
- * It sits between `background` (#000) and `surfaceSheet` (#0E1013) on purpose —
- * near enough the sheet value that chrome and sheets feel related, far enough
- * off #000 that the page it frames is plainly the darker, deeper thing.
+ * It sits between `background` (#080808) and `surfaceSheet` (#101010) on
+ * purpose — near enough the sheet value that chrome and sheets feel related,
+ * far enough off the page that what it frames is plainly the deeper thing.
+ *
+ * NEUTRALISED WITH THE REST OF THE RAMP. It was #0E0F12, which carried the same
+ * blue the greys did and, once the page lifted to #080808, had also drifted
+ * onto `surfaceSheet` rather than between it and the page. Both halves of its
+ * own rule were broken; this restores them.
  */
-export const ChromeBand = '#0E0F12';
+export const ChromeBand = '#0C0C0C';
 
 
 /* ------------------------------------------------------------------------- *
@@ -420,7 +425,7 @@ export const ChromeBand = '#0E0F12';
  */
 export const Brand = {
   lime: '#C7F53D',
-  ink: '#101114',
+  ink: '#101010',
 } as const;
 
 

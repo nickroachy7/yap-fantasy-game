@@ -18,7 +18,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { injuryCode, injuryWeight } from '@/lib/injury';
 import type { Database } from '@/lib/database.types';
 import { tierProgressLabel } from '@/components/lineup/model';
-import { gradient } from '@/components/ui/gradient';
+import { gradient, rgbTriplet } from '@/components/ui/gradient';
 import { PlayerSilhouette } from './PlayerAvatar';
 import { TierMark } from './TierMark';
 import { useTierTheme } from './use-tier-theme';
@@ -773,8 +773,11 @@ export function PlayerCard({
      and set level with it the two read as equals. */
   const markSize = totalSize - 2;
 
-  /* Fades toward the scheme's own page colour — see the header. */
-  const rgb = scheme === 'dark' ? '0, 0, 0' : '255, 255, 255';
+  /* Fades toward the scheme's own page colour, READ FROM THE TOKEN.
+     It was the literal '0, 0, 0' / '255, 255, 255', which was the page right up
+     until the neutral pass lifted it to #080808. Same rule the header always
+     stated, now actually tracking the value it names. */
+  const rgb = rgbTriplet(c.background);
 
   const a11yLabel =
     label ??
@@ -841,8 +844,20 @@ export function PlayerCard({
             two letters of position, so it is a third of the height at half the
             strength — enough to keep the label off a bright shoulder, not
             enough to be seen as a band. */}
-        <Scrim edge="top" base={headH} ramp={Math.round(headH * 1.1)} rgb={rgb} max={0.42} />
-        <Scrim edge="bottom" base={plateH} ramp={Math.round(plateH * 0.7)} rgb={rgb} max={0.86} />
+        {/* HALVED, BECAUSE THE STRENGTH WAS SET FOR A PHOTOGRAPH AND SPENT ON
+            A FLAT FILL. At 0.86 the bottom scrim took a #212121 card down to
+            #050505 — a 28-point cliff — and the top took it to #131313. Between
+            them sat the card's own untouched fill, so every card read as three
+            horizontal zones: dark, lit, dark. Three across a grid and those lit
+            strips line up into bands running clear across the screen, which is
+            the streaking. At 0.68 and 0.30 the same ramps fall 17 and 8 points:
+            enough to seat the type and round the square's ends, not enough to
+            band. When a real headshot lands these want revisiting UPWARD —
+            0.68 over a bright shoulder is thinner than over a grey silhouette —
+            but they should be tuned against a photograph, not guessed ahead of
+            one, which is how they got to 0.86 in the first place. */}
+        <Scrim edge="top" base={headH} ramp={Math.round(headH * 1.1)} rgb={rgb} max={0.30} />
+        <Scrim edge="bottom" base={plateH} ramp={Math.round(plateH * 0.7)} rgb={rgb} max={0.68} />
 
         {/* ---- the top strip: what he is, and what is about to happen -- *
           * The position holds the corner the tier letter used to. It has been     *
