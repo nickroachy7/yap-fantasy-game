@@ -110,6 +110,20 @@
  * wearing the same number — one is a standing, the other is a distance — and
  * the second is the one that answers "am I on pace" without totalling a lineup.
  *
+ * THE MIDDLE BAND CAN BE LEFT OUT, AND THE LOBBY IS WHY. A contest you have
+ * not entered has nothing to put in the scoring band — no total of yours, no
+ * standing, no pace — so it drew a well containing the words NOT ENTERED and
+ * ninety points of reserved air, which on a list of four is most of the list.
+ * `scoring={false}` omits the band and NOTHING ELSE: same head, same foot, same
+ * material, same gutters, same fixed heights. The card goes from 153pt to 64.
+ *
+ * That does not weaken the height contract, it narrows what it covers. The
+ * contract is that a card never changes size UNDERNEATH A READER, and the two
+ * surfaces are different lists — the lobby draws every card at 64, the carousel
+ * draws every card at 153. What is forbidden is one list holding both, and the
+ * prop is fixed per surface rather than derived from `entry`, so a contest
+ * cannot grow a band the moment its first point lands.
+ *
  * THE FOOT IS TOKENS, NOT SENTENCES. See `Token` in `contest-model`: a glyph
  * and a number is four characters where the sentence was seventeen, so a stake
  * can grow to five parts without the row breaking or the card growing a second
@@ -405,12 +419,23 @@ function Head({
           <Text numberOfLines={1} style={[Type.fine, styles.headGive, { color: c.textTertiary }]}>
             {fillLine(terms)}
           </Text>
-          <Rule />
-          {/* THE STATE NEVER GIVES. A caller's chip can be as long as "Not
-              enough coins", and a truncated status is the one string here that
-              becomes actively wrong when it is clipped — `NOT ENOUGH G…` reads
-              as a different sentence. The entry count is what shortens. */}
-          <View style={styles.status}>{right}</View>
+          {/* THE STATE NEVER GIVES. A caller's word can be as long as "40 COINS
+              SHORT", and a truncated status is the one string here that becomes
+              actively wrong when it is clipped — `NOT ENOUGH G…` reads as a
+              different sentence. The entry count is what shortens.
+
+              AND THE RULE GOES WITH IT WHEN THERE IS NO STATE. A divider is a
+              mark between two things; drawn against nothing it is a tick
+              hanging off the end of the entry count. The lobby is where that
+              started mattering — it passes `status={null}` now that the ENTER
+              chip is gone — and `right` is null there rather than an element
+              that renders null, which is what lets this test work at all. */}
+          {right !== null ? (
+            <>
+              <Rule />
+              <View style={styles.status}>{right}</View>
+            </>
+          ) : null}
         </View>
       </View>
     </View>
@@ -464,24 +489,40 @@ export function StatusMark({
     const word = settled.result === 'W' ? 'WON' : settled.result === 'L' ? 'LOST' : 'TIE';
     const tint =
       settled.result === 'W' ? c.positive : settled.result === 'L' ? c.negative : c.textSecondary;
-    return <Word text={word} color={tint} />;
+    return <StatusWord text={word} color={tint} />;
   }
-  if (played && field.final) return <Word text="FINAL" color={c.textSecondary} />;
-  if (played) return <Word text="LIVE" color={c.live} />;
+  if (played && field.final) return <StatusWord text="FINAL" color={c.textSecondary} />;
+  if (played) return <StatusWord text="LIVE" color={c.live} />;
   if (lock !== null && !lock.locked && lock.at !== null) {
     return (
-      <Word
+      <StatusWord
         text={countdownLabel(new Date(lock.at).getTime() - lock.now).toUpperCase()}
         color={c.textSecondary}
         numeric
       />
     );
   }
-  if (lock?.locked) return <Word text="LOCKED" color={c.textTertiary} />;
+  if (lock?.locked) return <StatusWord text="LOCKED" color={c.textTertiary} />;
   return null;
 }
 
-function Word({ text, color, numeric = false }: { text: string; color: string; numeric?: boolean }) {
+/**
+ * The head's right-hand slot, as one word in the colour that word means.
+ *
+ * EXPORTED BECAUSE THE LOBBY HAS ITS OWN WORD TO SAY. A caller that overrides
+ * the status with a chip is drawing a second kind of object in a corner sized
+ * for a word; a caller that has a fact rather than a state — "40 COINS SHORT" —
+ * should say it in the same voice the card says LIVE and LOCKED in.
+ */
+export function StatusWord({
+  text,
+  color,
+  numeric = false,
+}: {
+  text: string;
+  color: string;
+  numeric?: boolean;
+}) {
   return (
     <Text numberOfLines={1} style={[Type.micro, numeric && NUMERIC, { color }]}>
       {text}
@@ -954,6 +995,7 @@ export function ContestCard({
   period,
   entry = null,
   prize = null,
+  scoring = true,
   settled = null,
   onPress,
 }: {
@@ -962,12 +1004,17 @@ export function ContestCard({
   /** The week's deadline, drawn at the head's right end. */
   lock?: Lock | null;
   /**
-   * Overrides the card's own status word.
+   * Overrides the card's own status word. `null` says the corner is EMPTY.
    *
-   * The lobby's question is "can I enter this", not "what state is this week
-   * in", and it answers with a `StatusChip`. Same corner, same one row — which
-   * is the constraint that matters, since the head reserves exactly 20pt for
-   * whatever lands here.
+   * Three values, and the difference between two of them is load-bearing.
+   * `undefined` is "you decide", and the card draws its own `StatusMark` — the
+   * countdown, LIVE, LOCKED, the outcome. A node replaces that. `null` says
+   * there is nothing to report and takes the divider with it, which is what the
+   * lobby passes on a contest you can afford: the whole card is the button, so
+   * a word saying ENTER was labelling the door with the word "door".
+   *
+   * The head reserves exactly 20pt for whatever lands here, so a caller's node
+   * has to be a word or a chip, not a stack.
    */
   status?: React.ReactNode;
   /**
@@ -984,6 +1031,14 @@ export function ContestCard({
   entry?: Entry | null;
   /** What you were paid out of the pool, once the week is settled. */
   prize?: number | null;
+  /**
+   * Draw the scoring band. False in the lobby, where there is no score.
+   *
+   * A PROPERTY OF THE SURFACE, NOT OF THE DATA — see the header. Every card in
+   * a list must pass the same value, or the list changes height as entries and
+   * scores arrive.
+   */
+  scoring?: boolean;
   /**
    * THE WEEK IS OVER AND THIS IS WHAT IT DID. Null while it is still an offer.
    *
@@ -1003,9 +1058,17 @@ export function ContestCard({
         terms={terms}
         period={period}
         duel={entry?.opponent}
-        right={status ?? <StatusMark lock={lock} field={entry?.field ?? null} settled={settled} />}
+        /* `??` would have swallowed the empty corner: a caller passing null
+           means it, and only an absent prop asks the card to decide. */
+        right={
+          status !== undefined ? (
+            status
+          ) : (
+            <StatusMark lock={lock} field={entry?.field ?? null} settled={settled} />
+          )
+        }
       />
-      <Score terms={terms} entry={entry} settled={settled} />
+      {scoring ? <Score terms={terms} entry={entry} settled={settled} /> : null}
       <Foot terms={terms} prize={prize} settled={settled} />
     </>
   );

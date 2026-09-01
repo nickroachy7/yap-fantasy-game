@@ -22,10 +22,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionBar } from '@/components/shell/ActionBar';
 import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
-import { ContestCard, type Lock } from '@/components/contests/ContestCard';
+import { ContestCard, StatusWord, type Lock } from '@/components/contests/ContestCard';
 import type { ContestTerms, Duel, Settlement } from '@/components/contests/contest-model';
 import { ContestAbout } from '@/components/contests/ContestAbout';
 import { ContestActions } from '@/components/contests/ContestActions';
+import { LobbyHero } from '@/components/contests/LobbyHero';
+import type { CarryRung } from '@/components/runs/use-run-ladder';
 import { ContestFieldList } from '@/components/contests/ContestFieldPanel';
 import type { FieldEntrant } from '@/components/contests/use-contest-field';
 import type { FieldWeek } from '@/components/lineup/field';
@@ -84,7 +86,8 @@ import { SegmentedControl } from '@/components/shell/SegmentedControl';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { POSITION_ORDER, POSITIONS } from '@/constants/positions';
-import { Colors, Spacing, Type, selectionAccent } from '@/constants/theme';
+import { Brand, Colors, Radius, Spacing, Type, selectionAccent } from '@/constants/theme';
+import { rgba } from '@/components/ui/gradient';
 import { Icon } from '@/components/icons/Icon';
 import { GLYPHS } from '@/components/icons/glyphs';
 import { validateSet } from '@/components/icons/validate';
@@ -253,11 +256,25 @@ const KIT_RUN: Run = {
   losses: 1,
   endedAt: null,
   awaitingCarry: false,
-  carrySlots: 3,
-  nextRung: { atWins: 8, cardSlots: 5 },
+  /* CONSISTENT WITH `KIT_LADDER`, which is the real one: five wins stands on
+     the 3-win rung and keeps one card, with the next rung at six. The fixture
+     said three cards and a rung at eight — numbers from no ladder that has ever
+     shipped — and the header drew them beside a table that disagreed. */
+  carrySlots: 1,
+  nextRung: { atWins: 6, cardSlots: 2 },
   heldCards: 24,
   lostCards: 0,
 };
+
+/* The server's own four rows — `run_carry_ladder`, 20260825110000. Copied here
+   rather than fetched because the kit has no session; the real header reads the
+   table, which is the whole argument in `useRunLadder`. */
+const KIT_LADDER: CarryRung[] = [
+  { atWins: 0, cardSlots: 0 },
+  { atWins: 3, cardSlots: 1 },
+  { atWins: 6, cardSlots: 2 },
+  { atWins: 10, cardSlots: 3 },
+];
 
 const KIT_TERMS_TOP_N: ContestTerms = {
   formatName: 'WR Room', slotCount: 3, entryFeeCoins: 40,
@@ -794,24 +811,66 @@ function Kit() {
           </Section>
 
           <Section
+            title="Contests header"
+            note="The contests sheet’s hero, which is the set checklist’s hero pointed at a RUN — a name, a figure, the rule in full, a progress bar, and the ladder: every rung on it, what each wants, what each keeps, and which are behind you. That shape is why a set nobody will ever finish is still worth adding a card to, and the lobby has exactly the same question under it. A run is TWO numbers and neither can stand for the other: hearts are how long you last, and every contest below is priced in them, so the rack sits high and whole; wins are what you KEEP when the hearts run out, which is the ladder and the only reason a losing run is worth playing out. The figure is the record rather than the hearts because the bar and the table under it are about wins — a figure measuring one thing over a bar measuring another is the header disagreeing with itself. The mark on a rung is a PLACE, not a claim: a set rung is money you have or have not collected and gets a tick, a carry rung is where you are standing, so the one you are on is dotted and the ones behind it are unmarked — ticking them would promise four cards to somebody who keeps one. The ladder is the server’s table, never a constant: `run_carry_slots()` is what a death actually settles against, and its own migration says why it is a function. The band is washed in `Brand.lime` — shown here on the first of the three, at the sheet’s own `TONE_PEAK` of 0.26, where #C7F53D over #101010 resolves to a dark olive rather than the bright green the swatch suggests. It went up with no wash at all, on the argument that a tone is always the colour OF something and a run is not of anything; that was the right question and the wrong answer, because on every other sheet the band is also simply what makes a header read as one BLOCK. Lime is not a semantic hue anywhere in this codebase — it is the login mark and nothing else — so it says whose screen this is without claiming anything about the run inside it, which the two colours a run could otherwise claim would both do falsely: red is `negative`, worn by a lost heart and a dead run, and green is `positive`, which would congratulate every record equally. The marks inside stay `positive` teal so that green keeps meaning progress rather than meaning brand."
+            >
+            <View style={{ gap: Spacing.four }}>
+              {/* THE WASH, DRAWN THE WAY THE SHEET DRAWS IT. `SheetToneBand`
+                  cannot be used here — it climbs over a scroll container's
+                  inset with a negative margin, which inside the kit would pull
+                  it over the section above. So the fill is reproduced at the
+                  same colour and the same `TONE_PEAK`, which is the one number
+                  worth keeping in step by hand: the point of this section is
+                  judging the colour. */}
+              <View style={{ backgroundColor: rgba(Brand.lime, 0.26), padding: Spacing.three, borderRadius: Radius.panel }}>
+                <LobbyHero run={KIT_RUN} rungs={KIT_LADDER} week="Preseason 4" />
+              </View>
+              <LobbyHero run={KIT_RUN} rungs={KIT_LADDER} week="Preseason 4" />
+              {/* A fresh run: no record, bottom rung, nothing carried. */}
+              <LobbyHero
+                run={{ ...KIT_RUN, wins: 0, losses: 0, wagered: 0, wageredIn: 0, carrySlots: 0, nextRung: { atWins: 3, cardSlots: 1 } }}
+                rungs={KIT_LADDER}
+                week="Preseason 4"
+              />
+              {/* One heart left, deep in the ladder — the week the sheet is
+                  most worth reading and the state the copy is written for. */}
+              <LobbyHero
+                run={{ ...KIT_RUN, hearts: 1, wagered: 1, wageredIn: 1, wins: 9, losses: 4 }}
+                rungs={KIT_LADDER}
+                week="Week 1"
+              />
+            </View>
+          </Section>
+
+          <Section
             title="Contest card"
             note="THREE ZONES, AND THE MIDDLE ONE IS THE ONLY LIT ONE. That is the 2026-08-31 rework, and it is an answer to a card that read as six loose rows: the head and the foot are `surface`, the scoring band between them is `backgroundElement`, and the structure is drawn in MATERIAL rather than in three hairlines nobody could see at #272727 on #101010. Each zone answers exactly one question. THE HEAD is which contest this is, how it is won, how full it is and what state it is in — one row, four facts, a name and a status word at the outer edges with the objective and the entry count inboard of them. It was two rows and the first was half empty; one row fits, because the heaviest contest measures about 410 of the 460 points available. The objective sits at TERTIARY now, which reverses two earlier calls (13pt semibold in the primary colour, then labelled `TO WIN` to calm it down) and is safe for one specific reason: the scoring band restates it as `TO BEAT` over a `MEDIAN` or `3RD` chip, directly above the number being chased. The head no longer carries it alone. THE GIVE-ORDER IS THE OLD LESSON KEPT — if the row runs out, the NAME and the ENTRY COUNT truncate and the objective never does, because this card once shipped `Full Roster · 8 cards · Beat the med…` on every entered card before lock. The status is coloured TEXT rather than a pill: a filled chip is a second object on a card trying to have one lit band, and a single word at the end of a row is findable by colour alone. It carries the countdown before lock (`OPEN` told a reader what `9D 5H` already implies), then `LIVE` in the new `live` blue, then `WON` / `LOST` / `TIE`. Blue is a fourth semantic hue and it is deliberate: gold is spoken twice within a hundred points of this card — the focused heart and the Contests button — and red is spoken by losing. THE MIDDLE IS NOTHING BUT SCORING. Your total on the left, the total you have to beat on the right, `VS` and the margin in a fixed column between them so the sign cannot drag it off centre. Both totals are the SAME SIZE, which reverses a pass that ranked yours above theirs as a benchmark: the number you are judged against is not a footnote on your own score, it is the other half of one comparison. `TO BEAT` is a constant and the format is a chip — `COMMUNITY`, `THE CUT · 3RD` and a handle were three words for one idea and none of them said beat this. THE PACE BAR IS THE POINT OF THE WHOLE CARD: a 4pt rail, a dashed mark at the win condition, and a pip carrying your rank at your own total, so a player can tell whether they are on course without adding up eight players. Above the dashes is winning and below is losing, and the gap between the pip and the dashes IS the deficit. It takes three inputs and knows nothing else — a scale, your value, and the line — which is why the head-to-head cards here are the same component and not a `TugBar`. Two measurements in it are bug fixes rather than taste: the dashes are 18pt against a 14pt pip because at 11 the pip covered the line completely at the one moment it matters most, and the SCALE ANCHORS AT NOUGHT on a field of two, because low-to-high on a duel is exactly the two totals — the leader always fills the rail, the trailer never does, and the bar says nothing about by how much. RANK IS SAID TWICE ON PURPOSE: the chip is a standing, the pip is a distance. It is withheld entirely before the field has spread, because every lineup sits on a stored nought pregame and `rank()` hands everyone first place. THE FOOT IS TOKENS, NOT SENTENCES. A glyph and a number is four characters where the sentence was seventeen, so a stake can grow to five parts — coins, a heart, a pack — without the row breaking or the card growing a second one. That is what retired two columns each reserving a blank line. The unit word is ELASTIC: a side carrying one token prints it (`♥ 1 heart`, `◆ 1.5 a point`) and a side carrying two or three drops to bare numbers, so the free contest — the one every new player meets first, and the one with the most room — teaches the glyphs in words before anything asks them to be read cold. Labels are constant, `RISK` and `WIN`, turning to `STAKED` and `WON` at settlement; the modality that used to live there (`UP TO`, `SHARE`, `EARNS`) is gone, which costs the up-to on a capped top prize and is noted at `winTokens`. SEPARATORS HAVE A VOCABULARY WITH TWO WORDS: a solid hairline divides two things side by side, a dashed line is the line you have to cross, and the dashed line appears exactly once on the card. THE WHOLE CARD IS 153pt — 34 + 90 + 29 — against 164, and the saving is small and not the point. A lineup row underneath is 62. The first two cards here are lobby cards; the rest are entered, and the ones that matter are the top-three contest where the median decides nothing and the mark is the CUT, the field of ONE which is its own low and high and therefore has nobody to play, both duels, and the last four — the settled states, including final-and-unpaid, where `WON` says still settling rather than claiming a nought."
 
           >
+            {/* THE LOBBY PAIR, AND THEY ARE TWO ZONES RATHER THAN THREE. A
+                contest you have not entered has no score, no standing and no
+                pace, so `scoring={false}` drops the band and the card comes out
+                at 64pt. Nothing else about it moves — same head, same foot,
+                same material, same gutters. The corner is EMPTY on the one you
+                can enter: the whole card is the button. */}
             <ContestCard
               name="WR Room"
               terms={KIT_TERMS_TOP_N}
-              status={<StatusChip label="Enter" tone="warning" />}
+              scoring={false}
+              status={null}
               onPress={() => {}}
             />
             {/* No entries yet, so no pool yet — the state a four-tester week
                 spends most of its time in, and the one a placeholder would have
-                papered over. The reward line is the only string on this card
-                long enough to wrap, which is why the columns allow two lines. */}
+                papered over. It is also the card you cannot pay for, which is
+                the only thing the lobby's corner has left to say, and it says
+                it as a number: `40 COINS SHORT` names the errand where "Not
+                enough coins" only names the wall. */}
             <ContestCard
               name="Flex Three"
               terms={{ ...KIT_TERMS_MEDIAN, prizePool: 0, entrants: 0 }}
-              status={<StatusChip label="Not enough coins" />}
+              scoring={false}
+              status={<StatusWord text="40 COINS SHORT" color={c.warning} numeric />}
               onPress={() => {}}
             />
 
@@ -1061,9 +1120,9 @@ function Kit() {
 
           <Section
             title="Contest field"
-            note="Who else is in a contest, on the contest’s own page. The card draws the community as a distribution because there is no opponent to draw; this is the other half — the same field, named. Every row is a door into that manager’s lineup, which is readable from the moment they file it: the reveal rule that used to seal a lineup until its last card kicked off is gone, and what is left of it is the sub-line, which says whether what you would open is locked in or still being edited. Your own row is tinted rather than badged — a “You” chip would compete with the result chip in the same corner."
+            note="Who else is in a contest, on the contest’s own page. The card draws the community as a distribution because there is no opponent to draw; this is the other half — the same field, named. A row OPENS THAT MANAGER’S LINEUP IN PLACE, one at a time, drawn with the same `EntryLineup` at the same width as the reader’s own copy at the top of that page — which is what reverses the old call that made a row a door to a separate screen. That call was right about the DRAWING (the expansion it removed was a squashed four-column strip crammed under a 40pt row) and the drawing is what changed; leaving the page to hold eight cards against eight cards, then coming back, was the cost it could not pay. Here the rows are inert, because expanding is a fetch and the kit has no contest to fetch from — which is also why the affordance is derived from having a contest id rather than from a flag that could disagree with it. The sub-line says whether what you would open is locked in or still being edited; the reveal rule that used to seal a lineup until its last card kicked off is gone. Your own row is tinted rather than badged — a “You” chip would compete with the result chip in the same corner, and an OPEN row is lit brighter still."
             >
-            <ContestFieldList entrants={KIT_FIELD} slotCount={3} onOpen={() => {}} />
+            <ContestFieldList entrants={KIT_FIELD} slotCount={3} />
           </Section>
 
           <Section
@@ -1083,7 +1142,7 @@ function Kit() {
 
           <Section
             title="Contest actions"
-            note="Pinned to the bottom of the contest sheet, because that page is now four screens long and the control it used to hide at the end was the way OUT. Leaving is outlined rather than filled: the coins come back in full and you can enter again while the games are still ahead, so a solid red button would be shouting about something completely reversible. Once a card has kicked off there is nothing to leave, and the bar says so rather than offering a button the server would refuse.">
+            note="The two things you can do about an entry, drawn at the end of the contest page’s LINEUP tab, under the lineup they act on. They were pinned to the bottom of the sheet for a while, because that page was one four-screen column and the control being hidden at the end of it was the way OUT — tabs fixed that better, by making the face these belong to a lineup and two buttons. Pinning also had a cost: the bar followed the reader onto the field and the rules, offering to take them off a page they were still reading. Leaving is outlined rather than filled: the coins come back in full and you can enter again while the games are still ahead, so a solid red button would be shouting about something completely reversible. Once a card has kicked off there is nothing to leave, and it says so rather than offering a button the server would refuse.">
             <View style={{ gap: Spacing.three }}>
               <ContestActions
                 entryFeeCoins={40}

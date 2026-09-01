@@ -94,6 +94,8 @@ export function PlayerSheetFrame({
   subtitle,
   onClose,
   closeLabel = 'Close player profile',
+  dismissible = true,
+  footerGlass = false,
   tone,
   pinned,
   pinnedAt,
@@ -111,6 +113,24 @@ export function PlayerSheetFrame({
    * objects everywhere else in the app.
    */
   closeLabel?: string;
+  /**
+   * Whether a drag can throw this sheet away. See `dragCloses`.
+   *
+   * TRUE EVERYWHERE BUT A NESTED VIEW. Pass false while the sheet is showing
+   * something a back row can return from, so that pulling down and pressing ‹
+   * are not two gestures doing opposite things. The ✕ appears in the grabber's
+   * place, so there is still one way out and it is unambiguous.
+   */
+  dismissible?: boolean;
+  /**
+   * The footer draws its own material — see `GlassBar`.
+   *
+   * The slot keeps the safe-area inset and gives up the fill and the rule. It
+   * is a flag rather than something inferred from the node because a frame
+   * cannot look inside a child to find out what it is made of, and guessing
+   * wrong in either direction leaves a visible second bar.
+   */
+  footerGlass?: boolean;
   /**
    * A colour to wash the top of the sheet with — the card profile's tier, the
    * player profile's club.
@@ -196,7 +216,27 @@ export function PlayerSheetFrame({
    * from the bottom", with the ✕ still doing the work.
    */
   const draggable = Platform.OS === 'ios' && !isWeb;
-  const showClose = !draggable;
+  /**
+   * WHETHER A DRAG CAN ACTUALLY TAKE THIS SHEET AWAY RIGHT NOW.
+   *
+   * Separate from `draggable`, which is about the PRESENTATION — whether this
+   * platform's sheet is the kind that comes up from an edge with a bar on it,
+   * and therefore how the header is laid out. This is about the GESTURE, and a
+   * caller can turn it off for a while without the sheet changing shape.
+   *
+   * `ContestSheet` is why it exists. That sheet holds a stack of views, and on
+   * any view but the first there are two ways out pointing at different places:
+   * a back row that goes up one level, and a drag that throws the whole thing
+   * away. A reader on a contest's page pulling down to get back to the lobby
+   * lost the lobby as well — the two gestures read as one and did opposite
+   * things, which is the conflict the flag closes.
+   *
+   * THE GRABBER GOES WITH IT, and the ✕ arrives to replace it. A handle that
+   * does not move is exactly the lie this file already refuses to draw on
+   * Android, and a sheet with no way out at all would be worse than either.
+   */
+  const dragCloses = draggable && dismissible;
+  const showClose = !dragCloses;
 
   /**
    * Whether the bar is taken OUT of the layout and drawn over the content.
@@ -244,6 +284,15 @@ export function PlayerSheetFrame({
    * is what keeps the takeover on the right pixel across text sizes.
    */
   const [barHeight, setBarHeight] = useState(0);
+  /**
+   * How tall a FLOATING footer is, so the scroller can end above it.
+   *
+   * Zero until measured, which is one frame of the last row sitting under the
+   * bar on first paint. Reserving a guess instead would be a jump on every
+   * open, and the guess would be wrong the moment a caller's bar grows a second
+   * line.
+   */
+  const [footerHeight, setFooterHeight] = useState(0);
 
   /**
    * DRAG-TO-DISMISS, FOR THE NARROW WEB SHEET ONLY.
@@ -271,7 +320,7 @@ export function PlayerSheetFrame({
    */
   const [dragY] = useState(() => new Animated.Value(0));
   const [cardHeight, setCardHeight] = useState(0);
-  const canDrag = isWeb && !wide;
+  const canDrag = isWeb && !wide && dismissible;
 
   /**
    * Where the sheet goes when the finger leaves it.
@@ -527,7 +576,7 @@ export function PlayerSheetFrame({
   /* Absolute, and drawn AFTER the floating header so it sits on top of it: the
      grabber is the dismiss affordance and must stay visible whether or not the
      title bar has appeared. */
-  const floatingHandle = draggable ? (
+  const floatingHandle = dragCloses ? (
     <View pointerEvents="none" style={styles.handleFloat}>
       <View style={[styles.handleBar, { backgroundColor: c.textTertiary }]} />
     </View>
@@ -569,13 +618,48 @@ export function PlayerSheetFrame({
   const footerBar = footer ? (
     <View
       collapsable={false}
+      onLayout={footerGlass ? (e) => setFooterHeight(e.nativeEvent.layout.height) : undefined}
       style={[
         styles.footer,
-        {
-          backgroundColor: c.surfaceSheet,
-          borderTopColor: c.border,
-          paddingBottom: (isWeb ? 0 : bottom) + Spacing.three,
-        },
+        /**
+         * A GLASS FOOTER FLOATS OVER THE SCROLLER; A SOLID ONE SITS UNDER IT.
+         *
+         * This is the whole difference between a material and a strip, and
+         * getting it wrong produces exactly the bug it was reported as: the
+         * bottom of the page went black. A footer that is a SIBLING of the
+         * scroller in a column has nothing behind it — the content stops where
+         * the footer starts — and Liquid Glass with nothing passing under it
+         * renders as flat grey. `TabBarGlass` says this about its own first
+         * attempt and the sentence transfers word for word: "the material only
+         * exists where content passes under it."
+         *
+         * So it is lifted out of the flow and the scroller is given its height
+         * back as padding, which is what the floating tab bar does to the scene
+         * underneath it. The list can still be scrolled clear of the bar, and
+         * while it is under there the glass has something to refract.
+         */
+        footerGlass && styles.footerFloat,
+        footerGlass && styles.footerGlass,
+        /* GLASS BRINGS ITS OWN EVERYTHING. A floating bar draws its own
+           material, its own outline and its own scrim over the content behind
+           it — so the solid fill and the hairline this slot normally supplies
+           would sit BEHIND it as a second, squarer bar with a line on top,
+           which is exactly what a floating object must not have under it. The
+           safe-area inset is still the frame's: the caller is not the one who
+           knows whether this sheet has a home indicator to clear. */
+        /* NO INSET HERE FOR GLASS. The home indicator's clearance has to sit
+           INSIDE the bar's own box, or the scrim stops at the bar and the strip
+           below it is transparent — content scrolling under would show in the
+           gap between the glass and the screen's edge. The caller passes it to
+           `GlassBar` as `bottomInset` instead, where the wrap grows by it and
+           the gradient covers it. */
+        footerGlass
+          ? null
+          : {
+              backgroundColor: c.surfaceSheet,
+              borderTopColor: c.border,
+              paddingBottom: (isWeb ? 0 : bottom) + Spacing.three,
+            },
       ]}>
       {footer}
     </View>
@@ -597,7 +681,14 @@ export function PlayerSheetFrame({
         /* The home indicator's clearance belongs to whichever thing is at the
            bottom of the sheet. With a footer that is the footer, and adding it
            here as well would put a band of empty sheet under the last row. */
-        { paddingBottom: (footer || isWeb ? 0 : bottom) + Spacing.four },
+        /* A FLOATING FOOTER IS NOT IN THE FLOW, so the room it needs has to be
+           reserved here — its own height, safe area included, plus the page's
+           usual tail. A footer in the flow already occupies its space and only
+           the tail is owed. */
+        {
+          paddingBottom:
+            (footerGlass ? footerHeight : footer || isWeb ? 0 : bottom) + Spacing.four,
+        },
         /* With the header floating, the grabber floats too, so the content has
            to reserve the space it used to occupy in flow or the hero starts
            underneath it. True of the narrow web sheet as well now. */
@@ -981,11 +1072,18 @@ const styles = StyleSheet.create({
   }),
   /* The gutter is the content's, so the buttons line up with the cards above
      them rather than sitting a few points inside or outside the grid. */
+  /* The gutter and the rule belong to the SOLID footer; a glass one supplies
+     its own margins and its own edge, and overrides both below. */
   footer: {
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.three,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
+  footerGlass: { paddingHorizontal: 0, paddingTop: 0, borderTopWidth: 0 },
+  /* Over the scroller rather than under it — see the note where it is drawn.
+     `start`/`end` rather than left/right so it follows the writing direction,
+     as every other absolute box in this file does. */
+  footerFloat: { position: 'absolute', start: 0, end: 0, bottom: 0 },
   /**
    * The takeover row: the bar's gutter, its own bottom rhythm, and the rule.
    *

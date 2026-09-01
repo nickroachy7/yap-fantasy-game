@@ -451,6 +451,32 @@ export type Settlement = {
 };
 
 /**
+ * IS THIS WEEK OVER, and what did it do — from an entry, in one place.
+ *
+ * THREE SURFACES WERE COMPUTING THIS BY HAND: the carousel over the lineup, the
+ * settled card in the lobby, and the contest's own page. The expression is
+ * short enough to retype and that is exactly the danger — a card reading WON in
+ * one place and FINAL in another is the divergence this file exists to close,
+ * and it would have arrived through a copy that forgot half of the test.
+ *
+ * THE TEST IS `final` AND A REAL HIGH SCORE, and the second half is not
+ * belt-and-braces. `score_week` stamps `scored_at` and writes `total_points = 0`
+ * whether or not a ball has been thrown, so `final` alone puts a confident WON
+ * or LOST on a week that has not started. The field's best score is the only
+ * honest proof that anybody played.
+ *
+ * NULL IS "NOT SETTLED", which is a different card rather than a worse one —
+ * see `Foot`, where a null keeps the row in the present tense.
+ */
+export function settlementOf(entry: {
+  field: { final: boolean; high: number; result: Result | null };
+  myCoins: number | null;
+}): Settlement | null {
+  if (!entry.field.final || entry.field.high <= 0) return null;
+  return { result: entry.field.result, coins: entry.myCoins };
+}
+
+/**
  * WHAT IT COST, now that the answer is known.
  *
  * The coins went at submission and do not come back, so they read exactly as

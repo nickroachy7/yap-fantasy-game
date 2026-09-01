@@ -47,12 +47,15 @@ import { formatLine, topPrize, winLine, type ContestTerms } from './contest-mode
 export function ContestAbout({
   terms,
   name,
+  title = 'How it works',
   prizePoolBps,
   leavable,
   run,
 }: {
   terms: ContestTerms;
   name: string;
+  /** "" where a tab above already says what this is. See `ContestFieldPanel`. */
+  title?: string;
   /** Share of collected fees that is paid back out, in basis points. */
   prizePoolBps: number;
   /**
@@ -89,7 +92,7 @@ export function ContestAbout({
   const share = Math.round(prizePoolBps / 100);
 
   return (
-    <Panel title="How it works" inset={false}>
+    <Panel title={title} inset={false}>
       <View>
         <Fact term="The roster" body={formatLine(terms, name)}>
           A card can only play in one contest a week. Whatever you field here

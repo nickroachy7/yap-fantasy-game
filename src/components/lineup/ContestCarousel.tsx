@@ -92,6 +92,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ContestCard } from '@/components/contests/ContestCard';
+import { settlementOf } from '@/components/contests/contest-model';
 import { termsOfEntry, type MyContest } from '@/components/contests/use-my-contests';
 import { ContestHearts, type HeartResult, type HeartSpan } from '@/components/runs/Hearts';
 import { Colors, Spacing, selectionAccent } from '@/constants/theme';
@@ -1246,10 +1247,7 @@ function Card({
    * Both are legitimately null for a while after the whistle, and the model
    * words that state rather than guessing at it.
    */
-  const settled =
-    contest.field.final && contest.field.high > 0
-      ? { result: contest.field.result, coins: contest.myCoins }
-      : null;
+  const settled = settlementOf(contest);
 
   return (
     <ContestCard

@@ -17,18 +17,32 @@
  * list you read, not a shape you glance at.
  *
  * ---------------------------------------------------------------------------
- * A ROW IS A DOOR, NOT A DISCLOSURE
+ * A ROW OPENS IN PLACE, AND THAT REVERSES A CALL — HALF OF ONE
  * ---------------------------------------------------------------------------
  *
- * Tapping an entrant used to expand their slots INSIDE the row, which meant a
- * lineup — the densest object in the game, eight players deep with fixtures and
- * scores — was drawn as a squashed four-column strip so it would fit under a
- * 40pt row. It also meant only one could be open at a time, on a page where the
- * comparison you actually want is against a lineup two rows down.
+ * Tapping an entrant expanded their slots inside the row once before, and it
+ * was rightly taken out: a lineup is the densest object in the game, eight
+ * players deep with fixtures and scores, and it was being drawn as a squashed
+ * four-column strip so that it would fit under a 40pt row. So rows became doors
+ * to `entry/[contest]/[user]`, which drew a team the way a team is drawn
+ * everywhere else.
  *
- * So a row navigates to `entry/[contest]/[user]`, which draws their team the
- * way a team is drawn everywhere else. The panel is a leaderboard and nothing
- * else.
+ * The objection was to the DRAWING, not to the disclosure. What comes out of a
+ * row now is `EntryLineup` — the identical component, at the identical width,
+ * with the identical rows as the lineup of your own sitting at the top of this
+ * same page. Nothing is squashed and nothing is a footnote, so the reason the
+ * expansion was removed no longer applies to it.
+ *
+ * And the door had a cost the page could not pay. Comparing yourself with a
+ * rival meant leaving the page your own lineup is on to go and look at theirs,
+ * then coming back — two navigations to hold eight cards against eight cards,
+ * across a transition, from memory. Opened in place they are on one scroll.
+ *
+ * ONE AT A TIME, and this is the half of the old call that stands. The second
+ * complaint about the strip was that only one could be open; the answer is not
+ * to open several. A field of twenty-four with four expanded is two hundred
+ * rows of page, and the comparison a reader actually wants is against their own
+ * entry, which is pinned above the field rather than buried in it.
  *
  * ---------------------------------------------------------------------------
  * AND IT NEVER SAYS "NOT YET"
@@ -43,9 +57,12 @@
  * longer gates anything and is drawn as what it is: whether the lineup you are
  * about to open can still change before kickoff.
  */
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { initialsOf } from '@/components/shell/AppHeader';
+import { EntryLineup } from './EntryLineup';
+import { useContestLineup } from './use-contest-field';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
 import { StatusChip } from '@/components/ui/StatusChip';
@@ -59,21 +76,40 @@ export function ContestFieldPanel({
   loading,
   error,
   slotCount,
-  onOpen,
+  title = 'The field',
+  contestId,
 }: {
   entrants: FieldEntrant[] | null;
   loading: boolean;
   error: string | null;
   /** What a full lineup looks like here, so a row can say "2 of 3 cards". */
   slotCount: number;
-  onOpen: (entrant: FieldEntrant) => void;
+  /**
+   * The panel's heading, or "" where something above it is already the heading.
+   *
+   * A TAB BAR IS A HEADING. On the contest's page this panel sits directly
+   * under a tab reading `Rankings`, and a 15pt "The field" beneath it is the
+   * screen naming one thing twice in fourteen points. Standing alone — in the
+   * kit, or anywhere it is one panel among several — it names itself.
+   */
+  title?: string;
+  /**
+   * Which contest these lineups belong to. Null makes the rows inert.
+   *
+   * A ROW IS ONLY A DOOR WHERE THERE IS SOMETHING BEHIND IT. `contest_lineup`
+   * is keyed on the contest and the manager, so without an id there is nothing
+   * to fetch — which is exactly the kit's situation, and why the affordance is
+   * derived from this rather than from a separate flag that could disagree with
+   * it.
+   */
+  contestId: string | null;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
   if (error) {
     return (
-      <Panel title="The field">
+      <Panel title={title}>
         <Text style={[Type.fine, { color: c.negative }]}>{error}</Text>
       </Panel>
     );
@@ -82,10 +118,15 @@ export function ContestFieldPanel({
   /* A heading with nothing under it rather than a spinner. The panel is one
      screen down on a sheet that has already drawn the card and the terms, so a
      loader here is a spinner nobody is looking at. */
-  if (loading && entrants === null) return <Panel title="The field" />;
+  if (loading && entrants === null) return <Panel title={title} />;
 
   return (
-    <ContestFieldList entrants={entrants ?? []} slotCount={slotCount} onOpen={onOpen} />
+    <ContestFieldList
+      entrants={entrants ?? []}
+      slotCount={slotCount}
+      title={title}
+      contestId={contestId}
+    />
   );
 }
 
@@ -102,16 +143,26 @@ export function ContestFieldPanel({
 export function ContestFieldList({
   entrants: rows,
   slotCount,
-  onOpen,
+  title = 'The field',
+  contestId = null,
 }: {
   entrants: FieldEntrant[];
   slotCount: number;
-  /** Absent in the kit, where there is nowhere to navigate to. */
-  onOpen?: (entrant: FieldEntrant) => void;
+  /** "" where whatever sits above is already the heading. */
+  title?: string;
+  /** Absent in the kit, where there is no lineup to fetch. */
+  contestId?: string | null;
 }) {
+  /* WHOSE TEAM IS OPEN, by user id and one at a time — see the header. State
+     rather than a prop because it is a way of reading this list, not a fact
+     about the contest: nothing outside the panel has an opinion about which
+     row is expanded, and nothing outside it should be re-rendered when that
+     changes. */
+  const [open, setOpen] = useState<string | null>(null);
+
   return (
     <Panel
-      title="The field"
+      title={title}
       /* The count belongs to the heading rather than to a row: it is a fact
          about the contest, and repeating it per row is how a list starts
          restating its own length. */
@@ -126,12 +177,26 @@ export function ContestFieldList({
       ) : (
         <View>
           {rows.map((e) => (
-            <EntrantRow
-              key={e.userId}
-              entrant={e}
-              slotCount={slotCount}
-              onOpen={onOpen ? () => onOpen(e) : undefined}
-            />
+            <View key={e.userId}>
+              <EntrantRow
+                entrant={e}
+                slotCount={slotCount}
+                expanded={open === e.userId}
+                onOpen={
+                  contestId
+                    ? () => setOpen((was) => (was === e.userId ? null : e.userId))
+                    : undefined
+                }
+              />
+              {open === e.userId && contestId ? (
+                <EntrantLineup
+                  contestId={contestId}
+                  userId={e.userId}
+                  slotCount={slotCount}
+                  locked={e.locked}
+                />
+              ) : null}
+            </View>
           ))}
         </View>
       )}
@@ -166,10 +231,13 @@ function subLine(e: FieldEntrant, slotCount: number): string {
 function EntrantRow({
   entrant,
   slotCount,
+  expanded,
   onOpen,
 }: {
   entrant: FieldEntrant;
   slotCount: number;
+  /** Their lineup is drawn under this row right now. */
+  expanded: boolean;
   onOpen?: () => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -182,11 +250,20 @@ function EntrantRow({
       onPress={onOpen}
       disabled={!onOpen}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${entrant.displayName}'s lineup`}
+      accessibilityLabel={
+        expanded ? `Hide ${entrant.displayName}'s lineup` : `Open ${entrant.displayName}'s lineup`
+      }
+      accessibilityState={{ expanded }}
       style={({ pressed }) => [
         styles.row,
         { borderColor: c.border },
         entrant.isMe && { backgroundColor: c.backgroundMine },
+        /* THE OPEN ROW IS LIT, and it is the only thing marking where a block
+           of eight rows came from. `backgroundSelected` outranks the tint on
+           your own row deliberately: "which one did I open" is a question about
+           right now, and "which one is me" is answered again by every other
+           row not being lit. */
+        expanded && { backgroundColor: c.backgroundSelected },
         pressed && styles.pressed,
       ]}>
       <Text style={[Type.fine, NUMERIC, styles.rank, { color: c.textTertiary }]}>
@@ -217,17 +294,57 @@ function EntrantRow({
         />
       )}
       {/* The affordance, and the only thing on the row that is not a fact. A
-          list where every row leads somewhere still has to say so — a dense
-          table of numbers reads as a table until something marks it as a set
-          of doors. */}
-      {onOpen ? <Chevron color={c.textTertiary} /> : null}
+          list where every row opens still has to say so — a dense table of
+          numbers reads as a table until something marks it as a set of doors.
+          Turned down when it is open, which is the one mark that says the block
+          below belongs to this row and can be put away again. */}
+      {onOpen ? <Chevron color={c.textTertiary} down={expanded} /> : null}
     </Pressable>
   );
 }
 
 /** Two borders on a rotated square, which is the app's chevron everywhere. */
-function Chevron({ color }: { color: string }) {
-  return <View style={[styles.chev, { borderColor: color }]} />;
+function Chevron({ color, down = false }: { color: string; down?: boolean }) {
+  return <View style={[styles.chev, down && styles.chevDown, { borderColor: color }]} />;
+}
+
+/**
+ * One rival's team, opened out of their row.
+ *
+ * A COMPONENT SO THAT MOUNTING IS THE FETCH. `useContestLineup` idles on a null
+ * contest and keys its result to the request that asked for it, so collapsing a
+ * row genuinely stops the read and opening another cannot draw the first one's
+ * cards under the second one's name — the mismatch that hook's own header is
+ * written about.
+ *
+ * NO HEADING. `EntryLineup` titles itself "Starting lineup" wherever it stands
+ * alone; here the row directly above it is the heading, and a second one would
+ * be the panel naming the same thing twice in fourteen points. The hint keeps
+ * the one fact the row does not carry — whether these cards can still change.
+ */
+function EntrantLineup({
+  contestId,
+  userId,
+  slotCount,
+  locked,
+}: {
+  contestId: string;
+  userId: string;
+  slotCount: number;
+  locked: boolean;
+}) {
+  const { slots, loading } = useContestLineup(contestId, userId);
+  return (
+    <EntryLineup
+      title=""
+      slots={slots ?? []}
+      loading={loading && slots === null}
+      placeholder={slotCount}
+      hint={locked ? 'Locked in' : 'Can still change before kickoff'}
+      empty="Nothing filed"
+      emptyBody="This entry has no cards in it yet."
+    />
+  );
 }
 
 const styles = StyleSheet.create({
@@ -265,4 +382,8 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.half,
     flexShrink: 0,
   },
+  /* A quarter turn on from the ›, so the same two borders point down. The mark
+     is drawn from its own corner rather than its centre, so it also needs a
+     point of lift to sit on the row's centre line once turned. */
+  chevDown: { transform: [{ rotate: '135deg' }], marginTop: -3 },
 });

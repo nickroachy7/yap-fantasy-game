@@ -37,7 +37,7 @@
  * — so the footer those live on is not missing, it is inapplicable. A finished
  * contest is a thing you read.
  */
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { EntryLineup } from '@/components/contests/EntryLineup';
 import { ContestFieldPanel } from '@/components/contests/ContestFieldPanel';
@@ -59,12 +59,9 @@ export function weekLabel(seasonType: string, week: number): string {
 export function ContestRecapPanel({
   entry,
   onBack,
-  onOpenEntry,
 }: {
   entry: HistoryEntry;
   onBack: () => void;
-  /** Another manager's lineup. Still a push — see the note in `contests`. */
-  onOpenEntry: (userId: string, displayName: string) => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -144,34 +141,83 @@ export function ContestRecapPanel({
         loading={fieldLoading}
         error={fieldError}
         slotCount={slots?.length ?? 0}
-        onOpen={(e) => onOpenEntry(e.userId, e.displayName)}
+        contestId={entry.contestId}
       />
     </>
   );
 }
 
 /**
- * The way back one level, shared by both archive views.
+ * The way back one level, shared by every view of the contests sheet.
  *
- * Exported so the history panel and this one cannot drift into two different
- * back buttons on two screens of the same sheet.
+ * Exported so that four screens of one sheet cannot drift into four different
+ * back buttons — the archive, a recap, a contest and a rival's team all draw
+ * this, and the reader should not be able to tell which one they are on from
+ * the shape of the control that leaves it.
+ *
+ * ---------------------------------------------------------------------------
+ * IT IS A CONTROL NOW, NOT A LINE OF TEXT
+ * ---------------------------------------------------------------------------
+ *
+ * It was `‹  Contests` set in 13pt secondary with nothing around it, on the
+ * reasoning the carousel's rail uses for its own back link: a pill is a promise
+ * that something happens, and going somewhere is not that. That argument holds
+ * on the rail, where the words sit in a band between two other objects and a
+ * chip would make three. Here it is alone at the top of a sheet with a page of
+ * air around it, and the same restraint read as an unstyled fragment left over
+ * from something rather than as the way out.
+ *
+ * SO IT MATCHES THE ✕ IT IS THE COUNTERPART OF: the same 30pt height, the same
+ * `backgroundElement` fill going to `backgroundSelected` under a press, no
+ * border on either. Those two controls do the two things you can do with a
+ * nested sheet — go up one, or put the whole thing down — and they now read as
+ * a pair rather than as a button and a caption.
+ *
+ * THE LABEL IS THE DESTINATION, and it is why this is a pill rather than a bare
+ * chevron matching the ✕ exactly. A ‹ on its own is unambiguous about direction
+ * and silent about where it lands, and this sheet has four places it can land.
  */
 export function BackRow({ label, onPress }: { label: string; onPress: () => void }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   return (
-    <Text
+    <Pressable
+      onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`Back to ${label.toLowerCase()}`}
-      onPress={onPress}
-      style={[Type.strong, styles.back, { color: c.textSecondary }]}>
-      {`‹  ${label}`}
-    </Text>
+      hitSlop={8}
+      style={({ pressed }) => [
+        styles.back,
+        { backgroundColor: pressed ? c.backgroundSelected : c.backgroundElement },
+      ]}>
+      {/* Optically raised: a ‹ sits low in its own box against a 12pt label. */}
+      <Text style={[styles.backGlyph, { color: c.textSecondary }]}>‹</Text>
+      <Text numberOfLines={1} style={[styles.backLabel, { color: c.text }]}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  back: { paddingVertical: Spacing.two, alignSelf: 'flex-start' },
+  /* 30 and 15 are the ✕'s own height and radius — see `BackRow`. The right
+     padding is tighter than the left because the chevron carries air inside its
+     own box and the word does not. */
+  back: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    maxWidth: '100%',
+    height: 30,
+    borderRadius: 15,
+    paddingLeft: Spacing.two,
+    paddingRight: Spacing.three - 4,
+  },
+  backGlyph: { fontSize: 15, lineHeight: 16, fontWeight: '700', marginTop: -1 },
+  /* The rail's back label exactly, for the reason given there: a word read at
+     the start of a line beside an arrow, not a heading. */
+  backLabel: { fontSize: 12, lineHeight: 15, fontWeight: '600', flexShrink: 1, minWidth: 0 },
   head: {
     flexDirection: 'row',
     alignItems: 'center',

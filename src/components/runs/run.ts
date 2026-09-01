@@ -104,6 +104,31 @@ export function parseRun(data: unknown): Run | null {
 }
 
 /**
+ * ---------------------------------------------------------------------------
+ * THREE SENTENCES WITH NOBODY LEFT TO SAY THEM — `recordOf`, `wageredLine` AND
+ * `nextRungLine` — KEPT ANYWAY
+ * ---------------------------------------------------------------------------
+ *
+ * All three were written for the contests sheet's run panel, and that panel is
+ * a one-row rail now: the rack, and how many hearts are free to stake. The
+ * record, what is riding and what the next rung buys did not survive the cut —
+ * see `RunRail` for the argument, which is that the Entered tab answers "what
+ * is riding" with the actual contests, and the other two are true without ever
+ * being urgent.
+ *
+ * They are kept because they are the WORDING of facts this game still turns on,
+ * and the ladder in particular is the only thing standing between a death and
+ * losing everything — a run should be able to see the next rung without dying
+ * first, and the day that goes back on a screen it should go back in these
+ * words rather than in a second set written from scratch. `parseRun` produces
+ * everything they read.
+ *
+ * If they are still unused when the profile grows a run section, that is the
+ * screen they belong on. If that never happens, delete them; an unused export
+ * is only worth its comment for so long.
+ */
+
+/**
  * "3-1" — the run's record, or null before it has one.
  *
  * Null rather than "0-0" on a fresh run: a record of nothing is not a fact
@@ -115,17 +140,39 @@ export function recordOf(run: Run): string | null {
 }
 
 /**
- * What is currently on the line, as a sentence, or null when nothing is.
+ * WHAT THE RUN IS HOLDING, and how much of it can still be spent.
+ *
+ * "3 hearts · 1 free to stake". The count is the headline of the run panel and
+ * the free half is the half that changes what you do next: three hearts with
+ * two already riding is one heart of room, and a lobby priced in hearts cannot
+ * be read without that subtraction having been done for you.
+ *
+ * ALL STAKED IS A STATE, NOT A NOUGHT. "0 free to stake" invites the reader to
+ * check the arithmetic; the words say the same thing and say it as a condition
+ * they are in.
+ */
+export function heartsLine(run: Run): string {
+  const held = run.hearts === 1 ? '1 heart' : `${run.hearts} hearts`;
+  if (run.wagered <= 0) return held;
+  const free = run.hearts - run.wagered;
+  if (free <= 0) return `${held} · all staked`;
+  return `${held} · ${free} free to stake`;
+}
+
+/**
+ * What is currently on the line, as a phrase, or null when nothing is.
  *
  * SAID IN CONTESTS, NOT IN HEARTS, because the rack beside it is already saying
  * it in hearts — the words are there to name WHERE the stake is, which the pips
- * cannot. "2 riding in 2 contests" would be the same fact three times.
+ * cannot. It does not repeat the word either: `heartsLine` sits directly above
+ * it and has just spent it twice, so this is "2 riding on 2 contests" rather
+ * than "2 hearts riding on 2 contests" — the unit is established by the line
+ * above and by the pips beside it.
  */
 export function wageredLine(run: Run): string | null {
   if (run.wagered <= 0 || run.wageredIn <= 0) return null;
-  const hearts = run.wagered === 1 ? '1 heart' : `${run.wagered} hearts`;
   const where = run.wageredIn === 1 ? 'a contest' : `${run.wageredIn} contests`;
-  return `${hearts} riding on ${where}`;
+  return `${run.wagered} riding on ${where}`;
 }
 
 /**

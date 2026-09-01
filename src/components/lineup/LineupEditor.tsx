@@ -40,7 +40,7 @@
  * case a button genuinely handled — the write FAILING — gets a retry, because
  * an autosave that cannot save and cannot be told to try again is a dead end.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ActivityIndicator,
@@ -115,6 +115,74 @@ export type LineupEditorProps = {
    * know to close.
    */
   onEntered?: (contestCode: string) => void;
+  /**
+   * WHERE THE ENTRY BUTTON GOES, when it is not going here.
+   *
+   * ---------------------------------------------------------------------------
+   * WHY THE OFFER IS HANDED OUT RATHER THAN THE BUTTON
+   * ---------------------------------------------------------------------------
+   *
+   * The entry control's whole state — whether the lineup is full, what the fee
+   * is, whether a write is in flight — is derived inside this component from
+   * picks it holds locally, and it stays here. What crosses the boundary is a
+   * description of the offer, so the caller can draw it in its own material
+   * without learning anything about how a lineup is composed.
+   *
+   * IT IS A DESCRIPTION AND A REF, NOT A NODE AND NOT A CALLBACK IN THE OBJECT.
+   * `submit` changes identity on every edit, so putting it in the reported
+   * object would either re-report on every keystroke or capture a stale closure
+   * — the first is churn and the second is a button that files a lineup two
+   * swaps out of date. A mutable ref written on every render is always current
+   * and never a dependency.
+   *
+   * PASSING THIS SUPPRESSES THE INLINE BUTTON, which is the point: two live
+   * entry buttons for one entry is the parallel-copy problem this file's own
+   * header warns about, applied to the control that spends the coins.
+   */
+  onEntryOffer?: (offer: EntryOffer | null) => void;
+  /** Filled with the current actions so floated buttons can call them. */
+  entryRef?: MutableRefObject<EntryActions | null>;
+};
+
+/**
+ * The entry, as everything a button needs to offer it and nothing else.
+ *
+ * `ready` is deliberately not derivable by the caller from `filled` and `slots`
+ * alone: a lineup is enterable when every slot is full AND the week is not
+ * locked, and the second half is this component's to know.
+ */
+export type EntryOffer = {
+  ready: boolean;
+  fee: number;
+  slots: number;
+  filled: number;
+  /** A write is in flight; the button must not fire a second one. */
+  busy: boolean;
+  /**
+   * There is an empty slot with a card that could go in it.
+   *
+   * FALSE ON A FULL LINEUP AND ON AN EMPTY BENCH ALIKE, which are the two
+   * states where the control would do nothing — and a button that does nothing
+   * is worse than an absent one, because pressing it teaches the reader that
+   * the app is broken rather than that they are done.
+   */
+  canAutofill: boolean;
+  /** There is at least one filled slot to empty. */
+  canClear: boolean;
+};
+
+/**
+ * What a floated bar can DO, held in a ref rather than reported.
+ *
+ * These change identity on every edit — `submit` closes over the picks and
+ * `autofill` over the eligible lists — so reporting them alongside the offer
+ * would either re-report on every keystroke or hand out a stale closure. A
+ * mutable ref written each render is always current and never a dependency.
+ */
+export type EntryActions = {
+  submit: () => void;
+  autofill: () => void;
+  clear: () => void;
 };
 
 /**
@@ -147,7 +215,13 @@ const DEBOUNCE_MS = 700;
  */
 const LIVE_POLL_MS = 60_000;
 
-export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: LineupEditorProps = {}) {
+export function LineupEditor({
+  pinnedContest,
+  frame = 'screen',
+  onEntered,
+  onEntryOffer,
+  entryRef,
+}: LineupEditorProps = {}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const router = useRouter();
@@ -547,6 +621,20 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
     [eligibleBySlot, unavailableIds],
   );
 
+  /**
+   * Whether autofill has anything to do: an empty slot with a startable card in
+   * its list. Counted rather than simulated — the exact answer would mean
+   * running the whole assignment on every render to grey out one button, and
+   * the two disagree only in the case where a slot's single candidate has
+   * already been taken by another empty slot. That press fills what it can and
+   * leaves the impossible row, which is the same outcome the reader would get
+   * by hand.
+   */
+  const canAutofill = useMemo(
+    () => slots.some((cfg) => !picks[cfg.slot] && (eligibleCounts.get(cfg.slot) ?? 0) > 0),
+    [slots, picks, eligibleCounts],
+  );
+
   /* Grouped by position, not sorted by the reader — see `sortByPosition`. The
      `sort` state below still drives the SWAP SHEET, where choosing an ordering
      is the whole point of the list. */
@@ -619,6 +707,101 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
     },
     [overCap, capMessage],
   );
+
+  /**
+   * FILL EVERY EMPTY SLOT, from the lists the picker itself would show.
+   *
+   * ---------------------------------------------------------------------------
+   * IT INVENTS NO RANKING, AND THAT IS THE WHOLE DESIGN
+   * ---------------------------------------------------------------------------
+   *
+   * The obvious way to build this is to decide what "best" means — career FP,
+   * tier, closest to the next threshold — and there is no honest answer,
+   * because this app sells no projections and every one of those is a different
+   * bet. Worse, any answer would be a SECOND opinion: the swap sheet already
+   * orders each slot's candidates, by the reader's own `sort`, and an autofill
+   * that disagreed with the list it is standing next to would be the app
+   * arguing with itself about which card is better.
+   *
+   * So it takes the top of each slot's list, exactly as `eligibleBySlot` has
+   * already ordered it. Change the sort and autofill changes with it, which
+   * makes the control legible without a word of explanation: it picks what you
+   * would have picked first.
+   *
+   * ---------------------------------------------------------------------------
+   * SCARCEST SLOT FIRST, WHICH IS NOT FUSSINESS
+   * ---------------------------------------------------------------------------
+   *
+   * A greedy pass in slot order starves the strict slots: FLEX is eligible for
+   * nearly everybody, so filling it first can take the one running back the RB
+   * slot could have used, and leave a hole in a lineup that had a legal answer.
+   * Filling the narrowest choice first is the standard fix and costs one sort.
+   *
+   * It is not a full matching and does not need to be. A case where even that
+   * fails wants a card you do not hold, and the reader is left with an empty
+   * row to fill by hand — which is the same place they started, not a worse
+   * one.
+   *
+   * ONE EDIT, NOT N. `setEdits` is called once with every slot resolved, so the
+   * autosave debounce sees a single change and writes a single lineup. Calling
+   * `setPick` in a loop would queue eight state updates and, worse, eight
+   * chances for the cap gate to fire halfway through a half-built team.
+   */
+  const autofill = useCallback(() => {
+    if (overCap) {
+      setSubmitError(capMessage);
+      return;
+    }
+    const taken = new Set(
+      slots.map((cfg) => picks[cfg.slot]).filter((id): id is string => Boolean(id)),
+    );
+    const empty = slots
+      .filter((cfg) => !picks[cfg.slot])
+      .sort((a, b) => (eligibleCounts.get(a.slot) ?? 0) - (eligibleCounts.get(b.slot) ?? 0));
+
+    const filled: Record<string, string> = {};
+    for (const cfg of empty) {
+      const pick = (eligibleBySlot.get(cfg.slot) ?? []).find(
+        (card) => !unavailableIds.has(card.id) && !taken.has(card.id),
+      );
+      if (!pick) continue;
+      filled[cfg.slot] = pick.id;
+      taken.add(pick.id);
+    }
+    if (Object.keys(filled).length === 0) return;
+
+    setEdits((e) => ({ ...e, ...filled }));
+    setSubmitError(null);
+    setBlocked(false);
+  }, [overCap, capMessage, slots, picks, eligibleBySlot, eligibleCounts, unavailableIds]);
+
+  /**
+   * EMPTY EVERY SLOT, in one edit.
+   *
+   * The swap sheet can already clear a row at a time, which is right for
+   * changing your mind about one card and wrong for starting over — eight taps
+   * through eight sheets to get back to where autofill started. This is the
+   * counterpart to `autofill` and it is deliberately the same shape: one
+   * `setEdits`, so the autosave writes once rather than eight times.
+   *
+   * IT DOES NOT ASK. Nothing is spent, nothing is lost, and the picks are one
+   * press of the other button away from coming back — a confirm here would be
+   * ceremony around an act with no consequence. The fee is the thing that
+   * cannot be undone, and it is on a different button entirely.
+   */
+  const clearAll = useCallback(() => {
+    if (overCap) {
+      setSubmitError(capMessage);
+      return;
+    }
+    const emptied: Record<string, null> = {};
+    for (const cfg of slots) if (picks[cfg.slot]) emptied[cfg.slot] = null;
+    if (Object.keys(emptied).length === 0) return;
+
+    setEdits((e) => ({ ...e, ...emptied }));
+    setSubmitError(null);
+    setBlocked(false);
+  }, [overCap, capMessage, slots, picks]);
 
   const clearPick = useCallback(
     (slot: string) => {
@@ -874,6 +1057,15 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
     if (boughtEntry && contestCode) onEntered?.(contestCode);
   }, [slate, picks, contestCode, reloadLineup, reload, reloadMyContests, needsEntry, onEntered]);
 
+  /* THE REF, REWRITTEN EVERY RENDER so a floated button never holds a stale
+     `submit`. No dependency array on purpose: the whole job is to be current,
+     and an effect that ran only on identity change would be the stale-closure
+     bug written more carefully. */
+  useEffect(() => {
+    if (entryRef) entryRef.current = { submit: () => void submit(), autofill, clear: clearAll };
+  });
+
+
   /**
    * The autosave.
    *
@@ -984,6 +1176,53 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
      for a frame before settling to three. Held rather than shown — a board
      that changes shape under the reader looks like a bug, and in a sheet it is
      the first thing they see. */
+  /**
+   * THE OFFER, REPORTED ON ITS OWN FACTS.
+   *
+   * Every dependency here is a primitive, so this fires when the offer actually
+   * changes rather than on every render — which matters because the caller's
+   * handler is a `setState` and this is the component the reader is editing in.
+   *
+   * IT SITS ABOVE THE LOADING RETURN, like `useSettledResults` a few lines
+   * down and for the same reason: hooks cannot be called conditionally and
+   * there is an early exit below. `starters` rather than `filled`, which is
+   * derived after that exit — the same number, read where it is legal.
+   */
+  useEffect(() => {
+    if (!onEntryOffer) return;
+    onEntryOffer(
+      needsEntry && !allLocked
+        ? {
+            ready: starters.length === slots.length,
+            fee: contest?.entryFeeCoins ?? 0,
+            slots: slots.length,
+            filled: starters.length,
+            busy: saving,
+            canAutofill,
+            canClear: starters.length > 0,
+          }
+        : null,
+    );
+    /* AND WITHDRAWN ON THE WAY OUT. An offer is only good while the thing
+       making it is on screen: this editor unmounts when the contest page moves
+       to another tab, and without this the caller keeps the last offer it was
+       handed — which put a live "Fill all 3 slots to enter" bar over the
+       leaderboard, offering to spend coins from a face that has no lineup on
+       it. Caught on a device; no test would have seen it, because the bug is
+       entirely in what a second component does with state after the first one
+       is gone. */
+    return () => onEntryOffer(null);
+  }, [
+    onEntryOffer,
+    needsEntry,
+    allLocked,
+    starters.length,
+    slots.length,
+    contest?.entryFeeCoins,
+    saving,
+    canAutofill,
+  ]);
+
   /* ABOVE THE LOADING RETURN, because hooks cannot be called conditionally and
      there is an early exit a few lines down. It costs nothing there: the hook
      is off entirely when `pinned`, and its own reads are gated. */
@@ -1001,6 +1240,8 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
   }
 
   const filled = starters.length;
+
+
   /* "About to save" — the debounce window. The status line has to cover it or
      there is a visible second where an edit has been made and the screen says
      it is saved. */
@@ -1252,7 +1493,7 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
           says so, but that is the rule for a free contest you are already in;
           paying forty coins for two of three slots is a mistake somebody makes
           once and cannot undo, and the server will not stop them. */}
-      {needsEntry && !allLocked ? (
+      {needsEntry && !allLocked && !onEntryOffer ? (
         <Pressable
           onPress={filled === slots.length ? () => void submit() : undefined}
           disabled={filled !== slots.length || saving}
