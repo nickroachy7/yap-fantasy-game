@@ -34,3 +34,33 @@ export const horizontalStrip = {
   alwaysBounceHorizontal: false,
   overScrollMode: 'never',
 } as const;
+
+/**
+ * The props a VERTICAL scroller wants, which is one prop and a colour decision.
+ *
+ * ---------------------------------------------------------------------------
+ * THE DEFAULT INDICATOR FOLLOWS THE DEVICE, AND THIS APP DOES NOT
+ * ---------------------------------------------------------------------------
+ *
+ * `indicatorStyle` left unset resolves to UIKit's `default`, which adapts to
+ * the SYSTEM appearance: a dark bar under a light device setting, a bright one
+ * under a dark setting. Every other colour in this app is fixed — see
+ * `use-color-scheme`, where shipping one theme is a product decision — so the
+ * one element still asking the phone what it thinks is a scroll indicator, and
+ * it answers differently for two players looking at the same screen.
+ *
+ * `black` pins it. On a #080808 page that is a bar you can find when you are
+ * looking for it and do not notice when you are not, which is what a scroll
+ * indicator is for: it reports how far down a list you are, and it is never the
+ * thing you came to read. iOS draws it with a faint light edge, so it does not
+ * vanish outright against the page.
+ *
+ * THE WEB HALF IS IN `global.css`. react-native-web renders these as a real
+ * overflow container with the browser's own scrollbar on it, which no React
+ * prop reaches — `indicatorStyle` is silently dropped there. The rules under
+ * `::-webkit-scrollbar` are the same decision expressed in the only vocabulary
+ * that platform has.
+ */
+export const quietScrollbar = {
+  indicatorStyle: 'black',
+} as const;

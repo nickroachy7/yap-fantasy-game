@@ -19,6 +19,7 @@
 import { FlatList, StyleSheet } from 'react-native';
 
 import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
+import { quietScrollbar } from '@/components/ui/scroll-strip';
 import { Spacing } from '@/constants/theme';
 
 import { PLAYER_ROW_HEIGHT, PlayerRow, type RowFigure } from './PlayerRow';
@@ -48,6 +49,7 @@ export function PlayerList({
 
   return (
     <FlatList
+      {...quietScrollbar}
       data={players}
       keyExtractor={keyExtractor}
       renderItem={({ item }) => (

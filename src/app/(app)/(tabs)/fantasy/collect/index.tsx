@@ -92,6 +92,7 @@ import { useCollection } from '@/components/collection/use-collection';
 import { useOffers } from '@/components/collection/use-offers';
 import type { PosFilter } from '@/components/cards/PositionFilter';
 import { Screen } from '@/components/shell/Screen';
+import { quietScrollbar } from '@/components/ui/scroll-strip';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -737,6 +738,7 @@ export default function InventoryScreen() {
             </View>
 
             <FlatList
+              {...quietScrollbar}
               // numColumns cannot change on a live list, so a width change that
               // changes the column count remounts it. Holding the first render
               // until the measurement lands avoids one guaranteed remount.

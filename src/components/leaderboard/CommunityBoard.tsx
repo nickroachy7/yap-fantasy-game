@@ -32,6 +32,7 @@ import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { POS_FILTERS, type PosFilter } from '@/components/cards/PositionFilter';
 import { MenuButton, MenuHeading, MenuItem } from '@/components/ui/MenuButton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { quietScrollbar } from '@/components/ui/scroll-strip';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
@@ -222,6 +223,7 @@ export function CommunityBoard({
         </View>
       ) : null}
       <FlatList
+        {...quietScrollbar}
         ref={list}
         data={rows ?? []}
         style={styles.fill}

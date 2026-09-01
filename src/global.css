@@ -96,3 +96,74 @@ body {
   height: 100%;
 }
 
+
+/**
+ * SCROLLBARS, AS QUIET AS THE PLATFORM WILL LET THEM BE.
+ *
+ * ---------------------------------------------------------------------------
+ * THIS IS THE WEB HALF OF A DECISION MADE IN TWO PLACES
+ * ---------------------------------------------------------------------------
+ *
+ * The other half is `quietScrollbar` in `components/ui/scroll-strip.ts`, which
+ * pins iOS's indicator to the dark variant. It cannot help here:
+ * react-native-web renders a ScrollView as an ordinary overflow container with
+ * the BROWSER's scrollbar on it, and `indicatorStyle` is dropped on the floor.
+ * So the same intent has to be restated in CSS, and it applies to the document
+ * and to every scrolling view in the app at once.
+ *
+ * `color-scheme: dark` above already gets most of the way there — it is what
+ * makes the bar render as a dark widget rather than a light one on a black
+ * page. What it does not do is make it THIN, and the default is a 15px trough
+ * with a grey thumb, which on a page whose densest object is a 343pt card is a
+ * visible column of chrome down one side.
+ *
+ * SIX POINTS AND EIGHT PERCENT WHITE. Enough to see where you are in a list
+ * when you go looking; not enough to read as a border on the page. The track is
+ * transparent rather than tinted, so nothing is drawn at all where the thumb is
+ * not — a tinted trough is a permanent line, which is the thing being removed.
+ *
+ * IT BRIGHTENS ON HOVER, and only on hover. A pointer over the bar is somebody
+ * who has gone looking for it, which is the one moment it should be easy to
+ * grab. Touch devices never fire it.
+ *
+ * TWO VOCABULARIES, BOTH REQUIRED. `::-webkit-scrollbar` is Chrome, Edge and
+ * Safari; `scrollbar-width`/`scrollbar-color` is the standard property and is
+ * what Firefox reads. Neither is a superset of the other, and Firefox's `thin`
+ * is the only width it offers — there is no 6px there, which is why the two
+ * halves do not produce pixel-identical bars and do not need to.
+ *
+ * NOT `display: none`. A scrollbar is the only thing on a long page that says
+ * how much of it there is, and a desktop reader with a mouse wheel and no
+ * position readout is lost in a way a phone reader never is. This is meant to
+ * be findable, not gone. The views that genuinely want it GONE already say so
+ * in React — `showsVerticalScrollIndicator={false}` compiles to its own rule
+ * and still wins, because it is set on the element rather than here.
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.18);
+}
+
+/* The square where the two bars meet. Left undrawn, it renders as a pale block
+   in the corner of any view that scrolls both ways. */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}

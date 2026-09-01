@@ -28,6 +28,7 @@ import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } f
 import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { MenuButton, MenuHeading, MenuItem } from '@/components/ui/MenuButton';
 import { DASH } from '@/components/ui/DataTable';
+import { quietScrollbar } from '@/components/ui/scroll-strip';
 import { Colors, Spacing, Type, type CardTier } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
@@ -306,6 +307,7 @@ export function PointsBoard({
         </View>
       ) : null}
       <FlatList
+        {...quietScrollbar}
         ref={list}
         data={boardRows}
         style={styles.fill}

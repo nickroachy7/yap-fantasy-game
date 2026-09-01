@@ -14,6 +14,7 @@ import { isOverlayPath, webSectionOf } from '@/components/shell/sections';
 import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { WebPageTabs } from '@/components/shell/WebPageTabs';
+import { quietScrollbar } from '@/components/ui/scroll-strip';
 import { Colors, ContentMeasure, Spacing, type Measure } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -222,6 +223,7 @@ export function Screen({
 
   const body = scroll ? (
     <ScrollView
+      {...quietScrollbar}
       contentContainerStyle={[
         styles.content,
         flush && styles.flushTop,
