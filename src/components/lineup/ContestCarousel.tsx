@@ -28,6 +28,13 @@
  * THE RACK IS ALSO THE NAVIGATOR. Tapping a heart goes to the page it belongs
  * to — its contest, or the lobby tile for a heart still free. See `pipPage`.
  *
+ * THE PAGES ARE WIDER THAN THE CARD, and the difference is what you see during
+ * a swipe: two cards with air between them, the one leaving dimming as it
+ * goes. Before this a page was exactly the card, so mid-drag the two
+ * borders met and the pair read as one torn sheet rather than as two objects.
+ * The card did not shrink to pay for it — the stage spread into the screen's
+ * padding instead. See `PAGE_GUTTER` and `Page`.
+ *
  * ---------------------------------------------------------------------------
  * `onMomentumScrollEnd` DOES NOT EXIST ON WEB
  * ---------------------------------------------------------------------------
@@ -42,10 +49,15 @@
  * silently inert — it is accepted, forwarded to the scroll responder, and never
  * fired. Checked in `node_modules`, not inferred from the symptom.
  *
- * So web listens on `onScroll` as well. The handler is the same one and it is
- * idempotent — it compares against the current index and returns — so the extra
- * ticks during a drag cost nothing but a page change as you pass the halfway
- * point, which is what a snapping carousel should do anyway.
+ * So web listens on `onScroll` as well. The handler is idempotent — it compares
+ * against the current index and returns — so the extra ticks during a drag cost
+ * nothing but a page change as you pass the halfway point, which is what a
+ * snapping carousel should do anyway.
+ *
+ * Both platforms are now on that same `onScroll`, because the pages dim as they
+ * leave and the fade needs the offset on every frame rather than once per
+ * settle. It is a worklet, so native pays nothing across the bridge for it,
+ * and the settle inside it is still gated to web — see `onScroll` below.
  *
  * The snapping itself is fine on web: `pagingEnabled` compiles to CSS
  * scroll-snap there, so the offset always settles on a real page and the
@@ -55,7 +67,7 @@
  * `goTo` exists because none of that fires for a PROGRAMMATIC scroll: a tap on a
  * heart has to move the list and the state itself.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   FlatList,
   Platform,
@@ -67,6 +79,13 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
+import Animated, {
+  runOnJS,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  type SharedValue,
+} from 'react-native-reanimated';
 
 import { ContestCard } from '@/components/contests/ContestCard';
 import { termsOfEntry, type MyContest } from '@/components/contests/use-my-contests';
@@ -102,6 +121,97 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  * ships to Android and the arrows vanish, that clipping is the reason.
  */
 const CHEV_GUTTER = 14;
+
+/**
+ * The air between one card and the next, and the whole of this revamp.
+ *
+ * ---------------------------------------------------------------------------
+ * THE PAGES USED TO BE THE COLUMN, SO THE CARDS TOUCHED
+ * ---------------------------------------------------------------------------
+ *
+ * A page was exactly as wide as the card on it. That is invisible at rest — one
+ * card, centred, nothing beside it — and it is the whole problem the moment a
+ * thumb is on the screen: mid-drag the outgoing card's right border sat flush
+ * against the incoming card's left one, two bordered slabs sharing an edge and
+ * both bleeding off the screen. It did not read as two cards moving past each
+ * other. It read as one torn sheet, which is what a carousel looks like when
+ * nobody has looked at it mid-swipe.
+ *
+ * THE FIX IS NOT TO SHRINK THE CARD. `CHEV_GUTTER` above already argues that
+ * the card cannot pay for its own affordance, and taking 32pt out of it to make
+ * room for a gap would be the same mistake with a nicer motive.
+ *
+ * So the PAGE grows instead of the card shrinking. The stage cancels `Screen`'s
+ * padding the way the boards below it already do (`LineupEditor.bleed`), which
+ * makes each page 32pt wider than the column while the card inside keeps every
+ * point it had. At rest the card lands exactly where it landed before — the
+ * padding is back, as padding — and during a drag there are 32 points of page
+ * background between the two cards.
+ *
+ * Deliberately NOT a peek. The neighbour is still exactly one page away, so it
+ * is off-screen when the scroll settles; the header's note on `step` explains
+ * why a permanent sliver of the next card was tried and reverted, and nothing
+ * here disturbs that. This is air during the gesture only.
+ */
+const PAGE_GUTTER = Spacing.three;
+
+/**
+ * How far a page fades as it leaves. See `Page`.
+ *
+ * ---------------------------------------------------------------------------
+ * IT IS A FADE AND NOT A SCALE, AND THAT WAS LEARNED THE HARD WAY
+ * ---------------------------------------------------------------------------
+ *
+ * The leaving page used to give up 6% of its size as well as half its opacity,
+ * which is the standard carousel move and reads well in the abstract. On this
+ * card it produced two separate defects on a real phone, and they have one
+ * cause: the card is a ROUNDED CLIP WITH A BORDER, and scaling one of those
+ * resamples both.
+ *
+ *   THE BORDER FLICKERED. At the hairline it was, a 0.33pt line scaled to 0.94
+ *   lands at 0.31 — under a physical pixel, so it winked in and out along the
+ *   edge as the card moved. `ContestCard.styles.card` covers that half: the
+ *   outline is a whole point now, which survives the arithmetic.
+ *
+ *   THE CORNERS BROKE UP. That half cannot be fixed by making the line thicker.
+ *   A corner is an antialiased mask, and rescaling an antialiased curve every
+ *   frame gives you a different approximation of it every frame — the curve
+ *   crawls. It is at its worst on exactly the geometry this card has: a tight
+ *   radius, a bright line on it, and a dark page behind.
+ *
+ * So the scale is gone and the fade does the work alone. Nothing was really
+ * lost: the 32pt gutter is what separates the two cards mid-drag (see
+ * `PAGE_GUTTER`), and the fade is what ranks them. The scale was ranking them a
+ * second time, in the one currency this card cannot pay in.
+ */
+const PAGE_FADE = 0.5;
+
+/**
+ * How far off a page has to be before it starts to dim at all.
+ *
+ * ---------------------------------------------------------------------------
+ * A PAGE AT REST MUST BE AT EXACTLY 1, NOT AT 0.997
+ * ---------------------------------------------------------------------------
+ *
+ * A paged scroll does not always come to rest on a whole number of pages: it
+ * settles a fraction of a point off, and it stays there. Without a deadzone
+ * that fraction goes straight into the fade, so the card in front of you sits
+ * at an opacity a hair under 1 — invisible as brightness, and NOT invisible as
+ * geometry, because a view at opacity 1 is composited in place while a view at
+ * 0.997 is rendered offscreen and blended. The offscreen pass resamples the
+ * card's edges, so its one-point border and its rounded corners come back very
+ * slightly softer, and the card reads as fractionally smaller than the one you
+ * just came from. That was reported as "an extremely subtle difference in size
+ * between the cards", and the cards are the same size to the point.
+ *
+ * A twentieth of a page is far more than any settle residual and far less than
+ * any real drag, so the page you are on is exactly 1 and the fade still starts
+ * the instant a swipe is under way.
+ */
+const PAGE_HOME = 0.05;
+
+/** Captured once, because a worklet cannot read a getter off a module. */
+const WEB = Platform.OS === 'web';
 
 /** The lobby button's height. See `styles.enter` for why it is not `ControlDiameter`. */
 const ENTER_HEIGHT = 28;
@@ -169,7 +279,8 @@ export function ContestCarousel({
   const { width: windowWidth } = useWindowDimensions();
   /* Before the parent has measured, fall back to the window rather than to
      zero: a zero-width page makes `getItemLayout` divide by nothing and the
-     list snaps to index NaN.
+     list snaps to index NaN. The window is the screen, so the COLUMN it stands
+     in for is the window less the two gutters `Screen` pads it by.
 
      A PEEK WAS TRIED HERE — a sliver of the next card at the right edge, in
      place of the page dots. It is the standard carousel affordance and it was
@@ -177,7 +288,19 @@ export function ContestCarousel({
      bordered slab at the edge looks like a layout fault rather than a hint, and
      at any width small enough not to, it reads as a rendering seam. Full-width
      pages, and the swipe is advertised some other way. */
-  const step = width > 0 ? width : windowWidth;
+  const column = width > 0 ? width : Math.max(0, windowWidth - PAGE_GUTTER * 2);
+
+  /**
+   * The stride: one page, which is the card plus a gutter either side.
+   *
+   * EVERYTHING PAGES ON THIS and nothing pages on the card's width any more —
+   * `getItemLayout`, the settle's rounding, `goTo`'s offset and the stage's own
+   * frame. `pagingEnabled` snaps by the SCROLLER's width rather than by the
+   * item's, so the stage bleeding into `Screen`'s padding is not cosmetic: it
+   * is what keeps the frame and the item the same size and the snap on a real
+   * page. See `PAGE_GUTTER`.
+   */
+  const step = column + PAGE_GUTTER * 2;
 
   /* A dead run draws no rack, which is the masthead's old rule and its reason
      holds here too: an empty rack is the death screen's line to deliver, and
@@ -223,11 +346,32 @@ export function ContestCarousel({
    */
   const settledAt = useRef(index);
 
-  /* "The scroll has settled on a page." Native learns that from momentum end;
-     web from the debounced scroll event. Same arithmetic either way. */
-  const onSettle = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const next = Math.round(e.nativeEvent.contentOffset.x / step);
+  /**
+   * WHERE THE SCROLLER IS, live and fractional — the input the pages fade on.
+   *
+   * A shared value rather than state because it changes every frame of a drag,
+   * and nothing in React should hear about that: `page` below is the same fact
+   * rounded off and reported once per settle, which is all the board needs.
+   *
+   * IN PAGES, NOT IN POINTS, and that is not a convenience. `step` is measured,
+   * so it is wrong on the first render and right on the second; an offset in
+   * points would therefore need re-scaling the moment the column was measured,
+   * and the only writer is a scroll handler that does not run until something
+   * moves. In pages the seed is just `index` — true at any width, including a
+   * width nobody has measured yet.
+   *
+   * WRITTEN IN EXACTLY ONE PLACE, the handler below. A programmatic jump does
+   * not need a second writer: `scrollToOffset` emits a scroll event on both
+   * platforms this ships to, so the handler hears about a heart tap the same
+   * way it hears about a thumb.
+   */
+  const offset = useSharedValue(index);
+
+  /* "The scroll has settled on page N." Native is told by momentum end, web by
+     the scroll stream. Idempotent — it compares against the current index and
+     returns — which is what lets web hand it every tick of a drag. */
+  const settleTo = useCallback(
+    (next: number) => {
       /* EVERY PAGE IS A CONTEST NOW. The list used to carry one more — the
          lobby tile as a footer — and every bound here was `contests.length`
          rather than the last index because of it. */
@@ -236,7 +380,46 @@ export function ContestCarousel({
       setPage(next);
       if (next !== index) onIndexChange(next);
     },
-    [step, contests.length, index, onIndexChange],
+    [contests.length, index, onIndexChange],
+  );
+
+  const onSettle = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      settleTo(Math.round(e.nativeEvent.contentOffset.x / step));
+    },
+    [settleTo, step],
+  );
+
+  /**
+   * THE SCROLL ITSELF, ON THE UI THREAD.
+   *
+   * This is the only listener the list has on `onScroll`, and it does two jobs
+   * that used to want different platforms:
+   *
+   *   THE FADE is every platform's, and it is why the handler is a worklet at
+   *   all. A JS-thread `onScroll` driving it would be a frame behind the thumb
+   *   by construction, and a carousel whose cards lag the gesture is the thing
+   *   this component was being accused of. On the UI thread the shared value
+   *   and the finger are the same clock.
+   *
+   *   THE SETTLE is web's alone, and for the reason the header sets out:
+   *   `onMomentumScrollEnd` is inert under react-native-web, so web has to read
+   *   a page change out of the scroll stream. Native must NOT — a settle mid-
+   *   drag would swap the board underneath a card still moving, which is a
+   *   behaviour change to the platform that already works.
+   *
+   * `WEB` is captured, not read inside the worklet: `Platform.OS` is a getter
+   * on a module object and worklets get a frozen copy of what they close over.
+   */
+  const onScroll = useAnimatedScrollHandler(
+    {
+      onScroll: (e) => {
+        const at = e.contentOffset.x / step;
+        offset.value = at;
+        if (WEB) runOnJS(settleTo)(Math.round(at));
+      },
+    },
+    [step, settleTo],
   );
 
   /**
@@ -274,14 +457,16 @@ export function ContestCarousel({
    * for the same reason `goTo` jumps — on web an animated programmatic scroll
    * emits intermediate offsets that `onSettle` reads as a swipe back.
    *
-   * `step` is measured, so it is 0 for the first frame; scrolling on that would
-   * land everything at offset 0 and record it as the truth.
+   * The COLUMN is measured, so it is 0 for the first frame; scrolling on that
+   * would land everything at offset 0 and record it as the truth. `step` cannot
+   * be tested for it — a page is the column plus two gutters, so it is 32 even
+   * when nothing has been measured at all.
    */
   useEffect(() => {
-    if (step <= 0 || settledAt.current === index) return;
+    if (column <= 0 || settledAt.current === index) return;
     settledAt.current = index;
     listRef.current?.scrollToOffset({ offset: step * index, animated: false });
-  }, [index, step]);
+  }, [index, step, column]);
 
   /**
    * WHICH PIPS EACH CONTEST IS HOLDING — one span per card, computed once for
@@ -391,26 +576,24 @@ export function ContestCarousel({
 
   return (
     <View>
-      {/* THE STAGE: the pages, with an arrow hung off each side in the screen's
-          own padding. Only in the directions that exist — see `CHEV_GUTTER`. */}
+      {/* THE STAGE: the pages, spread into the screen's own padding, with an
+          arrow standing in each gutter. Only in the directions that exist —
+          see `CHEV_GUTTER` and `PAGE_GUTTER`. */}
       <View style={styles.stage}>
-        <ChevSlot side="left" show={page > 0} onPress={() => goTo(page - 1)} />
-        <ChevSlot side="right" show={page < contests.length - 1} onPress={() => goTo(page + 1)} />
-        <FlatList
+        <AnimatedList
           ref={listRef}
           data={contests}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           onMomentumScrollEnd={onSettle}
-          /* Web only, and only because the prop above never fires there. Adding
-             it on native as well would move the board mid-drag, which is a
-             behaviour change to the platform that already works. */
-          {...(Platform.OS === 'web'
-            ? { onScroll: onSettle, scrollEventThrottle: 16 }
-            : null)}
-          keyExtractor={(item) => item.id}
-          getItemLayout={(_, i) => ({ length: step, offset: step * i, index: i })}
+          /* Every platform, now that the handler is a worklet: the fade needs
+             the offset on every frame, and the settle inside it is still web's
+             alone. See `onScroll`. */
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          keyExtractor={(item: MyContest) => item.id}
+          getItemLayout={(_: unknown, i: number) => ({ length: step, offset: step * i, index: i })}
           /* OPENS ON THE LINKED CARD, not on the first one. Arriving from the
              contest sheet means the reader has just chosen a contest, and a
              carousel that marked it active while showing the free contest's card
@@ -418,11 +601,23 @@ export function ContestCarousel({
              down. Safe with `getItemLayout` supplied; without it the list cannot
              measure ahead and silently ignores this. */
           initialScrollIndex={index}
-          renderItem={({ item }) => (
-            <View style={{ width: step }}>
+          renderItem={({ item, index: i }: { item: MyContest; index: number }) => (
+            <Page i={i} step={step} offset={offset}>
               <Card contest={item} onOpen={onOpen} {...{ lockAt, locked, now }} />
-            </View>
+            </Page>
           )}
+        />
+        {/* AFTER THE PAGES, not before them. The stage now covers the two
+            gutters the arrows stand in, so drawn first they would be under the
+            scroll surface — and it also means they no longer have to paint
+            outside their parent's box, which was the Android caveat in the note
+            on `CHEV_GUTTER`. */}
+        <ChevSlot side="left" show={page > 0} offset={offset} onPress={() => goTo(page - 1)} />
+        <ChevSlot
+          side="right"
+          show={page < contests.length - 1}
+          offset={offset}
+          onPress={() => goTo(page + 1)}
         />
       </View>
       {rack ? (
@@ -437,6 +632,57 @@ export function ContestCarousel({
       ) : null}
     </View>
   );
+}
+
+/**
+ * The scroller, animated — the same `FlatList`, with a UI-thread `onScroll`.
+ *
+ * Declared at module scope because `createAnimatedComponent` builds a NEW
+ * component type every time it runs, and a new type inside a render is a
+ * different element on every pass: React unmounts the list and remounts it,
+ * which on a pager means the scroll position goes back to zero mid-swipe.
+ */
+const AnimatedList = Animated.FlatList;
+
+/**
+ * One page: the card, its two gutters, and how far it has faded.
+ *
+ * ---------------------------------------------------------------------------
+ * THE PAGE MOVES; THE CARD DOES NOT KNOW
+ * ---------------------------------------------------------------------------
+ *
+ * The animated style is on the PAGE rather than on the card, so the card itself
+ * stays a card: no animated props, no shared values, no knowledge that it is on
+ * a carousel at all. `ContestCard` is drawn in three other places and none of
+ * them should have to carry this.
+ *
+ * `away` is how many pages from home this one is, clamped to one. It is 0 for
+ * the page in front of you and 1 for anything fully off the screen, so at rest
+ * exactly one page is at full opacity and every other page is parked at the far
+ * end of the interpolation, motionless.
+ *
+ * The clamp is what keeps a five-card week cheap: pages beyond the neighbour do
+ * not carry on dimming, they simply sit at the floor. `PAGE_HOME` is the same
+ * idea at the other end, and it is not cosmetic — see the constant.
+ */
+function Page({
+  i,
+  step,
+  offset,
+  children,
+}: {
+  i: number;
+  step: number;
+  offset: SharedValue<number>;
+  children: ReactNode;
+}) {
+  const fade = useAnimatedStyle(() => {
+    const away = Math.abs(offset.value - i);
+    if (away < PAGE_HOME) return { opacity: 1 };
+    return { opacity: 1 - PAGE_FADE * Math.min(1, away) };
+  });
+
+  return <Animated.View style={[styles.page, { width: step }, fade]}>{children}</Animated.View>;
 }
 
 /**
@@ -747,14 +993,27 @@ function Plus({ color }: { color: string }) {
  * A chevron in the screen's padding, beside the card.
  *
  * ---------------------------------------------------------------------------
- * IT IS A CONTROL NOW, BECAUSE IT IS NO LONGER IN THE WAY
+ * IT IS A CONTROL, AND IT IS STILL NOT IN THE WAY
  * ---------------------------------------------------------------------------
  *
  * These used to be `pointerEvents="none"` and that was load-bearing rather than
  * fussy: they sat ON the scroll surface, so a tap target at the card's edge
- * would have swallowed the start of the very drag it was asking for. Outside
- * the card there is nothing to swallow — the trough is not part of the pager —
- * so the arrow can do what an arrow looks like it does.
+ * would have swallowed the start of the very drag it was asking for. Moving
+ * them out into the screen's padding is what let them become buttons.
+ *
+ * The padding is now INSIDE the pager — the stage bleeds over it so the pages
+ * can have a gutter, see `PAGE_GUTTER` — so on paper that argument is spent.
+ * It is not: the trough was never a place a drag could start from, because
+ * before the bleed there was no scroller under it, and a 14pt strip that
+ * swallows a gesture is indistinguishable from a 14pt strip with nothing in it.
+ * What changed is the drawing order, not the reachable surface.
+ *
+ * IT FADES WHILE THE PAGES MOVE, which is the one thing the bleed did cost. An
+ * arrow standing in a gutter is chrome beside the card; the same arrow standing
+ * over the card sliding through that gutter is a mark ON the card, and it was
+ * the last thing in the frame still looking like a mistake mid-swipe. It goes
+ * within a fifth of a page of leaving home and is back by the time the scroll
+ * settles, so at rest — the only state anybody reads — nothing has changed.
  *
  * IT DRAWS ONLY IN A DIRECTION THAT EXISTS, so the last page shows one arrow
  * and a single-contest account never sees a left one. Nothing shifts when one
@@ -764,29 +1023,37 @@ function Plus({ color }: { color: string }) {
 function ChevSlot({
   side,
   show,
+  offset,
   onPress,
 }: {
   side: 'left' | 'right';
   show: boolean;
+  offset: SharedValue<number>;
   onPress: () => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  /* Distance from the nearest whole page, so it is 0 at rest whichever page
+     that is, and 0.5 at the worst moment of a drag. Times five: gone a fifth of
+     the way across, rather than lingering at half strength over a card. */
+  const fade = useAnimatedStyle(() => ({
+    opacity: 1 - Math.min(1, Math.abs(offset.value - Math.round(offset.value)) * 5),
+  }));
+
   if (!show) return null;
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={side === 'left' ? 'Previous contest' : 'Next contest'}
-      /* The glyph is 7pt in a 14pt trough; the thumb gets the rest. */
-      hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
-      style={({ pressed }) => [
-        styles.chevSlot,
-        side === 'left' ? styles.chevLeftSlot : styles.chevRightSlot,
-        pressed && styles.pressed,
-      ]}>
-      <Chevron side={side} color={c.textTertiary} />
-    </Pressable>
+    <Animated.View
+      style={[styles.chevSlot, side === 'left' ? styles.chevLeftSlot : styles.chevRightSlot, fade]}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={side === 'left' ? 'Previous contest' : 'Next contest'}
+        /* The glyph is 7pt in a 14pt trough; the thumb gets the rest. */
+        hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
+        style={({ pressed }) => [styles.chevPress, pressed && styles.pressed]}>
+        <Chevron side={side} color={c.textTertiary} />
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -998,23 +1265,30 @@ const styles = StyleSheet.create({
      card's own name — a button does not have to outweigh the thing it serves. */
   enterLabel: { fontSize: 12, lineHeight: 15, fontWeight: '500' },
 
-  /* The pager, with the two arrows hung off its sides. Nothing here reserves
-     width for them — see `CHEV_GUTTER`. */
-  stage: { position: 'relative' },
+  /**
+   * THE PAGER, SPREAD BACK OVER `Screen`'s PADDING.
+   *
+   * The negative margin is the same one `LineupEditor.bleed` uses on the boards
+   * below, and for a related reason: this is the only way the pages get a gap
+   * between them without the card paying for it. The card is unmoved — the 16
+   * points come back immediately as each page's own padding. See `PAGE_GUTTER`.
+   */
+  stage: { position: 'relative', marginHorizontal: -PAGE_GUTTER },
+  /* One page. The card sits in the middle of it with a gutter either side, and
+     the gutters are what you see between two cards mid-drag. */
+  page: { paddingHorizontal: PAGE_GUTTER },
   /* `top: 0, bottom: 0` and centre: the arrow finds the card's vertical middle
      from the stage's own height, which is what the old placement needed a
      measured `cardHeight` for — and why it drew nothing at all until the first
      layout had landed. */
-  chevSlot: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: CHEV_GUTTER,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chevLeftSlot: { left: -CHEV_GUTTER },
-  chevRightSlot: { right: -CHEV_GUTTER },
+  chevSlot: { position: 'absolute', top: 0, bottom: 0, width: CHEV_GUTTER },
+  /* The button fills the slot; the slot carries the position and the fade. */
+  chevPress: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  /* Inside the stage now rather than outside it, because the stage reaches the
+     screen edge. The arithmetic is unchanged where it counts: a 14pt trough
+     starting 2pt in from the edge is exactly where these have always drawn. */
+  chevLeftSlot: { left: PAGE_GUTTER - CHEV_GUTTER },
+  chevRightSlot: { right: PAGE_GUTTER - CHEV_GUTTER },
   /* A chevron from one box and two borders, the way `TabIcon` builds every glyph
      it draws — no font, no asset, and it inherits the stroke weight of the rules
      around it. */
