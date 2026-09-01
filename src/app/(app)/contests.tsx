@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -96,7 +96,21 @@ export default function ContestsScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const router = useRouter();
-  const [view, setView] = useState<View_>('open');
+  /**
+   * WHICH SHELF THIS OPENED ON, from the route.
+   *
+   * The lineup board's rail has two doors into this screen — `+ Contests` and
+   * `Weeks` — and they want different faces of it. The param is read ONCE, as
+   * `useState`'s initial value, which is what makes it an opening position
+   * rather than a controlled prop: switching views inside the sheet must not
+   * have to write back to the URL, and coming back from a recap must not snap
+   * the reader to the shelf they arrived on twenty taps ago.
+   *
+   * Anything other than `history` opens the lobby, so a hand-typed or stale URL
+   * lands somewhere sensible rather than nowhere.
+   */
+  const { view: arrivedOn } = useLocalSearchParams<{ view?: string }>();
+  const [view, setView] = useState<View_>(arrivedOn === 'history' ? 'history' : 'open');
   /* The contest being read, carried rather than looked up: a row from week two
      is older than anything `contest_lobby` can answer about, and every figure
      the recap needs is already on the row. See `ContestRecapPanel`. */

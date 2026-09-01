@@ -17,13 +17,17 @@
  * nobody chose to be in, the only one with a season riding on it, and the only
  * one that is there before you have done anything.
  *
- * ONE CARD DRAWS NO CHROME, and there is very little chrome left to draw. The
- * page dots are gone: they stated position and nothing else, in a row of small
- * marks sitting directly above the run's rack — two indicators of the same size
- * arguing about which one the reader should be counting. Position is carried by
- * the rack now (the lit heart names the page) and by a pair of edge chevrons
- * that appear only in the directions that exist, so a single-contest account
- * sees one arrow toward the lobby and nothing else.
+ * ONE CARD DRAWS NO CHROME, and there is none left to draw. The page dots went
+ * first: they stated position and nothing else, in a row of small marks sitting
+ * directly above the run's rack — two indicators of the same size arguing about
+ * which one the reader should be counting. A pair of edge chevrons replaced
+ * them and have now gone the same way, for a version of the same reason. They
+ * were a second thing saying "there is more of this", drawn at the two points
+ * on the screen where the card is closest to the edge, and the rail beneath the
+ * card was already saying it in a form you can also count and also press.
+ *
+ * So position is the rack's alone: the lit pip names the page, and tapping one
+ * goes there. One indicator, at the centre of the row, doing both jobs.
  *
  * THE RACK IS ALSO THE NAVIGATOR. Tapping a heart goes to the page it belongs
  * to — its contest, or the lobby tile for a heart still free. See `pipPage`.
@@ -90,40 +94,12 @@ import Animated, {
 import { ContestCard } from '@/components/contests/ContestCard';
 import { termsOfEntry, type MyContest } from '@/components/contests/use-my-contests';
 import { ContestHearts, type HeartResult, type HeartSpan } from '@/components/runs/Hearts';
-import { Colors, ControlDiameter, Spacing, Type, selectionAccent } from '@/constants/theme';
+import { Colors, Spacing, selectionAccent } from '@/constants/theme';
 import type { PlayerState } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 /**
- * How far outside the card each chevron hangs.
- *
- * ---------------------------------------------------------------------------
- * IT IS BORROWED FROM THE SCREEN'S PADDING, NOT TAKEN FROM THE CARD
- * ---------------------------------------------------------------------------
- *
- * These arrows used to be absolutely positioned ON the scroll surface, 5pt
- * inside the card's own border — a grey glyph on the card's fill, at the height
- * of its densest band, legible only if you already knew it was there.
- *
- * The tidy fix was to give each one a real column in a row with the pager:
- * gutter, pages, gutter. That was wrong on sight. 28pt off a 343pt phone column
- * is a visibly crunched card, and the card is the densest thing on the screen —
- * it cannot pay for its own affordance.
- *
- * `Screen` already pads its content by `Spacing.three`, and the boards below
- * cancel that padding to bleed to the screen edge. So there are 16 points of
- * air either side of the card that nothing else is using, and the arrows go
- * there: outside the card, inside the screen, and free.
- *
- * 14 leaves 2pt of clearance at the screen edge and puts the 7pt glyph roughly
- * halfway into the trough. They are placed absolutely and therefore draw
- * OUTSIDE their parent's box, which iOS and the web both allow; if this ever
- * ships to Android and the arrows vanish, that clipping is the reason.
- */
-const CHEV_GUTTER = 14;
-
-/**
- * The air between one card and the next, and the whole of this revamp.
+ * The air between one card and the next.
  *
  * ---------------------------------------------------------------------------
  * THE PAGES USED TO BE THE COLUMN, SO THE CARDS TOUCHED
@@ -134,19 +110,18 @@ const CHEV_GUTTER = 14;
  * thumb is on the screen: mid-drag the outgoing card's right border sat flush
  * against the incoming card's left one, two bordered slabs sharing an edge and
  * both bleeding off the screen. It did not read as two cards moving past each
- * other. It read as one torn sheet, which is what a carousel looks like when
- * nobody has looked at it mid-swipe.
+ * other. It read as one torn sheet.
  *
- * THE FIX IS NOT TO SHRINK THE CARD. `CHEV_GUTTER` above already argues that
- * the card cannot pay for its own affordance, and taking 32pt out of it to make
- * room for a gap would be the same mistake with a nicer motive.
+ * THE FIX IS NOT TO SHRINK THE CARD. The card is the densest thing on this
+ * screen and taking 32pt out of it to make room for a gap would be paying for
+ * the fix with the thing being fixed.
  *
- * So the PAGE grows instead of the card shrinking. The stage cancels `Screen`'s
- * padding the way the boards below it already do (`LineupEditor.bleed`), which
- * makes each page 32pt wider than the column while the card inside keeps every
- * point it had. At rest the card lands exactly where it landed before — the
- * padding is back, as padding — and during a drag there are 32 points of page
- * background between the two cards.
+ * So the PAGE grows instead. The stage cancels `Screen`'s padding the way the
+ * boards below it already do (`LineupEditor.bleed`), which makes each page 32pt
+ * wider than the column while the card inside keeps every point it had. At rest
+ * the card lands exactly where it landed before — the padding is back, as
+ * padding — and during a drag there are 32 points of page background between
+ * the two cards.
  *
  * Deliberately NOT a peek. The neighbour is still exactly one page away, so it
  * is off-screen when the scroll settles; the header's note on `step` explains
@@ -180,9 +155,9 @@ const PAGE_GUTTER = Spacing.three;
  *   radius, a bright line on it, and a dark page behind.
  *
  * So the scale is gone and the fade does the work alone. Nothing was really
- * lost: the 32pt gutter is what separates the two cards mid-drag (see
- * `PAGE_GUTTER`), and the fade is what ranks them. The scale was ranking them a
- * second time, in the one currency this card cannot pay in.
+ * lost: the 32pt gutter is what separates the two cards mid-drag, and the fade
+ * is what ranks them. The scale was ranking them a second time, in the one
+ * currency this card cannot pay in.
  */
 const PAGE_FADE = 0.5;
 
@@ -213,18 +188,37 @@ const PAGE_HOME = 0.05;
 /** Captured once, because a worklet cannot read a getter off a module. */
 const WEB = Platform.OS === 'web';
 
-/** The lobby button's height. See `styles.enter` for why it is not `ControlDiameter`. */
+/** The contests chip's height. See `styles.chip` for why it is not `ControlDiameter`. */
 const ENTER_HEIGHT = 28;
 
 /** The `+` ahead of the lobby button's label. See `Plus`. */
 const PLUS_SIZE = 9;
+
+/**
+ * One pip on the rail's pager.
+ *
+ * 16, and it has come down twice from 24. At 24 in a filled tray the rack was
+ * the heaviest object on the row and read as the row's subject — which was true
+ * when it drew the run's own hearts and stopped being true when the masthead
+ * took that over. A page indicator outranks nothing; it reports where you are.
+ *
+ * The second cut is what the rest of the row bought. With the tray gone, the
+ * edge chevrons gone and the left-hand door down to bare words, 20 was again
+ * the loudest thing in a row of quiet ones.
+ *
+ * IT DOES NOT GO BELOW THIS. A pip is a drawn heart with a blade through it or
+ * a tear down it, and those are shapes rather than dots — `Hearts` faceted the
+ * silhouette precisely so its edges would hold at small sizes, and 16 is where
+ * that argument was being made. The floor is legibility, not taste.
+ */
+const PIP_SIZE = 16;
 
 export function ContestCarousel({
   contests,
   index,
   onIndexChange,
   onOpen,
-  showResult,
+  week,
   lockAt,
   locked,
   now,
@@ -245,14 +239,6 @@ export function ContestCarousel({
    * A contest you had entered had no page at all once you were in it.
    */
   onOpen?: (contest: MyContest) => void;
-  /**
-   * Whether a settled contest's W/L/T badge is still being announced.
-   *
-   * Absent means yes, always — which is what every caller outside the board
-   * wants and what this did before the clock existed. The board passes the
-   * 24-hour-and-unacknowledged test; see `LineupEditor`.
-   */
-  showResult?: (contestId: string) => boolean;
   lockAt: string | null;
   locked: boolean;
   now: number;
@@ -262,8 +248,24 @@ export function ContestCarousel({
    * nothing here, exactly as the masthead used to decide. See the foot.
    */
   run: PlayerState['run'];
-  /** Open the lobby. The last page of the carousel is the way in. */
-  onEnter: () => void;
+  /**
+   * THE WEEK THE BOARD IS ON, for the left of the rail. Null draws no link.
+   *
+   * It is a prop rather than `contests[0].weekLabel` because the rail outlives
+   * the cards: the empty-board branch still has to draw the door out, and a
+   * label read off a list that is empty is no label at all.
+   */
+  week: string | null;
+  /**
+   * Open the contests screen, on one of its two shelves.
+   *
+   * ONE PROP AND NOT TWO, because it is one screen. `contests.tsx` is three
+   * views behind one route — open contests, `Recent contests`, and a recap
+   * reader — so the rail's two buttons are two doors into the same room and the
+   * signature says so. Two callbacks would have hidden that, and the first
+   * question anybody asks about this row is why it has two buttons.
+   */
+  onEnter: (view: 'open' | 'history') => void;
   /**
    * The measured width of the column this sits in.
    *
@@ -568,6 +570,7 @@ export function ContestCarousel({
         committed={committed}
         pips={[]}
         focus={null}
+        week={week}
         onGo={goTo}
         onEnter={onEnter}
       />
@@ -576,9 +579,8 @@ export function ContestCarousel({
 
   return (
     <View>
-      {/* THE STAGE: the pages, spread into the screen's own padding, with an
-          arrow standing in each gutter. Only in the directions that exist —
-          see `CHEV_GUTTER` and `PAGE_GUTTER`. */}
+      {/* THE STAGE: the pages, spread into the screen's own padding so they
+          have a gutter between them. See `PAGE_GUTTER`. */}
       <View style={styles.stage}>
         <AnimatedList
           ref={listRef}
@@ -607,18 +609,6 @@ export function ContestCarousel({
             </Page>
           )}
         />
-        {/* AFTER THE PAGES, not before them. The stage now covers the two
-            gutters the arrows stand in, so drawn first they would be under the
-            scroll surface — and it also means they no longer have to paint
-            outside their parent's box, which was the Android caveat in the note
-            on `CHEV_GUTTER`. */}
-        <ChevSlot side="left" show={page > 0} offset={offset} onPress={() => goTo(page - 1)} />
-        <ChevSlot
-          side="right"
-          show={page < contests.length - 1}
-          offset={offset}
-          onPress={() => goTo(page + 1)}
-        />
       </View>
       {rack ? (
         <RunRail
@@ -626,6 +616,7 @@ export function ContestCarousel({
           committed={committed}
           pips={pips}
           focus={spanFor(page)}
+          week={week}
           onGo={goTo}
           onEnter={onEnter}
         />
@@ -759,6 +750,7 @@ function RunRail({
   committed,
   pips,
   focus,
+  week,
   onGo,
   onEnter,
 }: {
@@ -776,9 +768,11 @@ function RunRail({
   /** One per card on the board, in the carousel's order — see `ContestHearts`. */
   pips: { contest: number; result: HeartResult | null; entered: boolean }[];
   focus: HeartSpan | null;
+  /** The week these cards belong to. See the carousel's prop. */
+  week: string | null;
   onGo: (page: number) => void;
-  /** The lobby, from the button at the end of the row. */
-  onEnter: () => void;
+  /** The contests screen, from either end of the row. See the carousel's prop. */
+  onEnter: (view: 'open' | 'history') => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -881,37 +875,113 @@ function RunRail({
    * — still there, still pressable, because the screen behind it is worth
    * reading either way, but no longer pointing at a spend the run cannot make.
    */
+  /* Whether there is a heart left to spend, which is the only thing the row's
+     right-hand end changes with. See the note on the chip. */
   const live = free > 0;
-  /* Knocked out of the fill in the page's own colour, the way every punched
-     glyph in this app is drawn. See `YapLogo`'s `ink`. */
-  const ink = live ? c.background : c.textSecondary;
 
   return (
     <View style={styles.rail}>
       {/**
-        * THE RUN'S TRAY: one heart per card, and what is left over.
-        *
-        * The rack used to draw the RUN's own hearts — held, staked and lost —
-        * because it was the only place saying how many you had. The masthead
-        * says that now (see `AppHeader`), which freed this row to be what the
-        * screen actually needs: a pager whose lit pip names the card above. See
-        * `ContestHearts` for what each state means and for the bug that made
-        * the one-to-one non-negotiable.
-        */}
-      <View style={[styles.tray, { backgroundColor: c.surface }]}>
-        <View style={styles.rack}>
-          <ContestHearts
-            entries={pips}
-            focus={focus}
-            size={24}
-            onPress={(i) => onGo(pips[i].contest)}
-          />
-        </View>
-        {live ? (
-          <Text style={[Type.fine, styles.freeCount, { color: c.textSecondary }]}>
-            {free} free
-          </Text>
-        ) : null}
+       * PREVIOUS WEEKS: the same screen the other end of the row opens, on its
+       * archive shelf.
+       *
+       * IT IS A SHORTCUT AND IT IS ALLOWED TO BE ONE. `contests.tsx` has held a
+       * `Recent contests` view for as long as it has existed, reachable by
+       * opening Contests and switching shelves — two taps for the thing a
+       * player wants most often on a Tuesday.
+       *
+       * IT IS ALSO THE ONLY WAY THERE NOW. The board used to carry last week's
+       * entries as recap cards; it does not, because a finished week is not
+       * something you swipe past on your way to setting a lineup. That makes
+       * this the door to every week behind the current one rather than a
+       * shortcut to the one the carousel was already showing.
+       *
+       * NO PILL. It was a chip matching the one at the far end, and two chips
+       * flanking a pager is a row of three objects competing — the pager, and
+       * the two things it is between. A pill is a promise that something
+       * happens; this is a place to go, so it is set as a mark and words, the
+       * way a link is.
+       *
+       * ---------------------------------------------------------------------
+       * IT NAMES THE WEEK YOU ARE ON, NOT THE ONE IT GOES TO
+       * ---------------------------------------------------------------------
+       *
+       * It said `Previous weeks`, which is a label for a destination and was
+       * doing only that job. Naming the CURRENT week instead does two jobs with
+       * the same eight characters.
+       *
+       * It states where the board is. Nothing else on this screen says which
+       * week these cards belong to — the card's own head spends that corner on
+       * a countdown, and did so precisely because a live card had no use for a
+       * week label. On a Tuesday, with last week's results still in the reader's
+       * head, "which week am I setting" is a real question.
+       *
+       * And it makes the `‹` mean something specific. A back arrow beside a
+       * week is an offer to go to the week BEFORE it, which is exactly where it
+       * goes; a back arrow beside the words "previous weeks" is an arrow beside
+       * a sign pointing at itself. It is the same construction as a date
+       * stepper, minus the forward half — there is no week after this one.
+       *
+       * NULL DRAWS NOTHING. An empty board still has to keep the door at the
+       * far end (see the note where `contests.length === 0` is handled), but a
+       * back arrow beside a week that could not be named would be a control
+       * that is all mark and no subject.
+       */}
+      <View style={styles.side}>
+        {week === null ? null : (
+          <Pressable
+            onPress={() => onEnter('history')}
+            accessibilityRole="button"
+            accessibilityLabel={`${week}. Open contests from previous weeks`}
+            /* Bare words are a small target, so the slop does all the work —
+               the same trick `Pip` uses. */
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 12 }}
+            style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
+            <Chevron side="left" color={c.textTertiary} />
+            <Text style={[styles.backLabel, { color: c.textSecondary }]}>{week}</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {/**
+       * THE PAGER, ON THE PAGE'S OWN CENTRE.
+       *
+       * ---------------------------------------------------------------------
+       * IT WAS IN A TRAY, AND THE TRAY WAS ANSWERING A QUESTION THAT IS GONE
+       * ---------------------------------------------------------------------
+       *
+       * The rack used to sit in a filled pill at the left of the row with the
+       * free-heart count at its right end, and the pill existed to enclose a
+       * hundred points of dead space between a rack pushed to one edge and a
+       * button pushed to the other. It solved that. What it could not stop
+       * being was a CONTAINER, and a container reads as a panel of status —
+       * which is what the rack was when it drew the run's own hearts and the
+       * masthead did not.
+       *
+       * The masthead says how many hearts you hold now. What is left here is
+       * position: which of these cards am I looking at. That is not a status
+       * panel, it is a page indicator, and a page indicator belongs on the
+       * centre line with nothing drawn around it.
+       *
+       * CENTRED BY THE TWO SIDES, not by a margin. Both flanks are `flexBasis:
+       * 0, flexGrow: 1`, so they take equal shares of whatever is left over and
+       * the rack lands on the true middle of the column whatever the two
+       * buttons happen to measure. A `justifyContent: 'space-between'` with a
+       * spacer would put it in the middle of the GAP, which is a different
+       * place and moves every time a label changes.
+       *
+       * THE RACK IS THE HALF THAT GIVES. `minWidth: 0` and a clip here, and
+       * nothing shrinkable on the buttons: a week with eight cards squeezes the
+       * pips and never the doors. That was the tray's one good idea and it
+       * survives the tray.
+       */}
+      <View style={styles.pager}>
+        <ContestHearts
+          entries={pips}
+          focus={focus}
+          size={PIP_SIZE}
+          onPress={(i) => onGo(pips[i].contest)}
+        />
       </View>
 
       {/**
@@ -923,59 +993,130 @@ function RunRail({
        * way. A button at a fixed position under the thumb costs one tap from
        * any page.
        *
-       * IT NEVER SHRINKS AND IT NEVER MOVES. The tray beside it is the half
+       * IT NEVER SHRINKS AND IT NEVER MOVES. The pager beside it is the half
        * that gives. Whatever happens to the left of it, the door stays the same
        * size in the same corner.
+       *
+       * THE FREE COUNT IS NO LONGER SPELLED OUT, and losing the words is the
+       * one real cost of taking the tray away. `1 free` was the tray's
+       * right-hand occupant and there is nowhere left to put it: hard against
+       * this button it reads as the button's label, which is the exact failure
+       * that produced the tray in the first place.
+       *
+       * What it was FOR survives — the count existed to answer "is this button
+       * worth pressing", and the `+` answers that. The masthead carries the
+       * number. The screen reader still hears it; see `accessibilityLabel`.
+       *
+       * ---------------------------------------------------------------------
+       * THE GOLD IS ON THE MARK NOW, NOT ON THE SLAB
+       * ---------------------------------------------------------------------
+       *
+       * This has been an outline, then a filled gold pill, and the swing was
+       * never really about the button. It was about what else the row was
+       * doing. The fill was earned back when the rack gave up its gold corner
+       * ticks and the accent was left saying exactly one thing.
+       *
+       * The row has been emptied since. The tray went, the edge chevrons went,
+       * the pager came down to 16pt and the left-hand door is bare words — so
+       * the same gold slab that was one strong object among several is now the
+       * only loud thing on a quiet band, sitting directly under the card that
+       * is the screen's actual subject. Nothing about the button changed; what
+       * it is louder THAN did.
+       *
+       * So the pill stays and the fill goes quiet. It has to stay a pill: this
+       * is the app's main call to action and the one door to the contests
+       * screen, and words alone at both ends of the row would leave the act and
+       * the side door looking like the same kind of thing. What carries the
+       * state is the `+` — struck in the accent when a heart is free, absent
+       * when none is. Gold appears once on this screen, at nine points, on the
+       * one mark whose whole job is to say the act is voluntary.
        */}
-      <Pressable
-        onPress={onEnter}
-        accessibilityRole="button"
-        accessibilityLabel={
-          live
-            ? `Contests. ${free === 1 ? '1 heart' : `${free} hearts`} free`
-            : 'Contests'
-        }
-        /* Drawn at `ControlDiameter` and reached out past the platform's 44 —
-           the same trick `Pip` uses, and the reason this can be a quiet outline
-           without being a small target. */
-        hitSlop={9}
-        style={({ pressed }) => [
-          styles.enter,
-          !live && styles.enterBare,
-          { backgroundColor: live ? accent : c.backgroundElement },
-          pressed && styles.pressed,
-        ]}>
-        {/**
-          * THE `+` IS BACK, AND THIS IS NOT THE ONE THAT WAS REMOVED.
-          *
-          * What was wrong before was a `+` ALONE: a bare glyph in a row of
-          * hearts could add a heart, a card or a slot, and the words that said
-          * which sat outside the button where they could not be pressed.
-          *
-          * Leading a label it has the opposite problem to solve and solves it
-          * well — the glyph is what the eye finds at a glance and the noun is
-          * what settles the ambiguity, so "a new contest, by choice" arrives in
-          * one look instead of a read. It is also the only mark on this row
-          * that says the act is VOLUNTARY: everything else here is a heart the
-          * week has already committed.
-          *
-          * DRAWN, NOT TYPED. A `+` glyph sits high in its own line box, so
-          * centring it needs a hand-tuned baseline nudge that drifts the first
-          * time the type size changes — the previous circle carried exactly
-          * that hack. Two bars cannot drift, and it is how `Chevron` below
-          * draws its own arrow.
-          *
-          * IT GOES WHEN NOTHING IS FREE, because by then it is a promise the
-          * run cannot keep. The quiet state already drops the gold and the
-          * count; leaving a `+` on it would be the one part of the button still
-          * offering a new contest to somebody with nothing to stake. What is
-          * left is the room's name, which is the half that stays true — there
-          * are still recaps in there to read.
-          */}
-        {live ? <Plus color={ink} /> : null}
-        <Text style={[styles.enterLabel, { color: ink }]}>Contests</Text>
-      </Pressable>
+      <View style={[styles.side, styles.sideEnd]}>
+        <RailChip
+          label="Contests"
+          accessibilityLabel={
+            live ? `Contests. ${free === 1 ? '1 heart' : `${free} hearts`} free` : 'Contests'
+          }
+          onPress={() => onEnter('open')}
+          fill={c.backgroundElement}
+          ink={c.text}
+          /**
+           * THE `+` IS BACK, AND THIS IS NOT THE ONE THAT WAS REMOVED.
+           *
+           * What was wrong before was a `+` ALONE: a bare glyph in a row of
+           * hearts could add a heart, a card or a slot, and the words that said
+           * which sat outside the button where they could not be pressed.
+           *
+           * Leading a label it has the opposite problem to solve and solves it
+           * well — the glyph is what the eye finds at a glance and the noun is
+           * what settles the ambiguity, so "a new contest, by choice" arrives
+           * in one look instead of a read. It is also the only mark on this row
+           * that says the act is VOLUNTARY: everything else here is a heart the
+           * week has already committed.
+           *
+           * DRAWN, NOT TYPED. A `+` glyph sits high in its own line box, so
+           * centring it needs a hand-tuned baseline nudge that drifts the first
+           * time the type size changes — an earlier circle carried exactly that
+           * hack. Two bars cannot drift, and it is how `Chevron` draws its own
+           * arrow and how the Weeks button gets its lead mark.
+           *
+           * IT GOES WHEN NOTHING IS FREE, because by then it is a promise the
+           * run cannot keep. The quiet state already drops the gold; leaving a
+           * `+` on it would be the one part of the button still offering a new
+           * contest to somebody with nothing to stake. What is left is the
+           * room's name, which is the half that stays true — there are still
+           * recaps in there to read.
+           */
+          lead={live ? <Plus color={accent} /> : null}
+        />
+      </View>
     </View>
+  );
+}
+
+/**
+ * One chip on the rail: an optional lead mark, and a word.
+ *
+ * BOTH ENDS OF THE ROW ARE THIS. They are the same object doing opposite jobs —
+ * a call to action and a side door — and what separates them is the fill and
+ * the mark, not the geometry. Drawn from two components they drifted a point in
+ * height the first time either was touched, and two chips flanking a centred
+ * pager show that immediately.
+ */
+function RailChip({
+  label,
+  accessibilityLabel,
+  onPress,
+  fill,
+  ink,
+  lead,
+}: {
+  label: string;
+  accessibilityLabel: string;
+  onPress: () => void;
+  fill: string;
+  ink: string;
+  /** The mark before the word. Null draws the word alone — see `chipBare`. */
+  lead: React.ReactNode;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      /* Drawn at `ENTER_HEIGHT` and reached out past the platform's 44 — the
+         same trick `Pip` uses, and the reason these can be quiet chips without
+         being small targets. */
+      hitSlop={9}
+      style={({ pressed }) => [
+        styles.chip,
+        !lead && styles.chipBare,
+        { backgroundColor: fill },
+        pressed && styles.pressed,
+      ]}>
+      {lead}
+      <Text style={[styles.chipLabel, { color: ink }]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -986,74 +1127,6 @@ function Plus({ color }: { color: string }) {
       <View style={[styles.plusBar, { backgroundColor: color }]} />
       <View style={[styles.plusBar, styles.plusBarUp, { backgroundColor: color }]} />
     </View>
-  );
-}
-
-/**
- * A chevron in the screen's padding, beside the card.
- *
- * ---------------------------------------------------------------------------
- * IT IS A CONTROL, AND IT IS STILL NOT IN THE WAY
- * ---------------------------------------------------------------------------
- *
- * These used to be `pointerEvents="none"` and that was load-bearing rather than
- * fussy: they sat ON the scroll surface, so a tap target at the card's edge
- * would have swallowed the start of the very drag it was asking for. Moving
- * them out into the screen's padding is what let them become buttons.
- *
- * The padding is now INSIDE the pager — the stage bleeds over it so the pages
- * can have a gutter, see `PAGE_GUTTER` — so on paper that argument is spent.
- * It is not: the trough was never a place a drag could start from, because
- * before the bleed there was no scroller under it, and a 14pt strip that
- * swallows a gesture is indistinguishable from a 14pt strip with nothing in it.
- * What changed is the drawing order, not the reachable surface.
- *
- * IT FADES WHILE THE PAGES MOVE, which is the one thing the bleed did cost. An
- * arrow standing in a gutter is chrome beside the card; the same arrow standing
- * over the card sliding through that gutter is a mark ON the card, and it was
- * the last thing in the frame still looking like a mistake mid-swipe. It goes
- * within a fifth of a page of leaving home and is back by the time the scroll
- * settles, so at rest — the only state anybody reads — nothing has changed.
- *
- * IT DRAWS ONLY IN A DIRECTION THAT EXISTS, so the last page shows one arrow
- * and a single-contest account never sees a left one. Nothing shifts when one
- * disappears: the slots are absolutely placed and the pager does not know they
- * are there.
- */
-function ChevSlot({
-  side,
-  show,
-  offset,
-  onPress,
-}: {
-  side: 'left' | 'right';
-  show: boolean;
-  offset: SharedValue<number>;
-  onPress: () => void;
-}) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  /* Distance from the nearest whole page, so it is 0 at rest whichever page
-     that is, and 0.5 at the worst moment of a drag. Times five: gone a fifth of
-     the way across, rather than lingering at half strength over a card. */
-  const fade = useAnimatedStyle(() => ({
-    opacity: 1 - Math.min(1, Math.abs(offset.value - Math.round(offset.value)) * 5),
-  }));
-
-  if (!show) return null;
-  return (
-    <Animated.View
-      style={[styles.chevSlot, side === 'left' ? styles.chevLeftSlot : styles.chevRightSlot, fade]}>
-      <Pressable
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={side === 'left' ? 'Previous contest' : 'Next contest'}
-        /* The glyph is 7pt in a 14pt trough; the thumb gets the rest. */
-        hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
-        style={({ pressed }) => [styles.chevPress, pressed && styles.pressed]}>
-        <Chevron side={side} color={c.textTertiary} />
-      </Pressable>
-    </Animated.View>
   );
 }
 
@@ -1167,91 +1240,94 @@ const styles = StyleSheet.create({
    * "second container" mistake that got the rack thrown out of a panel in the
    * first place. Space does the separating.
    */
-  rail: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    /* NO `space-between`. The tray flexes, so the slack is inside it — pushing
-       the two apart as well would just move the gap back out. */
-    gap: Spacing.two,
-    paddingTop: Spacing.two + 2,
-  },
   /**
-   * THE TRAY, and the only flexible thing on the row.
+   * THE RAIL: a door, a pager, a door.
    *
-   * It stretches to just short of the button so the slack between them is
-   * ENCLOSED rather than spanned — which is the whole reason the row stopped
-   * reading as two leftovers pushed to opposite edges.
+   * NO RULE ABOVE IT. It had a hairline, on the reasoning that a divider
+   * separates the carousel's chrome from the run. There is no chrome left to
+   * separate from, so the line was drawing a boundary between a card and the
+   * only other thing on the screen — which is exactly the "second container"
+   * mistake that got the rack thrown out of a panel in the first place, and
+   * then out of a tray. Space does the separating.
    *
-   * `surface` rather than `backgroundElement`: element is this app's fill for
-   * things you press, and the tray is not one — the pips inside it are. One
-   * step off black is all it needs to give the rack a floor.
+   * NO `gap`. The two flanks already own every point that is not the pager, so
+   * a gap would be adding space to a row whose spare space is the layout.
    */
-  tray: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: ControlDiameter,
-    paddingHorizontal: Spacing.two + 2,
-    borderRadius: ControlDiameter / 2,
-  },
+  rail: { flexDirection: 'row', alignItems: 'center', paddingTop: Spacing.two + 2 },
   /**
-   * One heart per card means the rack grows with the week, so it is the half
-   * that gives. `overflow: hidden` is the interim answer to a rack too long for
-   * the tray — a clipped rack is recoverable by swiping, and the alternative is
-   * pushing the door off the screen. The real answer is to let it scroll, which
-   * is worth doing the week a board can hold eight cards.
-   */
-  rack: { flexShrink: 1, minWidth: 0, overflow: 'hidden' },
-  /* The tray's right-hand occupant. `auto` rather than a spacer so it sits at
-     the tray's end whatever the rack is doing, and never wraps. */
-  freeCount: { marginLeft: 'auto', paddingLeft: Spacing.two, flexShrink: 0 },
-  /**
-   * THE LOBBY BUTTON. A gold line, not a gold slab.
+   * A FLANK, and the reason the pager lands on the true centre.
    *
-   * `ControlDiameter` tall — the app's one round-control height, so this agrees
-   * with the filter chips rather than inventing a size — and as wide as its
-   * words. An outline because the focus ticks on the active heart are already
-   * gold and already mean something else; see the note above `live`.
+   * `flexBasis: 0` with `flexGrow: 1` on both sides means the leftover width is
+   * split in half whatever the two buttons measure, so the middle of the pager
+   * is the middle of the column even though "Weeks" and "+ Contests" are
+   * nothing like the same width.
+   *
+   * NO `minWidth: 0` here, deliberately. A flex item will not shrink below its
+   * content unless told to, so the buttons hold their size and the pager — the
+   * one box that IS told to — gives first. That was the tray's one good idea
+   * and it is the only part of the tray worth keeping.
    */
-  enter: {
+  side: { flexBasis: 0, flexGrow: 1, alignItems: 'flex-start' },
+  sideEnd: { alignItems: 'flex-end' },
+  /* The rack. `overflow: hidden` is the interim answer to a week with more
+     cards than the row can hold — a clipped pager is recoverable by swiping,
+     and the alternative is pushing a door off the screen. The real answer is to
+     let it scroll, which is worth doing the week a board can hold eight. */
+  pager: { flexShrink: 1, minWidth: 0, overflow: 'hidden' },
+  /**
+   * A CHIP AT EITHER END. Both ends of the row, one geometry.
+   *
+   * `ENTER_HEIGHT` tall — 28 rather than the app's 32pt `ControlDiameter`,
+   * which is a decision worth keeping now that there are two of these. At 32
+   * beside a 20pt rack the chips are the biggest things on the row, and a
+   * filter chip is not the comparison that matters here: those sit in a row of
+   * their own peers, these sit either side of a pager and have to rank BELOW
+   * it. The pager is what the row is about.
+   *
+   * The touch target does not shrink with it: `hitSlop` still reaches past 44.
+   */
+  chip: {
     flexShrink: 0,
-    justifyContent: 'center',
-    /**
-     * 28, NOT `ControlDiameter`.
-     *
-     * It was 32 — the app's one round-control height, so that it would agree
-     * with the inventory's filter chips. Set beside a 24pt rack it still read
-     * as the biggest thing on the row, and a filter chip is not the comparison
-     * that matters here: those sit in a row of their own peers, this sits next
-     * to hearts and has to rank BELOW them. The rack is what the row is about.
-     *
-     * Four points off the height, one off the type and two off the padding
-     * takes it from 112pt wide to about 92 — a quarter of the row rather than a
-     * third — without touching the label, because the noun is what tells you
-     * what you are entering and is worth more than the points it costs.
-     *
-     * The touch target does not shrink with it: `hitSlop` still reaches past
-     * 44pt.
-     */
     height: ENTER_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: Spacing.two - 2,
-    /* TIGHTER ON THE GLYPH SIDE. A `+` is mostly air where a letter is mostly
-       ink, so equal padding leaves the left visibly slacker than the right.
-       Two points back is the optical correction, and it happens to pay for a
-       third of what the glyph costs in width. */
+    /* TIGHTER ON THE MARK SIDE. A `+` and a chevron are mostly air where a
+       letter is mostly ink, so equal padding leaves the left visibly slacker
+       than the right. Two points back is the optical correction, and it happens
+       to pay for a third of what the mark costs in width. */
     paddingLeft: Spacing.two + 2,
     paddingRight: Spacing.three - 4,
     borderRadius: ENTER_HEIGHT / 2,
   },
-  /* NO GLYPH, NO OPTICAL CORRECTION. The tighter left padding above exists to
+  /**
+   * THE WAY BACK, as words rather than as a chip. See the note where it is
+   * drawn for why it is not a pill.
+   *
+   * The gap is two points tighter than the chip's, because a `‹` set beside
+   * lowercase words with no fill around them has nothing to hold it in — inside
+   * a pill the padding does that, and out here the word has to.
+   */
+  back: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two - 4 },
+  /**
+   * The chip's type exactly, because the two ends of this row must not look
+   * like they came from different ones.
+   *
+   * NOT CAPITALS. `weekLabel` is `WEEK 1` — cut for a chip in the card's head,
+   * where capitals are the app's voice for a stamped fact set beside something
+   * else. This is not that: it is a word a person reads at the start of a line,
+   * next to an arrow, and a heading shouting inside a sentence outranks the
+   * pager it is meant to sit beside. `weekTitle` is the same week set as a
+   * phrase — see `weekTitleOf`.
+   */
+  backLabel: { fontSize: 12, lineHeight: 15, fontWeight: '500' },
+  /* NO MARK, NO OPTICAL CORRECTION. The tighter left padding above exists to
      pay for the air inside a `+`; with the word alone it just parks the label
      off-centre in its own pill. */
-  enterBare: { paddingLeft: Spacing.three - 4 },
-  /* The glyph's box. 9 against a 12pt label — a shade under the cap height, so
-     it reads as punctuation to the word rather than a second word. */
+  chipBare: { paddingLeft: Spacing.three - 4 },
+  /* The `+`'s box. 9 against a 12pt label — a shade under the cap height, so it
+     reads as punctuation to the word rather than as a second word. */
   plus: { width: PLUS_SIZE, height: PLUS_SIZE, alignItems: 'center', justifyContent: 'center' },
   /* Both bars are the same rule; one of them stood on its end. 1.5 because a
      stroke this short needs the weight to hold its own beside 12pt type. */
@@ -1263,7 +1339,7 @@ const styles = StyleSheet.create({
      because an outline does not have to work as hard to be seen. */
   /* 12/500. At 13/600 the label was the heaviest text on the screen below the
      card's own name — a button does not have to outweigh the thing it serves. */
-  enterLabel: { fontSize: 12, lineHeight: 15, fontWeight: '500' },
+  chipLabel: { fontSize: 12, lineHeight: 15, fontWeight: '500' },
 
   /**
    * THE PAGER, SPREAD BACK OVER `Screen`'s PADDING.
@@ -1281,14 +1357,6 @@ const styles = StyleSheet.create({
      from the stage's own height, which is what the old placement needed a
      measured `cardHeight` for — and why it drew nothing at all until the first
      layout had landed. */
-  chevSlot: { position: 'absolute', top: 0, bottom: 0, width: CHEV_GUTTER },
-  /* The button fills the slot; the slot carries the position and the fade. */
-  chevPress: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  /* Inside the stage now rather than outside it, because the stage reaches the
-     screen edge. The arithmetic is unchanged where it counts: a 14pt trough
-     starting 2pt in from the edge is exactly where these have always drawn. */
-  chevLeftSlot: { left: PAGE_GUTTER - CHEV_GUTTER },
-  chevRightSlot: { right: PAGE_GUTTER - CHEV_GUTTER },
   /* A chevron from one box and two borders, the way `TabIcon` builds every glyph
      it draws — no font, no asset, and it inherits the stroke weight of the rules
      around it. */

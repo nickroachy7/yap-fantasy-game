@@ -56,16 +56,12 @@ import { BenchBoard } from '@/components/lineup/BenchBoard';
 import { ContestCarousel } from '@/components/lineup/ContestCarousel';
 import { WelcomeBackBanner } from '@/components/contests/WelcomeBackBanner';
 import { useAuth } from '@/context/AuthContext';
-import {
-  recentlySettled,
-  useContestHistory,
-} from '@/components/contests/use-contest-history';
+import { useContestHistory } from '@/components/contests/use-contest-history';
 import {
   seedFor,
   unseenResults,
   useResultsSeen,
 } from '@/components/contests/use-results-seen';
-import { RecapBoard } from '@/components/lineup/RecapBoard';
 import { useMyContests } from '@/components/contests/use-my-contests';
 import { SlotBoard } from '@/components/lineup/SlotBoard';
 import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
@@ -207,17 +203,51 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
     setLastLinked(linkedCode);
     setSwiped(null);
   }
-  const linkedIndex = linkedCode
-    ? (myContests?.findIndex((ct) => ct.code === linkedCode) ?? -1)
-    : -1;
+  /**
+   * THE BOARD IS THIS WEEK, AND ONLY THIS WEEK.
+   *
+   * ---------------------------------------------------------------------------
+   * A FINISHED WEEK IS NOT SOMETHING YOU SWIPE PAST
+   * ---------------------------------------------------------------------------
+   *
+   * `my_contest_cards` unions the current slate with `recap_slate()` — the week
+   * just gone, for as long as the lineup board has moved on and the results are
+   * still fresh. That was built so a settled contest had somewhere to be read,
+   * and it put last week's cards on the carousel to do it.
+   *
+   * Which made the board two things at once. This screen exists to SET A
+   * LINEUP, and every card on it is a header for the slots underneath; a card
+   * whose week is over has no slots to head, so the boards had to grow a second
+   * branch to draw a recap instead. A reader swiping toward the contest they
+   * came to fill passed a page where the whole screen changed meaning.
+   *
+   * Finished weeks live behind `Previous weeks` on the rail now, which reaches
+   * every week rather than the one `recap_slate()` can still see. And a result
+   * still announces itself the moment it lands: `WelcomeBackBanner` is at the
+   * top of this board and says so, which is the right shape for news — it
+   * arrives, you read it, you dismiss it. A card you have to swipe past is not
+   * news, it is furniture.
+   *
+   * FILTERED HERE RATHER THAN IN THE HOOK. `contest/[code]` calls
+   * `useMyContests` too, and it is the page a recap opens INTO — filtering at
+   * the source would take the archive's own destination away from it. It is the
+   * board that is about this week, not the data.
+   *
+   * The pinned lookup below reads the UNFILTERED list for the same reason: the
+   * contest sheet is handed a code and must find it whatever week it belongs
+   * to.
+   */
+  const board = useMemo(() => (myContests ?? []).filter((ct) => !ct.recap), [myContests]);
+
+  const linkedIndex = linkedCode ? board.findIndex((ct) => ct.code === linkedCode) : -1;
   const rawIndex = swiped ?? (linkedIndex > 0 ? linkedIndex : 0);
 
   /* Clamped, because the list can shrink under the index: a contest settles,
      or the week rolls over, and the card that was in front is gone. */
-  const cardIndex = myContests?.length ? Math.min(rawIndex, myContests.length - 1) : 0;
+  const cardIndex = board.length ? Math.min(rawIndex, board.length - 1) : 0;
   const current = pinned
     ? (myContests?.find((ct) => ct.code === pinnedContest) ?? null)
-    : (myContests?.length ? myContests[cardIndex] : null);
+    : (board.length ? board[cardIndex] : null);
   /* The free contest is the default and passes no code, which is what every
      caller written before the lobby existed meant. */
   const contestCode = current && current.kind !== 'free' ? current.code : undefined;
@@ -1047,24 +1077,32 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
   const card = pinned ? null : (
     <View onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}>
       <ContestCarousel
-        contests={myContests ?? []}
+        contests={board}
+        /* EVERY CARD ON THE BOARD IS THIS WEEK now that recaps are filtered
+           out, so any of them can name it. Null while the list is loading,
+           which the rail reads as "draw no back link". */
+        week={board[0]?.weekTitle ?? null}
         index={cardIndex}
         onIndexChange={setSwiped}
         lockAt={nextLockAt ?? lockAt}
         locked={allLocked}
         now={now}
         run={run}
-        /* The lobby, over this board. It is a sheet rather than a page now, so
-           this pushes and closing puts the reader back on the lineup they were
-           filling — see `CONTESTS` in `sections.ts`. */
-        onEnter={() => router.push('/contests')}
+        /* The contests screen, over this board. It is a sheet rather than a page
+           now, so this pushes and closing puts the reader back on the lineup
+           they were filling — see `CONTESTS` in `sections.ts`.
+
+           THE SHELF TRAVELS IN THE URL. Both ends of the rail arrive here and
+           they want different faces of the same screen; the alternative was
+           lifting `contests.tsx`'s view state up into a store so a board two
+           routes away could set it, which is a lot of machinery for a string
+           the router already carries. */
+        onEnter={(view) =>
+          router.push(
+            view === 'history' ? { pathname: '/contests', params: { view } } : '/contests',
+          )
+        }
         width={cardWidth}
-        /* THE SAME BOOKKEEPING THE BANNER USES, which is the whole reason it is
-           held up here rather than inside it: dismissing the banner has to
-           clear the pips in the same gesture, and two components each holding
-           their own copy of "have they seen this" would disagree the moment one
-           of them was acknowledged. */
-        showResult={results.showResult}
         onOpen={(ct) => router.push({ pathname: '/contest/[code]', params: { code: ct.code } })}
       />
     </View>
@@ -1073,20 +1111,23 @@ export function LineupEditor({ pinnedContest, frame = 'screen', onEntered }: Lin
   /**
    * Everything under the card.
    *
-   * TWO BOARDS. A recap card belongs to a finished WEEK, so the editor under it
-   * would be the new week's empty slots beneath last week's final score — see
-   * `RecapBoard`. Everything else is the board this screen exists to be.
+   * ONE BOARD, FINALLY. There were three, and both of the others existed to
+   * describe a page of the carousel that was not a lineup.
    *
-   * THERE WAS A THIRD, and it went with the lobby tile. Swiping past the last
-   * contest used to land on an invitation, which is a page with no contest and
-   * therefore no lineup, so the boards drew an empty state for it. The lobby is
-   * a button on the rail now (see `ContestCarousel`), every page of the
-   * carousel is a real contest again, and the state that existed only to
-   * describe the gap between them is gone with it.
+   * The first went with the lobby tile: swiping past the last contest used to
+   * land on an invitation, which is a page with no contest and therefore no
+   * slots, so the boards drew an empty state for it. The lobby is a button on
+   * the rail now.
+   *
+   * The second was `RecapBoard`, for a card belonging to a finished WEEK — the
+   * editor under one of those would have been the new week's empty slots
+   * beneath last week's final score. Finished weeks are off the board entirely
+   * now (see `board`), so there is no such card to draw and the branch has gone
+   * with the reason for it.
+   *
+   * What is left is the board this screen exists to be.
    */
-  const boards = current?.recap ? (
-    <RecapBoard contest={current} />
-  ) : (
+  const boards = (
     <>
       {/* THE WALL, WHERE IT CAN BE SEEN. Over the cap nothing on this board can
           be changed — see `overCap` — so the reason sits above the slots rather
@@ -1333,30 +1374,14 @@ function useSettledResults(pinned: boolean) {
   }, [on, history.loading, history.entries, seenThrough, acknowledge]);
 
   /**
-   * Still worth a badge: settled within the day, and not yet acknowledged.
-   *
-   * BOTH TESTS, because either alone is wrong. Time alone ignores a player who
-   * has explicitly said they have seen it; acknowledgement alone leaves a
-   * receipt up for the eleven days `recap_slate()` can run to, which is the
-   * thing the clock was added to stop.
-   *
-   * A contest with no row in the history has not settled, so there is nothing
-   * to expire and the badge is left alone — that is the live case, where the
-   * carousel is drawing `entered` rather than a result anyway.
+   * THIS ALSO RETURNED `showResult`, a per-contest test for whether a settled
+   * week's W/L/T badge was still worth drawing on the carousel's rack. Its one
+   * consumer was a prop `ContestCarousel` accepted and never read, and the rack
+   * it was meant to gate now draws no receipts at all: finished weeks are off
+   * the board (see `board`), so every pip on it belongs to a contest that is
+   * either live or waiting. The banner is what announces a result now.
    */
-  const showResult = useCallback(
-    (contestId: string) => {
-      const entry = history.entries?.find((e) => e.contestId === contestId);
-      if (!entry) return true;
-      return (
-        recentlySettled([entry], Date.now()).length > 0 &&
-        unseen.some((u) => u.contestId === contestId)
-      );
-    },
-    [history.entries, unseen],
-  );
-
-  return { unseen, acknowledge, showResult };
+  return { unseen, acknowledge };
 }
 
 /** A board's name and its count, on one baseline. */

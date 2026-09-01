@@ -785,6 +785,7 @@ const CONTEST_FIXTURES: MyContest[] = [
     myCoins: null,
     recap: false,
     weekLabel: 'PRE 4',
+    weekTitle: 'Preseason 4',
   },
   {
     id: 'fx-wr',
@@ -823,6 +824,7 @@ const CONTEST_FIXTURES: MyContest[] = [
     myCoins: null,
     recap: false,
     weekLabel: 'PRE 4',
+    weekTitle: 'Preseason 4',
   },
 ];
 
@@ -851,6 +853,7 @@ function LineupFixture() {
              states and the focused pip can be seen moving as you swipe — see
              `Foot` in the carousel. */
           run={FIXTURE_PLAYER.run}
+          week={CONTEST_FIXTURES[0].weekTitle}
           onEnter={() => {}}
           width={carouselWidth}
         />

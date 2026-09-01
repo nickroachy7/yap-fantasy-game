@@ -87,6 +87,8 @@ export type MyContest = {
    * sit next to the name, because the name is what makes them look identical.
    */
   weekLabel: string;
+  /** The same week set as a phrase, for a line rather than a chip. See `weekTitleOf`. */
+  weekTitle: string;
   /**
    * What YOU are owed out of it — null until the week is final and the places
    * are decided.
@@ -165,6 +167,26 @@ function weekLabelOf(seasonType: number, week: number): string {
 }
 
 /**
+ * The same week, set as a phrase rather than as a chip.
+ *
+ * TWO FORMS BECAUSE THERE ARE TWO VOICES. `weekLabelOf` is cut for the card's
+ * head — capitals, abbreviated, sitting in a 20pt row beside a contest name it
+ * must not crowd, which is the app's voice for a stamped fact. This one is read
+ * as words: it sits on the lineup rail beside a back arrow, in a line a person
+ * reads rather than scans, and `WEEK 1` there is a heading shouting inside a
+ * sentence.
+ *
+ * Spelled out for the same reason. `PRE 4` is fine as a stamp next to a contest
+ * that says what it is; standing alone as the only thing naming the week the
+ * board is on, it should say the word.
+ */
+export function weekTitleOf(seasonType: number, week: number): string {
+  if (seasonType === 1) return `Preseason ${week}`;
+  if (seasonType === 3) return `Playoff ${week}`;
+  return `Week ${week}`;
+}
+
+/**
  * numeric(10,2) and bigint both arrive as strings depending on how the driver
  * renders them, and a string here silently breaks every comparison the card
  * makes — the same trap `parseFieldWeeks` documents.
@@ -204,6 +226,7 @@ export function useMyContests(includeCode?: string): MyContestsState {
         slotCount: Number(r.slot_count),
         entryFeeCoins: r.entry_fee_coins,
         weekLabel: weekLabelOf(Number(r.season_type), Number(r.week)),
+        weekTitle: weekTitleOf(Number(r.season_type), Number(r.week)),
         lineupId: r.lineup_id,
         filled: Number(r.filled ?? 0),
         field: {
