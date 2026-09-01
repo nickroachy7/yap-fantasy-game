@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { Link, useLocalSearchParams } from 'expo-router';
 
 import { Icon } from '@/components/icons/Icon';
 import { cardBadge, runCashout, runCleared, runStreak } from '@/components/icons/glyphs';
@@ -76,7 +76,16 @@ export default function ProfileScreen() {
   const { session, signOut } = useAuth();
   const { coins, displayName, cardCount, refresh } = usePlayer();
 
-  const [tab, setTab] = useState<TabKey>('overview');
+  /* The masthead's gear deep-links straight here — see `AppHeader`, whose
+     trailing slot points at `/profile?tab=settings`. Seeded from the param
+     rather than driven by it: the param names where you ARRIVE, and the
+     segmented control owns the tab from then on. Driving it would mean every
+     tap had to write the URL back, which buys nothing on a screen nobody
+     deep-links into twice. */
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const [tab, setTab] = useState<TabKey>(
+    params.tab === 'activity' || params.tab === 'settings' ? params.tab : 'overview',
+  );
   const [slate, setSlate] = useState<Slate | null>(null);
   const [ledger, setLedger] = useState<LedgerRow[] | null>(null);
   const [weeks, setWeeks] = useState<WeekRow[] | null>(null);

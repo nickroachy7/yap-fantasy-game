@@ -1,93 +1,139 @@
 /**
- * The app header: the wordmark, the hearts, and the coin balance.
+ * The app header — and it is a TEMPLATE now, not a masthead.
+ *
+ * ---------------------------------------------------------------------------
+ * THREE SLOTS, FILLED DIFFERENTLY BY TWO PRODUCTS
+ * ---------------------------------------------------------------------------
+ *
+ * Yap Fantasy is one global board every user shares. Private leagues are the
+ * same game, configured by whoever made the league, and the header is MOSTLY
+ * uniform between them — which is the whole reason this file stopped being a
+ * layout and became a set of slots:
+ *
+ *              LEADING            IDENTITY                    TRAILING
+ *   Yap main   (reserved, empty)  bot mark + YAP FANTASY       hearts · coins · gear
+ *   League     back chevron       league logo + league name    (configurable) · gear
+ *
+ * THE LEADING SLOT IS RESERVED ON YAP MAIN, and that is the least obvious line
+ * in this file. Yap main has nowhere to go back TO — it is the product, not a
+ * page inside something — so it draws no chevron. But if the slot only existed
+ * where the chevron does, the logo would sit 32pt further left on Yap main
+ * than in a league, and the two headers would not agree on the one position
+ * that matters most. So the gutter is always there and sometimes empty. It
+ * costs a strip of black nobody will ever notice, and it buys the promise that
+ * the identity never moves between the two experiences.
+ *
+ * THE TRAILING SLOT IS ANCHORED BY THE GEAR, for the same class of reason.
+ * A league can switch hearts and coins off independently, so the right side
+ * has four possible widths. Something has to hold the right edge or the whole
+ * cluster slides about between leagues; the gear is always present, so it is
+ * that thing. It is also why the gear is worth having up here at all beyond
+ * the obvious — settings had a home already, as a tab inside Profile.
+ *
+ * ---------------------------------------------------------------------------
+ * TWO PILLS, NOT ONE CAPSULE
+ * ---------------------------------------------------------------------------
+ *
+ * These were bare figures on the page, then briefly one divided capsule, and
+ * are now a pill each. The capsule was arguing that hearts and coins are one
+ * fact — a wallet — and the configuration is what killed that: a league can
+ * run coins without hearts, so the capsule had to grow rules about when its
+ * divider exists and which corners round, and a container whose shape depends
+ * on config is a container the eye cannot learn.
+ *
+ * A pill each has no such state. Hearts off removes a pill. Both off removes
+ * both, and the gear is left holding the edge, which is exactly what it is for.
+ * The two currencies are also spent in different places — coins buy cards from
+ * every screen, a heart is only ever risked by a contest — so drawing them as
+ * one purse was overstating the relationship anyway.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THE HEARTS CAME BACK UP HERE
+ * ---------------------------------------------------------------------------
+ *
+ * They lived in the contest carousel's foot for a while, on the argument that
+ * a heart is only ever risked by ONE object and belongs beside it. That still
+ * holds for the RUN — what is staked, what is lost — and `RunRail` still draws
+ * it there. What it could not do is answer "how many do I have" from any other
+ * screen, which is a balance question, and balances belong to the chrome.
+ *
+ * ONE GLYPH AND A NUMBER, exactly as the coin is. Not a rack: five pips in a
+ * masthead would out-weigh the wordmark beside them.
+ *
+ * ---------------------------------------------------------------------------
+ * THE LEAGUE NAME IS THE PART THAT WILL BREAK
+ * ---------------------------------------------------------------------------
+ *
+ * "YAP FANTASY" is eleven characters we chose. A league name is whatever
+ * somebody typed, and the identity box is ~186pt on a 393pt phone — around
+ * 22 characters at 15pt.
+ *
+ * Three things keep that from clipping, in the order they fire:
+ *
+ *  1. A 24-character cap at league creation (see `LEAGUE_NAME_MAX`, which the
+ *     create form imports so the two cannot drift). The person naming the
+ *     league solves it in the one moment they are thinking about the name.
+ *  2. `adjustsFontSizeToFit` down to a 12pt floor — `NAME_MIN_SCALE` is that
+ *     floor expressed as the ratio RN wants. A long name at 24 characters on a
+ *     320pt SE gets quieter type rather than an ellipsis, and the header's
+ *     height never moves.
+ *  3. Truncation, which after the first two should effectively never be seen.
+ *
+ * SENTENCE CASE FOR THEIRS, LETTERSPACED CAPS FOR OURS. Caps are the Yap
+ * wordmark's voice and run about a third wider per character, which spends the
+ * budget on styling a name we did not choose. Two settings in one slot still
+ * reads as one template, and it quietly says whose house you are in.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT IS STILL DELIBERATELY ABSENT
+ * ---------------------------------------------------------------------------
  *
  * NO BAND. It used to paint itself `#0E0F12` — a shade off the page, plus a
- * gold bloom in the corner — so the chrome read as a fixed branded strip
- * regardless of the device setting. That argument died when the app went
- * dark-only (see `use-color-scheme`): against a black page, a near-black band
- * is not "branded chrome", it is a rectangle of very slightly different black
- * with a visible seam under it, and the seam was the only thing it actually
- * communicated. Drawing on the page background makes the top of the screen the
- * top of the screen, and gives the wordmark and the balance back the quiet they
- * were fighting.
+ * gold bloom in the corner. Against a black page a near-black band is not
+ * branded chrome, it is a rectangle of very slightly different black with a
+ * visible seam under it, and the seam was the only thing it communicated.
  *
- * NO ACCOUNT BUTTON. Profile is a bottom tab now (see `NAV_TABS`), so the
- * avatar up here was a second door to a room that already has one — and the
- * more expensive of the two, since it cost the header its only interactive
- * element and the reader a decision about which way in to use.
+ * NO ACCOUNT BUTTON. Profile is a bottom tab, so an avatar here was a second
+ * door to a room that already has one.
  *
- * AND STILL NO BACK ARROW. One was added for a Fantasy hub and removed with it:
- * the four boards are peers reached from the strip below, so there is no
- * "up" for an arrow to point at, and a chevron that only ever pops a stack
- * nobody built is furniture. If a screen inside this chrome ever does have a
- * parent, that is the moment to bring it back — not before.
- *
- * NO PAGE TITLE EITHER. It used to carry a `context` line under the wordmark —
- * "Packs & pulls", "Deferred to Week 3 · nothing tracked" — which made the
- * chrome say something different on every tab and turned a fixed one-line
- * masthead into a two-line block of varying height. The bottom tab bar already
- * names the screen you are on, and the screens that carry live week state say
- * it themselves in a place you can act on: the lineup's score band leads with
- * PRE WK 3. `Screen` still takes `context` and still renders it on WIDE, under
+ * NO PAGE TITLE. It used to carry a `context` line under the wordmark, which
+ * made a fixed one-line masthead into a two-line block of varying height. The
+ * tab bar names the screen; `Screen` still renders `context` on WIDE, under
  * the page heading, where there is a heading for it to qualify.
  *
- * THE HEARTS ARE GONE FROM HERE, and where they went is the argument.
+ * ---------------------------------------------------------------------------
+ * `attached` IS ABOUT THE GAP BELOW. It says another row of chrome sits
+ * directly under this one, so the masthead gives up most of its bottom
+ * padding. Without it the header's 14 and the row's own top padding both claim
+ * the same joint and you get 27pt of nothing between a wordmark and a tab
+ * label — measured, on the Fantasy tab, which is where it was found.
  *
- * They sat next to the balance on the reasoning that both are "what you have to
- * spend", and that entering a contest costs coins and risks a heart in one
- * action. The first half held; the second is what broke it. The coins are spent
- * from every screen — packs, sets, contests — so the balance belongs to the
- * chrome. A heart is only ever risked by ONE object, the contest, and that
- * object has a card of its own on the board where the risking happens.
+ * ---------------------------------------------------------------------------
+ * THE COIN. Drawn from two Views rather than an icon font or an SVG, which is
+ * the rule `Icon.tsx` sets out: that set is faceted and earns `react-native-svg`,
+ * while a circle does not. A disc and a concentric rim are a circle twice.
  *
- * So the rack now sits under that card, in the carousel's foot, where the pip a
- * particular contest is holding comes forward as you swipe to it — see `Foot`
- * in `ContestCarousel`. What it says there it could never say up here: not "you
- * have two hearts" on a screen full of cards for sale, but "THIS contest is
- * holding this one, and that is what is behind it".
- *
- * The full rack is still read outright in two places, both of which are about
- * the run rather than about a contest: the lobby's run panel, and the death
- * screen. `Hearts` itself is unchanged apart from the focus it grew for the
- * carousel.
- *
- * THE BALANCE IS A NUMBER, NOT A WIDGET. The pill it used to sit in — border,
- * inset fill, a 8pt "COINS" label above the figure — was three pieces of
- * decoration around one fact, stacked into two lines to fit. The coin glyph
- * already says what the number counts, so the label was reading it out twice.
- *
- * ONE PROP, AND IT IS ABOUT THE GAP BELOW. `attached` says another row of
- * chrome sits directly under this one, so the masthead gives up most of its
- * bottom padding. Without it the header's 14 and the row's own top padding both
- * claim the same joint and you get 27pt of nothing between a wordmark and a tab
- * label — measured, on the Fantasy tab, which is where it was found. The row
- * below owns that space now; this one just stops adding to it.
- *
- * The coin is drawn from two Views rather than an icon font or an SVG, which
- * is the rule `Icon.tsx` sets out: that set is faceted — chamfers, chevrons,
- * shields — and earns `react-native-svg`, while a circle does not. A disc and a
- * concentric rim are a circle twice, so they are Views, and stay crisp at every
- * size for no dependency.
- *
- * IT IS DRAWN FOR 8pt, NOT FOR 12. The header shows it at 12, but the set
- * checklist and the collection summary show it at 8, and a mark that only
- * survives at its largest use is the wrong mark. So the rim is struck at a
- * fixed FRACTION of the size rather than a fixed width: it thins with the coin
- * instead of swallowing it, and at 8pt it lands on a hairline and reads as one
- * disc rather than as mud.
+ * IT IS DRAWN FOR 8pt, NOT FOR 12. The header shows it at 12, the set
+ * checklist and the collection summary at 8, and a mark that only survives at
+ * its largest use is the wrong mark. So the rim is struck at a fixed FRACTION
+ * of the size rather than a fixed width: it thins with the coin instead of
+ * swallowing it, and at 8pt it lands on a hairline and reads as one disc.
  *
  * The rim is a translucent black, so it reads on the gold the balance uses and
- * on the grey a spent milestone uses, and simply disappears into the near-black
- * coin the claim chips put on a gold plate — which is the correct failure. It
- * goes quiet; it never goes wrong.
+ * on the grey a spent milestone uses, and disappears into the near-black coin
+ * the claim chips put on a gold plate — which is the correct failure. It goes
+ * quiet; it never goes wrong.
  *
  * It is exported: the shop, the collection summary and the card profile all
  * price things in coins and must use this exact mark.
  */
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Link } from 'expo-router';
+import type { ReactNode } from 'react';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { YapMark } from '@/components/brand/YapLogo';
+import { BackChevron, Gear } from '@/components/icons/Chrome';
 import { Heart } from '@/components/runs/Hearts';
 import { Colors, Spacing, TierColors } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
@@ -97,12 +143,32 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 const NUMERIC = { fontVariant: ['tabular-nums' as const] };
 
 /**
+ * The reserved leading gutter, in points — see the header. Identical whether a
+ * chevron is drawn in it or not.
+ *
+ * IT IS THE MARK'S WIDTH, NOT THE TOUCH TARGET'S. 20 is exactly the chevron;
+ * the tappable area comes from `hitSlop`, which spills outside the layout and
+ * costs the row nothing. Reserving 44 here for a finger would have taken the
+ * space out of the wordmark instead, and at 375pt there is none to take —
+ * see the note on the trailing metal below.
+ */
+const LEAD = 20;
+
+/** What a league name may be. The create form imports this; do not fork it. */
+export const LEAGUE_NAME_MAX = 24;
+
+/** 12pt floor over the 15pt set size — the shrink budget, as RN wants it. */
+const NAME_MIN_SCALE = 0.8;
+
+/** The same 12pt floor, over the wordmark's 14. See the wordmark below. */
+const WORDMARK_MIN_SCALE = 0.86;
+
+/**
  * First letter of each of the first two word-ish parts. Splitting on separators
  * matters: "a_very_long_name" was rendering as "A_", which looks broken.
  *
- * Still exported, and still used — by the sidebar, the profile page and the
- * contest card. The header stopped drawing an avatar; the monogram itself is
- * not the header's idea.
+ * Used by the sidebar, the profile page, the contest card — and now by the
+ * league plate below, which is the same problem with a different subject.
  */
 export function initialsOf(name: string): string {
   const parts = name.split(/[\s._\-]+/).filter(Boolean);
@@ -136,60 +202,182 @@ export function Coin({ size = 11, color }: { size?: number; color: string }) {
   );
 }
 
+/**
+ * WHO THIS HEADER BELONGS TO. Omitted means Yap Fantasy itself; supplying one
+ * puts a private league in the identity slot without moving anything else.
+ */
+export type HeaderIdentity = {
+  /** As typed by whoever made the league. Capped at `LEAGUE_NAME_MAX`. */
+  name: string;
+  /** The plate's fill and the initials over it. Falls back to the page ramp. */
+  tint?: string;
+  onTint?: string;
+  /** An uploaded crest, once leagues can have one. Replaces the initials. */
+  logo?: ReactNode;
+};
+
+/** Which currencies this league runs. Both, unless a league says otherwise. */
+export type HeaderCurrencies = { hearts?: boolean; coins?: boolean };
+
+/** One balance: a mark, a figure, and nothing else. See the header on pills. */
+function Pill({
+  mark,
+  value,
+  color,
+  surface,
+}: {
+  mark: ReactNode;
+  value: string;
+  color: string;
+  surface: string;
+}) {
+  return (
+    <View style={[styles.pill, { backgroundColor: surface }]}>
+      {mark}
+      <Text style={[styles.figure, NUMERIC, { color }]}>{value}</Text>
+    </View>
+  );
+}
+
 export function AppHeader({
   /** Another row of chrome follows immediately. See the header. */
   attached = false,
-}: { attached?: boolean } = {}) {
+  /** A private league. Omitted draws the Yap lockup. */
+  identity,
+  /**
+   * Where back goes. Omitted keeps the gutter reserved and empty, which is
+   * what Yap main wants — see the header.
+   */
+  back,
+  /** Per-league switches. Hearts additionally require a run to exist. */
+  currencies,
+  /** Where the gear goes. Defaults to this account's own settings. */
+  settingsHref = '/profile?tab=settings',
+}: {
+  attached?: boolean;
+  identity?: HeaderIdentity;
+  back?: { href: string; label?: string };
+  currencies?: HeaderCurrencies;
+  settingsHref?: string;
+} = {}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const accent = TierColors[scheme].gold.accent;
   const top = useSafeAreaInsets().top;
   const { coins, run, loading } = usePlayer();
 
+  const showHearts = currencies?.hearts !== false && !!run;
+  const showCoins = currencies?.coins !== false;
+
   return (
     <View style={[styles.base, { paddingTop: top, backgroundColor: c.background }]}>
       <View style={[styles.row, attached && styles.rowAttached]}>
-        {/* Mark plus wordmark, not the stacked lockup. The lockup is two lines
-            tall and this masthead is one line by design (see the header) —
-            dropping it in would have doubled the height of the chrome on every
-            screen to say the same word. `ink` is the page, because that is what
-            the bot's face slots are showing through to. */}
-        <View style={styles.brand}>
-          <YapMark height={19} ink={c.background} />
-          <Text style={[styles.wordmark, { color: c.text }]}>YAP FANTASY</Text>
+        {/* LEADING — reserved whether or not it draws anything. */}
+        <View style={styles.lead}>
+          {back ? (
+            <Link href={back.href as never} asChild>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={back.label ?? 'Back'}
+                hitSlop={10}>
+                <BackChevron size={20} color={c.text} />
+              </Pressable>
+            </Link>
+          ) : null}
         </View>
 
-        <View style={styles.right}>
-          {/* HEARTS BESIDE COINS, because they are the same KIND of fact: a
-              balance you spend, that the game gives back, and that you check
-              before deciding anything. Coins buy cards; hearts buy entries.
-              Keeping one in the masthead and the other buried under a carousel
-              made the second look like a property of the lineup screen rather
-              than of the account.
-
-              It is also what freed the rail below to stop being a readout. The
-              rack had to draw every heart you held because nothing else did;
-              with the count up here the row is free to draw only the hearts
-              that are actually in a contest — see `RunRail`.
-
-              ONE GLYPH AND A NUMBER, exactly as the coin is. Not a rack: five
-              pips in a masthead would out-weigh the wordmark beside them, and
-              the shape of the run — what is staked, what is lost — is the
-              rail's job on the screen where it matters. */}
-          {run ? (
-            <View style={styles.balance}>
-              <Heart size={12} state="free" />
-              <Text style={[styles.figure, NUMERIC, { color: c.text }]}>
-                {loading ? '—' : run.hearts}
-              </Text>
-            </View>
-          ) : null}
-          <View style={styles.balance}>
-            <Coin size={12} color={accent} />
-            <Text style={[styles.figure, NUMERIC, { color: c.text }]}>
-              {loading ? '—' : coins.toLocaleString()}
+        {/* IDENTITY — the one thing that must not move between products. */}
+        {identity ? (
+          <View style={styles.brand}>
+            {identity.logo ?? (
+              <View
+                style={[
+                  styles.plate,
+                  { backgroundColor: identity.tint ?? c.backgroundElement },
+                ]}>
+                <Text style={[styles.plateText, { color: identity.onTint ?? c.text }]}>
+                  {initialsOf(identity.name)}
+                </Text>
+              </View>
+            )}
+            {/* Sentence case, and allowed to shrink before it clips. See the
+                header — this is somebody else's name, not our wordmark. */}
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={NAME_MIN_SCALE}
+              style={[styles.leagueName, { color: c.text }]}>
+              {identity.name}
             </Text>
           </View>
+        ) : (
+          /* Mark plus wordmark, not the stacked lockup. The lockup is two lines
+             tall and this masthead is one line by design — dropping it in would
+             have doubled the height of the chrome on every screen to say the
+             same word. `ink` is the page, because that is what the bot's face
+             slots are showing through to. */
+          <View style={styles.brand}>
+            <YapMark height={19} ink={c.background} />
+            {/* `numberOfLines` is load-bearing now that the identity slot is
+                the flex child that gives — without it the wordmark answers a
+                tight row by WRAPPING to "YAP / FANTASY" and silently doubles
+                the height of the chrome on every screen. Found at 375pt.
+
+                AND THE WORDMARK SHRINKS TOO, which took some arguing.
+
+                Measured, in the iOS system face at 14/800/1.8: "YAP FANTASY"
+                needs 118.3pt. After the metal was tightened as far as it goes
+                (see the row's note) a 375pt phone leaves it 114.1 — four short.
+                375 is the SE 2/3 and the 13 mini, not an edge case.
+
+                The alternative was cutting letterspacing to 1.3 for everyone,
+                which pays for two narrow handsets by making the wordmark
+                slightly wrong on every wide one. This way 393 and up render it
+                exactly as drawn and the small phones step down a point or so,
+                invisible unless you hold two devices side by side.
+
+                The floor is 12pt — the same floor the league name gets, for
+                the same reason, which is the point of a template.
+
+                RN Web ignores `adjustsFontSizeToFit` and will truncate instead.
+                That is survivable and not the interesting bug on that surface:
+                the wordmark resolves to TIMES there, because `fontFamily:
+                'inherit'` finds nothing to inherit from and lands on the UA
+                default rather than on `--font-display`. Worth fixing, but as
+                its own change — it is a brand bug, not a layout one. */}
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={WORDMARK_MIN_SCALE}
+              style={[styles.wordmark, { color: c.text }]}>
+              YAP FANTASY
+            </Text>
+          </View>
+        )}
+
+        {/* TRAILING — variable width, right edge held by the gear. */}
+        <View style={styles.right}>
+          {showHearts ? (
+            <Pill
+              mark={<Heart size={12} state="free" />}
+              value={loading ? '—' : String(run!.hearts)}
+              color={c.text}
+              surface={c.surface}
+            />
+          ) : null}
+          {showCoins ? (
+            <Pill
+              mark={<Coin size={12} color={accent} />}
+              value={loading ? '—' : coins.toLocaleString()}
+              color={c.text}
+              surface={c.surface}
+            />
+          ) : null}
+          <Link href={settingsHref as never} asChild>
+            <Pressable accessibilityRole="button" accessibilityLabel="Settings" hitSlop={10}>
+              <Gear size={19} color={c.textSecondary} />
+            </Pressable>
+          </Link>
         </View>
       </View>
     </View>
@@ -201,22 +389,39 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: Spacing.three,
-    /* The masthead is one line now, so this padding IS its height. The band's
-       own edges used to do the separating; with nothing drawn, the space is
-       the only thing telling the page where the chrome stops, and 12 left the
+    /* The masthead is one line, so this padding IS its height. The band's own
+       edges used to do the separating; with nothing drawn, the space is the
+       only thing telling the page where the chrome stops, and 12 left the
        wordmark reading as a caption stuck to the notch. */
     paddingVertical: 14,
-    gap: Spacing.three,
+    /* ---------------------------------------------------------------------
+       THE METAL IS TIGHT ON PURPOSE, and this is the measurement that set it.
+       The gutter and the gear together cost the row ~47pt that the old
+       two-figure masthead did not spend. At 375pt — SE 2/3, 13 mini, and not
+       a rare phone — that left the wordmark 102pt to say something that needs
+       118 in the iOS system face, so it truncated to "YAP FANT…".
+       Eighteen points came back out of the spacing rather than the type: this
+       gap, `LEAD`, the pill padding and the trailing gap. Cutting the wordmark
+       instead would have shrunk the brand on the narrow phones and left it
+       alone on the wide ones, which is the one inconsistency a masthead cannot
+       afford. If anything is ever added to this row, it is these four numbers
+       that have already been spent.
+       --------------------------------------------------------------------- */
+    gap: 8,
   },
   /* Not zero: the two rows should read as stacked, not as one squashed block,
      and 4 is enough to keep the wordmark off the labels below while letting the
      row underneath set the actual gap. */
   rowAttached: { paddingBottom: 4 },
-  /* `flexShrink: 1` lives on the wordmark, not here, so the text truncates
-     before the mark does — a clipped logo looks broken, clipped type does not. */
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 9, flexShrink: 1 },
+  /* Fixed and never shrinking — the gutter is the promise. See the header. */
+  lead: { width: LEAD, flexShrink: 0, alignItems: 'flex-start', justifyContent: 'center' },
+  /* `flex: 1` so the identity is the ONLY thing that gives up width when the
+     row is tight: the chevron, the pills and the gear are all fixed, so a long
+     league name shrinks its own type rather than squeezing the numbers.
+     `minWidth: 0` is what actually lets it — without it a flex child refuses to
+     go below its content width and pushes the pills off the edge instead. */
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 },
   wordmark: {
     fontSize: 14,
     fontWeight: '800',
@@ -224,12 +429,40 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     ...Platform.select({ web: { fontFamily: 'inherit' }, default: {} }),
   },
-  /* `flexShrink: 0` so a long wordmark truncates rather than squeezing the
-     balance — the figure is the reason the right side exists. One child now
-     that the rack has moved to the contest card; the row stays because the
-     right side is a place, and the next thing that earns a spot beside the
-     balance should land in it rather than inventing its own. */
-  right: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, flexShrink: 0 },
-  balance: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 0 },
-  figure: { fontSize: 17, fontWeight: '800', letterSpacing: -0.2 },
+  /* Sentence case, tighter, and a size up from the wordmark to compensate for
+     the caps it is not wearing. See the header. */
+  leagueName: {
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: -0.1,
+    flexShrink: 1,
+    ...Platform.select({ web: { fontFamily: 'inherit' }, default: {} }),
+  },
+  /* Square with a soft corner, sized to the wordmark's cap height so the two
+     identities weigh the same. Not a circle: a circle is an avatar, and a
+     league is not a person. */
+  plate: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  plateText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  /* `flexShrink: 0` so a long name truncates rather than squeezing the
+     balances — the figures are the reason the right side exists. */
+  right: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 0 },
+  /* No border. Two bordered pills side by side on a black page is four
+     hairlines to read past for two numbers; the fill separates on its own. */
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+    flexShrink: 0,
+  },
+  figure: { fontSize: 14, fontWeight: '800', letterSpacing: -0.2 },
 });
