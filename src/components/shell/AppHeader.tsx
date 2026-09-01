@@ -14,6 +14,10 @@
  *   Yap main   (reserved, empty)  bot mark + YAP FANTASY       hearts · coins · gear
  *   League     back chevron       league logo + league name    (configurable) · gear
  *
+ * — plus a fourth, empty slot mirroring the leading gutter on the far right,
+ * so the row is symmetric in BOTH products rather than only in a league. See
+ * `TRAIL`, which is the note on why an invisible gutter still shows.
+ *
  * THE LEADING SLOT IS RESERVED ON YAP MAIN, and that is the least obvious line
  * in this file. Yap main has nowhere to go back TO — it is the product, not a
  * page inside something — so it draws no chevron. But if the slot only existed
@@ -129,7 +133,7 @@
  */
 import { Link } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { YapMark } from '@/components/brand/YapLogo';
@@ -154,14 +158,64 @@ const NUMERIC = { fontVariant: ['tabular-nums' as const] };
  */
 const LEAD = 20;
 
+/**
+ * The counterweight, and it holds nothing — ever.
+ *
+ * The leading gutter is invisible on Yap main, so the row read as INDENTED
+ * there: the mark started 44pt in while the gear finished 16 from the other
+ * edge, and a masthead with a 28pt limp is what you notice instead of the
+ * wordmark. Leagues never had the problem, because a chevron fills the slot.
+ *
+ * Mirroring it costs 20pt of row width and makes both products symmetric —
+ * identity in at 36, gear out at 36 — rather than only one of them. The 8pt
+ * that used to sit between the gutter and the identity paid for most of it:
+ * the chevron's band is narrow inside its 20pt slot, so the two never touch
+ * even with the gap gone.
+ *
+ * If a second trailing action is ever added, this is where it goes, and the
+ * symmetry survives.
+ */
+const TRAIL = 20;
+
 /** What a league name may be. The create form imports this; do not fork it. */
 export const LEAGUE_NAME_MAX = 24;
 
 /** 12pt floor over the 15pt set size — the shrink budget, as RN wants it. */
 const NAME_MIN_SCALE = 0.8;
 
-/** The same 12pt floor, over the wordmark's 14. See the wordmark below. */
-const WORDMARK_MIN_SCALE = 0.86;
+/**
+ * The wordmark's floor — 0.8 of 14, so about 11pt.
+ *
+ * A FLOOR, NOT A TARGET, and the distinction is what set the number. iOS picks
+ * whatever scale actually fits and stops there; the floor only bites when even
+ * that is not enough, and then it truncates instead. So a lower floor costs
+ * nothing at any width where the type already fits, and buys the row a margin.
+ *
+ * Measured after the trailing mirror landed: a 375pt phone leaves the wordmark
+ * 104.8pt for something needing 118.3, which is a scale of 0.886 — it renders
+ * around 12.4pt there and 14 everywhere from 393 up. At the 0.86 this started
+ * at, that was three percent of headroom, and the next thing added to the row
+ * would have turned a quiet shrink into "YAP FANT…" with nothing to warn you.
+ */
+const WORDMARK_MIN_SCALE = 0.8;
+
+/**
+ * THE WEB STAND-IN FOR THE SHRINK, because RN Web does not implement
+ * `adjustsFontSizeToFit` — it drops the prop and truncates instead.
+ *
+ * That is fine on a desktop browser, where the wordmark has room to spare, and
+ * not fine on a phone browser: the deployed site showed "YAP FANT…" at 375
+ * the moment the trailing mirror took its 12pt. iOS was already handling the
+ * same width by quietly rendering at ~12.4.
+ *
+ * So on web, and only on web, the wordmark is SET at that size below the width
+ * where it stops fitting rather than scaled down to it. Same outcome, reached
+ * the only way this platform can reach it.
+ *
+ * 393 is the first width where 14 fits outright — the iPhone 14/15/16 and up.
+ * Below it every handset is 375 or 390, and 12.5 clears both.
+ */
+const WORDMARK_WEB_TIGHT = { below: 393, size: 12.5 } as const;
 
 /**
  * First letter of each of the first two word-ish parts. Splitting on separators
@@ -264,7 +318,13 @@ export function AppHeader({
   const c = Colors[scheme];
   const accent = TierColors[scheme].gold.accent;
   const top = useSafeAreaInsets().top;
+  const { width } = useWindowDimensions();
   const { coins, run, loading } = usePlayer();
+
+  /* See `WORDMARK_WEB_TIGHT`. Native leaves this at the set size and lets
+     `adjustsFontSizeToFit` do the work. */
+  const wordmarkSize =
+    Platform.OS === 'web' && width < WORDMARK_WEB_TIGHT.below ? WORDMARK_WEB_TIGHT.size : undefined;
 
   const showHearts = currencies?.hearts !== false && !!run;
   const showCoins = currencies?.coins !== false;
@@ -336,8 +396,8 @@ export function AppHeader({
                 exactly as drawn and the small phones step down a point or so,
                 invisible unless you hold two devices side by side.
 
-                The floor is 12pt — the same floor the league name gets, for
-                the same reason, which is the point of a template.
+                Both this and the league name floor at 0.8 of their set size,
+                for the same reason, which is the point of a template.
 
                 RN Web ignores `adjustsFontSizeToFit` and will truncate instead.
                 That is survivable and not the interesting bug on that surface:
@@ -349,7 +409,7 @@ export function AppHeader({
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={WORDMARK_MIN_SCALE}
-              style={[styles.wordmark, { color: c.text }]}>
+              style={[styles.wordmark, { color: c.text }, !!wordmarkSize && { fontSize: wordmarkSize }]}>
               YAP FANTASY
             </Text>
           </View>
@@ -379,6 +439,11 @@ export function AppHeader({
             </Pressable>
           </Link>
         </View>
+
+        {/* The counterweight for the leading gutter. Empty by design — see
+            `TRAIL`. `pointerEvents` off so it cannot eat a tap meant for the
+            gear beside it. */}
+        <View style={styles.trail} pointerEvents="none" />
       </View>
     </View>
   );
@@ -407,8 +472,13 @@ const styles = StyleSheet.create({
        alone on the wide ones, which is the one inconsistency a masthead cannot
        afford. If anything is ever added to this row, it is these four numbers
        that have already been spent.
+
+       NO `gap` HERE, deliberately. A gap on the row applies to every joint
+       equally, and the two joints are not equal: the one between the gutter
+       and the identity must be ZERO for the mirror to balance, while the one
+       between the identity and the balances is the only real breathing space
+       in the row. `brand` carries the second as a margin instead.
        --------------------------------------------------------------------- */
-    gap: 8,
   },
   /* Not zero: the two rows should read as stacked, not as one squashed block,
      and 4 is enough to keep the wordmark off the labels below while letting the
@@ -421,7 +491,16 @@ const styles = StyleSheet.create({
      league name shrinks its own type rather than squeezing the numbers.
      `minWidth: 0` is what actually lets it — without it a flex child refuses to
      go below its content width and pushes the pills off the edge instead. */
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 },
+  brand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    flex: 1,
+    minWidth: 0,
+    /* The row's only real joint — see the row's note on why there is no
+       shared `gap`. Everything left of the identity is structural. */
+    marginRight: 8,
+  },
   wordmark: {
     fontSize: 14,
     fontWeight: '800',
@@ -453,6 +532,8 @@ const styles = StyleSheet.create({
   /* `flexShrink: 0` so a long name truncates rather than squeezing the
      balances — the figures are the reason the right side exists. */
   right: { flexDirection: 'row', alignItems: 'center', gap: 7, flexShrink: 0 },
+  /* Mirrors `lead` exactly, and must keep doing so. See `TRAIL`. */
+  trail: { width: TRAIL, flexShrink: 0 },
   /* No border. Two bordered pills side by side on a black page is four
      hairlines to read past for two numbers; the fill separates on its own. */
   pill: {
