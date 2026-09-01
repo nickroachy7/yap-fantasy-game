@@ -318,6 +318,27 @@ export function ContestCarousel({
    * the screen behind an invitation. So the page is tracked here and
    * `onIndexChange` fires only for the pages that are contests.
    *
+   * ---------------------------------------------------------------------------
+   * IT IS NOT THE SAME THING AS THE INDEX THE BOARD LOADS
+   * ---------------------------------------------------------------------------
+   *
+   * `page` is what the RAIL points at; `index` is what the LINEUP is for. They
+   * used to move together at the moment the scroll settled, so on a phone the
+   * rail sat pointing at the card you had just left for the whole length of a
+   * flick — the one moment the reader is actively asking "which one am I going
+   * to".
+   *
+   * The two now change at different times on purpose, because the two costs are
+   * not the same. Swapping the lit pip is a repaint. Swapping the board is a
+   * query, eight rows of cards, and a scroll position — doing that at the
+   * halfway point of a drag would fire it for every card you flick past on your
+   * way to the fourth one, and undo them all if you let go early.
+   *
+   * So the pip crosses when the scroll crosses (see `crossTo`) and the board
+   * follows when it lands (see `settleTo`). The rail leads the board by about
+   * a third of a second, which is exactly the interval in which the reader has
+   * decided and the app has not caught up.
+   *
    * Adjusted DURING RENDER when the parent moves the index — arriving from the
    * contest sheet on a particular card — which is React's own pattern for
    * "state derived from a prop that can also change on its own". Same
@@ -352,8 +373,9 @@ export function ContestCarousel({
    * WHERE THE SCROLLER IS, live and fractional — the input the pages fade on.
    *
    * A shared value rather than state because it changes every frame of a drag,
-   * and nothing in React should hear about that: `page` below is the same fact
-   * rounded off and reported once per settle, which is all the board needs.
+   * and nothing in React should hear about that. What React hears is the same
+   * fact ROUNDED — `page`, once per crossing — which is a handful of updates a
+   * swipe rather than one a frame.
    *
    * IN PAGES, NOT IN POINTS, and that is not a convenience. `step` is measured,
    * so it is wrong on the first render and right on the second; an offset in
@@ -369,14 +391,43 @@ export function ContestCarousel({
    */
   const offset = useSharedValue(index);
 
+  /**
+   * WHICH PAGE JS HAS BEEN TOLD ABOUT, so it is told once per crossing.
+   *
+   * The handler runs every frame; `crossTo` is a `setState`. Without this the
+   * worklet would hop the bridge sixty times a second to hand React the same
+   * number it already has. Kept on the UI thread beside the offset it is
+   * derived from, so the comparison happens where the value is.
+   */
+  const shown = useSharedValue(index);
+
+  /**
+   * "The scroll has crossed onto page N." The rail's half, and only the rail's.
+   *
+   * It fires the moment the scroll passes the halfway mark, which is the point
+   * at which the snap is already decided — so the lit pip names the card you
+   * are going to land on rather than the one you are leaving.
+   *
+   * NOTHING BELOW THE CARD HEARS THIS. It does not touch `settledAt` and it
+   * does not call `onIndexChange`; a page you flick through on the way to
+   * another one should light its pip in passing and never load its lineup.
+   */
+  const crossTo = useCallback(
+    (next: number) => {
+      /* EVERY PAGE IS A CONTEST NOW. The list used to carry one more — the
+         lobby tile as a footer — and every bound here was `contests.length`
+         rather than the last index because of it. */
+      if (next < 0 || next > contests.length - 1) return;
+      setPage(next);
+    },
+    [contests.length],
+  );
+
   /* "The scroll has settled on page N." Native is told by momentum end, web by
      the scroll stream. Idempotent — it compares against the current index and
      returns — which is what lets web hand it every tick of a drag. */
   const settleTo = useCallback(
     (next: number) => {
-      /* EVERY PAGE IS A CONTEST NOW. The list used to carry one more — the
-         lobby tile as a footer — and every bound here was `contests.length`
-         rather than the last index because of it. */
       if (next < 0 || next > contests.length - 1) return;
       settledAt.current = next;
       setPage(next);
@@ -404,6 +455,10 @@ export function ContestCarousel({
    *   this component was being accused of. On the UI thread the shared value
    *   and the finger are the same clock.
    *
+   *   THE CROSSING is every platform's too, and it is the reason the rail can
+   *   keep up with a thumb the board cannot. Guarded on `shown`, so it reaches
+   *   JS once per page rather than once per frame.
+   *
    *   THE SETTLE is web's alone, and for the reason the header sets out:
    *   `onMomentumScrollEnd` is inert under react-native-web, so web has to read
    *   a page change out of the scroll stream. Native must NOT — a settle mid-
@@ -418,10 +473,17 @@ export function ContestCarousel({
       onScroll: (e) => {
         const at = e.contentOffset.x / step;
         offset.value = at;
-        if (WEB) runOnJS(settleTo)(Math.round(at));
+
+        const next = Math.round(at);
+        if (next !== shown.value) {
+          shown.value = next;
+          runOnJS(crossTo)(next);
+        }
+
+        if (WEB) runOnJS(settleTo)(next);
       },
     },
-    [step, settleTo],
+    [step, crossTo, settleTo],
   );
 
   /**
