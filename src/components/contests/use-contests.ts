@@ -27,6 +27,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
 import { useLoader, type Load } from '@/hooks/use-loader';
+import { sessionCache } from '@/lib/session-cache';
 import { supabase } from '@/lib/supabase';
 import type { ContestTerms, PayoutCurve, WinCondition } from './contest-model';
 
@@ -149,52 +150,88 @@ export type ContestsState = {
   error: string | null;
   reload: () => void;
 };
+/** One lobby row, in the shape the sheet reads. Lifted out of the hook so the
+    cache below and the hook share one mapping rather than two that can drift. */
+function rowsToContests(rows: Row[]): Contest[] {
+  return rows.map((r) => ({
+    id: r.id,
+    code: r.code,
+    kind: r.kind,
+    name: r.name,
+    formatCode: r.format_code,
+    formatName: r.format_name,
+    slotCount: Number(r.slot_count),
+    entryFeeCoins: r.entry_fee_coins,
+    maxEntrants: r.max_entrants,
+    entrants: Number(r.entrants ?? 0),
+    season: r.season,
+    seasonType: r.season_type,
+    week: r.week,
+    mine: r.my_lineup_id
+      ? { lineupId: r.my_lineup_id, filled: Number(r.my_filled ?? 0) }
+      : null,
+    affordable: r.affordable,
+    winCondition: r.win_condition,
+    winRank: r.win_rank,
+    winPct: r.win_pct === null || r.win_pct === undefined ? null : Number(r.win_pct),
+    targetPoints:
+      r.target_points === null || r.target_points === undefined
+        ? null
+        : Number(r.target_points),
+    payoutCurve: r.payout_curve ?? 'flat',
+    scoreRate: Number(r.score_rate ?? 0),
+    heartsAtRisk: Number(r.hearts_at_risk ?? 0),
+    heartsOnWin: Number(r.hearts_on_win ?? 0),
+    myHearts: r.my_hearts === null || r.my_hearts === undefined ? null : Number(r.my_hearts),
+    prizePool: Number(r.prize_pool ?? 0),
+    podiumCoins: Number(r.podium_coins ?? 0),
+    prizePoolBps: Number(r.prize_pool_bps ?? 0),
+    recap: Boolean(r.recap),
+  }));
+}
+
+/**
+ * THE LOBBY, HELD BETWEEN VISITS.
+ *
+ * `LobbyView` unmounts the moment a contest frame is pushed over it, so coming
+ * back mounted a fresh hook with `contests` at null: an empty sheet, a round
+ * trip, then the rows again. Popping in and out of a contest made the whole
+ * lobby flash, which reads as the app losing its place rather than as a page
+ * being read.
+ *
+ * Cached to be SHOWN and never to be trusted — entries arrive and pools grow
+ * while you are inside a contest — so the hook seeds from memory and then
+ * reloads every time, exactly as it did before. What changes is only what fills
+ * the screen while that runs.
+ *
+ * INVALIDATED BEFORE EVERY READ, because `sessionCache.read` does not re-fetch
+ * after a success: it holds the resolved promise until the key is cleared,
+ * which is right for immutable config and would freeze a lobby on the first
+ * version it ever saw.
+ */
+const lobbyCache = sessionCache<'all', Contest[]>(async () => {
+  const { data, error } = await supabase.rpc('contest_lobby');
+  if (error) throw new Error(error.message);
+  return rowsToContests((data ?? []) as Row[]);
+});
+
+
 
 export function useContests(): ContestsState {
-  const [contests, setContests] = useState<Contest[] | null>(null);
+  /* Seeded from memory so returning from a contest draws the lobby it already
+     knows on the first paint — see `lobbyCache`. */
+  const [contests, setContests] = useState<Contest[] | null>(() => lobbyCache.peek('all') ?? null);
 
   const load = useCallback<Load>(async (live) => {
-    const { data, error } = await supabase.rpc('contest_lobby');
-    if (!live()) return null;
-    if (error) return error.message;
-
-    setContests(
-      ((data ?? []) as Row[]).map((r) => ({
-        id: r.id,
-        code: r.code,
-        kind: r.kind,
-        name: r.name,
-        formatCode: r.format_code,
-        formatName: r.format_name,
-        slotCount: Number(r.slot_count),
-        entryFeeCoins: r.entry_fee_coins,
-        maxEntrants: r.max_entrants,
-        entrants: Number(r.entrants ?? 0),
-        season: r.season,
-        seasonType: r.season_type,
-        week: r.week,
-        mine: r.my_lineup_id
-          ? { lineupId: r.my_lineup_id, filled: Number(r.my_filled ?? 0) }
-          : null,
-        affordable: r.affordable,
-        winCondition: r.win_condition,
-        winRank: r.win_rank,
-        winPct: r.win_pct === null || r.win_pct === undefined ? null : Number(r.win_pct),
-        targetPoints:
-          r.target_points === null || r.target_points === undefined
-            ? null
-            : Number(r.target_points),
-        payoutCurve: r.payout_curve ?? 'flat',
-        scoreRate: Number(r.score_rate ?? 0),
-        heartsAtRisk: Number(r.hearts_at_risk ?? 0),
-        heartsOnWin: Number(r.hearts_on_win ?? 0),
-        myHearts: r.my_hearts === null || r.my_hearts === undefined ? null : Number(r.my_hearts),
-        prizePool: Number(r.prize_pool ?? 0),
-        podiumCoins: Number(r.podium_coins ?? 0),
-        prizePoolBps: Number(r.prize_pool_bps ?? 0),
-        recap: Boolean(r.recap),
-      })),
-    );
+    lobbyCache.invalidate('all');
+    try {
+      const rows = await lobbyCache.read('all');
+      if (!live()) return null;
+      setContests(rows);
+    } catch (err) {
+      if (!live()) return null;
+      return err instanceof Error ? err.message : 'Could not load the contests.';
+    }
     return null;
   }, []);
 

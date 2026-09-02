@@ -15,6 +15,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
 import { useLoader, type Load } from '@/hooks/use-loader';
+import { sessionCache } from '@/lib/session-cache';
 import { supabase } from '@/lib/supabase';
 import type { FieldWeek } from '@/components/lineup/field';
 import type { ContestTerms, PayoutCurve, WinCondition } from './contest-model';
@@ -222,68 +223,100 @@ export type MyContestsState = {
   error: string | null;
   reload: () => void;
 };
+/** One entry row, in the shape the carousel and the shelves read. Lifted out of
+    the hook so the cache below and the hook share one mapping. */
+function rowsToMine(rows: Row[]): MyContest[] {
+  return rows.map((r) => ({
+    id: r.contest_id,
+    code: r.code,
+    kind: r.kind,
+    name: r.name,
+    formatCode: r.format_code,
+    formatName: r.format_name,
+    slotCount: Number(r.slot_count),
+    entryFeeCoins: r.entry_fee_coins,
+    weekLabel: weekLabelOf(Number(r.season_type), Number(r.week)),
+    weekTitle: weekTitleOf(Number(r.season_type), Number(r.week)),
+    lineupId: r.lineup_id,
+    filled: Number(r.filled ?? 0),
+    field: {
+      week: Number(r.week),
+      entrants: Number(r.entrants ?? 0),
+      low: num(r.low) ?? 0,
+      median: num(r.median) ?? 0,
+      average: num(r.average) ?? 0,
+      high: num(r.high) ?? 0,
+      final: Boolean(r.final),
+      myPoints: num(r.my_points),
+      myRank: num(r.my_rank),
+      ahead: num(r.ahead),
+      result: (r.result as FieldWeek['result']) ?? null,
+    },
+    heartsAtRisk: Number(r.hearts_at_risk ?? 0),
+    heartsOnWin: Number(r.hearts_on_win ?? 0),
+    winCondition: r.win_condition,
+    winRank: r.win_rank === null || r.win_rank === undefined ? null : Number(r.win_rank),
+    winPct: num(r.win_pct),
+    targetPoints: num(r.target_points),
+    payoutCurve: r.payout_curve ?? 'flat',
+    scoreRate: num(r.score_rate) ?? 0,
+    cut: num(r.cut),
+    prizePool: num(r.prize_pool) ?? 0,
+    podiumCoins: num(r.podium_coins) ?? 0,
+    myPrize: num(r.my_prize),
+    /* Absent on an install talking to a database without
+       `20260831040000`, which `num` reads as null — the same "still
+       settling" line the real pre-payout state draws, which is the right
+       thing for both. */
+    myCoins: num(r.my_coins),
+    recap: Boolean(r.recap),
+  }));
+}
+
+/**
+ * YOUR ENTRIES, HELD BETWEEN VISITS — the same problem `lobbyCache` solves, on
+ * the other half of the sheet. `LobbyView` unmounts when a contest opens over
+ * it, so Entered and Recent came back empty and refilled from the network.
+ *
+ * Keyed by the contest being COMPOSED (`includeCode`), because that argument
+ * changes what the RPC returns; two different codes are two different answers
+ * and must not share a slot.
+ *
+ * Seeded to be shown, invalidated before every read so it is never stale — see
+ * `lobbyCache` for why `read` alone is not enough.
+ */
+const mineCache = sessionCache<string, MyContest[]>(async (key) => {
+  const { data, error } = await supabase.rpc('my_contest_cards', {
+    p_include: key === '' ? undefined : key,
+  });
+  if (error) throw new Error(error.message);
+  return rowsToMine((data ?? []) as Row[]);
+});
+
+/** Forget every entry list. Registered in `forgetUserData`: these are yours. */
+export function invalidateMyContests(): void {
+  mineCache.invalidate();
+}
+
+
 
 export function useMyContests(includeCode?: string): MyContestsState {
-  const [contests, setContests] = useState<MyContest[] | null>(null);
+  /* Seeded from memory so the shelves come back drawn — see `mineCache`. */
+  const [contests, setContests] = useState<MyContest[] | null>(
+    () => mineCache.peek(includeCode ?? '') ?? null,
+  );
 
   const load = useCallback<Load>(async (live) => {
-    /* `includeCode` is the contest being COMPOSED — chosen from the lobby, not
-       yet entered, because the fee lands on the first submission rather than on
-       a separate entry step. Without it the carousel cannot show the card the
-       reader just tapped. See `20260825080000`. */
-    const { data, error } = await supabase.rpc('my_contest_cards', {
-      p_include: includeCode ?? undefined,
-    });
-    if (!live()) return null;
-    if (error) return error.message;
-
-    setContests(
-      ((data ?? []) as Row[]).map((r) => ({
-        id: r.contest_id,
-        code: r.code,
-        kind: r.kind,
-        name: r.name,
-        formatCode: r.format_code,
-        formatName: r.format_name,
-        slotCount: Number(r.slot_count),
-        entryFeeCoins: r.entry_fee_coins,
-        weekLabel: weekLabelOf(Number(r.season_type), Number(r.week)),
-        weekTitle: weekTitleOf(Number(r.season_type), Number(r.week)),
-        lineupId: r.lineup_id,
-        filled: Number(r.filled ?? 0),
-        field: {
-          week: Number(r.week),
-          entrants: Number(r.entrants ?? 0),
-          low: num(r.low) ?? 0,
-          median: num(r.median) ?? 0,
-          average: num(r.average) ?? 0,
-          high: num(r.high) ?? 0,
-          final: Boolean(r.final),
-          myPoints: num(r.my_points),
-          myRank: num(r.my_rank),
-          ahead: num(r.ahead),
-          result: (r.result as FieldWeek['result']) ?? null,
-        },
-        heartsAtRisk: Number(r.hearts_at_risk ?? 0),
-        heartsOnWin: Number(r.hearts_on_win ?? 0),
-        winCondition: r.win_condition,
-        winRank: r.win_rank === null || r.win_rank === undefined ? null : Number(r.win_rank),
-        winPct: num(r.win_pct),
-        targetPoints: num(r.target_points),
-        payoutCurve: r.payout_curve ?? 'flat',
-        scoreRate: num(r.score_rate) ?? 0,
-        cut: num(r.cut),
-        prizePool: num(r.prize_pool) ?? 0,
-        podiumCoins: num(r.podium_coins) ?? 0,
-        myPrize: num(r.my_prize),
-        /* Absent on an install talking to a database without
-           `20260831040000`, which `num` reads as null — the same "still
-           settling" line the real pre-payout state draws, which is the right
-           thing for both. */
-        myCoins: num(r.my_coins),
-        recap: Boolean(r.recap),
-      })),
-    );
+    const key = includeCode ?? '';
+    mineCache.invalidate(key);
+    try {
+      const rows = await mineCache.read(key);
+      if (!live()) return null;
+      setContests(rows);
+    } catch (err) {
+      if (!live()) return null;
+      return err instanceof Error ? err.message : 'Could not load your contests.';
+    }
     return null;
   }, [includeCode]);
 

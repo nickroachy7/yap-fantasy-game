@@ -33,6 +33,7 @@
 import { invalidateCollection } from '@/components/collection/use-collection';
 import { invalidateSets } from '@/components/collection/use-sets';
 import { invalidateContestFields } from '@/components/contests/use-contest-field';
+import { invalidateMyContests } from '@/components/contests/use-my-contests';
 import { invalidateLineupCollection } from '@/components/lineup/use-lineup-data';
 
 export function forgetUserData(): void {
@@ -40,4 +41,5 @@ export function forgetUserData(): void {
   invalidateLineupCollection();
   invalidateSets();
   invalidateContestFields();
+  invalidateMyContests();
 }
