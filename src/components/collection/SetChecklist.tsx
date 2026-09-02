@@ -201,15 +201,12 @@ export function SetFilters({
   filter: SetFilter;
   onFilter: (next: SetFilter) => void;
 }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const counts = useMemo(() => countsOf(members), [members]);
 
   return (
     <Tabs
       value={filter}
       onChange={onFilter}
-      /* The app's selection colour, same as the strip this now matches. */
-      accent={selectionAccent(scheme)}
       tabs={FILTERS.map((f) => ({
         value: f.key,
         label: f.label,

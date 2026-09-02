@@ -771,8 +771,22 @@ export function webSectionOf(pathname: string): WebSection | null {
  */
 const SHEET_PREFIXES = ['/player/', '/card/', '/set/', '/contest/'] as const;
 
+/**
+ * The SHEETS ONLY — the half of `isOverlayPath` that every surface agrees on.
+ *
+ * It exists because the rail does not agree about the other half. The note
+ * above argues that Packs IS a rail row and should light while its sheet is
+ * open, so `Sidebar` must not freeze on a takeover the way `Screen` does — but
+ * it must freeze on `/card/abc`, which belongs to no row at all and otherwise
+ * leaves the rail with nothing marked. One predicate could not say both, and
+ * the disagreement is real rather than an oversight, so it is named.
+ */
+export function isSheetPath(pathname: string): boolean {
+  return SHEET_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
 export function isOverlayPath(pathname: string): boolean {
   const takeovers = allChildren().filter((c) => c.takeover);
   if (takeovers.some((c) => c.href === pathname)) return true;
-  return SHEET_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  return isSheetPath(pathname);
 }

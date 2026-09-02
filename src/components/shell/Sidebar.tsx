@@ -42,11 +42,13 @@ import { ActionIcon } from '@/components/shell/ActionBar';
 import { Hearts } from '@/components/runs/Hearts';
 import { Coin, initialsOf } from '@/components/shell/AppHeader';
 import {
+  isSheetPath,
   isWebNavActive,
   WEB_NAV,
   type WebNavIcon,
   type WebNavItem,
 } from '@/components/shell/sections';
+import { useSteadyPathname } from '@/components/shell/use-steady-pathname';
 import { NavIcon } from '@/components/icons/NavIcon';
 import { ChromeBand, RailWidth, TierColors, selectionAccent } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
@@ -71,7 +73,15 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
      phone, so it reads the same token that bar does. */
   const selection = selectionAccent(scheme);
   const realPathname = usePathname();
-  const pathname = pathnameOverride ?? realPathname;
+  /**
+   * SHEETS ONLY, not `isOverlayPath`, and the difference is the rail's whole
+   * argument with `Screen`. A takeover like Packs IS a row here and should
+   * light while its sheet is open — freezing on those would mark the row you
+   * came FROM. A profile sheet is nobody's row, so without this the rail simply
+   * goes dark the moment one opens over it, which on web is the entire time it
+   * is up. See `isSheetPath` and `useSteadyPathname`.
+   */
+  const pathname = useSteadyPathname(pathnameOverride ?? realPathname, isSheetPath);
   const { coins, displayName, run, loading } = usePlayer();
 
   return (

@@ -5,12 +5,13 @@
  * Every tab uses this so the chrome cannot drift between screens.
  */
 import { usePathname } from 'expo-router';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppHeader } from '@/components/shell/AppHeader';
 import { useFrame } from '@/components/shell/frame';
 import { isOverlayPath, webSectionOf } from '@/components/shell/sections';
+import { useSteadyPathname } from '@/components/shell/use-steady-pathname';
 import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { WebPageTabs } from '@/components/shell/WebPageTabs';
@@ -187,28 +188,17 @@ export function Screen({
 
   /**
    * The last path that was a PAGE, so a sheet opened over this one cannot
-   * change what this one says it is.
+   * change what this one says it is: opening Packs from Players used to re-title
+   * the page behind the dialog from "Players" to "Trend", drop its view tabs and
+   * re-measure it, then put all three back on close.
    *
-   * `usePathname` reports the top of the stack, and the sheets are mounted
-   * above the tab navigator with the page beneath still rendered — so opening
-   * Packs from Players re-titled the page behind the dialog from "Players" to
-   * "Trend", dropped its view tabs and re-measured it, then put all three back
-   * on close. See `isOverlayPath`, which is also where the rail's opposite and
-   * correct behaviour is argued.
-   *
-   * State set DURING RENDER, which is React's own pattern for "something from
-   * the previous render" and not the mistake it looks like: React discards the
-   * output and re-runs this component immediately, before committing or
-   * touching the DOM, so the extra pass costs one render of one component at
-   * the moment a sheet opens. A ref adjusted in place would be cheaper and is
-   * what this was first written as — `react-hooks/refs` rejects it, correctly:
-   * a ref read during render is invisible to React, so nothing guarantees the
-   * page re-renders when the value changes back.
+   * The rule lived here, in this one component, which is why both navs kept
+   * going dark behind a sheet for as long as they did — see `useSteadyPathname`,
+   * where it now lives for all three. `isOverlayPath` rather than `isSheetPath`
+   * because a takeover must not retitle the page underneath it either; the rail
+   * is the one surface that wants the other answer.
    */
-  const [lastPage, setLastPage] = useState(routed);
-  const overlaid = isOverlayPath(routed);
-  if (!overlaid && routed !== lastPage) setLastPage(routed);
-  const pathname = overlaid ? lastPage : routed;
+  const pathname = useSteadyPathname(routed, isOverlayPath);
   /* Memoised on the path: this returns a fresh object with a fresh `tabs`
      array every call, and `Screen` re-renders once a second on the lineup
      while the lock counts down. */

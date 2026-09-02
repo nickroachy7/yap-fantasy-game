@@ -92,7 +92,8 @@
 import { usePathname, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { FANTASY_SECTIONS } from '@/components/shell/sections';
+import { FANTASY_SECTIONS, isOverlayPath } from '@/components/shell/sections';
+import { useSteadyPathname } from '@/components/shell/use-steady-pathname';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, selectionAccent } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -119,7 +120,19 @@ export function FantasyTopNav({
 }: { pathnameOverride?: string } = {}) {
   const router = useRouter();
   const realPathname = usePathname();
-  const pathname = pathnameOverride ?? realPathname;
+  /**
+   * FROZEN WHILE A SHEET IS OVER THE PAGE, or the strip goes dark behind it.
+   *
+   * `usePathname` reports the top of the stack for every component in the tree,
+   * so opening a player from the Compete board tells this strip it is at
+   * `/card/abc` — which matches none of the four sections, so nothing is
+   * underlined and nothing is lit. On iOS you see it as the profile is dragged
+   * back down and the board reappears underneath with its accent missing; on
+   * web the sheet paints nothing at all and the strip is plainly dark the whole
+   * time. `Screen` has held its heading steady like this for the same reason;
+   * this strip had been left behind. See `useSteadyPathname`.
+   */
+  const pathname = useSteadyPathname(pathnameOverride ?? realPathname, isOverlayPath);
   const wide = useIsWide();
 
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';

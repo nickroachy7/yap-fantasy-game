@@ -63,7 +63,8 @@ import { useMemo, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ActionBar, type Action } from '@/components/shell/ActionBar';
-import { childrenOf } from '@/components/shell/sections';
+import { childrenOf, isSheetPath } from '@/components/shell/sections';
+import { useSteadyPathname } from '@/components/shell/use-steady-pathname';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Spacing } from '@/constants/theme';
 
@@ -86,7 +87,23 @@ export function SectionNav({
   action?: ReactNode;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
+  /**
+   * FROZEN UNDER A SHEET, so this row keeps its mark while one is open over it.
+   *
+   * `active` below is an exact match on each child's href, and a sheet's path
+   * matches none of them — so opening a player from the Players board greyed
+   * out Search, Trending and Top together, and the row you were actually on
+   * lost its accent for as long as the profile was up. Same defect as the
+   * strip above it; see `useSteadyPathname`.
+   *
+   * `isSheetPath` AND NOT `isOverlayPath`, which is the same call `Sidebar`
+   * makes and for the same reason. Search and Packs are takeovers that are
+   * ALSO rows in this nav — the comment on `onPress` below is why they are
+   * pushed rather than replaced — so freezing on a takeover would refuse to
+   * light the very row that was just pressed. A profile sheet is nobody's row
+   * here, and that is the case worth freezing for.
+   */
+  const pathname = useSteadyPathname(usePathname(), isSheetPath);
   const wide = useIsWide();
 
   const actions = useMemo<Action[]>(() => {

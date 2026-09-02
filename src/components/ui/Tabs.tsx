@@ -11,7 +11,7 @@
  */
 import { ScrollView, StyleSheet, Pressable, Text, View } from 'react-native';
 
-import { Colors, Spacing, Type } from '@/constants/theme';
+import { Colors, Spacing, Type, selectionAccent } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { horizontalStrip } from '@/components/ui/scroll-strip';
 
@@ -31,11 +31,29 @@ export function Tabs<T extends string>({
   tabs: Tab<T>[];
   value: T;
   onChange: (next: T) => void;
+  /**
+   * The underline's colour. Defaults to the app's selection accent, and that
+   * default is the fix for a bug that shipped twice.
+   *
+   * It used to fall back to `c.text` — plain white — so a caller that simply
+   * did not think about the mark got one. Both profile sheets were such
+   * callers, which meant opening a card or a player replaced a nav marked in
+   * the app's accent with one marked in white, and the accent appeared to
+   * drain out of the app the moment a sheet came up. `SetChecklist` had
+   * already hit this and fixed it by passing the accent explicitly; the same
+   * omission in two more places is the default's fault, not the callers'.
+   *
+   * Every control in this app that marks a live selection uses this colour —
+   * `FantasyTopNav`'s underline, `ActionBar`'s tab, `SegmentedControl`'s
+   * active segment, `Sidebar`'s marker. White was the outlier, so it is now
+   * the thing a caller has to ask for rather than the thing it gets by
+   * forgetting.
+   */
   accent?: string;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const mark = accent ?? c.text;
+  const mark = accent ?? selectionAccent(scheme);
 
   return (
     // Scrolls horizontally so a long tab set degrades by scrolling rather than
