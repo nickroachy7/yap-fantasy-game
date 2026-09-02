@@ -602,6 +602,8 @@ export function ContestView({
             error={fieldError}
             slotCount={contest.slotCount}
             contestId={contest.id}
+            /* The lobby row already counted the field; hold that many rows. */
+            expect={contest.entrants}
           />
 
           {/* Everything the card prices in eight characters, said in sentences.

@@ -64,6 +64,7 @@ import { initialsOf } from '@/components/shell/AppHeader';
 import { EntryLineup } from './EntryLineup';
 import { useContestLineup } from './use-contest-field';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { RowSkeleton } from '@/components/lineup/LineupRow';
 import { Panel } from '@/components/ui/Panel';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
@@ -77,6 +78,7 @@ export function ContestFieldPanel({
   error,
   slotCount,
   title = 'The field',
+  expect,
   contestId,
 }: {
   entrants: FieldEntrant[] | null;
@@ -93,6 +95,8 @@ export function ContestFieldPanel({
    * kit, or anywhere it is one panel among several — it names itself.
    */
   title?: string;
+  /** Entrants the caller already knows about, for the loading skeleton. */
+  expect?: number;
   /**
    * Which contest these lineups belong to. Null makes the rows inert.
    *
@@ -118,7 +122,25 @@ export function ContestFieldPanel({
   /* A heading with nothing under it rather than a spinner. The panel is one
      screen down on a sheet that has already drawn the card and the terms, so a
      loader here is a spinner nobody is looking at. */
-  if (loading && entrants === null) return <Panel title={title} />;
+  /* SKELETON ROWS, NOT AN EMPTY PANEL.
+     The old comment here argued a spinner was pointless because the field sits
+     a screen down, and that was true when the field was behind a tab. On one
+     page it is the section directly under the lineup, and an empty panel is
+     the same re-layout the slots had: the page draws short, the entrants
+     arrive, and everything below them jumps.
+     `expect` is what the caller already knows about the field — the entrant
+     count off the contest row — so the panel holds the height it is about to
+     need. Two rows minimum, because a contest with nobody in it still has to
+     look like a list that is loading rather than a panel that is broken. */
+  if (loading && entrants === null) {
+    return (
+      <Panel title={title}>
+        {Array.from({ length: Math.max(2, Math.min(expect ?? 0, 8)) }, (_, i) => (
+          <RowSkeleton key={`field-skeleton-${i}`} />
+        ))}
+      </Panel>
+    );
+  }
 
   return (
     <ContestFieldList
