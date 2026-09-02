@@ -158,7 +158,14 @@ declare
 begin
   select id into v_cheap from act_copies where label = 'cheap';
   select id into v_rich  from act_copies where label = 'rich';
-  select sell_value into v_price from public.tier_thresholds where tier = 'bronze';
+  -- Priced off card_prices, not the superseded tier ladder. The fixture's player
+  -- has no value score and the copy no settled points, so this is still the same
+  -- 8 it always was — reading the view is what keeps that a fact rather than a
+  -- coincidence, and what makes the assertion survive the player being scored.
+  select cp.sell_value into v_price
+    from act_copies a
+    join public.card_prices cp on cp.card_instance_id = a.id
+   where a.label = 'cheap';
 
   select value into e
     from jsonb_array_elements(public.card_actions(array[v_cheap, v_rich])) value

@@ -77,6 +77,9 @@ declare
   v_rank_b  bigint;
   v_rank_c  bigint;
   v_row     record;
+  v_expect       bigint;
+  v_expect_a     bigint;
+  v_expect_sets  bigint;
   v_n       integer;
   i         integer;
 
@@ -257,10 +260,23 @@ begin
       v_rank_a, v_rank_b, v_rank_c;
   end if;
 
+  -- PRICED OFF card_prices RATHER THAN OFF A NUMBER. This suite is about WHICH
+  -- copies the board counts — sold ones are gone, committed ones are frozen —
+  -- and it used to encode the flat 8/40/150/500 ladder to say so. The sale is now
+  -- (base + settled points) x tier multiplier, so a hardcoded total fails on a
+  -- change to figures this suite was never testing. card_prices.test.sql owns
+  -- what a card is worth; this one owns who is counted.
+  select coalesce(sum(cp.sell_value), 0)::bigint into v_expect
+    from public.card_instances ci
+    join public.card_prices cp on cp.card_instance_id = ci.id
+    join public.cards c on c.id = ci.card_id
+   where ci.user_id = v_a and ci.sold_at is null and c.season = v_season;
+
+  v_expect_a := v_expect;
   select * into v_row from public.board_collection(v_season, 500) where user_id = v_a;
-  if v_row.held <> 10 or v_row.players <> 1 or v_row.value_coins <> 80 then
-    raise exception 'FAIL 2: A held=% players=% value=%, expected 10/1/80',
-      v_row.held, v_row.players, v_row.value_coins;
+  if v_row.held <> 10 or v_row.players <> 1 or v_row.value_coins <> v_expect then
+    raise exception 'FAIL 2: A held=% players=% value=%, expected 10/1/%',
+      v_row.held, v_row.players, v_row.value_coins, v_expect;
   end if;
 
   -- C HOLDS ONE DIAMOND AND HAS BURNT ANOTHER, and since 20260824200600 both
@@ -269,20 +285,32 @@ begin
   -- copy stays on the board frozen at the tier it went in at. `held` stays 1
   -- and `in_sets` carries the other, which is the distinction that lets the
   -- board show how much of a shelf can still grow.
+  select coalesce(sum(cp.sell_value), 0)::bigint into v_expect
+    from public.card_instances ci
+    join public.card_prices cp on cp.card_instance_id = ci.id
+    join public.cards c on c.id = ci.card_id
+   where ci.user_id = v_c and ci.sold_at is null and c.season = v_season;
+  select coalesce(sum(cp.sell_value), 0)::bigint into v_expect_sets
+    from public.card_instances ci
+    join public.card_prices cp on cp.card_instance_id = ci.id
+    join public.cards c on c.id = ci.card_id
+   where ci.user_id = v_c and ci.sold_at is null and ci.committed_at is not null
+     and c.season = v_season;
+
   select * into v_row from public.board_collection(v_season, 500) where user_id = v_c;
-  if v_row.value_coins <> 1000 or v_row.held <> 1 or v_row.in_sets <> 1 then
-    raise exception 'FAIL 2: C value=% held=% in_sets=%, expected 1000/1/1 (a committed copy still counts)',
-      v_row.value_coins, v_row.held, v_row.in_sets;
+  if v_row.value_coins <> v_expect or v_row.held <> 1 or v_row.in_sets <> 1 then
+    raise exception 'FAIL 2: C value=% held=% in_sets=%, expected %/1/1 (a committed copy still counts)',
+      v_row.value_coins, v_row.held, v_row.in_sets, v_expect;
   end if;
-  if v_row.in_sets_coins <> 500 then
-    raise exception 'FAIL 2: C in_sets_coins=%, expected 500', v_row.in_sets_coins;
+  if v_row.in_sets_coins <> v_expect_sets then
+    raise exception 'FAIL 2: C in_sets_coins=%, expected %', v_row.in_sets_coins, v_expect_sets;
   end if;
 
   -- A's SOLD copy is the other half of the same rule and must still be absent.
   select * into v_row from public.board_collection(v_season, 500) where user_id = v_a;
-  if v_row.in_sets <> 0 or v_row.value_coins <> 80 then
-    raise exception 'FAIL 2: A value=% in_sets=%, expected 80/0 (a sold copy must not count)',
-      v_row.value_coins, v_row.in_sets;
+  if v_row.in_sets <> 0 or v_row.value_coins <> v_expect_a then
+    raise exception 'FAIL 2: A value=% in_sets=%, expected %/0 (a sold copy must not count)',
+      v_row.value_coins, v_row.in_sets, v_expect_a;
   end if;
   raise notice 'PASS 2: collections rank by sell value; sold copies are gone, committed copies are frozen';
 

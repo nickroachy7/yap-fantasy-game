@@ -269,7 +269,7 @@ $$;
 -- `can_commit`, so a floor missing here is a bulk add built to be refused.
 do $$
 declare
-  v_copy uuid; v_offer jsonb;
+  v_copy uuid; v_offer jsonb; v_pays integer;
 begin
   -- Player 5: held as a bronze and nothing else.
   select id into v_copy
@@ -306,9 +306,14 @@ begin
   if not (v_offer ->> 'can_commit')::boolean then
     raise exception 'FAIL: the unfloored set refused a bronze it should accept';
   end if;
-  if (v_offer ->> 'pays')::integer <> 4 then
-    raise exception 'FAIL: the unfloored set quoted % coins for a bronze, expected 4',
-      (v_offer ->> 'pays')::integer;
+  -- DERIVED, not hardcoded. What this asserts is that the offer is priced off the
+  -- copy the commit would actually burn; the absolute number is card_prices'
+  -- business and moved when the sale became (base + points) x tier.
+  select floor(cp.sell_value * 50 / 100.0)::integer into v_pays
+    from public.card_prices cp where cp.card_instance_id = v_copy;
+  if (v_offer ->> 'pays')::integer <> v_pays then
+    raise exception 'FAIL: the unfloored set quoted % coins for a bronze, expected %',
+      (v_offer ->> 'pays')::integer, v_pays;
   end if;
 
   -- Player 3's silver: the weekly accepts it, and quotes the silver's own
@@ -325,9 +330,11 @@ begin
   if not (v_offer ->> 'can_commit')::boolean then
     raise exception 'FAIL: the weekly refused a silver';
   end if;
-  if (v_offer ->> 'pays')::integer <> 20 then
-    raise exception 'FAIL: the weekly quoted % coins for a silver, expected 20',
-      (v_offer ->> 'pays')::integer;
+  select floor(cp.sell_value * 50 / 100.0)::integer into v_pays
+    from public.card_prices cp where cp.card_instance_id = v_copy;
+  if (v_offer ->> 'pays')::integer <> v_pays then
+    raise exception 'FAIL: the weekly quoted % coins for a silver, expected %',
+      (v_offer ->> 'pays')::integer, v_pays;
   end if;
 end;
 $$;
@@ -335,20 +342,30 @@ $$;
 -- ------------------------------------------------------------ the commit runs
 
 do $$
-declare r jsonb; v_bronze uuid;
+declare r jsonb; v_bronze uuid; v_pays integer;
 begin
   select id into v_bronze
     from public.card_instances
    where card_id = (select id from wk_cards where n = 2)
      and tier = 'bronze';
 
+  -- What the gold is worth BEFORE it is burnt, at the standard 50% share.
+  -- Derived rather than hardcoded: the assertion is that the commit pays for the
+  -- copy it actually took, and it used to encode gold's flat 150 to say so. The
+  -- sale is now (base + settled points) x tier multiplier, so the number moved
+  -- on a change this suite was never testing.
+  select floor(cp.sell_value * 50 / 100.0)::integer into v_pays
+    from public.card_prices cp
+    join public.card_instances ci on ci.id = cp.card_instance_id
+   where ci.card_id = (select id from wk_cards where n = 2)
+     and ci.tier = 'gold';
+
   r := public.commit_card_to_set('test-weekly-2026', (select id from wk_cards where n = 2));
   if (r ->> 'tier') <> 'gold' then
     raise exception 'FAIL: the weekly burnt a % copy, expected the gold', r ->> 'tier';
   end if;
-  -- 150 at gold, at the standard 50% commit share.
-  if (r ->> 'paid')::integer <> 75 then
-    raise exception 'FAIL: committing a gold paid %, expected 75', (r ->> 'paid')::integer;
+  if (r ->> 'paid')::integer <> v_pays then
+    raise exception 'FAIL: committing a gold paid %, expected %', (r ->> 'paid')::integer, v_pays;
   end if;
 
   -- THE BRONZE IS UNTOUCHED. The floor decides which copy is eligible; it must

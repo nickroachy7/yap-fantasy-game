@@ -68,7 +68,13 @@ declare
   r        jsonb;
   ok       boolean;
 begin
-  select sell_value into v_price from public.tier_thresholds where tier = 'silver';
+  -- This COPY's own price, off card_prices. Read rather than computed for the
+  -- same reason the fixture header gives for reading silver's floor out of
+  -- tier_thresholds: the sale is now (base + settled points) x tier multiplier,
+  -- and a test that re-derives that arithmetic is testing its own copy of it.
+  select cp.sell_value into v_price
+    from public.card_prices cp
+   where cp.card_instance_id = v_card;
 
   -- 1. An unauthenticated caller cannot sell.
   perform set_config('request.jwt.claims', NULL, true);
