@@ -1412,10 +1412,6 @@ export function LineupEditor({
     <View onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}>
       <ContestCarousel
         contests={board}
-        /* EVERY CARD ON THE BOARD IS THIS WEEK now that recaps are filtered
-           out, so any of them can name it. Null while the list is loading,
-           which the rail reads as "draw no back link". */
-        week={board[0]?.weekTitle ?? null}
         index={cardIndex}
         onIndexChange={setSwiped}
         lockAt={nextLockAt ?? lockAt}
@@ -1426,9 +1422,9 @@ export function LineupEditor({
            now, so this pushes and closing puts the reader back on the lineup
            they were filling — see `CONTESTS` in `sections.ts`.
 
-           THE SHELF TRAVELS IN THE URL. Both ends of the rail arrive here and
-           they want different faces of the same screen; the alternative was
-           lifting `contests.tsx`'s view state up into a store so a board two
+           THE SHELF TRAVELS IN THE URL. The rail asks for one face of the
+           screen and a recap link elsewhere asks for another; the alternative
+           was lifting `contests.tsx`'s view state up into a store so a board two
            routes away could set it, which is a lot of machinery for a string
            the router already carries. */
         onEnter={(view) =>
@@ -1436,6 +1432,10 @@ export function LineupEditor({
             view === 'history' ? { pathname: '/contests', params: { view } } : '/contests',
           )
         }
+        /* The shop, over this board, exactly as `PacksButton` opens it from the
+           collection — `/packs` is a sheet, so this pushes and closing puts the
+           reader back on the lineup they were filling. */
+        onPacks={() => router.push('/packs')}
         width={cardWidth}
         onOpen={(ct) => router.push({ pathname: '/contest/[code]', params: { code: ct.code } })}
       />

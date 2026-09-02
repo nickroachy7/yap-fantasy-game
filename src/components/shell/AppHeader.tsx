@@ -11,7 +11,7 @@
  * layout and became a set of slots:
  *
  *              LEADING            IDENTITY                    TRAILING
- *   Yap main   (reserved, empty)  bot mark + YAP FANTASY       hearts · coins · gear
+ *   Yap main   (reserved, empty)  bot mark + YAP FANTASY       coins · gear
  *   League     back chevron       league logo + league name    (configurable) · gear
  *
  * — plus a fourth, empty slot mirroring the leading gutter on the far right,
@@ -28,41 +28,45 @@
  * the identity never moves between the two experiences.
  *
  * THE TRAILING SLOT IS ANCHORED BY THE GEAR, for the same class of reason.
- * A league can switch hearts and coins off independently, so the right side
- * has four possible widths. Something has to hold the right edge or the whole
- * cluster slides about between leagues; the gear is always present, so it is
- * that thing. It is also why the gear is worth having up here at all beyond
- * the obvious — settings had a home already, as a tab inside Profile.
+ * A league can switch its coins off, so the right side has two possible
+ * widths. Something has to hold the right edge or the cluster slides about
+ * between leagues; the gear is always present, so it is that thing. It is also
+ * why the gear is worth having up here at all beyond the obvious — settings had
+ * a home already, as a tab inside Profile.
  *
  * ---------------------------------------------------------------------------
- * TWO PILLS, NOT ONE CAPSULE
+ * ONE PILL, BECAUSE ONE BALANCE IS LEFT
  * ---------------------------------------------------------------------------
  *
  * These were bare figures on the page, then briefly one divided capsule, and
- * are now a pill each. The capsule was arguing that hearts and coins are one
- * fact — a wallet — and the configuration is what killed that: a league can
- * run coins without hearts, so the capsule had to grow rules about when its
- * divider exists and which corners round, and a container whose shape depends
- * on config is a container the eye cannot learn.
+ * then a pill each. The capsule was arguing that hearts and coins are one fact
+ * — a wallet — and the configuration is what killed that: a league can run
+ * coins without hearts, so the capsule had to grow rules about when its divider
+ * exists and which corners round, and a container whose shape depends on config
+ * is a container the eye cannot learn.
  *
- * A pill each has no such state. Hearts off removes a pill. Both off removes
- * both, and the gear is left holding the edge, which is exactly what it is for.
- * The two currencies are also spent in different places — coins buy cards from
- * every screen, a heart is only ever risked by a contest — so drawing them as
- * one purse was overstating the relationship anyway.
+ * A pill each had no such state, and the hearts have since left the row
+ * entirely (below), so what is here now is the coin pill and the gear. Coins
+ * off removes the pill and the gear holds the edge, which is what it is for.
  *
  * ---------------------------------------------------------------------------
- * WHY THE HEARTS CAME BACK UP HERE
+ * WHY THE HEARTS WENT BACK DOWN TO THE RUN
  * ---------------------------------------------------------------------------
  *
- * They lived in the contest carousel's foot for a while, on the argument that
- * a heart is only ever risked by ONE object and belongs beside it. That still
- * holds for the RUN — what is staked, what is lost — and `RunRail` still draws
- * it there. What it could not do is answer "how many do I have" from any other
- * screen, which is a balance question, and balances belong to the chrome.
+ * They lived in the contest carousel's foot, came up here to answer "how many
+ * do I have" from any screen, and have gone back down — this time as the first
+ * thing on `RunRail`, ahead of the pips that say which of them are riding.
  *
- * ONE GLYPH AND A NUMBER, exactly as the coin is. Not a rack: five pips in a
- * masthead would out-weigh the wordmark beside them.
+ * The balance argument was right about balances and wrong about this one. A
+ * heart is not spent from every screen the way a coin is; it is risked by
+ * exactly one object, and that object is on the compete board. Up here the
+ * count sat on Collection and Players — screens where a heart cannot move —
+ * beside a coin balance, with nothing linking it to the contest risking one.
+ * On the rail the number a player holds and the hearts already committed are
+ * one glance apart, which is the comparison the figure exists for.
+ *
+ * THE COIN STAYS, because it is the one that IS spent everywhere: packs,
+ * entries and sells all move it, from wherever you happen to be standing.
  *
  * ---------------------------------------------------------------------------
  * THE LEAGUE NAME IS THE PART THAT WILL BREAK
@@ -138,7 +142,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { YapMark } from '@/components/brand/YapLogo';
 import { BackChevron, Gear } from '@/components/icons/Chrome';
-import { Heart } from '@/components/runs/Hearts';
 import { Colors, Spacing, TierColors } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -270,8 +273,11 @@ export type HeaderIdentity = {
   logo?: ReactNode;
 };
 
-/** Which currencies this league runs. Both, unless a league says otherwise. */
-export type HeaderCurrencies = { hearts?: boolean; coins?: boolean };
+/**
+ * Which currencies this league runs in its header. Coins, unless a league says
+ * otherwise — hearts are drawn by `RunRail` on the board, not by the chrome.
+ */
+export type HeaderCurrencies = { coins?: boolean };
 
 /** One balance: a mark, a figure, and nothing else. See the header on pills. */
 function Pill({
@@ -303,7 +309,7 @@ export function AppHeader({
    * what Yap main wants — see the header.
    */
   back,
-  /** Per-league switches. Hearts additionally require a run to exist. */
+  /** Per-league switches. See `HeaderCurrencies`. */
   currencies,
   /** Where the gear goes. Defaults to this account's own settings. */
   settingsHref = '/profile?tab=settings',
@@ -319,14 +325,13 @@ export function AppHeader({
   const accent = TierColors[scheme].gold.accent;
   const top = useSafeAreaInsets().top;
   const { width } = useWindowDimensions();
-  const { coins, run, loading } = usePlayer();
+  const { coins, loading } = usePlayer();
 
   /* See `WORDMARK_WEB_TIGHT`. Native leaves this at the set size and lets
      `adjustsFontSizeToFit` do the work. */
   const wordmarkSize =
     Platform.OS === 'web' && width < WORDMARK_WEB_TIGHT.below ? WORDMARK_WEB_TIGHT.size : undefined;
 
-  const showHearts = currencies?.hearts !== false && !!run;
   const showCoins = currencies?.coins !== false;
 
   return (
@@ -417,14 +422,6 @@ export function AppHeader({
 
         {/* TRAILING — variable width, right edge held by the gear. */}
         <View style={styles.right}>
-          {showHearts ? (
-            <Pill
-              mark={<Heart size={12} state="free" />}
-              value={loading ? '—' : String(run!.hearts)}
-              color={c.text}
-              surface={c.surface}
-            />
-          ) : null}
           {showCoins ? (
             <Pill
               mark={<Coin size={12} color={accent} />}

@@ -94,8 +94,9 @@ import Animated, {
 import { ContestCard } from '@/components/contests/ContestCard';
 import { settlementOf } from '@/components/contests/contest-model';
 import { termsOfEntry, type MyContest } from '@/components/contests/use-my-contests';
-import { ContestHearts, type HeartResult, type HeartSpan } from '@/components/runs/Hearts';
-import { Colors, Spacing, selectionAccent } from '@/constants/theme';
+import { ContestHearts, Heart, type HeartResult, type HeartSpan } from '@/components/runs/Hearts';
+import { useIsWide } from '@/components/shell/useResponsive';
+import { Colors, NUMERIC, Spacing, selectionAccent } from '@/constants/theme';
 import type { PlayerState } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -219,12 +220,12 @@ export function ContestCarousel({
   index,
   onIndexChange,
   onOpen,
-  week,
   lockAt,
   locked,
   now,
   run,
   onEnter,
+  onPacks,
   width,
 }: {
   contests: MyContest[];
@@ -250,23 +251,26 @@ export function ContestCarousel({
    */
   run: PlayerState['run'];
   /**
-   * THE WEEK THE BOARD IS ON, for the left of the rail. Null draws no link.
+   * Open the contests screen, on one of its shelves.
    *
-   * It is a prop rather than `contests[0].weekLabel` because the rail outlives
-   * the cards: the empty-board branch still has to draw the door out, and a
-   * label read off a list that is empty is no label at all.
-   */
-  week: string | null;
-  /**
-   * Open the contests screen, on one of its two shelves.
-   *
-   * ONE PROP AND NOT TWO, because it is one screen. `contests.tsx` is three
-   * views behind one route — open contests, `Recent contests`, and a recap
-   * reader — so the rail's two buttons are two doors into the same room and the
-   * signature says so. Two callbacks would have hidden that, and the first
-   * question anybody asks about this row is why it has two buttons.
+   * IT STILL TAKES A SHELF even though the rail only ever asks for `open`. The
+   * archive was the left-hand door on this row and it is gone — a shortcut to a
+   * view one tap inside the room the other door opens — but `contests.tsx` is
+   * three views behind one route and a recap link elsewhere still arrives at
+   * the same screen by the same param. Narrowing this to a bare callback would
+   * hide that the destination has shelves at all.
    */
   onEnter: (view: 'open' | 'history') => void;
+  /**
+   * The pack shop, over this board — the same `/packs` sheet `PacksButton`
+   * pushes from the collection.
+   *
+   * A CALLBACK RATHER THAN A ROUTER, like `onEnter` and `onOpen` beside it:
+   * this file draws a rail and knows nothing about where the app keeps its
+   * sheets, and the one page that mounts the carousel already owns every other
+   * push on the screen.
+   */
+  onPacks: () => void;
   /**
    * The measured width of the column this sits in.
    *
@@ -633,9 +637,9 @@ export function ContestCarousel({
         committed={committed}
         pips={[]}
         focus={null}
-        week={week}
         onGo={goTo}
         onEnter={onEnter}
+        onPacks={onPacks}
       />
     ) : null;
   }
@@ -679,9 +683,9 @@ export function ContestCarousel({
           committed={committed}
           pips={pips}
           focus={spanFor(page)}
-          week={week}
           onGo={goTo}
           onEnter={onEnter}
+          onPacks={onPacks}
         />
       ) : null}
     </View>
@@ -813,9 +817,9 @@ function RunRail({
   committed,
   pips,
   focus,
-  week,
   onGo,
   onEnter,
+  onPacks,
 }: {
   run: NonNullable<PlayerState['run']>;
   /**
@@ -831,15 +835,17 @@ function RunRail({
   /** One per card on the board, in the carousel's order — see `ContestHearts`. */
   pips: { contest: number; result: HeartResult | null; entered: boolean }[];
   focus: HeartSpan | null;
-  /** The week these cards belong to. See the carousel's prop. */
-  week: string | null;
   onGo: (page: number) => void;
-  /** The contests screen, from either end of the row. See the carousel's prop. */
+  /** The contests screen. See the carousel's prop. */
   onEnter: (view: 'open' | 'history') => void;
+  /** The pack shop. See the carousel's prop. */
+  onPacks: () => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const accent = selectionAccent(scheme);
+  /* The rail draws Packs as a row of its own on wide. See the doors. */
+  const wide = useIsWide();
 
   const held = Math.max(0, run.hearts);
   const staked = Math.min(Math.max(0, committed), held);
@@ -945,156 +951,151 @@ function RunRail({
   return (
     <View style={styles.rail}>
       {/**
-       * PREVIOUS WEEKS: the same screen the other end of the row opens, on its
-       * archive shelf.
-       *
-       * IT IS A SHORTCUT AND IT IS ALLOWED TO BE ONE. `contests.tsx` has held a
-       * `Recent contests` view for as long as it has existed, reachable by
-       * opening Contests and switching shelves — two taps for the thing a
-       * player wants most often on a Tuesday.
-       *
-       * IT IS ALSO THE ONLY WAY THERE NOW. The board used to carry last week's
-       * entries as recap cards; it does not, because a finished week is not
-       * something you swipe past on your way to setting a lineup. That makes
-       * this the door to every week behind the current one rather than a
-       * shortcut to the one the carousel was already showing.
-       *
-       * NO PILL. It was a chip matching the one at the far end, and two chips
-       * flanking a pager is a row of three objects competing — the pager, and
-       * the two things it is between. A pill is a promise that something
-       * happens; this is a place to go, so it is set as a mark and words, the
-       * way a link is.
+       * THE RUN, AT THE HEAD OF THE ROW: what you hold, then what is riding.
        *
        * ---------------------------------------------------------------------
-       * IT NAMES THE WEEK YOU ARE ON, NOT THE ONE IT GOES TO
+       * THE COUNT CAME DOWN FROM THE MASTHEAD
        * ---------------------------------------------------------------------
        *
-       * It said `Previous weeks`, which is a label for a destination and was
-       * doing only that job. Naming the CURRENT week instead does two jobs with
-       * the same eight characters.
+       * `AppHeader` carried it as a pill beside the coins, and the argument was
+       * that a balance belongs to the chrome. It holds for coins, which are
+       * spent from every screen in the app. It never held for hearts: a heart
+       * is risked by exactly ONE object, that object is the card above this
+       * row, and up in the masthead the figure sat on Collection and Players —
+       * screens where a heart cannot move — with nothing linking it to anything.
        *
-       * It states where the board is. Nothing else on this screen says which
-       * week these cards belong to — the card's own head spends that corner on
-       * a countdown, and did so precisely because a live card had no use for a
-       * week label. On a Tuesday, with last week's results still in the reader's
-       * head, "which week am I setting" is a real question.
+       * Here it is one glance from the pips, and that pairing is the reason to
+       * draw it at all: the pill is what you HOLD, the rack is which of them
+       * this week has already committed. Neither number says the other.
        *
-       * And it makes the `‹` mean something specific. A back arrow beside a
-       * week is an offer to go to the week BEFORE it, which is exactly where it
-       * goes; a back arrow beside the words "previous weeks" is an arrow beside
-       * a sign pointing at itself. It is the same construction as a date
-       * stepper, minus the forward half — there is no week after this one.
+       * IT IS THE MASTHEAD'S PILL, not a new object — same fill, same glyph,
+       * same shape — because a reader who has been looking at it up there for
+       * weeks should recognise it, not learn it again. The type steps down to
+       * this row's 13/700: a 14/800 figure among 12pt labels and 16pt pips
+       * would make the balance the loudest thing on a band whose subject is the
+       * card above it.
        *
-       * NULL DRAWS NOTHING. An empty board still has to keep the door at the
-       * far end (see the note where `contests.length === 0` is handled), but a
-       * back arrow beside a week that could not be named would be a control
-       * that is all mark and no subject.
+       * NOT A RACK. `Hearts` would draw five pips here, next to a rack of pips
+       * that means something else entirely, and the two would read as one run
+       * of ten. A glyph and a number cannot be confused with a page indicator.
+       *
+       * IT IS A READOUT AND NOT A DOOR. Nothing on the run's own state is
+       * pressable — pressing a balance implies somewhere to go, and the place
+       * hearts come from is a contest, which is what the far end of this row is
+       * for.
        */}
-      <View style={styles.side}>
-        {week === null ? null : (
-          <Pressable
-            onPress={() => onEnter('history')}
-            accessibilityRole="button"
-            accessibilityLabel={`${week}. Open contests from previous weeks`}
-            /* Bare words are a small target, so the slop does all the work —
-               the same trick `Pip` uses. */
-            hitSlop={{ top: 12, bottom: 12, left: 8, right: 12 }}
-            style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-            <Chevron side="left" color={c.textTertiary} />
-            <Text style={[styles.backLabel, { color: c.textSecondary }]}>{week}</Text>
-          </Pressable>
-        )}
+      <View style={styles.run}>
+        <View
+          accessible
+          accessibilityRole="text"
+          accessibilityLabel={held === 1 ? '1 heart' : `${held} hearts`}
+          style={[styles.held, { backgroundColor: c.surface }]}>
+          <Heart size={12} state="free" />
+          <Text style={[styles.heldFigure, NUMERIC, { color: c.text }]}>{String(held)}</Text>
+        </View>
+
+        {/**
+         * THE PAGER, BESIDE THE COUNT RATHER THAN ON THE COLUMN'S CENTRE.
+         *
+         * ---------------------------------------------------------------------
+         * IT WAS IN A TRAY, THEN ON THE MIDDLE, AND BOTH WERE ANSWERING THE
+         * ROW IT USED TO BE IN
+         * ---------------------------------------------------------------------
+         *
+         * The rack sat in a filled pill at the left of the row to enclose a
+         * hundred points of dead space; the pill read as a panel of status, so
+         * it went and the rack took the column's true centre between two doors.
+         * Centring was right for a row with a door at each end. This row has
+         * both doors at one end, so a centred pager would float in the middle of
+         * nothing with the run's own count stranded away from it.
+         *
+         * SO IT JOINS THE COUNT. Held and riding are two halves of one fact and
+         * they now read left to right in that order, which is also the order a
+         * player asks them in: how many do I have, how many are already out.
+         *
+         * THE RACK IS STILL THE HALF THAT GIVES. `minWidth: 0` and a clip here,
+         * nothing shrinkable on the pill or the doors: a week with eight cards
+         * squeezes the pips and never anything else. That was the tray's one
+         * good idea and it has survived both moves.
+         */}
+        <View style={styles.pager}>
+          <ContestHearts
+            entries={pips}
+            focus={focus}
+            size={PIP_SIZE}
+            onPress={(i) => onGo(pips[i].contest)}
+          />
+        </View>
       </View>
 
       {/**
-       * THE PAGER, ON THE PAGE'S OWN CENTRE.
+       * THE TWO DOORS, TOGETHER AT THE END OF THE ROW.
        *
-       * ---------------------------------------------------------------------
-       * IT WAS IN A TRAY, AND THE TRAY WAS ANSWERING A QUESTION THAT IS GONE
-       * ---------------------------------------------------------------------
+       * They were at opposite ends — Contests here, previous weeks facing it —
+       * and the week door is gone: the contests screen lists its own archive,
+       * so the rail was carrying a shortcut to a shelf one tap inside the room
+       * it already opens. What is left is a pair of things you GO to, and a pair
+       * belongs side by side rather than either side of a readout.
        *
-       * The rack used to sit in a filled pill at the left of the row with the
-       * free-heart count at its right end, and the pill existed to enclose a
-       * hundred points of dead space between a rack pushed to one edge and a
-       * button pushed to the other. It solved that. What it could not stop
-       * being was a CONTAINER, and a container reads as a panel of status —
-       * which is what the rack was when it drew the run's own hearts and the
-       * masthead did not.
+       * PACKS IS HERE BECAUSE THE HEARTS ARE. This band is now the whole answer
+       * to "what can I spend, and where" — a heart and the contest that takes
+       * it, coins and the shop that takes them — on the screen where a player is
+       * already deciding. The collection board has carried `PacksButton` for as
+       * long as packs have existed; this is the same door, not a second one,
+       * which is why it is the same route and the same word.
        *
-       * The masthead says how many hearts you hold now. What is left here is
-       * position: which of these cards am I looking at. That is not a status
-       * panel, it is a page indicator, and a page indicator belongs on the
-       * centre line with nothing drawn around it.
+       * ORDER IS BY STAKE. Contests risks a heart and is the app's main call to
+       * action, so it is read first; packs are the shop, and a shop is what you
+       * visit after you know what you need. Swapping them would put a purchase
+       * ahead of the play.
        *
-       * CENTRED BY THE TWO SIDES, not by a margin. Both flanks are `flexBasis:
-       * 0, flexGrow: 1`, so they take equal shares of whatever is left over and
-       * the rack lands on the true middle of the column whatever the two
-       * buttons happen to measure. A `justifyContent: 'space-between'` with a
-       * spacer would put it in the middle of the GAP, which is a different
-       * place and moves every time a label changes.
-       *
-       * THE RACK IS THE HALF THAT GIVES. `minWidth: 0` and a clip here, and
-       * nothing shrinkable on the buttons: a week with eight cards squeezes the
-       * pips and never the doors. That was the tray's one good idea and it
-       * survives the tray.
+       * NOTHING ON WIDE FOR PACKS. The rail carries Packs as a row of its own
+       * there, and a second door two inches from the first is the duplication
+       * `PacksButton` already refuses to make. Contests has no such row, so it
+       * is drawn at every width.
        */}
-      <View style={styles.pager}>
-        <ContestHearts
-          entries={pips}
-          focus={focus}
-          size={PIP_SIZE}
-          onPress={(i) => onGo(pips[i].contest)}
-        />
-      </View>
-
-      {/**
-       * THE WAY INTO ANOTHER CONTEST, at the end of the row it belongs to.
-       *
-       * The lobby was reachable only by swiping past every card to a tile at
-       * the end of the carousel — fine when you are in one contest, a chore
-       * when you are in four, and it is the app's main call to action either
-       * way. A button at a fixed position under the thumb costs one tap from
-       * any page.
-       *
-       * IT NEVER SHRINKS AND IT NEVER MOVES. The pager beside it is the half
-       * that gives. Whatever happens to the left of it, the door stays the same
-       * size in the same corner.
-       *
-       * THE FREE COUNT IS NO LONGER SPELLED OUT, and losing the words is the
-       * one real cost of taking the tray away. `1 free` was the tray's
-       * right-hand occupant and there is nowhere left to put it: hard against
-       * this button it reads as the button's label, which is the exact failure
-       * that produced the tray in the first place.
-       *
-       * What it was FOR survives — the count existed to answer "is this button
-       * worth pressing", and the `+` answers that. The masthead carries the
-       * number. The screen reader still hears it; see `accessibilityLabel`.
-       *
-       * ---------------------------------------------------------------------
-       * THE GOLD IS ON THE MARK NOW, NOT ON THE SLAB
-       * ---------------------------------------------------------------------
-       *
-       * This has been an outline, then a filled gold pill, and the swing was
-       * never really about the button. It was about what else the row was
-       * doing. The fill was earned back when the rack gave up its gold corner
-       * ticks and the accent was left saying exactly one thing.
-       *
-       * The row has been emptied since. The tray went, the edge chevrons went,
-       * the pager came down to 16pt and the left-hand door is bare words — so
-       * the same gold slab that was one strong object among several is now the
-       * only loud thing on a quiet band, sitting directly under the card that
-       * is the screen's actual subject. Nothing about the button changed; what
-       * it is louder THAN did.
-       *
-       * So the pill stays and the fill goes quiet. It has to stay a pill: this
-       * is the app's main call to action and the one door to the contests
-       * screen, and words alone at both ends of the row would leave the act and
-       * the side door looking like the same kind of thing. What carries the
-       * state is the `+` — struck in the accent when a heart is free, absent
-       * when none is. Gold appears once on this screen, at nine points, on the
-       * one mark whose whole job is to say the act is voluntary.
-       */}
-      <View style={[styles.side, styles.sideEnd]}>
+      <View style={styles.doors}>
+        {/**
+         * THE WAY INTO ANOTHER CONTEST.
+         *
+         * The lobby was reachable only by swiping past every card to a tile at
+         * the end of the carousel — fine when you are in one contest, a chore
+         * when you are in four, and it is the app's main call to action either
+         * way. A button at a fixed position under the thumb costs one tap from
+         * any page.
+         *
+         * IT NEVER SHRINKS AND IT NEVER MOVES. The pager beside it is the half
+         * that gives. Whatever happens to the left of it, the door stays the
+         * same size in the same corner.
+         *
+         * THE FREE COUNT IS NOT SPELLED OUT, and it no longer has to be. `1
+         * free` was a tray's occupant and could not be moved next to this
+         * button without reading as its label — but the pill at the head of the
+         * row now states what is held, the pips state what is committed, and
+         * the difference between them is the answer that phrase was for.
+         *
+         * ---------------------------------------------------------------------
+         * THE GOLD IS ON THE MARK, NOT ON THE SLAB
+         * ---------------------------------------------------------------------
+         *
+         * This has been an outline, then a filled gold pill, and the swing was
+         * never really about the button. It was about what else the row was
+         * doing. The row has been emptied since — the tray went, the edge
+         * chevrons went, the pager came down to 16pt — so the same gold slab
+         * that was one strong object among several would now be the only loud
+         * thing on a quiet band, sitting directly under the card that is the
+         * screen's actual subject.
+         *
+         * So the pill stays and the fill goes quiet. It has to stay a pill:
+         * this is the app's main call to action and the one door to the
+         * contests screen. What carries the state is the `+` — struck in the
+         * accent when a heart is free, absent when none is. Gold appears once
+         * on this screen, at nine points, on the one mark whose whole job is to
+         * say the act is voluntary. The packs door beside it takes coins, which
+         * are gold everywhere else in the app, so its own `+` is deliberately
+         * NOT the accent: two gold marks four points apart would make the row
+         * choose between them.
+         */}
         <RailChip
           label="Contests"
           accessibilityLabel={
@@ -1104,7 +1105,8 @@ function RunRail({
           fill={c.backgroundElement}
           ink={c.text}
           /**
-           * THE `+` IS BACK, AND THIS IS NOT THE ONE THAT WAS REMOVED.
+           * THE `+` LEADS THE WORD, and that is not the `+` that was once
+           * removed from this row.
            *
            * What was wrong before was a `+` ALONE: a bare glyph in a row of
            * hearts could add a heart, a card or a slot, and the words that said
@@ -1113,25 +1115,37 @@ function RunRail({
            * Leading a label it has the opposite problem to solve and solves it
            * well — the glyph is what the eye finds at a glance and the noun is
            * what settles the ambiguity, so "a new contest, by choice" arrives
-           * in one look instead of a read. It is also the only mark on this row
-           * that says the act is VOLUNTARY: everything else here is a heart the
-           * week has already committed.
+           * in one look instead of a read.
            *
            * DRAWN, NOT TYPED. A `+` glyph sits high in its own line box, so
            * centring it needs a hand-tuned baseline nudge that drifts the first
            * time the type size changes — an earlier circle carried exactly that
-           * hack. Two bars cannot drift, and it is how `Chevron` draws its own
-           * arrow and how the Weeks button gets its lead mark.
+           * hack. Two bars cannot drift.
            *
            * IT GOES WHEN NOTHING IS FREE, because by then it is a promise the
-           * run cannot keep. The quiet state already drops the gold; leaving a
-           * `+` on it would be the one part of the button still offering a new
-           * contest to somebody with nothing to stake. What is left is the
-           * room's name, which is the half that stays true — there are still
-           * recaps in there to read.
+           * run cannot keep. Leaving it on would be the one part of the button
+           * still offering a new contest to somebody with nothing to stake.
+           * What is left is the room's name, which is the half that stays true
+           * — there are still recaps in there to read.
            */
           lead={live ? <Plus color={accent} /> : null}
         />
+        {wide ? null : (
+          <RailChip
+            label="Packs"
+            accessibilityLabel="Packs"
+            onPress={onPacks}
+            fill={c.backgroundElement}
+            ink={c.text}
+            /* ALWAYS DRAWN, unlike the contests mark. Packs are bought with
+               coins and there is always something on the shelf to look at, so
+               there is no state in which this door offers something the player
+               cannot reach — the shop's own rows say what is affordable. In the
+               quiet ink, because the accent is spoken by the button beside it;
+               see the note on the doors. */
+            lead={<Plus color={c.textSecondary} />}
+          />
+        )}
       </View>
     </View>
   );
@@ -1140,11 +1154,11 @@ function RunRail({
 /**
  * One chip on the rail: an optional lead mark, and a word.
  *
- * BOTH ENDS OF THE ROW ARE THIS. They are the same object doing opposite jobs —
- * a call to action and a side door — and what separates them is the fill and
- * the mark, not the geometry. Drawn from two components they drifted a point in
- * height the first time either was touched, and two chips flanking a centred
- * pager show that immediately.
+ * BOTH DOORS ARE THIS. They are the same object pointing at two rooms, and what
+ * separates them is the mark, not the geometry. Drawn from two components they
+ * drifted a point in height the first time either was touched — which was
+ * visible when they flanked a pager and is unmissable now that they are
+ * shoulder to shoulder.
  */
 function RailChip({
   label,
@@ -1190,19 +1204,6 @@ function Plus({ color }: { color: string }) {
       <View style={[styles.plusBar, { backgroundColor: color }]} />
       <View style={[styles.plusBar, styles.plusBarUp, { backgroundColor: color }]} />
     </View>
-  );
-}
-
-/** One arrow, from a box and two borders. See `styles.chev`. */
-function Chevron({ side, color }: { side: 'left' | 'right'; color: string }) {
-  return (
-    <View
-      style={[
-        styles.chev,
-        side === 'right' ? styles.chevRight : styles.chevLeft,
-        { borderColor: color },
-      ]}
-    />
   );
 }
 
@@ -1313,36 +1314,73 @@ const styles = StyleSheet.create({
    * NO `gap`. The two flanks already own every point that is not the pager, so
    * a gap would be adding space to a row whose spare space is the layout.
    */
-  rail: { flexDirection: 'row', alignItems: 'center', paddingTop: Spacing.two + 2 },
   /**
-   * A FLANK, and the reason the pager lands on the true centre.
+   * TWO GROUPS, and the gap between them is whatever is left.
    *
-   * `flexBasis: 0` with `flexGrow: 1` on both sides means the leftover width is
-   * split in half whatever the two buttons measure, so the middle of the pager
-   * is the middle of the column even though "Weeks" and "+ Contests" are
-   * nothing like the same width.
-   *
-   * NO `minWidth: 0` here, deliberately. A flex item will not shrink below its
-   * content unless told to, so the buttons hold their size and the pager — the
-   * one box that IS told to — gives first. That was the tray's one good idea
-   * and it is the only part of the tray worth keeping.
+   * `gap` here is a FLOOR and not the spacing: the run grows into the slack, so
+   * on any normal week the doors are hard against the right edge and the joint
+   * is a hundred points wide. It only does anything on the week that fills the
+   * row, where it is what stops the last pip touching the first `+`.
    */
-  side: { flexBasis: 0, flexGrow: 1, alignItems: 'flex-start' },
-  sideEnd: { alignItems: 'flex-end' },
+  rail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: Spacing.two + 2,
+    gap: Spacing.three,
+  },
+  /**
+   * THE RUN: held, then riding.
+   *
+   * `flexGrow` takes the slack so the doors sit on the right edge, and
+   * `flexShrink` with the clip on the pager inside means a crowded week is paid
+   * for by the pips alone. The pill does not shrink; a truncated balance is not
+   * a balance.
+   */
+  run: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  /**
+   * The masthead's pill, one step quieter. See the note where it is drawn.
+   *
+   * The geometry is `AppHeader.pill` unchanged — same gap, same padding, same
+   * radius — because it IS that object, moved. Only the figure steps down.
+   */
+  held: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+    flexShrink: 0,
+  },
+  /* 13/700 against the masthead's 14/800: this row's loudest thing is the card
+     above it, and a balance is not allowed to outweigh a page indicator by
+     much. Tabular, so a run that drops from 10 to 9 does not shift the pips. */
+  heldFigure: { fontSize: 13, fontWeight: '700', letterSpacing: -0.2 },
+  /* The doors, and neither of them ever gives. See the note where they are
+     drawn. The gap is the chip's own internal one, so the pair reads as one
+     cluster rather than as two buttons that happen to be near each other. */
+  doors: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two - 2, flexShrink: 0 },
   /* The rack. `overflow: hidden` is the interim answer to a week with more
      cards than the row can hold — a clipped pager is recoverable by swiping,
      and the alternative is pushing a door off the screen. The real answer is to
      let it scroll, which is worth doing the week a board can hold eight. */
   pager: { flexShrink: 1, minWidth: 0, overflow: 'hidden' },
   /**
-   * A CHIP AT EITHER END. Both ends of the row, one geometry.
+   * BOTH DOORS, ONE GEOMETRY.
    *
    * `ENTER_HEIGHT` tall — 28 rather than the app's 32pt `ControlDiameter`,
-   * which is a decision worth keeping now that there are two of these. At 32
-   * beside a 20pt rack the chips are the biggest things on the row, and a
-   * filter chip is not the comparison that matters here: those sit in a row of
-   * their own peers, these sit either side of a pager and have to rank BELOW
-   * it. The pager is what the row is about.
+   * which is a decision worth keeping now that there are two of these sitting
+   * next to each other. At 32 beside a 16pt rack a PAIR of chips is plainly the
+   * biggest object on the row, and a filter chip is not the comparison that
+   * matters here: those sit in a row of their own peers, these sit at the end of
+   * a readout and have to rank below the card the readout serves.
    *
    * The touch target does not shrink with it: `hitSlop` still reaches past 44.
    */
@@ -1361,27 +1399,6 @@ const styles = StyleSheet.create({
     paddingRight: Spacing.three - 4,
     borderRadius: ENTER_HEIGHT / 2,
   },
-  /**
-   * THE WAY BACK, as words rather than as a chip. See the note where it is
-   * drawn for why it is not a pill.
-   *
-   * The gap is two points tighter than the chip's, because a `‹` set beside
-   * lowercase words with no fill around them has nothing to hold it in — inside
-   * a pill the padding does that, and out here the word has to.
-   */
-  back: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two - 4 },
-  /**
-   * The chip's type exactly, because the two ends of this row must not look
-   * like they came from different ones.
-   *
-   * NOT CAPITALS. `weekLabel` is `WEEK 1` — cut for a chip in the card's head,
-   * where capitals are the app's voice for a stamped fact set beside something
-   * else. This is not that: it is a word a person reads at the start of a line,
-   * next to an arrow, and a heading shouting inside a sentence outranks the
-   * pager it is meant to sit beside. `weekTitle` is the same week set as a
-   * phrase — see `weekTitleOf`.
-   */
-  backLabel: { fontSize: 12, lineHeight: 15, fontWeight: '500' },
   /* NO MARK, NO OPTICAL CORRECTION. The tighter left padding above exists to
      pay for the air inside a `+`; with the word alone it just parks the label
      off-centre in its own pill. */
@@ -1413,15 +1430,5 @@ const styles = StyleSheet.create({
   /* One page. The card sits in the middle of it with a gutter either side, and
      the gutters are what you see between two cards mid-drag. */
   page: { paddingHorizontal: PAGE_GUTTER },
-  /* `top: 0, bottom: 0` and centre: the arrow finds the card's vertical middle
-     from the stage's own height, which is what the old placement needed a
-     measured `cardHeight` for — and why it drew nothing at all until the first
-     layout had landed. */
-  /* A chevron from one box and two borders, the way `TabIcon` builds every glyph
-     it draws — no font, no asset, and it inherits the stroke weight of the rules
-     around it. */
-  chev: { width: 7, height: 7, borderTopWidth: 1.5, borderRightWidth: 1.5, opacity: 0.55 },
-  chevRight: { transform: [{ rotate: '45deg' }] },
-  chevLeft: { transform: [{ rotate: '-135deg' }] },
   pressed: { opacity: 0.6 },
 });
