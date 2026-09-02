@@ -138,11 +138,12 @@
 import { Pressable, StyleSheet, Text, View, type DimensionValue } from 'react-native';
 
 import { Icon } from '@/components/icons/Icon';
-import { formatFlex3, formatRoster, formatWr, coin, packStandard } from '@/components/icons/glyphs';
+import { formatFlex3, formatRoster, formatWr, packStandard } from '@/components/icons/glyphs';
 import type { Glyph } from '@/components/icons/system';
 
 import { Heart } from '@/components/runs/Hearts';
-import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
+import { Coin } from '@/components/shell/AppHeader';
+import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import type { FieldWeek } from '@/components/lineup/field';
@@ -957,7 +958,22 @@ function Mark({ token, side }: { token: Token; side: 'risk' | 'win' }) {
       />
     );
   }
-  if (token.kind === 'coin') return <Icon glyph={coin} color={tint} size={11} focused />;
+  /* THE COIN, NOT THE GEM. `glyphs.coin` is the old faceted-gem artwork from
+     before the currency was renamed, and it survived here because this card
+     draws its marks through `Icon` while the rest of the app draws coins with
+     `Coin` — the masthead's own disc. Two different pictures of one currency,
+     on the two screens a player checks their balance against. */
+  /* GOLD ON THE WIN SIDE, and it is the masthead's own gold — `TierColors.gold
+     .accent`, the colour the coin balance is drawn in at the top of every
+     screen. A coin you are being offered should be the same coin you count in
+     your wallet, and `positive` teal made the prize read as a status rather
+     than as money.
+     The RISK side keeps `textSecondary`, deliberately: what you pay is stated
+     quietly and what you win is not, which is the same ranking the heart
+     already follows on this row. */
+  if (token.kind === 'coin') {
+    return <Coin size={11} color={side === 'win' ? TierColors[scheme].gold.accent : tint} />;
+  }
   if (token.kind === 'pack') return <Icon glyph={packStandard} color={tint} size={11} focused />;
   return null;
 }

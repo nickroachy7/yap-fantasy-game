@@ -95,18 +95,13 @@ export type SheetFrame =
       backLabel?: string;
     };
 
-export function ContestSheet({ initial }: { initial: SheetFrame | SheetFrame[] }) {
+export function ContestSheet({ initial }: { initial: SheetFrame }) {
   const router = useRouter();
   /* SEEDED ONCE. The route's params are an opening position, not a controlled
      prop — the same call `LobbyView` makes about `?view=history`, for the same
      reason: navigating inside the sheet must not have to write back to the URL,
      and a re-render must not snap the reader to the frame they arrived on. */
-  /* AN ARRAY IS A STACK ALREADY OPEN. `/contest/[code]` uses it to arrive on a
-     contest with the lobby underneath, so that page has a way back and stops
-     being the sheet's root — see the note on that route. */
-  const [stack, setStack] = useState<SheetFrame[]>(() =>
-    Array.isArray(initial) ? initial : [initial],
-  );
+  const [stack, setStack] = useState<SheetFrame[]>([initial]);
   const here = stack[stack.length - 1];
 
   const push = useCallback((frame: SheetFrame) => setStack((s) => [...s, frame]), []);
