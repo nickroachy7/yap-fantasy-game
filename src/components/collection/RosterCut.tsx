@@ -101,8 +101,11 @@ const styles = StyleSheet.create({
    * side. Without the padding above, the line touches the cards it is cutting
    * away from and floats 12pt clear of the ones it is cutting off.
    *
-   * 12 above and 4 here, because the grid adds its own 12 below: 16 of clear
-   * air on each side of the rule, which is what makes it read as a division
+   * 12 above and 4 here, and the caller makes up the difference below. The
+   * collection grid used to supply it for free — its own 12pt row gap fell
+   * under the separator — and now that the collection is a list of touching
+   * rows there is no gap to borrow, so the screen pads this out to match. 16 of
+   * clear air on each side of the rule is what makes it read as a division
    * rather than as an underline on the row above.
    */
   cut: {

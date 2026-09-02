@@ -1,6 +1,11 @@
 /**
  * One grid cell: a <PlayerCard> sized to the column.
  *
+ * NOT THE COLLECTION ANY MORE. The inventory is a list of rows — see
+ * `InventoryRow` — because a 100pt square had nowhere to put the two numbers
+ * that screen exists to weigh. This survives where a card face being a face is
+ * the whole event: the pack pull, the run-over screen, and the galleries.
+ *
  * The card is reused as-is — this wrapper adds the one thing the card cannot
  * know about, which is how wide its column is.
  *

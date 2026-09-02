@@ -58,6 +58,7 @@ import {
 } from '@/components/dev/fixtures';
 import { BulkBar, type BulkStage } from '@/components/collection/BulkBar';
 import { InventoryCard } from '@/components/collection/InventoryCard';
+import { InventoryRow } from '@/components/collection/InventoryRow';
 import { RosterBar } from '@/components/collection/RosterBar';
 import { RosterCut } from '@/components/collection/RosterCut';
 import { CardExits } from '@/components/cards/CardExits';
@@ -1735,8 +1736,31 @@ function Kit() {
           </Section>
 
           <Section
+            title="Inventory row"
+            note="What the collection is made of. It is the COMPETE BOARD'S ROW — the same badge column, the same three lines, the same 62pt height and inset hairline — imported rather than rebuilt, so a card looks the same on Sunday and on Monday. One column differs: where the lineup stacks this week's points over a projection, the collection stacks what the copy has BANKED over what it SELLS FOR, which are the two halves of the only question this screen asks. The total comes off the tier line to pay for it, so line 3 keeps the tier mark and the distance still to run and nothing is printed twice. Line 2 has no fixture to draw — the collection reads no schedule — so it carries the player's season instead, with the injury designation still qualifying it. In multi-select the position badge becomes the tick and the state marks move onto line 2: IN SET is positive because a copy of that player is committed and this one is still yours, STARTING is the one refusal and takes the tick away entirely.">
+            <View style={styles.rows}>
+              {[
+                { card: OWNED_CARDS[1], selecting: false, selected: false, blocked: false },
+                { card: OWNED_CARDS[0], selecting: true, selected: false, blocked: false },
+                { card: OWNED_CARDS[1], selecting: true, selected: false, blocked: false },
+                { card: OWNED_CARDS[0], selecting: true, selected: true, blocked: false },
+                { card: OWNED_CARDS[2], selecting: true, selected: false, blocked: true },
+              ].map((s2, i) => (
+                <InventoryRow
+                  key={i}
+                  card={s2.card}
+                  selecting={s2.selecting}
+                  selected={s2.selected}
+                  blocked={s2.blocked}
+                  onPress={() => {}}
+                />
+              ))}
+            </View>
+          </Section>
+
+          <Section
             title="Inventory cell"
-            note="The grid cell in every state multi-select can put it in. The first is AT REST and carries no marks at all — the same card, out of the mode. IN SET means a copy of that PLAYER is already committed; this copy is still yours and still sellable, which is why it is the positive tone rather than a grey-out. STARTING is the one refusal: the copy is in a lineup you have not played, so it can be neither sold nor burnt into a set — it takes the tick's place rather than sitting beside it, because a circle you cannot press is a cell contradicting itself. All of them appear only while you are choosing, because that is the only time any of it is news.">
+            note="THE COLLECTION NO LONGER DRAWS THIS — see the row above. The compact card survives where a face being a face is the event: the pack pull, the run-over screen, the gallery. Kept here in every state multi-select could put it in. The first is AT REST and carries no marks at all — the same card, out of the mode. IN SET means a copy of that PLAYER is already committed; this copy is still yours and still sellable, which is why it is the positive tone rather than a grey-out. STARTING is the one refusal: the copy is in a lineup you have not played, so it can be neither sold nor burnt into a set — it takes the tick's place rather than sitting beside it, because a circle you cannot press is a cell contradicting itself. All of them appear only while you are choosing, because that is the only time any of it is news.">
             <View style={styles.row}>
               {[
                 { label: 'at rest', card: OWNED_CARDS[1], selecting: false, selected: false, blocked: false },
@@ -2012,6 +2036,8 @@ function KitEntered({
 }
 
 const styles = StyleSheet.create({
+  /* Full-bleed rows carry their own gutter, so the box around them adds none. */
+  rows: { alignSelf: 'stretch' },
   kitPullFill: { flex: 1 },
   kitPullRail: { paddingHorizontal: Spacing.three, paddingTop: Spacing.five, paddingBottom: Spacing.two },
   kitPullClose: {

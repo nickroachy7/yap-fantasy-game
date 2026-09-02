@@ -376,8 +376,30 @@ const JOB_OPTIONS: { job: Exclude<JobFilter, 'ALL'>; label: string }[] = [
  * does is enter a mode. "Select 19" answers a question nobody asked at the
  * moment they are asking a different one, and it makes a control that is
  * sometimes a verb and sometimes a quantity. The count is real and it belongs
- * where a count belongs: `BulkBar` says "19 selected" the instant the mode
- * opens, which is after the press rather than before it.
+ * where a count belongs: `BulkBar` says "19 selected" the instant the pressed
+ * mode opens, which is after the press rather than before it.
+ *
+ * ---------------------------------------------------------------------------
+ * AND THEN THE WORD ITSELF WENT, WHICH REVERSES A DECISION THIS NOTE MADE
+ * ---------------------------------------------------------------------------
+ *
+ * The word arrived because an unlabelled square is a control nobody finds. That
+ * was true and it is still true, and it lost to arithmetic: the toolbar it sits
+ * on now carries two readouts and two doors — `+ Sets` and `+ Packs` — and at
+ * 375pt the five of them come to 370 points in a 343-point box. Something on
+ * the row had to give up its word, and the candidates were this one and the
+ * `VALUE` label on the collection's worth.
+ *
+ * `VALUE` was the wrong one to cut. The masthead carries a gold coin and a gold
+ * figure eight points above this row — your balance — and the only thing that
+ * tells the two apart is that one of them is captioned. A second unlabelled
+ * coin readout would be a screen quietly stating two different numbers in one
+ * voice.
+ *
+ * So the glyph stands alone, and what protects it is that it is the ONLY
+ * bordered square on the row. It is not competing with the two round filter
+ * menus that used to flank it; those are gone. A phone also reaches the mode by
+ * holding any row, which the grid taught and the list kept.
  *
  * ---------------------------------------------------------------------------
  * QUIET AT REST
@@ -433,11 +455,8 @@ export function SelectButton({
         name="select"
         color={on ? accent : c.textSecondary}
         focused={on}
-        size={13}
+        size={15}
       />
-      <Text numberOfLines={1} style={[Type.label, { color: on ? c.text : c.textSecondary }]}>
-        Select
-      </Text>
     </Pressable>
   );
 }
@@ -496,14 +515,18 @@ const styles = StyleSheet.create({
      that gives. */
   /* `Radius.control` rather than `Radius.chip`: this is a button, not a value
      you pick. `flexShrink: 0` because the row's give is the spacer. */
+  /* SQUARE, now that the word has gone — the same box the two round filter
+     menus used to be, so the row's one remaining control is the size the row
+     was built for. `paddingHorizontal` would make it an oblong with a glyph
+     rattling around in it. */
   select: {
     flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.one + 1,
+    justifyContent: 'center',
     height: TOOLBAR_HEIGHT,
+    width: TOOLBAR_HEIGHT,
     borderRadius: Radius.control,
-    paddingHorizontal: Spacing.two + 1,
   },
   /* Same metrics as ChipRow's own content row — this one is a ScrollView the
      sort strip owns, because it has a label and a direction chip pinned either

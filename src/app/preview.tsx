@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PlayerCard } from '@/components/cards';
 import { InventoryCard } from '@/components/collection/InventoryCard';
+import { InventoryRow as CollectionRow } from '@/components/collection/InventoryRow';
 import { OWNED_CARDS, SAMPLE_CARDS } from '@/components/dev/fixtures';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -30,7 +31,7 @@ const GAP = Spacing.two + 4;
 const columnWidth = (content: number, columns: number) =>
   Math.floor((content - GAP * (columns - 1)) / columns);
 
-function InventoryRow({ label, content, columns }: {
+function InventoryGrid({ label, content, columns }: {
   label: string;
   content: number;
   columns: number;
@@ -65,8 +66,33 @@ export default function PreviewScreen() {
         <ScrollView contentContainerStyle={styles.content}>
           <ThemedText type="title">Card gallery</ThemedText>
 
-          <InventoryRow label="Compact, phone" content={PHONE_CONTENT} columns={3} />
-          <InventoryRow label="Compact, web" content={WEB_CONTENT} columns={7} />
+          {/* THE COLLECTION DRAWS THESE, not the cards below. The compact card
+              is kept in the gallery because the pack pull still uses that
+              treatment, but the inventory is a list now — see `InventoryRow` —
+              and this is the object a reviewer should be looking at first. */}
+          <ThemedText type="subtitle">Collection rows — resting</ThemedText>
+          <View style={[styles.rows, { width: PHONE_CONTENT + Spacing.three * 2 }]}>
+            {OWNED_CARDS.map((card) => (
+              <CollectionRow key={`row-${card.id}`} card={card} onPress={() => {}} />
+            ))}
+          </View>
+
+          <ThemedText type="subtitle">Collection rows — selecting</ThemedText>
+          <View style={[styles.rows, { width: PHONE_CONTENT + Spacing.three * 2 }]}>
+            {OWNED_CARDS.map((card, i) => (
+              <CollectionRow
+                key={`pick-${card.id}`}
+                card={card}
+                selecting
+                selected={i % 4 === 0}
+                blocked={i === 2}
+                onPress={() => {}}
+              />
+            ))}
+          </View>
+
+          <InventoryGrid label="Compact, phone" content={PHONE_CONTENT} columns={3} />
+          <InventoryGrid label="Compact, web" content={WEB_CONTENT} columns={7} />
 
           <ThemedText type="subtitle">Grid size</ThemedText>
           <View style={styles.grid}>
@@ -88,6 +114,9 @@ export default function PreviewScreen() {
 }
 
 const styles = StyleSheet.create({
+  /* Rows are full-bleed and carry their own gutter, so the box around them is
+     the PAGE width rather than the content width the grid is measured at. */
+  rows: { alignSelf: 'center' },
   fill: { flex: 1 },
   content: { padding: 24, gap: 20, alignItems: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, justifyContent: 'center' },

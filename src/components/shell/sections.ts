@@ -199,13 +199,14 @@ export type NavTab = {
  * are two cards short of would be missing from exactly the screen that sells
  * hardest. One object, two doors, and the same sheet behind both.
  *
- * IT IS NOT A CHILD OF EITHER SECTION, and that is the difference between where
- * it sits and where it USED to. As a `detached` child it was drawn by
+ * IT IS NOT A CHILD OF ANY SECTION, and that is the difference between where it
+ * sits and where it USED to. As a `detached` child it was drawn by
  * `SectionNav`, which meant a full row of chrome above the page holding one
  * circle and nothing else — the tray beside it had gone empty when Collection
- * stopped being a folder. It is drawn by the two pages now, on the right of
- * their summary strip (`PacksButton`, `SummaryStrip.action`), so the row is
- * gone and the button kept its size and its place at the top right.
+ * stopped being a folder. It became a round button each page drew for itself
+ * (`PacksButton`), and it is a `DoorChip` now: `+ Packs`, at the end of the
+ * collection's toolbar and the lineup's rail, beside the other door on each.
+ * One object, two rows, and the same sheet behind both.
  *
  * It stays declared HERE because everything else about it is still navigation:
  * the rail resolves `/packs` to this label and glyph, and `isOverlayPath` reads
@@ -291,16 +292,37 @@ const PLAYER_VIEWS: NavChild[] = [
 ];
 
 /**
- * The two views under Collect.
+ * Sets, which is a SHEET over your collection rather than a view beside it.
  *
- * The same pair Collection held before 2026-08-21, back under one board for a
- * reason the split did not weigh: a set is where a card GOES. See
- * `collect/_layout.tsx`.
+ * IT WAS A CHILD OF COLLECT and drew a two-item bar — COLLECTION | SETS — above
+ * every visit to the board, and the note that bar replaced is worth keeping
+ * because the argument in it has not changed: a set is where a card GOES, so
+ * the inventory and its exits are one loop and must not be two tabs you have to
+ * choose between.
+ *
+ * What changed is that a permanent bar is not the only way to keep them
+ * together, and it was the expensive one — a row of chrome on every visit to
+ * the board, naming a pair that are not peers. Your collection is the screen;
+ * sets are an errand you run against it.
+ *
+ * SO IT IS A DOOR ON THE BOARD, exactly as `CONTESTS` is on the lineup: a chip
+ * at the end of the collection's own toolbar, beside the shop. That puts the
+ * exit on the screen holding the cards it is an exit for — closer than the tab
+ * ever was — and gives the sheet the one thing the page could not have, which
+ * is somewhere to go when you put it down.
+ *
+ * DECLARED HERE FOR THE SAME REASONS AS `PACKS` AND `CONTESTS`, which it now
+ * matches exactly: the rail resolves `/sets` to this label and glyph, and
+ * `isOverlayPath` reads `takeover` off it to know the sheet is mounted above
+ * the tabs. Nothing draws it as a nav item — `detached` says so.
  */
-const COLLECT_VIEWS: NavChild[] = [
-  { href: '/fantasy/collect', label: 'Collection', icon: 'inventory' },
-  { href: '/fantasy/collect/sets', label: 'Sets', icon: 'sets' },
-];
+export const SETS: NavChild = {
+  href: '/sets',
+  label: 'Sets',
+  icon: 'sets',
+  takeover: true,
+  detached: true,
+};
 
 export const FANTASY_SECTIONS: NavSection[] = [
   /* COMPETE, which was Lineup. Renaming it is not a tidy-up — a lobby means
@@ -316,14 +338,17 @@ export const FANTASY_SECTIONS: NavSection[] = [
        draws nothing for an empty section and `webSectionOf` folds no tabs, so
        both presentations answer correctly without being told. */
   },
-  /* COLLECT, which was Collection and Sets as peers. Two boards for one loop —
-     look at your cards, decide what to do with them — and the exit was on the
-     board you had to go out of your way to open. */
+  /* COLLECT: the cards you own.
+     NO CHILDREN, which makes it the second board with none. Sets was the other
+     view and is a sheet now — see `SETS` — so there is one page under this row
+     and nothing for a bar to switch between. Same shape as Compete, and the
+     same three presentations answer correctly without being told: `SectionNav`
+     draws nothing, `webSectionOf` folds no tabs, and the rail keeps the board
+     as one row. */
   {
     href: '/fantasy/collect',
     label: 'Collect',
     icon: 'collection',
-    children: COLLECT_VIEWS,
   },
   /* PLAYERS, which was a bottom TAB for three days and is a board again.
    *
@@ -469,10 +494,11 @@ export function childrenOf(href: string): NavChild[] {
  * Every sub-page declared anywhere in the tree, plus the ones that hang off no
  * bar at all.
  *
- * `PACKS` is the reason for the last two terms, and `CONTESTS` joined it: both
- * are destinations the rail lists and takeovers `isOverlayPath` must know
- * about, and both are drawn by a page rather than by anybody's nav — so they
- * appear in no `children` array and walking the tree alone would miss them.
+ * `PACKS` is the reason for the last three terms, and `CONTESTS` and `SETS`
+ * joined it: all three are destinations the rail lists and takeovers
+ * `isOverlayPath` must know about, and all three are drawn by a page rather
+ * than by anybody's nav — so they appear in no `children` array and walking the
+ * tree alone would miss them.
  */
 function allChildren(): NavChild[] {
   return [
@@ -480,6 +506,7 @@ function allChildren(): NavChild[] {
     ...NAV_TABS.flatMap((t) => t.children ?? []),
     PACKS,
     CONTESTS,
+    SETS,
   ];
 }
 
@@ -610,7 +637,16 @@ const WEB_NAV_SPEC: WebNavSpec[] = [
      view of the board. On a phone the carousel's last card is the way in; a
      rail has room to name it outright. */
   { href: '/contests' },
+  /* NO TABS LEFT TO FOLD — Sets was the second view and is the sheet below.
+     `section` stays so the row still lights for anything under
+     `/fantasy/collect`, and `measure` stays because it is the width the board
+     asks for whether or not there is a heading to hang tabs in. */
   { href: '/fantasy/collect', section: '/fantasy/collect', measure: 'table' },
+  /* Sets, as its own row rather than as a tab under Collect — the same
+     treatment `/contests` gets above and for the same reason: it is a sheet,
+     not a view of the board. On a phone the board's toolbar carries the door; a
+     rail has room to name it outright. */
+  { href: '/sets' },
   /* Directly under the board that makes you want more cards, which is the
      question it answers. It is still the sheet it is on a phone (see
      `(app)/_layout`), opened over the app rather than navigated to; a rail row

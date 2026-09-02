@@ -5,7 +5,8 @@
  * specificities:
  *
  *   solid  — one position. `QB`, `RB`, `TE`. Filled with that position's
- *            accent, abbreviation drawn on top.
+ *            accent, abbreviation drawn on top. `tone` decides whether the
+ *            accent is the fill, the ink, or absent — see it.
  *   split  — a slot that accepts several positions. `FLEX` becomes three
  *            vertical cells, one per eligible position, each in its own
  *            accent and carrying that position's initial.
@@ -76,8 +77,17 @@ export type PositionBadgeProps = {
    * (see `constants/positions.ts`); the accent is a scanning accelerator
    * layered on text, never a substitute for it — which is exactly what makes it
    * safe to take away when something else needs the attention more.
+   *
+   * `outline` is the bench badge's box with the position's ink — no fill, a
+   * grey border, and the abbreviation in its own accent. It exists for the
+   * COLLECTION, which sits between the two cases the other tones were drawn
+   * for: it is a list of cards, so a column of solid blocks out-shouts the tier
+   * marks down the same page, but it is also a list you scan BY POSITION, so
+   * dropping the accent entirely takes away the one channel that makes a column
+   * of thirty sortable at a glance. Keeping the letters coloured keeps the
+   * accelerator and gives the weight back.
    */
-  tone?: 'position' | 'neutral';
+  tone?: 'position' | 'neutral' | 'outline';
 };
 
 /**
@@ -138,7 +148,9 @@ export function PositionBadge({
   const theme = Colors[scheme];
   const text = (label ?? '--').toUpperCase();
   const split = positions && positions.length > 1;
-  const neutral = tone === 'neutral';
+  /* Both unfilled tones share the box; they differ only in the ink. */
+  const neutral = tone === 'neutral' || tone === 'outline';
+  const inked = tone === 'outline';
 
   if (split) {
     /* Each cell holds ONE character, so the type may be sized to the cell
@@ -175,7 +187,7 @@ export function PositionBadge({
                 style={[
                   styles.text,
                   {
-                    color: neutral ? theme.text : c.onAccent,
+                    color: inked ? c.accent : neutral ? theme.text : c.onAccent,
                     fontSize: splitFont,
                   },
                 ]}>
@@ -218,7 +230,10 @@ export function PositionBadge({
         numberOfLines={1}
         style={[
           styles.text,
-          { color: neutral ? theme.text : c.onAccent, fontSize: Math.max(8, size * 0.4) },
+          {
+            color: inked ? c.accent : neutral ? theme.text : c.onAccent,
+            fontSize: Math.max(8, size * 0.4),
+          },
         ]}>
         {text}
       </Text>

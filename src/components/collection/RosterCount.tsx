@@ -1,5 +1,5 @@
 /**
- * "29/30", at the far right of the toolbar.
+ * "29/30", beside what the collection is worth.
  *
  * ---------------------------------------------------------------------------
  * IT WAS A FULL-WIDTH BAND
@@ -34,18 +34,24 @@
  * carries the explanation where it can actually be read.
  *
  * ---------------------------------------------------------------------------
- * WHY IT SITS AFTER THE BUTTON
+ * WHY IT SITS BESIDE THE VALUE, AND WHY IT USED TO SIT AFTER THE BUTTON
  * ---------------------------------------------------------------------------
  *
- * The row ends with it because a capacity reading belongs at the end of a gauge,
- * and because the space to its left is the row's only give — anything parked
- * there is the first thing squeezed when a figure grows.
+ * It was last on the row, on the argument that a capacity reading belongs at
+ * the end of a gauge — and on a real fear: a bare number immediately right of a
+ * button reading "Select" invites being read as the button's count, which is
+ * exactly the "Select 18" wording that was removed for saying the wrong thing.
+ * The margin below is what kept them two objects.
  *
- * THE ADJACENCY IS THE RISK. A bare number immediately right of a button reading
- * "Select" invites being read as the button's count, which is exactly the
- * "Select 18" wording that was removed for saying the wrong thing. The margin is
- * what keeps them two objects; if that proves too subtle in a real hand, the fix
- * is a "Cards" label rather than more space.
+ * The row was rebuilt around two doors (`+ Sets`, `+ Packs`) and the end of it
+ * is theirs now. This came to the head of the row instead, next to the value —
+ * which is where it should have been all along. They are two facts about ONE
+ * collection, what it is worth and how full it is, and a reader takes them in
+ * together. Nothing sits beside this any more that could be mistaken for its
+ * subject, so the adjacency risk went with the move.
+ *
+ * The margin stays, doing a smaller job: it keeps the count from binding to the
+ * gold figure on its left as though it were part of the same number.
  */
 import { StyleSheet, Text, View } from 'react-native';
 

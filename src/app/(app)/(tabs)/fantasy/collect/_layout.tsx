@@ -1,42 +1,44 @@
 import { Stack } from 'expo-router';
 
-import { PacksButton } from '@/components/shell/PacksButton';
 import { SectionFrame } from '@/components/shell/SectionFrame';
 
 /**
- * COLLECT: the cards you own, and the sets they can go into.
+ * COLLECT: the cards you own.
  *
- * Sets were lifted out of Collection on 2026-08-21 to sit beside it, on the
- * argument that a set is a thing you work towards rather than a view of your
- * inventory. That argument still holds — but the split cost more than it paid,
- * because a set is also the EXIT for the cards on the other screen. Committing
- * is the only exit that preserves board value, `my_collection_in_set` puts set
- * membership on the inventory cell, and `card_actions` already offers the
- * commit from there. One loop, and it was living in two tabs.
+ * ---------------------------------------------------------------------------
+ * IT IS ONE PAGE NOW, AND THE BAR IS GONE
+ * ---------------------------------------------------------------------------
  *
- * A tab you must deliberately open to discover an exit is a tab you do not
- * open. The Sets tab sitting unused was mostly economics — see
- * `20260824235000_weekly_sets.sql` — but not only.
+ * Sets were lifted out of Collection on 2026-08-21 to sit beside it, then
+ * brought back under one board on the argument that a set is the EXIT for the
+ * cards on the other screen — committing is the only exit that preserves board
+ * value, and a tab you must deliberately open to discover an exit is a tab you
+ * do not open.
  *
- * They are two pages under one board now, which is the shape Collection had
- * before it stopped being a folder. What is different this time is that the
- * pair is no longer Inventory-and-Sets-as-peers with a redirect in front of
- * them: Collection IS the index, and Sets is the page beside it.
+ * That argument was right about the loop and wrong about the shape. Keeping
+ * them together as two tabs bought the connection with a permanent row of
+ * chrome above a board whose whole subject is the cards underneath it — and it
+ * still put the exit one deliberate tap away, just a shorter one.
  *
- * THE FRAME CARRIES THE PACKS BUTTON, beside the two tabs, and it is back here
- * after a spell on each page's summary strip. Two reasons, and the second is
- * the one that moved it:
+ * Sets is a SHEET over the collection now, opened by a chip at the end of the
+ * board's own toolbar beside the shop. See `SETS` in `sections.ts`. The exit is
+ * on the screen holding the cards it is an exit for, which is closer than the
+ * tab ever was, and the board gets the row back.
  *
- *   chrome rendered above the navigator survives a navigation, so opening Packs
- *     and closing it again does not rebuild the bar you pressed — and drawn by
- *     each page instead, the button blinks on every flip between them;
- *   the summary strip SCROLLS AWAY with the rows it summarises, and the way out
- *     to the shop is not a statement about your collection. It must not leave
- *     with one.
+ * THE PACKS BUTTON WENT THE SAME WAY. It was this frame's `action` — chrome
+ * rendered above the navigator, which was the right place for it while there
+ * was a bar for it to sit beside. With no bar there is nothing to hang it on,
+ * and it is one of the two doors on the toolbar now, drawn by `DoorChip`
+ * exactly as the lineup's rail draws its pair.
+ *
+ * `SectionFrame` stays, and draws nothing: a section with no children has no
+ * bar. What it still supplies is the frame state every page in here reads —
+ * that a masthead is already on screen. Compete has been in exactly this shape
+ * since its own lobby became a sheet.
  */
 export default function CollectLayout() {
   return (
-    <SectionFrame section="/fantasy/collect" action={<PacksButton />}>
+    <SectionFrame section="/fantasy/collect">
       <Stack screenOptions={{ headerShown: false, animation: 'none' }} />
     </SectionFrame>
   );

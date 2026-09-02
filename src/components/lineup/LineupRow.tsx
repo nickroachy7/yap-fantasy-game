@@ -586,12 +586,31 @@ function Row({
 export function Identity({
   card,
   right,
+  secondary,
   progress: progressOverride,
   emptyPrimary,
   emptySecondary,
 }: {
   card: RowCard | null;
   right: React.ReactNode;
+  /**
+   * WHAT GOES ON LINE 2 WHERE THERE IS NO FIXTURE.
+   *
+   * The lineup and the swap sheet leave this alone: their second line is this
+   * Sunday's game, which is the whole reason a card is being looked at there.
+   * The COLLECTION has no fixture to draw — it deliberately reads no schedule
+   * (see `InventoryCard`) — and a row that skipped the line would be two lines
+   * tall beside three-line rows everywhere else, while a row that kept it empty
+   * would read as data that failed to load.
+   *
+   * So the caller supplies the line. A node rather than a string, because the
+   * collection puts coloured state marks in front of its phrase and they are
+   * the same kind of token as the injury code that still follows it.
+   *
+   * `undefined` means "draw the fixture"; an explicit `null` is a caller with
+   * nothing to say, and gets an empty line rather than a bye.
+   */
+  secondary?: React.ReactNode;
   /**
    * Replaces the tier line's closing phrase.
    *
@@ -665,7 +684,7 @@ export function Identity({
                   A tie takes the quiet colour. It is not a result anybody is
                   pleased or sorry about, and a third accent for a state that
                   happens twice a season would be a colour nobody learns. */}
-              {result ? (
+              {result && secondary === undefined ? (
                 <Text
                   numberOfLines={1}
                   style={[
@@ -684,29 +703,33 @@ export function Identity({
                   {result.mark}
                 </Text>
               ) : null}
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.fixture,
-                  /* Three colours for three states, and only one of them is an
-                     alarm. BYE is the negative because it is a failure you can
-                     still fix; LIVE is the positive because it is the row
-                     asking to be looked at; everything else is quiet grey. */
-                  {
-                    color: !card.game?.opponent
-                      ? c.negative
-                      : card.game.status === 'live'
-                        ? c.positive
-                        : c.textTertiary,
-                  },
-                  card.game?.status === 'live' && styles.fixtureLive,
-                ]}>
+              {secondary !== undefined ? (
+                secondary
+              ) : (
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.fixture,
+                    /* Three colours for three states, and only one of them is an
+                       alarm. BYE is the negative because it is a failure you can
+                       still fix; LIVE is the positive because it is the row
+                       asking to be looked at; everything else is quiet grey. */
+                    {
+                      color: !card.game?.opponent
+                        ? c.negative
+                        : card.game.status === 'live'
+                          ? c.positive
+                          : c.textTertiary,
+                    },
+                    card.game?.status === 'live' && styles.fixtureLive,
+                  ]}>
                   {card.game === undefined
-                  ? ''
-                  : card.game?.opponent
-                    ? [kick, result?.score, matchupLabel(card.game)].filter(Boolean).join(' ')
-                    : 'BYE — no game this week'}
-              </Text>
+                    ? ''
+                    : card.game?.opponent
+                      ? [kick, result?.score, matchupLabel(card.game)].filter(Boolean).join(' ')
+                      : 'BYE — no game this week'}
+                </Text>
+              )}
               {/* The doubt, on the thing it is a doubt about. Two colours, not
                   one: `Out` and `Questionable` are not the same warning, and
                   the feed emits four times as many of the second. */}

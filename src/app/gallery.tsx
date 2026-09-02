@@ -22,14 +22,13 @@ import { Redirect } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
-import { InventoryCard } from '@/components/collection/InventoryCard';
-import { InventoryControls, SelectButton } from '@/components/collection/CollectionFilters';
+import { InventoryRow } from '@/components/collection/InventoryRow';
+import { SelectButton } from '@/components/collection/CollectionFilters';
+import { DoorChip, Plus } from '@/components/ui/DoorChip';
 import { CollectionValue } from '@/components/collection/CollectionValue';
 import { RosterAlert } from '@/components/collection/RosterAlert';
 import { RosterCount } from '@/components/collection/RosterCount';
-import { spareIds } from '@/components/collection/spares';
-import { countByPosition, countByTier, summarise, type JobFilter } from '@/components/collection/types';
-import type { PosFilter } from '@/components/cards/PositionFilter';
+import { summarise } from '@/components/collection/types';
 import {
   CARD_PROFILE_NEVER_STARTED,
   CARD_PROFILE_SAMPLE,
@@ -220,8 +219,8 @@ const VIEW_TITLE: Record<View_, string> = {
 /** Drives the rail's active/nested state, which is otherwise unreachable here. */
 const VIEW_PATH: Record<View_, string> = {
   inventory: '/fantasy/collect',
-  sets: '/fantasy/collect/sets',
-  checklist: '/fantasy/collect/sets',
+  sets: '/sets',
+  checklist: '/sets',
   leaderboard: '/fantasy/leaderboard',
   lineup: '/fantasy/compete',
   recap: '/fantasy/compete',
@@ -314,7 +313,6 @@ const RECAP_FIXTURE: Recap = {
 
 
 const GAP = Spacing.two + 4;
-const MIN_CARD_WIDTH = 100;
 
 /**
  * Measures its own box, exactly as inventory.tsx does.
@@ -457,101 +455,73 @@ const GALLERY_SPARES = OWNED_MANY.map((card, i) => ({
 }));
 
 function InventoryFixture() {
-  const [w, setW] = useState(0);
-  /* No gutter subtraction here, unlike inventory.tsx. This sits inside
-   * Screen's SCROLLING container, which already applies the gutter as padding,
-   * so the measured box is the usable width. inventory.tsx measures inside
-   * `scroll={false}`, whose box is unpadded because the FlatList applies the
-   * gutter itself — so there it must subtract. Subtracting in both places
-   * double-counted here and drew 95pt cards where the product draws 106. */
-  const contentWidth = w;
-  const columns = Math.max(3, Math.min(7, Math.floor((contentWidth + GAP) / (MIN_CARD_WIDTH + GAP))));
-  const itemWidth = Math.floor((contentWidth - GAP * (columns - 1)) / columns);
-
-  /* Live state, because the row is only worth looking at in its states: a
-     filter applied, the Select button carrying a count, the mode on. */
-  const [job, setJob] = useState<JobFilter>('ALL');
-  const [position, setPosition] = useState<PosFilter>('ALL');
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  /* Live, because the row is only worth looking at in both its states: the mode
+     off, and the mode on with ticks down the badge column. */
   const [selecting, setSelecting] = useState(false);
 
-  const spares = useMemo(() => spareIds(GALLERY_SPARES), []);
-  /* No server here, so the Fits-a-set answer is stood in for. */
-  const commitable = useMemo(() => new Set(['many-1', 'many-2', 'many-3', 'many-8']), []);
   const starters = useMemo(() => new Set(['many-0', 'many-5', 'many-9']), []);
-
-  const shown = useMemo(
-    () =>
-      GALLERY_SPARES.filter((card) => {
-        if (position !== 'ALL' && card.position !== position) return false;
-        if (job === 'spare') return spares.has(card.id);
-        if (job === 'set') return commitable.has(card.id);
-        if (job === 'starting') return starters.has(card.id);
-        return true;
-      }),
-    [job, position, spares, commitable, starters],
-  );
-
   const stats = useMemo(() => summarise(GALLERY_SPARES), []);
-  const jobCounts = useMemo(
-    () => ({
-      spare: GALLERY_SPARES.filter((c) => spares.has(c.id)).length,
-      set: GALLERY_SPARES.filter((c) => commitable.has(c.id)).length,
-      starting: GALLERY_SPARES.filter((c) => starters.has(c.id)).length,
-    }),
-    [spares, commitable, starters],
-  );
+
   return (
-    <View onLayout={(e) => setW(e.nativeEvent.layout.width)}>
-      {w === 0 ? null : (
-        <>
-          {/* The real row, drawing its own gutter as it does in the product
-              — hence the negative margin, the same escape the board controls
-              take above. */}
-          <View style={styles.inventoryControls}>
-            <View style={styles.inventoryRow}>
-              <CollectionValue sellValue={stats.sellValue} />
-              <View style={styles.inventorySpacer} />
-              <InventoryControls
-                job={job}
-                onJob={setJob}
-                jobCounts={jobCounts}
-                offersReady
-                position={position}
-                onPosition={setPosition}
-                positionCounts={countByPosition(GALLERY_SPARES)}
-                tier="ALL"
-                onTier={() => {}}
-                tierTotal={GALLERY_SPARES.length}
-                tierCounts={countByTier(GALLERY_SPARES)}
-                sort="fp"
-                dir="desc"
-                onSort={() => {}}
-              />
-              <SelectButton on={selecting} onPress={() => setSelecting((v) => !v)} />
-              <RosterCount roster={{ held: 31, cap: 30, warnAt: 24, overBy: 2, isOver: true, isNear: true, remaining: 0 }} />
-            </View>
-            {/* The one state that draws a band. Under the cap it is null, and
-                it is layout-neutral, so the gutter comes from here. */}
-            <View style={{ paddingHorizontal: Spacing.three }}>
-              <RosterAlert roster={{ held: 32, cap: 30, warnAt: 24, overBy: 2, isOver: true, isNear: true, remaining: 0 }} />
-            </View>
-            <View style={styles.inventoryRow}>
-              <CollectionValue sellValue={232} />
-              <View style={styles.inventorySpacer} />
-              <RosterCount roster={{ held: 14, cap: 30, warnAt: 24, overBy: 0, isOver: false, isNear: false, remaining: 16 }} />
-            </View>
+    <View>
+      {/* The real row, drawing its own gutter as it does in the product —
+          hence the negative margin, the same escape the board controls take
+          above.
+
+          IT IS FOUR OBJECTS NOW, and it was seven. The filters went with the
+          grid: `InventoryControls` narrowed a mosaic of squares nobody could
+          read, and the rows say what the squares could not. What is left is two
+          readouts, the mode switch, and the two doors. */}
+      <View style={styles.inventoryControls}>
+        <View style={styles.inventoryRow}>
+          <CollectionValue sellValue={stats.sellValue} />
+          <RosterCount roster={{ held: 31, cap: 30, warnAt: 24, overBy: 2, isOver: true, isNear: true, remaining: 0 }} />
+          <View style={styles.inventorySpacer} />
+          <SelectButton on={selecting} onPress={() => setSelecting((v) => !v)} />
+          <View style={styles.inventoryDoors}>
+            <DoorChip
+              label="Sets"
+              accessibilityLabel="Sets"
+              onPress={() => {}}
+              fill={c.backgroundElement}
+              ink={c.text}
+              lead={<Plus color={c.textSecondary} />}
+            />
+            <DoorChip
+              label="Packs"
+              accessibilityLabel="Packs"
+              onPress={() => {}}
+              fill={c.backgroundElement}
+              ink={c.text}
+              lead={<Plus color={c.textSecondary} />}
+            />
           </View>
-          <View style={styles.grid}>
-            {shown.map((card) => (
-              <InventoryCard
-                key={card.id}
-                card={card}
-                width={itemWidth}
-              />
-            ))}
-          </View>
-        </>
-      )}
+        </View>
+        {/* The one state that draws a band. Under the cap it is null, and it is
+            layout-neutral, so the gutter comes from here. */}
+        <View style={{ paddingHorizontal: Spacing.three }}>
+          <RosterAlert roster={{ held: 32, cap: 30, warnAt: 24, overBy: 2, isOver: true, isNear: true, remaining: 0 }} />
+        </View>
+        <View style={styles.inventoryRow}>
+          <CollectionValue sellValue={232} />
+          <RosterCount roster={{ held: 14, cap: 30, warnAt: 24, overBy: 0, isOver: false, isNear: false, remaining: 16 }} />
+          <View style={styles.inventorySpacer} />
+        </View>
+        {/* Full-bleed, like the list they are in — each row carries its own
+            gutter and draws its own inset rule. */}
+        {GALLERY_SPARES.map((card) => (
+          <InventoryRow
+            key={card.id}
+            card={card}
+            selecting={selecting}
+            selected={selecting && card.id.endsWith('4')}
+            blocked={selecting && starters.has(card.id)}
+            onPress={() => {}}
+          />
+        ))}
+      </View>
     </View>
   );
 }
@@ -1262,6 +1232,8 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.one + 2,
   },
   inventorySpacer: { flex: 1, minWidth: 0 },
+  /* The doors, as one cluster — the product's own gap. */
+  inventoryDoors: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two - 2, flexShrink: 0 },
   rows: { gap: 1 },
   row: {
     flexDirection: 'row',

@@ -187,6 +187,10 @@ export default function AppLayout() {
             note on `view` there — a sheet stacked on a sheet is the layering
             `pull.tsx` was already burned by once. */}
         <Stack.Screen name="contests" options={sheetOptions} />
+        {/* Sets, over the collection. Same presentation as packs and the lobby,
+            and it arrived here from the same direction: it was a tab beside the
+            board and is a door on it. See `SETS` in `sections.ts`. */}
+        <Stack.Screen name="sets" options={sheetOptions} />
         {/* The death screen. An ORDINARY PUSH, and that is the decision:
             every other route in this stack is presented over the app, and this
             one deliberately is not.

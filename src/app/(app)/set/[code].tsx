@@ -316,10 +316,13 @@ export default function SetChecklistScreen() {
 
   /* Guarded for the same reason as `packs` and `search`: `back()` on an empty
      stack does nothing, so a checklist opened from a link or a refreshed tab
-     had a close button that did not close. Sets is this sheet's landing page. */
+     had a close button that did not close. The fallback used to be the Sets
+     TAB; sets is a sheet now (see `SETS` in `sections.ts`) and dismissing to a
+     sheet from a sheet would leave the reader on a takeover with nothing under
+     it. The collection is the board both of them are doors on. */
   const close = useCallback(() => {
     if (router.canGoBack()) router.back();
-    else router.dismissTo('/fantasy/collect/sets');
+    else router.dismissTo('/fantasy/collect');
   }, [router]);
 
   return (

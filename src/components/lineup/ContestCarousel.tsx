@@ -75,7 +75,6 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   FlatList,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -96,6 +95,7 @@ import { settlementOf } from '@/components/contests/contest-model';
 import { termsOfEntry, type MyContest } from '@/components/contests/use-my-contests';
 import { ContestHearts, Heart, type HeartResult, type HeartSpan } from '@/components/runs/Hearts';
 import { useIsWide } from '@/components/shell/useResponsive';
+import { DoorChip, Plus } from '@/components/ui/DoorChip';
 import { Colors, NUMERIC, Spacing, selectionAccent } from '@/constants/theme';
 import type { PlayerState } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -189,12 +189,6 @@ const PAGE_HOME = 0.05;
 
 /** Captured once, because a worklet cannot read a getter off a module. */
 const WEB = Platform.OS === 'web';
-
-/** The contests chip's height. See `styles.chip` for why it is not `ControlDiameter`. */
-const ENTER_HEIGHT = 28;
-
-/** The `+` ahead of the lobby button's label. See `Plus`. */
-const PLUS_SIZE = 9;
 
 /**
  * One pip on the rail's pager.
@@ -1096,7 +1090,7 @@ function RunRail({
          * NOT the accent: two gold marks four points apart would make the row
          * choose between them.
          */}
-        <RailChip
+        <DoorChip
           label="Contests"
           accessibilityLabel={
             live ? `Contests. ${free === 1 ? '1 heart' : `${free} hearts`} free` : 'Contests'
@@ -1131,7 +1125,7 @@ function RunRail({
           lead={live ? <Plus color={accent} /> : null}
         />
         {wide ? null : (
-          <RailChip
+          <DoorChip
             label="Packs"
             accessibilityLabel="Packs"
             onPress={onPacks}
@@ -1147,62 +1141,6 @@ function RunRail({
           />
         )}
       </View>
-    </View>
-  );
-}
-
-/**
- * One chip on the rail: an optional lead mark, and a word.
- *
- * BOTH DOORS ARE THIS. They are the same object pointing at two rooms, and what
- * separates them is the mark, not the geometry. Drawn from two components they
- * drifted a point in height the first time either was touched — which was
- * visible when they flanked a pager and is unmissable now that they are
- * shoulder to shoulder.
- */
-function RailChip({
-  label,
-  accessibilityLabel,
-  onPress,
-  fill,
-  ink,
-  lead,
-}: {
-  label: string;
-  accessibilityLabel: string;
-  onPress: () => void;
-  fill: string;
-  ink: string;
-  /** The mark before the word. Null draws the word alone — see `chipBare`. */
-  lead: React.ReactNode;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      /* Drawn at `ENTER_HEIGHT` and reached out past the platform's 44 — the
-         same trick `Pip` uses, and the reason these can be quiet chips without
-         being small targets. */
-      hitSlop={9}
-      style={({ pressed }) => [
-        styles.chip,
-        !lead && styles.chipBare,
-        { backgroundColor: fill },
-        pressed && styles.pressed,
-      ]}>
-      {lead}
-      <Text style={[styles.chipLabel, { color: ink }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-/** A `+` from two bars, sized to sit inside the lobby button's label. */
-function Plus({ color }: { color: string }) {
-  return (
-    <View style={styles.plus}>
-      <View style={[styles.plusBar, { backgroundColor: color }]} />
-      <View style={[styles.plusBar, styles.plusBarUp, { backgroundColor: color }]} />
     </View>
   );
 }
@@ -1364,60 +1302,16 @@ const styles = StyleSheet.create({
      much. Tabular, so a run that drops from 10 to 9 does not shift the pips. */
   heldFigure: { fontSize: 13, fontWeight: '700', letterSpacing: -0.2 },
   /* The doors, and neither of them ever gives. See the note where they are
-     drawn. The gap is the chip's own internal one, so the pair reads as one
-     cluster rather than as two buttons that happen to be near each other. */
+     drawn, and `DoorChip` for the chip itself — the collection's toolbar draws
+     the same pair, which is why the geometry no longer lives in this file. The
+     gap is the chip's own internal one, so the two read as one cluster rather
+     than as two buttons that happen to be near each other. */
   doors: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two - 2, flexShrink: 0 },
   /* The rack. `overflow: hidden` is the interim answer to a week with more
      cards than the row can hold — a clipped pager is recoverable by swiping,
      and the alternative is pushing a door off the screen. The real answer is to
      let it scroll, which is worth doing the week a board can hold eight. */
   pager: { flexShrink: 1, minWidth: 0, overflow: 'hidden' },
-  /**
-   * BOTH DOORS, ONE GEOMETRY.
-   *
-   * `ENTER_HEIGHT` tall — 28 rather than the app's 32pt `ControlDiameter`,
-   * which is a decision worth keeping now that there are two of these sitting
-   * next to each other. At 32 beside a 16pt rack a PAIR of chips is plainly the
-   * biggest object on the row, and a filter chip is not the comparison that
-   * matters here: those sit in a row of their own peers, these sit at the end of
-   * a readout and have to rank below the card the readout serves.
-   *
-   * The touch target does not shrink with it: `hitSlop` still reaches past 44.
-   */
-  chip: {
-    flexShrink: 0,
-    height: ENTER_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.two - 2,
-    /* TIGHTER ON THE MARK SIDE. A `+` and a chevron are mostly air where a
-       letter is mostly ink, so equal padding leaves the left visibly slacker
-       than the right. Two points back is the optical correction, and it happens
-       to pay for a third of what the mark costs in width. */
-    paddingLeft: Spacing.two + 2,
-    paddingRight: Spacing.three - 4,
-    borderRadius: ENTER_HEIGHT / 2,
-  },
-  /* NO MARK, NO OPTICAL CORRECTION. The tighter left padding above exists to
-     pay for the air inside a `+`; with the word alone it just parks the label
-     off-centre in its own pill. */
-  chipBare: { paddingLeft: Spacing.three - 4 },
-  /* The `+`'s box. 9 against a 12pt label — a shade under the cap height, so it
-     reads as punctuation to the word rather than as a second word. */
-  plus: { width: PLUS_SIZE, height: PLUS_SIZE, alignItems: 'center', justifyContent: 'center' },
-  /* Both bars are the same rule; one of them stood on its end. 1.5 because a
-     stroke this short needs the weight to hold its own beside 12pt type. */
-  plusBar: { position: 'absolute', width: PLUS_SIZE, height: 1.5, borderRadius: 0.75 },
-  plusBarUp: { width: 1.5, height: PLUS_SIZE },
-  /* Not on the type scale on purpose: `body` at 12/500 is a caption's weight
-     and this is a button. 13/600 is the smallest thing in this app that reads
-     as one without being set in caps — and it is a notch under the fill's 700,
-     because an outline does not have to work as hard to be seen. */
-  /* 12/500. At 13/600 the label was the heaviest text on the screen below the
-     card's own name — a button does not have to outweigh the thing it serves. */
-  chipLabel: { fontSize: 12, lineHeight: 15, fontWeight: '500' },
-
   /**
    * THE PAGER, SPREAD BACK OVER `Screen`'s PADDING.
    *

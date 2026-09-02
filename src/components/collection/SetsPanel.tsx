@@ -47,23 +47,35 @@
  * the network, the wallet, the two notices — and the summary strip, which sits
  * at the TOP OF THE SCROLL, under the filters, and goes up the page with the
  * rows. It used to be pinned above the scroll and collapse on a push; see the
- * note at the render for why it stopped. The inventory's strip made the same
- * move in the same change, and the two have to keep making it together — a
- * strip that scrolls on one tab and collapses on the other is a step down half
- * a line every time you flip between them.
+ * note at the render for why it stopped.
+ *
+ * IT IS A SHEET NOW, over the collection, and it used to be a page beside it
+ * under a COLLECTION | SETS bar. See `SETS` in `sections.ts` for why the bar
+ * went; what it means for this file is that the panel renders its own
+ * `PlayerSheetFrame` rather than sitting inside a `Screen`.
+ *
+ * THE VIEW RENDERS THE FRAME, which is `ContestSheet`'s rule and worth
+ * restating: the title, the subtitle and the pinned controls are all derived
+ * from `useSets`, so a host that owned the frame would have to call this
+ * panel's data hook to fill it in. The route above is a path and a close
+ * handler and nothing else.
+ *
+ * AND THE SCROLL IS THE FRAME'S. This drew its own `ScrollView` as a page, and
+ * keeping it would have put one scroller inside another — the frame supplies
+ * one, drives its floating header from it, and reserves the sheet's bottom
+ * inset in it. The filters and the claim bar move to the frame's `pinned` slot,
+ * which is the same guarantee this file's render note asks for: a control that
+ * cannot be scrolled away from what it controls.
+ *
+ * WHAT THAT COST: pull-to-refresh, which a sheet has nowhere to put. It is not
+ * a loss worth machinery — a sheet is mounted fresh every time it is opened, so
+ * `useSets` reads on the way in, and the claim path reloads on its own. The
+ * contests sheet made the same trade.
  */
 import { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
+import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
@@ -81,10 +93,18 @@ import { useSets } from './use-sets';
 
 export function SetsPanel({
   onOpenSet,
-  onBackToInventory,
+  onClose,
 }: {
   onOpenSet: (code: string) => void;
-  onBackToInventory: () => void;
+  /**
+   * Put the sheet down.
+   *
+   * It was `onBackToInventory` and pointed at a sibling tab; with the tab gone
+   * there is nothing to go BACK to — closing puts you on whatever board you
+   * opened this from, which is the collection in every path that exists today
+   * and does not have to be.
+   */
+  onClose: () => void;
   /**
    * Drawn on the right of the summary strip — the Packs button.
    *
@@ -94,13 +114,16 @@ export function SetsPanel({
    * with no router under it.
    */
 }) {
-  const tabSpace = useTabBarSpace();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   // Single source of truth for the balance: the header reads the same value, so
   // a claim has to refresh THAT rather than keep a second copy here.
   const { refresh: refreshPlayer } = usePlayer();
-  const { sets, error, loading, refreshing, refresh, reload } = useSets();
+  /* NO `refreshing` ANY MORE. It drove a `RefreshControl` on a scroll this file
+     owned; the frame supplies the scroller now and takes no refresh control, so
+     the flag has nothing to drive. `refresh` itself stays — the error state's
+     Try again button is the one thing that still calls it. */
+  const { sets, error, loading, refresh, reload } = useSets();
 
   /** The code being claimed, so only the pressed row shows a spinner. */
   /* Which sets are on screen. Held here rather than in `SetsList`, because the
@@ -219,78 +242,86 @@ export function SetsPanel({
     await Promise.all([refresh(), refreshPlayer()]);
   }, [refresh, refreshPlayer]);
 
-  if (loading) {
-    return (
-      <View style={styles.centred}>
-        <ActivityIndicator />
+  /**
+   * THE SHEET'S ONE LINE BEFORE THE LIST, and it came off the route.
+   *
+   * It says the most actionable true thing, in that order: coins you can claim
+   * beat slots you can fill, and both beat the inventory number. "2 ready to
+   * claim" is worth a line; "37 sets" is what is left when there is nothing to
+   * do about any of them.
+   *
+   * IT IS DERIVED HERE RATHER THAN PASSED IN, which is the whole reason this
+   * file renders its own frame. As a page it was computed in the route from a
+   * second `useSets()` call — free, because the hook is session-cached, but
+   * still two places that had to agree about what the most actionable thing is.
+   */
+  const context = loading
+    ? 'Loading'
+    : summary.ready > 0
+      ? `${summary.ready} ready to claim · ${summary.coinsWaiting.toLocaleString()} coins`
+      : summary.toCommit > 0
+        ? `${summary.toCommit} slots you can fill today`
+        : `${summary.sets} sets · ${summary.claimed} claimed`;
+
+  /* WHAT IS PINNED IS THE CONTROLS AND NOTHING ELSE.
+
+     The chips decide what you are looking at, so they cannot leave the screen
+     you are looking at. The claim-all bar acts on sets you may not have
+     scrolled to, so it must not be possible to scroll past it. Both only exist
+     when there are sets — the empty state below is a whole-sheet message, and
+     chips over it would be filters on nothing.
+
+     THE STRIP IS NOT UP HERE ANY MORE. It is the first thing in the scroll
+     instead, and goes up the page with the rows. It is a statement — how many
+     sets, how many claimed, how much is waiting — and a statement about a list
+     belongs with the list rather than over the controls that cut the list down.
+     The inventory's strip made the identical move.
+
+     IT IS THE FRAME'S `pinned` SLOT NOW rather than a sibling of a scroll this
+     file owned, and the guarantee is the same one: the frame draws it above the
+     scroller and outside it. */
+  const pinned =
+    all.length > 0 ? (
+      <View style={styles.strip}>
+        <SetsFilters sets={all} filter={filter} onFilter={setFilter} />
+        {ready.length > 0 ? (
+          <ClaimAllBar
+            count={ready.length}
+            coins={summary.coinsWaiting}
+            busy={claimingAll}
+            onPress={() => void claimAll()}
+          />
+        ) : null}
       </View>
-    );
-  }
+    ) : null;
 
   /* Only when there is nothing to draw. A failed REFRESH over a list that is
      already on screen must not replace it with an error page — the rows are
      still the last true answer. */
-  if (error && sets === null) {
-    return (
+  const body =
+    loading || (error && sets === null) ? (
       <View style={styles.centred}>
-        <Text style={[Type.section, { color: c.text }]}>Could not load your sets</Text>
-        <Text style={[Type.body, styles.centredText, { color: c.textSecondary }]}>{error}</Text>
-        <Pressable
-          onPress={() => void onRefresh()}
-          accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.retry,
-            { backgroundColor: c.backgroundElement },
-            pressed && styles.pressed,
-          ]}>
-          <Text style={[Type.strong, { color: c.text }]}>Try again</Text>
-        </Pressable>
+        {loading ? (
+          <ActivityIndicator />
+        ) : (
+          <>
+            <Text style={[Type.section, { color: c.text }]}>Could not load your sets</Text>
+            <Text style={[Type.body, styles.centredText, { color: c.textSecondary }]}>{error}</Text>
+            <Pressable
+              onPress={() => void onRefresh()}
+              accessibilityRole="button"
+              style={({ pressed }) => [
+                styles.retry,
+                { backgroundColor: c.backgroundElement },
+                pressed && styles.pressed,
+              ]}>
+              <Text style={[Type.strong, { color: c.text }]}>Try again</Text>
+            </Pressable>
+          </>
+        )}
       </View>
-    );
-  }
-
-  return (
-    <View style={styles.fill}>
-      {/* WHAT IS PINNED IS THE CONTROLS AND NOTHING ELSE.
-
-          The chips decide what you are looking at, so they cannot leave the
-          screen you are looking at. The claim-all bar acts on sets you may not
-          have scrolled to, so it must not be possible to scroll past it. Both
-          only exist when there are sets — the empty state below is a whole-page
-          message, and chips over it would be filters on nothing.
-
-          THE STRIP IS NOT UP HERE ANY MORE. It is the first thing in the scroll
-          instead, and goes up the page with the rows. It is a statement — how
-          many sets, how many claimed, how much is waiting — and a statement
-          about a list belongs with the list rather than over the controls that
-          cut the list down. The inventory's strip made the identical move; see
-          the note at the top of this file for why the two have to match. */}
-      {all.length > 0 ? (
-        <View style={styles.strip}>
-          <SetsFilters sets={all} filter={filter} onFilter={setFilter} />
-          {ready.length > 0 ? (
-            <ClaimAllBar
-              count={ready.length}
-              coins={summary.coinsWaiting}
-              busy={claimingAll}
-              onPress={() => void claimAll()}
-            />
-          ) : null}
-        </View>
-      ) : null}
-
-      <ScrollView
-        style={styles.fill}
-        contentContainerStyle={[
-          styles.content,
-          /* The pinned chips own the gap under the nav now, so the scroll starts
-             flush — except with no chips above it, where this is the only thing
-             holding the empty state off the nav. */
-          all.length === 0 && styles.contentTop,
-          styles.contentTail,
-          { paddingBottom: tabSpace },
-        ]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+    ) : (
+      <View style={styles.content}>
         {/* FIRST IN THE SCROLL, above the notices and the rows, which is the
             place the filters used to occupy. It is the same `SummaryStrip` the
             inventory draws in the same position on its own list — see the note
@@ -309,8 +340,8 @@ export function SetsPanel({
           <EmptyState
             title="No sets this season"
             body="Sets are built from the season's card pool, and there is no pool here yet."
-            actionLabel="Back to Inventory"
-            onAction={onBackToInventory}
+            actionLabel="Back to your cards"
+            onAction={onClose}
           />
         ) : (
           <>
@@ -361,8 +392,23 @@ export function SetsPanel({
             )}
             </>
           )}
-      </ScrollView>
-    </View>
+      </View>
+    );
+
+  return (
+    /* `surface` rather than `tone`: a sheet full of sets is not about a club or
+       a tier and has no hue to be washed in — the same call `LobbyView` makes,
+       and the same step on the dark scale, so the two sheets a player opens
+       from the two boards are made of the same material. */
+    <PlayerSheetFrame
+      surface={c.backgroundElement}
+      title="Sets"
+      subtitle={context}
+      onClose={onClose}
+      closeLabel="Close sets"
+      pinned={pinned}>
+      {body}
+    </PlayerSheetFrame>
   );
 }
 
@@ -373,11 +419,11 @@ const styles = StyleSheet.create({
      `strip` from when the summary lived in here too — it is the chips' block
      now, and the strip is inside the scroll. */
   strip: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two, gap: Spacing.two },
-  content: { paddingHorizontal: Spacing.three, gap: Spacing.three },
-  /* Clearance under the last set, and NOT a tab bar's worth of it — the scene
-     already ends where the bar begins. See the inventory grid's `LIST_TAIL`. */
-  contentTail: { paddingBottom: Spacing.four },
-  contentTop: { paddingTop: Spacing.three },
+  /* NO PADDING OF ITS OWN ANY MORE — the frame's scroller carries the sheet's
+     gutter and its bottom inset, and adding either here would be a double
+     indent against the pinned chips above. What is left is the rhythm between
+     the strip, the notices and the list. */
+  content: { gap: Spacing.three },
   centred: {
     flex: 1,
     alignItems: 'center',
