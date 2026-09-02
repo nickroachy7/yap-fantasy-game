@@ -326,7 +326,11 @@ export function LobbyView({
 
       {run?.awaitingCarry ? <DeadRun run={run} onClaim={() => router.push('/run-over')} /> : null}
 
-      <SectionHead label="Entered" count={playing.length} />
+      <SectionHead
+        label="Entered"
+        count={playing.length}
+        hint="Filed for this week. Tap one to see the field."
+      />
       <View style={styles.stack}>
         {playing.length > 0 ? (
           playing.map((m) => (
@@ -340,6 +344,7 @@ export function LobbyView({
       <SectionHead
         label="Recent"
         count={finished.length}
+        hint="Settled, with what each one paid."
         action={<ArchiveLink onPress={() => setView('history')} />}
       />
       <View style={styles.stack}>
@@ -357,7 +362,11 @@ export function LobbyView({
           which described its STATE rather than its kind — and once Friendly
           sits under it on the same scroll, "open" stops distinguishing the two
           (a friendly contest is open too). */}
-      <SectionHead label="Community" count={open.length} />
+      <SectionHead
+        label="Community"
+        count={open.length}
+        hint="Open to every manager. A new slate each week."
+      />
       <View style={styles.stack}>
         {open.length > 0 ? (
           open.map((c) => (
@@ -383,7 +392,11 @@ export function LobbyView({
           does not exist". That was the wrong call: a lobby with one kind of
           contest in it does not tell a player the other kind is coming, and the
           shelf is one quiet row. It is the cheapest possible promise. */}
-      <SectionHead label="Friendly" count={0} />
+      <SectionHead
+        label="Friendly"
+        count={0}
+        hint="Play a week against people you invite."
+      />
       <ComingSoon />
 
         </>
@@ -665,10 +678,13 @@ function SettledEntry({ entry, onPress }: { entry: MyContest; onPress: () => voi
 function SectionHead({
   label,
   count,
+  hint,
   action,
 }: {
   label: string;
   count: number;
+  /** One line on what the shelf holds. See the note on `sectionHint`. */
+  hint: string;
   action?: React.ReactNode;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -676,12 +692,15 @@ function SectionHead({
 
   return (
     <View style={styles.sectionHead}>
-      <Text style={[Type.figure, { color: c.text }]}>{label}</Text>
-      {count > 0 ? (
-        <Text style={[Type.figure, NUMERIC, { color: c.textTertiary }]}>{String(count)}</Text>
-      ) : null}
-      <View style={styles.sectionSpacer} />
-      {action}
+      <View style={styles.sectionTop}>
+        <Text style={[Type.figure, { color: c.text }]}>{label}</Text>
+        {count > 0 ? (
+          <Text style={[Type.figure, NUMERIC, { color: c.textTertiary }]}>{String(count)}</Text>
+        ) : null}
+        <View style={styles.sectionSpacer} />
+        {action}
+      </View>
+      <Text style={[Type.body, { color: c.textTertiary }]}>{hint}</Text>
     </View>
   );
 }
@@ -708,9 +727,7 @@ function ComingSoon() {
   const c = Colors[scheme];
   return (
     <View style={[styles.soon, { borderColor: c.border }]}>
-      <Text style={[Type.strong, { color: c.textSecondary }]}>
-        Play a week against people you invite
-      </Text>
+      <Text style={[Type.strong, { color: c.textTertiary }]}>Coming soon</Text>
     </View>
   );
 }
@@ -767,16 +784,16 @@ function Footnote() {
 }
 
 const styles = StyleSheet.create({
-  sectionHead: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.four,
-    paddingBottom: Spacing.two + 2,
-  },
+  /* NO HORIZONTAL PADDING OF ITS OWN. The sheet's scroller already insets its
+     children by `Spacing.three`, and the card stacks take it as given — so a
+     heading that added its own sat 32pt in while the cards it named sat at 16,
+     and every heading on the page was visibly out of line with its own list.
+     The band escapes the same inset with a negative margin; this just accepts
+     it. */
+  sectionHead: { paddingTop: Spacing.four, paddingBottom: Spacing.two + 2, gap: 2 },
+  sectionTop: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two },
   sectionSpacer: { flex: 1 },
-  sectionEmpty: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
+  sectionEmpty: { paddingBottom: Spacing.two },
   /* The same shape as the dead-run row above it — a block of text and one
      affordance on the right — because they are the same kind of object: a thing
      on this sheet that opens a different screen. */
@@ -846,9 +863,6 @@ const styles = StyleSheet.create({
    * much is coming.
    */
   soon: {
-    /* Its own inset now. It used to sit inside a `Panel`, which supplied one;
-       on a single page it is a bare row like every other section's body. */
-    marginHorizontal: Spacing.three,
     justifyContent: 'center',
     borderWidth: 1,
     borderStyle: 'dashed',
@@ -869,5 +883,5 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   pressed: { opacity: 0.6 },
-  footnote: { marginTop: Spacing.two, paddingHorizontal: Spacing.one },
+  footnote: { marginTop: Spacing.two },
 });
