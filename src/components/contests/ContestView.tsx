@@ -83,7 +83,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { ContestAbout } from './ContestAbout';
 import { ContestCard } from './ContestCard';
-import { coin, formatRoster, runCashout, runWiped } from '@/components/icons/glyphs';
+import { coin, formatRoster, runWiped } from '@/components/icons/glyphs';
 import { ContestFieldPanel } from './ContestFieldPanel';
 import { EntryLineup } from './EntryLineup';
 import { formatLine, settlementOf } from './contest-model';
@@ -378,20 +378,18 @@ export function ContestView({
              bar — it is a control that takes up the same room while refusing
              to work. A recent contest gets a page with no glass on it. */
           <GlassBar>
-            {contest && contest.kind === 'lobby' ? (
-              <GlassPill compact>
-                <BarAction
-                  glyph={runCashout}
-                  hint={
-                    contest.entryFeeCoins > 0
-                      ? `Leave this contest and take back ${contest.entryFeeCoins} coins`
-                      : 'Leave this contest'
-                  }
-                  enabled={!busy}
-                  onPress={() => setLeaving(true)}
-                />
-              </GlassPill>
-            ) : null}
+            {/* THE ACT FIRST, THE WAY OUT AFTER IT. Leaving led the row while
+                it was a bare glyph, borrowing Clear's position from the entry
+                bar — but Clear is a step INSIDE the thing you came to do and
+                leaving is the opposite of it. Ordered this way the row reads
+                as the offer and then the escape, which is the order a reader
+                wants them in.
+
+                AND IT SAYS "LEAVE". The glyph alone was unreadable: `runCashout`
+                means something specific about a run and nothing obvious about
+                an entry, so the one destructive control on the page was the one
+                nobody could identify. It is not `compact` any more either —
+                that variant is sized for a mark with no word beside it. */}
             <GlassPill grow>
               <BarAction
                 glyph={formatRoster}
@@ -402,6 +400,20 @@ export function ContestView({
                 onPress={() => contest && toBoard(contest.code)}
               />
             </GlassPill>
+            {contest && contest.kind === 'lobby' ? (
+              <GlassPill>
+                <BarAction
+                  label="Leave"
+                  hint={
+                    contest.entryFeeCoins > 0
+                      ? `Leave this contest and take back ${contest.entryFeeCoins} coins`
+                      : 'Leave this contest'
+                  }
+                  enabled={!busy}
+                  onPress={() => setLeaving(true)}
+                />
+              </GlassPill>
+            ) : null}
           </GlassBar>
         ) : undefined
       }>
