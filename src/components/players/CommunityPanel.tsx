@@ -33,19 +33,24 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { EarningsScale } from './EarningsScale';
+import { CopyRow } from './CopyRow';
 import { Row, Section } from './Section';
 import { Colors, NUMERIC, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { type MarketTier, type MarketTop, type PlayerMarket } from './market';
+import { type MarketTier, type PlayerMarket } from './market';
 
 export function CommunityPanel({
   market,
   playerName,
+  position,
+  team,
   copy,
 }: {
   market: PlayerMarket | null;
-  /** Names the population section — "Every Cam Ward" rather than "the community". */
+  /** For the leaderboard row's identity block. */
   playerName: string;
+  position: string | null;
+  team: string | null;
   /**
    * The ONE copy the page is about, on the card profile.
    *
@@ -81,7 +86,7 @@ export function CommunityPanel({
 
   if (totals.minted === 0) {
     return (
-      <Section label={`Every ${playerName}`}>
+      <Section label="Community cards">
         <Row
           label="Copies"
           value="None yet — every card enters the game from a pack"
@@ -102,7 +107,7 @@ export function CommunityPanel({
         * headings describing the same population, and no order to them at all.
         */}
       <Section
-        label={`Every ${playerName}`}
+        label="Community cards"
         hint={`${totals.held} ${totals.held === 1 ? 'COPY' : 'COPIES'} · ${totals.owners} ${totals.owners === 1 ? 'OWNER' : 'OWNERS'}`}>
         <TierComposition tiers={tiers} held={totals.held} />
         <Row label="Minted" value={mintedValue(totals)} />
@@ -133,22 +138,42 @@ export function CommunityPanel({
         </Section>
       ) : null}
 
-      <Section label="Best copies">
-        {/* ONE COPY, BECAUSE THE SERVER RETURNS ONE. `player_market` gives a
-            single `top`; a leaderboard of three needs it to return a list, and
-            inventing the other two from the tier bests would be a chart of
-            different players' cards dressed as a ranking. */}
-        <Row label="Best" value={bestValue(top)} muted={!top || top.careerFp <= 0} />
-        {tiers
-          .filter((t) => t.copies > 0 && (t.bestFp ?? 0) > 0)
-          .map((t) => (
-            <Row
-              key={t.tier}
-              label={`Best ${t.tier}`}
-              value={`${(t.bestFp as number).toFixed(0)} FP · ${t.copies} ${t.copies === 1 ? 'copy' : 'copies'}`}
-            />
-          ))}
-      </Section>
+      {/**
+        * THE LEADERBOARD, AS ROWS RATHER THAN A SENTENCE.
+        *
+        * Same row as the lineup board and as your own copies above it, with the
+        * rank in the badge column where a slot would be and the holder's name
+        * in place of the tier progress — a copy that is not yours has no
+        * threshold we hold, and who owns it is the thing a reader wants.
+        *
+        * ONE ROW, BECAUSE THE SERVER RETURNS ONE. `player_market` gives a
+        * single `top`. Filling the other two places from the per-tier bests
+        * would put three different people's cards in a column ordered by tier
+        * rather than by score, which is a ranking of nothing.
+        */}
+      {top && top.careerFp > 0 ? (
+        <Section label="Best copies" hint="ACROSS EVERY OWNER">
+          <CopyRow
+            card={{
+              name: playerName,
+              position,
+              team,
+              tier: top.tier,
+              careerFp: top.careerFp,
+              nextTierAt: null,
+              nextTierLabel: null,
+            }}
+            badge={<RankMark rank={1} />}
+            right={<TopFigure value={top.careerFp} />}
+            progress={{
+              text: top.isYou
+                ? `Yours · ${top.lineupStarts} start${top.lineupStarts === 1 ? '' : 's'}`
+                : `${top.displayName} · ${top.lineupStarts} start${top.lineupStarts === 1 ? '' : 's'}`,
+            }}
+            accessibilityLabel={`Best copy, ${top.careerFp.toFixed(0)} points, held by ${top.isYou ? 'you' : top.displayName}`}
+          />
+        </Section>
+      ) : null}
     </>
   );
 }
@@ -156,20 +181,6 @@ export function CommunityPanel({
 /** "18 all time · 3 sold back", or just the count when none have gone. */
 function mintedValue(totals: PlayerMarket['totals']): string {
   return totals.sold > 0 ? `${totals.minted} · ${totals.sold} sold back` : String(totals.minted);
-}
-
-/**
- * Who holds the best copy and what it has done.
- *
- * Every copy on zero is its own answer rather than a rank: the "highest" would
- * be whichever row sorted first, which is noise dressed as a leaderboard.
- */
-function bestValue(top: MarketTop | null): string {
-  if (!top || top.careerFp <= 0) return 'None yet — first to play him takes it';
-  const over = `over ${top.lineupStarts} start${top.lineupStarts === 1 ? '' : 's'}`;
-  return top.isYou
-    ? `Yours · ${top.careerFp.toFixed(0)} FP ${over}`
-    : `${top.displayName} · ${top.careerFp.toFixed(0)} FP ${over}`;
 }
 
 /**
@@ -247,6 +258,7 @@ function TierComposition({ tiers, held }: { tiers: MarketTier[]; held: number })
 
 const styles = StyleSheet.create({
   block: { gap: Spacing.two + 2 },
+  rank: { alignItems: 'center' },
   /* The gap is the separator. Two adjacent segments in neighbouring tier
      colours — bronze against gold at small sizes — otherwise read as one. */
   stack: { flexDirection: 'row', gap: 2, height: 10, borderRadius: 5, overflow: 'hidden' },
@@ -257,3 +269,22 @@ const styles = StyleSheet.create({
   seasonRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two },
   seasonYear: { width: 44 },
 });
+
+/** The rank, in the badge column a lineup row spends on a slot. */
+function RankMark({ rank }: { rank: number }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  return (
+    <View style={styles.rank}>
+      <Text style={[Type.strong, NUMERIC, { color: c.textSecondary }]}>{`#${rank}`}</Text>
+    </View>
+  );
+}
+
+function TopFigure({ value }: { value: number }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  return (
+    <Text style={[Type.figure, NUMERIC, { color: c.text }]}>{value.toFixed(1)}</Text>
+  );
+}

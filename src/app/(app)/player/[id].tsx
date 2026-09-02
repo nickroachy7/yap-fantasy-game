@@ -229,11 +229,18 @@ export default function PlayerDetailScreen() {
                 cards={owned}
                 loading={ownedLoading}
                 playerName={player.name}
+                position={player.position}
+                team={player.team}
                 onOpen={openCard}
               />
             </Section>
 
-            <CommunityPanel market={market} playerName={player.name} />
+            <CommunityPanel
+              market={market}
+              playerName={player.name}
+              position={player.position}
+              team={player.team}
+            />
           </SectionStack>
         ) : null}
 

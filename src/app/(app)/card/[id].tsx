@@ -31,16 +31,17 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { readCardActions, type CardActionSet, type CardActions } from '@/components/cards/card-actions';
 import { CardExits, cardExitNote } from '@/components/cards/CardExits';
 import { PlayerAvatar } from '@/components/cards/PlayerAvatar';
+import { TierMark } from '@/components/cards/TierMark';
 import { dropCards } from '@/components/collection/use-collection';
 import { invalidateSets } from '@/components/collection/use-sets';
 import { CardHistory } from '@/components/players/CardHistory';
-import { CardStanding } from '@/components/players/CardStanding';
+import { CopyRow } from '@/components/players/CopyRow';
 import { CommunityPanel } from '@/components/players/CommunityPanel';
 import { GameLogTab } from '@/components/players/GameLogTab';
 import { OverviewTab } from '@/components/players/OverviewTab';
 import { HERO_PORTRAIT, PlayerHero, type HeroFigure } from '@/components/players/PlayerHero';
 import { PlayerSheetFrame, SheetToneBand } from '@/components/players/PlayerSheetFrame';
-import { Row, Section, SectionStack } from '@/components/players/Section';
+import { Section, SectionStack } from '@/components/players/Section';
 import { StartLog } from '@/components/players/StartLog';
 import { startKey } from '@/components/players/GameLog';
 import { parseCardProfile, type CardProfile } from '@/components/players/card-profile';
@@ -48,7 +49,7 @@ import { sellErrorMessage } from '@/components/players/sell';
 import { usePlayerPage } from '@/components/players/use-player-page';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
-import { Colors, Radius, Spacing, TierColors, Type } from '@/constants/theme';
+import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
@@ -66,6 +67,30 @@ const TABS: Tab<ProfileTab>[] = [
   { value: 'card', label: 'Card' },
   { value: 'log', label: 'Game log' },
 ];
+
+/**
+ * The copy's history, as the one line that hangs under its row.
+ *
+ * Ordered by how often it is the reason someone looked: how many weeks it has
+ * been started, then what a set will do with it, then where it came from. The
+ * set clause is dropped on a copy with nothing to say about sets, rather than
+ * printed as "no sets" — an absent clause is shorter than a negative one and
+ * says the same thing.
+ */
+function copyMeta(
+  card: { season: number | null; rarity: string | null; source: string | null; acquiredAt: string | null },
+  starts: number,
+  exitNote: string | null,
+): string {
+  return [
+    starts === 0 ? 'Never started' : `${starts} start${starts === 1 ? '' : 's'}`,
+    exitNote,
+    `${card.rarity ?? 'Unknown'}${card.source ? `, from a ${card.source}` : ''}`,
+    dateLabel(card.acquiredAt),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
 
 /** "4 Aug 2026". Short and unambiguous — no locale-dependent 8/4 vs 4/8. */
 function dateLabel(iso: string | null): string {
@@ -305,6 +330,8 @@ export default function CardDetailScreen() {
     /* The bar's caveat, printed in the page rather than under the capsules —
        see `cardExitNote`. Null on the common path, and null outright on a copy
        that has already left, where there is no offer to qualify. */
+    const scoredStarts = card.starts.filter((x) => x.scored).length;
+
     const exitNote =
       k.soldAt || k.committedAt
         ? null
@@ -415,22 +442,51 @@ export default function CardDetailScreen() {
               * Everything that was prose is a labelled pair with its value on
               * the right edge — see `Row`.
               */}
-            <Section
-              label="This copy"
-              hint={
-                toNext === null || k.nextTierLabel === null
-                  ? 'TOP TIER'
-                  : `${toNext.toFixed(0)} FP TO ${k.nextTierLabel.toUpperCase()}`
-              }>
-              <CardStanding card={k} />
-              <StartLog starts={card.starts} playerName={k.playerName} />
-              <Row
-                label="Acquired"
-                value={`${k.rarity ?? 'Unknown'}${k.source ? `, from a ${k.source}` : ''} · ${dateLabel(k.acquiredAt)}`}
+            {/**
+              * THE COPY AS A ROW, not as a progress bar over a stack of pairs.
+              *
+              * It was the only card on the page drawn differently from every
+              * other card in the app — and it is the one a reader arrived to
+              * look at. `CopyRow` is the lineup board's row, so the object you
+              * tapped in a lineup looks like the same object when it opens.
+              *
+              * Its history goes on ONE line under the row: when it arrived, how
+              * many weeks it has been started, and what a set will do with it.
+              * Those were four labelled pairs and a progress bar, describing a
+              * card that in the common case has done nothing yet.
+              */}
+            <Section label="This copy">
+              <CopyRow
+                card={{
+                  name: k.playerName,
+                  position: k.positionAbbreviation,
+                  team: k.teamAbbreviation,
+                  injuryStatus: k.injuryStatus,
+                  tier: k.tier,
+                  careerFp: k.careerFp,
+                  nextTierAt: k.nextTierAt,
+                  nextTierLabel: k.nextTierLabel,
+                }}
+                badge={<TierMark tier={k.tier} size={18} />}
+                right={
+                  <Text style={[Type.figure, NUMERIC, { color: c.text }]}>
+                    {k.careerFp.toFixed(1)}
+                  </Text>
+                }
+                meta={copyMeta(k, card.starts.length, exitNote)}
+                accessibilityLabel={`Your ${k.tier} ${k.playerName} card`}
               />
-              {/* The bar's caveat, as a row rather than the paragraph it was.
-                  See `cardExitNote`. */}
-              {exitNote ? <Row label="Sets" value={exitNote} muted /> : null}
+
+              {/* THE RECEIPT, ONLY ONCE THERE IS SOMETHING TO RECEIPT.
+                  `career_fp` moves in exactly one way — a week this copy was in
+                  a lineup and that week was scored — and on a card with
+                  fourteen starts that table is the only place the total can be
+                  checked. On a card with none it was a season band, four column
+                  heads and a row of dashes around a fact the meta line above
+                  already states, so it does not draw at all. */}
+              {scoredStarts > 0 ? (
+                <StartLog starts={card.starts} playerName={k.playerName} />
+              ) : null}
             </Section>
 
             {/* YOUR OTHER COPIES, between the one you opened and everyone
@@ -445,6 +501,8 @@ export default function CardDetailScreen() {
                   cards={others}
                   loading={page.ownedLoading}
                   playerName={k.playerName}
+                  position={k.positionAbbreviation}
+                  team={k.teamAbbreviation}
                   onOpen={(x) => router.replace({ pathname: '/card/[id]', params: { id: x.id } })}
                 />
               </Section>
@@ -457,6 +515,8 @@ export default function CardDetailScreen() {
             <CommunityPanel
               market={page.market}
               playerName={k.playerName}
+              position={k.positionAbbreviation}
+              team={k.teamAbbreviation}
               copy={{
                 careerFp: k.careerFp,
                 rank: card.rank.amongPlayer,

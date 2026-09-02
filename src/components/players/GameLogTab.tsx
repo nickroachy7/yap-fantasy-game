@@ -59,7 +59,7 @@ export function GameLogTab({
   return (
     <SectionStack>
       {profile && profile.career.length > 0 ? (
-        <Section label="Season by season" hint="EXCLUDES PER-GAME BONUSES" flush>
+        <Section label="Season by season" hint="EXCLUDES PER-GAME BONUSES">
           <CareerTable career={profile.career} position={profile.player.positionAbbreviation} />
           {missingFromLog.length > 0 ? (
             <Text style={[Type.fine, styles.reconcile, { color: c.textTertiary }]}>
@@ -69,7 +69,7 @@ export function GameLogTab({
         </Section>
       ) : null}
 
-      <Section label="Week by week" flush>
+      <Section label="Week by week">
         <GameLog
           sections={sections}
           position={profile?.player.positionAbbreviation ?? null}
@@ -81,5 +81,5 @@ export function GameLogTab({
 }
 
 const styles = StyleSheet.create({
-  reconcile: { paddingHorizontal: Spacing.three, paddingTop: Spacing.two },
+  reconcile: { paddingTop: Spacing.two },
 });

@@ -59,7 +59,6 @@ import { PlayerHero, type HeroFigure } from '@/components/players/PlayerHero';
 import { RecentForm, recentFormCount, recentFormHint } from '@/components/players/RecentForm';
 import { Section, SectionStack } from '@/components/players/Section';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
-import { CardStanding } from '@/components/players/CardStanding';
 import { GameLogTab } from '@/components/players/GameLogTab';
 import { startKey } from '@/components/players/GameLog';
 import { CommunityPanel } from '@/components/players/CommunityPanel';
@@ -1092,8 +1091,18 @@ function ProfileFixture() {
       {/* ---- Card: both states of each, because the interesting one is the
            empty one. A market nobody has played and a card never started are
            what the whole beta looks like for a month. ---------------------- */}
-      <CommunityPanel market={parseMarket(MARKET_SAMPLE)} playerName={profile.player.name} />
-      <CommunityPanel market={parseMarket(MARKET_UNPLAYED)} playerName={profile.player.name} />
+      <CommunityPanel
+        market={parseMarket(MARKET_SAMPLE)}
+        playerName={profile.player.name}
+        position={profile.player.positionAbbreviation}
+        team={profile.player.teamAbbreviation}
+      />
+      <CommunityPanel
+        market={parseMarket(MARKET_UNPLAYED)}
+        playerName={profile.player.name}
+        position={profile.player.positionAbbreviation}
+        team={profile.player.teamAbbreviation}
+      />
 
       <CardFixture payload={CARD_PROFILE_SAMPLE} />
       <CardFixture payload={CARD_PROFILE_NEVER_STARTED} />
@@ -1107,7 +1116,6 @@ function CardFixture({ payload }: { payload: typeof CARD_PROFILE_SAMPLE }) {
   if (!card) return null;
   return (
     <>
-      <CardStanding card={card.card} />
       <StartLog starts={card.starts} playerName={card.card.playerName} />
     </>
   );

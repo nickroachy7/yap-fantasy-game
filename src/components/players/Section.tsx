@@ -30,7 +30,20 @@
  * rather than a heading of its own, and because a right-aligned grey line at
  * that size is furniture the eye skips, which is exactly what it should be.
  *
- * FULL BLEED, BY CANCELLING THE FRAME'S GUTTER
+ * THE RULES ARE FULL BLEED; THE CONTENT IS NOT
+ *
+ * There was a `flush` escape hatch that dropped a section's gutter so a
+ * horizontally scrolling table could reach the screen's edges. It made the
+ * tables scroll properly and it made the page look unfinished: a column of
+ * headings and figures all starting 16pt in, with two tables and their
+ * footnotes starting at nought. Text against the bezel reads as a layout that
+ * has broken rather than as a table that extends.
+ *
+ * So nothing is flush. Every section pads its content by `Spacing.three` and
+ * the RULE alone runs edge to edge, which is what actually made the sections
+ * read as divisions of one page rather than as stacked cards.
+ *
+ * FULL BLEED RULES, BY CANCELLING THE FRAME'S GUTTER
  *
  * `PlayerSheetFrame` pads its scroll content by `Spacing.three` and gaps its
  * children by the same. A rule inset 16pt from each edge reads as the top of a
@@ -65,29 +78,19 @@ export function Section({
    * usually saying something the numbers already say.
    */
   hint,
-  /**
-   * The body loses the 16pt gutter; the label keeps it.
-   *
-   * For the one child that has to reach the sheet's edges: the career table
-   * scrolls sideways, and a horizontal scroller that starts and ends 16pt short
-   * of the screen reads as a stuck table rather than a scrolling one.
-   */
-  flush = false,
   children,
 }: {
   label?: string;
   hint?: string;
-  flush?: boolean;
   children: ReactNode;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
   return (
-    <View
-      style={[styles.section, flush && styles.sectionFlush, { borderTopColor: c.borderStrong }]}>
+    <View style={[styles.section, { borderTopColor: c.borderStrong }]}>
       {label || hint ? (
-        <View style={[styles.head, flush && styles.headFlush]}>
+        <View style={styles.head}>
           {label ? (
             <Text numberOfLines={1} style={[Type.section, styles.headLabel, { color: c.text }]}>
               {label}
@@ -261,9 +264,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three - 2,
     gap: Spacing.two + 2,
   },
-  sectionFlush: { paddingHorizontal: 0 },
   head: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: Spacing.two },
-  headFlush: { paddingHorizontal: Spacing.three },
   /* Only the label gives way. A hint truncated to "EXCLUDES BONU…" is noise;
      a section title truncated is the one word the block exists to name. */
   headLabel: { flexShrink: 1, minWidth: 0 },

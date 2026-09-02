@@ -25,11 +25,12 @@
  * the gap between a player's production and your copy's earnings is a fact you
  * can see only with his stats next to it.
  */
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { TierBadge } from '@/components/cards/TierBadge';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Colors, NUMERIC, Spacing, Type, type CardTier } from '@/constants/theme';
+import { TierMark } from '@/components/cards/TierMark';
+import { CopyRow } from './CopyRow';
+import { Row } from './Section';
+import { Colors, NUMERIC, Type, type CardTier } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export type OwnedCard = {
@@ -58,11 +59,16 @@ export function CardHistory({
   cards,
   loading,
   playerName,
+  position,
+  team,
   onOpen,
 }: {
   cards: OwnedCard[];
   loading: boolean;
   playerName: string;
+  /** For the row's identity block, which draws the club and position colour. */
+  position: string | null;
+  team: string | null;
   /** Opens the card profile for one copy. */
   onOpen?: (card: OwnedCard) => void;
 }) {
@@ -73,88 +79,52 @@ export function CardHistory({
   // someone who owns three. A wrong answer is worse than a late one here.
   if (loading) return null;
 
-  return (
-    <View style={styles.list}>
-      {cards.length === 0 ? (
-        <EmptyState
-          title="You don’t hold this player"
-          body="Cards arrive from packs. Nothing on this page changes that — it is here so you can decide whether you want to."
-        />
-      ) : (
-        cards.map((card) => {
-          const toNext =
-            card.nextTierAt !== null ? Math.max(0, card.nextTierAt - card.careerFp) : null;
+  if (cards.length === 0) {
+    return (
+      <Row
+        label="Copies"
+        value={`None — cards arrive from packs, and nothing here changes that`}
+        muted
+      />
+    );
+  }
 
-          return (
-            <Pressable
-              key={card.id}
-              onPress={onOpen ? () => onOpen(card) : undefined}
-              disabled={!onOpen}
-              accessibilityRole={onOpen ? 'button' : 'text'}
-              accessibilityLabel={
-                `${playerName}, ${card.season ?? 'unknown season'} card, ${card.tier} tier, ` +
-                `${card.careerFp.toFixed(0)} points over ${card.lineupStarts} starts` +
-                (onOpen ? '. Opens this card.' : '')
-              }
-              style={({ pressed }) => [
-                styles.row,
-                { borderColor: c.border },
-                pressed && styles.pressed,
-              ]}>
-              <TierBadge tier={card.tier} size="compact" />
-              <View style={styles.body}>
-                <Text style={[Type.strong, { color: c.text }]}>
-                  {`${card.season ?? '—'} card`}
-                </Text>
-                <Text style={[Type.fine, { color: c.textTertiary }]}>
-                  {`Acquired ${acquiredLabel(card.acquiredAt)}`}
-                </Text>
-                {/* The distinction the whole panel exists for, spelled out
-                    rather than left to be inferred from two numbers. */}
-                <Text style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
-                  {`${card.careerFp.toFixed(1)} FP earned over ${card.lineupStarts} start${card.lineupStarts === 1 ? '' : 's'}`}
-                </Text>
-              </View>
-              <View style={styles.next}>
-                {toNext === null || card.nextTierLabel === null ? (
-                  <Text style={[Type.micro, { color: c.textTertiary }]}>MAX TIER</Text>
-                ) : (
-                  <>
-                    <Text style={[Type.strong, NUMERIC, { color: c.text }]}>
-                      {toNext.toFixed(0)}
-                    </Text>
-                    <Text style={[Type.micro, styles.right, { color: c.textTertiary }]}>
-                      {`FP TO ${card.nextTierLabel.toUpperCase()}`}
-                    </Text>
-                  </>
-                )}
-              </View>
-              {onOpen ? (
-                <Text style={[Type.section, { color: c.textTertiary }]}>›</Text>
-              ) : null}
-            </Pressable>
-          );
-        })
-      )}
+  return (
+    <View>
+      {cards.map((card) => (
+        <CopyRow
+          key={card.id}
+          card={{
+            name: playerName,
+            position,
+            team,
+            tier: card.tier,
+            careerFp: card.careerFp,
+            nextTierAt: card.nextTierAt,
+            nextTierLabel: card.nextTierLabel,
+          }}
+          badge={<TierMark tier={card.tier} size={18} />}
+          right={
+            <Text style={[Type.figure, NUMERIC, { color: c.text }]}>
+              {card.careerFp.toFixed(1)}
+            </Text>
+          }
+          /* THE HISTORY, ON ONE LINE UNDER THE ROW. It was three stacked lines
+             inside a bespoke row — season, acquired, "N FP earned over M
+             starts" — which is the row saying in prose what the identity block
+             above it now says in its own vocabulary. What is left is the two
+             facts the row cannot carry: when it arrived, and how many weeks it
+             has actually been played. */
+          meta={`${card.season ?? '—'} card · acquired ${acquiredLabel(card.acquiredAt)} · ${card.lineupStarts} start${card.lineupStarts === 1 ? '' : 's'}`}
+          onPress={onOpen ? () => onOpen(card) : undefined}
+          accessibilityLabel={
+            `${playerName}, ${card.season ?? 'unknown season'} card, ${card.tier} tier, ` +
+            `${card.careerFp.toFixed(0)} points over ${card.lineupStarts} starts` +
+            (onOpen ? '. Opens this card.' : '')
+          }
+        />
+      ))}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  /* Cancels the zone's gutter so the pressable rows and their rules reach the
-     sheet's edges — a tappable row that stops short of the screen reads as a
-     card, and these are list items. */
-  list: { marginHorizontal: -Spacing.three },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 2,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  body: { flex: 1, minWidth: 0, gap: 1 },
-  next: { alignItems: 'flex-end', gap: 3 },
-  right: { textAlign: 'right' },
-  pressed: { opacity: 0.6 },
-});
