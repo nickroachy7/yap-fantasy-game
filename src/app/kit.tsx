@@ -25,7 +25,6 @@ import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
 import { ContestCard, StatusWord, type Lock } from '@/components/contests/ContestCard';
 import type { ContestTerms, Duel, Settlement } from '@/components/contests/contest-model';
 import { ContestAbout } from '@/components/contests/ContestAbout';
-import { ContestActions } from '@/components/contests/ContestActions';
 import { LobbyHero } from '@/components/contests/LobbyHero';
 import { ContestFieldList } from '@/components/contests/ContestFieldPanel';
 import type { FieldEntrant } from '@/components/contests/use-contest-field';
@@ -1140,26 +1139,6 @@ function Kit() {
             />
           </Section>
 
-          <Section
-            title="Contest actions"
-            note="The two things you can do about an entry, drawn at the end of the contest page’s LINEUP tab, under the lineup they act on. They were pinned to the bottom of the sheet for a while, because that page was one four-screen column and the control being hidden at the end of it was the way OUT — tabs fixed that better, by making the face these belong to a lineup and two buttons. Pinning also had a cost: the bar followed the reader onto the field and the rules, offering to take them off a page they were still reading. Leaving is outlined rather than filled: the coins come back in full and you can enter again while the games are still ahead, so a solid red button would be shouting about something completely reversible. Once a card has kicked off there is nothing to leave, and it says so rather than offering a button the server would refuse.">
-            <View style={{ gap: Spacing.three }}>
-              <ContestActions
-                entryFeeCoins={40}
-                locked={false}
-                canLeave
-                onLineup={() => {}}
-                onLeave={() => {}}
-              />
-              <ContestActions
-                entryFeeCoins={40}
-                locked
-                canLeave
-                onLineup={() => {}}
-                onLeave={() => {}}
-              />
-            </View>
-          </Section>
 
           <Section
             title="Lineup rows"

@@ -82,9 +82,8 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ContestAbout } from './ContestAbout';
-import { ContestActions } from './ContestActions';
 import { ContestCard } from './ContestCard';
-import { coin, formatRoster, runWiped } from '@/components/icons/glyphs';
+import { coin, formatRoster, runCashout, runWiped } from '@/components/icons/glyphs';
 import { ContestFieldPanel } from './ContestFieldPanel';
 import { EntryLineup } from './EntryLineup';
 import { formatLine, settlementOf } from './contest-model';
@@ -93,7 +92,6 @@ import { useContestField, useContestLineup } from './use-contest-field';
 import { useMyContests } from './use-my-contests';
 import { LineupEditor, type EntryActions, type EntryOffer } from '@/components/lineup/LineupEditor';
 import { BarAction, GlassBar, GlassPill } from '@/components/ui/GlassBar';
-import { Tabs, type Tab } from '@/components/ui/Tabs';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { StatusChip } from '@/components/ui/StatusChip';
@@ -104,8 +102,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useAuth } from '@/context/AuthContext';
 
-/** The three faces of a contest. See `face`. */
-type Face = 'lineup' | 'field' | 'rules';
 
 export function ContestView({
   code,
@@ -191,15 +187,6 @@ export function ContestView({
    * naming it after one of the six would promise the smallest of them. Scoring
    * proper is a page of its own, which that tab links to.
    */
-  const tabs: Tab<Face>[] = [
-    { value: 'lineup', label: 'Lineup' },
-    {
-      value: 'field',
-      label: 'Rankings',
-      hint: entrants && entrants.length > 0 ? String(entrants.length) : undefined,
-    },
-    { value: 'rules', label: 'Rules' },
-  ];
 
   /* WHETHER THE WEEK IS OVER, from the one helper every surface uses — see
      `settlementOf`. Null while it is still a live offer, which is what keeps
@@ -245,7 +232,6 @@ export function ContestView({
    * that is about YOU on every one of those days, and it is where the thing you
    * came to DO lives: the editor before you enter, the way to the board after.
    */
-  const [face, setFace] = useState<Face>('lineup');
 
   const { session } = useAuth();
   const me = session?.user.id ?? null;
@@ -306,15 +292,19 @@ export function ContestView({
       dismissible={dismissible}
       closeLabel="Close contest"
       /* THE ONLY THING THAT FLOATS IS THE ENTRY, and only while there is one to
-         make. `ContestActions` was pinned here once and is in the page now,
-         under the lineup it acts on: a bar that follows the reader through the
-         field and the rules offering to take them off the page is navigation
-         OUT of a page they are still reading. This is the opposite — the one
-         act this page exists for, which was buried under a bench.
+         make: the one act this page exists for, which was buried under a
+         bench before it was pinned.
 
-         IT LEAVES WITH THE LINEUP TAB. The offer is null on the other two
-         faces because the editor is not mounted there, so the bar does not
-         hang over a leaderboard offering to spend coins on it. */
+         TWO OFFERS, ONE BAR. Entering gets Clear / Pick for me / Enter;
+         an entry you can still change gets Leave / Edit my lineup. They are
+         the same material in the same place because they are the same kind of
+         moment, and because the sets sheet has drawn its own actions this way
+         since `CardExits` — a second bar shape for the same job would be the
+         divergence this app keeps closing.
+
+         NOTHING ONCE IT IS PLAYING. Locked or settled, the footer is
+         undefined: a disabled bar takes the same room while refusing to work,
+         so a recent contest gets a page with no glass on it at all. */
       footerGlass
       footer={
         offer ? (
@@ -365,6 +355,51 @@ export function ContestView({
                 primary
                 enabled={offer.ready && !offer.busy}
                 onPress={() => acts.current?.submit()}
+              />
+            </GlassPill>
+          </GlassBar>
+        ) : entered && !myRow?.locked && !settled ? (
+          /* ENTERED, AND STILL CHANGEABLE. The same bar in the same place,
+             because it is the same kind of moment: the one act this page
+             exists for, at the bottom of the sheet where the reader's thumb
+             already is.
+
+             It was two plain buttons in the flow — `ContestActions` — on the
+             argument that a pinned bar following a reader through the field
+             and the rules is navigation OUT of a page they are still reading.
+             That argument belonged to the tabbed version: the bar could not
+             know which face was open, so it hung over a leaderboard offering
+             to spend coins. On one page there is nothing to follow the reader
+             through; the page IS the lineup, with the field and the rules
+             under it, and the bar is about the lineup at the top of it.
+
+             LOCKED OR SETTLED, NO BAR AT ALL. There is nothing to do once the
+             cards are playing, and a disabled bar that hovers is worse than no
+             bar — it is a control that takes up the same room while refusing
+             to work. A recent contest gets a page with no glass on it. */
+          <GlassBar>
+            {contest && contest.kind === 'lobby' ? (
+              <GlassPill compact>
+                <BarAction
+                  glyph={runCashout}
+                  hint={
+                    contest.entryFeeCoins > 0
+                      ? `Leave this contest and take back ${contest.entryFeeCoins} coins`
+                      : 'Leave this contest'
+                  }
+                  enabled={!busy}
+                  onPress={() => setLeaving(true)}
+                />
+              </GlassPill>
+            ) : null}
+            <GlassPill grow>
+              <BarAction
+                glyph={formatRoster}
+                label="Edit my lineup"
+                hint="Edit your lineup for this contest on the board"
+                primary
+                enabled={!busy}
+                onPress={() => contest && toBoard(contest.code)}
               />
             </GlassPill>
           </GlassBar>
@@ -432,32 +467,25 @@ export function ContestView({
             settled={settled}
           />
 
-          {/* THE PAGE IS THREE PAGES NOW, AND THE CARD IS ABOVE ALL OF THEM.
+          {/* ONE PAGE, IN THE ORDER A CONTEST IS READ.
+              It was three tabs — Lineup, Rankings, Rules — and the argument for
+              them was real: the page had been four screens of stacked panels,
+              and whichever went second buried the other two. Tabs made them
+              peers, one tap apart.
 
-              It was one column — your team, then the field, then nine rules,
-              then the editor — and each of those is a screen, so the page was
-              four screens tall and the reader met them in whatever order the
-              file happened to declare. Worse, it forced a ranking that has no
-              right answer: the rules matter most before you enter, the field
-              matters most on Sunday, and your own team matters most on the
-              Monday after. Whichever went second buried the other two.
+              What tabs cost here is the same thing they cost the lobby. Two
+              thirds of the page is always hidden, the bar at the bottom cannot
+              know which face is open (which is why it was gated on `offer` and
+              why the entered actions ended up loose in the flow instead), and
+              "how does my lineup compare" is answered by tapping between two
+              faces rather than by scrolling between two sections.
 
-              Tabs are the honest shape for that. Three things about one
-              contest, none of them a step in a sequence, all of them reachable
-              in a tap. The card stays ABOVE the bar because it is not one of
-              the three: it is what all three are about, and it is the one thing
-              on this page that should never be a tap away.
-
-              `Tabs` rather than something new — the card profile and the player
-              profile are sheets with exactly this shape, and a fourth tab set
-              that behaved differently would be the divergence this app keeps
-              closing everywhere else. */}
-          <View style={[styles.tabBar, { borderColor: c.backgroundElement }]}>
-            <Tabs tabs={tabs} value={face} onChange={setFace} />
-          </View>
-
-          {face === 'lineup' ? (
-            <>
+              The ranking that tabs refused to make is made by the order, and it
+              is not arbitrary: your lineup, then the field it is measured
+              against, then the rules that decide it. That is the sentence the
+              contest is, and each section is shorter than the tab version
+              because none of them has to stand alone any more. */}
+          <>
               {/* YOUR TEAM. The card says how the week went; this says what it
                   went on, which is why they are the two things a reader lands
                   on. THE HINT NAMES THE WEEK once there is nothing left to say
@@ -524,53 +552,34 @@ export function ContestView({
                 />
               )}
 
-              {/* THE TWO THINGS YOU CAN DO ABOUT YOUR ENTRY, and they are IN
-                  THE PAGE now rather than pinned to the bottom of the sheet.
+          </>
 
-                  The bar was pinned because the page was four screens tall and
-                  "leave" is the way out — a control you have to scroll to is a
-                  control most people never find. Tabs are what fixed that
-                  rather than the pinning: this tab is a lineup and two buttons,
-                  so both are in view without a bar that follows the reader
-                  through the field and the rules offering to take them off the
-                  page they are reading. */}
-              {entered ? (
-                <ContestActions
-                  entryFeeCoins={contest.entryFeeCoins}
-                  locked={Boolean(myRow?.locked)}
-                  canLeave={contest.kind === 'lobby'}
-                  busy={busy}
-                  onLineup={() => toBoard(contest.code)}
-                  onLeave={() => setLeaving(true)}
-                />
-              ) : null}
-            </>
-          ) : face === 'field' ? (
-            /* WHO ELSE IS IN IT — the half of a contest that nothing else in
-               the app draws. A row opens that manager's lineup IN PLACE,
-               readable from the moment they file it; see `20260830010000`. */
-            <ContestFieldPanel
-              title=""
-              entrants={entrants}
-              loading={fieldLoading}
-              error={fieldError}
-              slotCount={contest.slotCount}
-              contestId={contest.id}
-            />
-          ) : (
-            /* Everything the card prices in eight characters, said in
-               sentences. */
-            <ContestAbout
-              title=""
-              terms={termsOfContest(contest)}
-              name={contest.name}
-              prizePoolBps={contest.prizePoolBps}
-              leavable={contest.kind === 'lobby' && !contest.recap}
-              /* The rack the reader is staking, drawn the way every other
-                 surface draws it — see the note on `run` in `ContestAbout`. */
-              run={run}
-            />
-          )}
+          {/* WHO ELSE IS IN IT — the half of a contest that nothing else in the
+              app draws. A row opens that manager's lineup IN PLACE, readable
+              from the moment they file it; see `20260830010000`.
+              It carries its own heading again: the tab above it used to be the
+              heading, and with the tab gone a bare list of managers under a
+              lineup has nothing saying which is which. */}
+          <ContestFieldPanel
+            entrants={entrants}
+            loading={fieldLoading}
+            error={fieldError}
+            slotCount={contest.slotCount}
+            contestId={contest.id}
+          />
+
+          {/* Everything the card prices in eight characters, said in sentences.
+              Last, because it is the section a reader needs once and the other
+              two are the ones they come back for. */}
+          <ContestAbout
+            terms={termsOfContest(contest)}
+            name={contest.name}
+            prizePoolBps={contest.prizePoolBps}
+            leavable={contest.kind === 'lobby' && !contest.recap}
+            /* The rack the reader is staking, drawn the way every other surface
+               draws it — see the note on `run` in `ContestAbout`. */
+            run={run}
+          />
         </View>
       )}
       <ConfirmDialog
@@ -642,5 +651,4 @@ const styles = StyleSheet.create({
   /* The profiles' tab bars lost this rule when their content became hairline
      sections that draw their own — see `players/Section`. This sheet's content
      is still panels, so it keeps the rule that separates the tabs from them. */
-  tabBar: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 2 },
 });
