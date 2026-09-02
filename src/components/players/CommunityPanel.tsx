@@ -32,18 +32,35 @@
  */
 import { StyleSheet, Text, View } from 'react-native';
 
-import { useTierTheme } from '@/components/cards/use-tier-theme';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Panel } from '@/components/ui/Panel';
-import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
+import { EarningsScale } from './EarningsScale';
+import { Section } from './Section';
+import { Colors, NUMERIC, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { playedShare, type MarketTier, type PlayerMarket } from './market';
+import { playedShare, type MarketTier, type MarketYours, type PlayerMarket } from './market';
 
-const DASH = '—';
-
-const pct = (share: number) => `${Math.round(share * 100)}%`;
-
-export function CommunityPanel({ market }: { market: PlayerMarket | null }) {
+export function CommunityPanel({
+  market,
+  copy,
+}: {
+  market: PlayerMarket | null;
+  /**
+   * The ONE copy the page is about, on the card profile.
+   *
+   * Without it the scale plots your BEST copy, which is what the directory
+   * page wants — it is about the player, and if you hold three the interesting
+   * one is the best. On `/card/<id>` that would be wrong in the one way that
+   * matters: you opened a specific object, and a scale showing a different
+   * copy of the same player is a chart about somebody else's decision.
+   *
+   * The rank travels with it and comes from `card_profile`, NOT from
+   * `market.yours.bestRank`. Both RPCs compute a rank among copies of this
+   * player, so reading the market's on a page that already holds the card's own
+   * is two sources for one number, free to disagree the moment somebody starts
+   * a lineup between the two reads.
+   */
+  copy?: { careerFp: number; rank: number; pool: number } | null;
+}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
@@ -52,104 +69,89 @@ export function CommunityPanel({ market }: { market: PlayerMarket | null }) {
   const { totals, tiers, top, yours, seasons } = market;
   const share = playedShare(totals);
 
+  /* The copy the scale marks, and the rank that names its position. See `copy`
+     above for why the card page passes its own rather than letting this reach
+     for the market's. */
+  const yoursFp = copy ? copy.careerFp : (yours?.bestFp ?? null);
+  const rankHint = copy ? `#${copy.rank} OF ${copy.pool}` : standingHint(yours, totals.held);
+
   if (totals.minted === 0) {
     return (
-      <Panel title="Across the community">
+      <Section label="ACROSS THE COMMUNITY">
         <EmptyState
           title="No copies of this player exist yet"
           body="Nobody has pulled him from a pack. Every card enters the game that way, so the first copy is still out there."
         />
-      </Panel>
+      </Section>
     );
   }
 
   return (
-    <Panel
-      title="Across the community"
-      hint={`${totals.minted} minted all time`}>
-      <View style={styles.body}>
-        <View style={styles.figures}>
-          <Figure label="IN CIRCULATION" value={String(totals.held)} hint={heldHint(market)} />
-          <Figure
-            label="OWNERS"
-            value={String(totals.owners)}
-            hint={totals.owners > 0 && totals.held > totals.owners ? 'some hold several' : undefined}
-          />
-          {/* The figure that says whether he is PLAYED, not merely held. */}
-          <Figure
-            label="EVER STARTED"
-            value={share === null ? DASH : pct(share)}
-            hint={share === null ? undefined : `${totals.started} of ${totals.held}`}
-          />
-          <Figure
-            label="AVG EARNED"
-            value={totals.avgFp === null ? DASH : totals.avgFp.toFixed(0)}
-            hint="FP per copy"
-          />
-        </View>
+    <>
+      {/**
+        * ONE BAR IS THE POPULATION.
+        *
+        * This was four figure tiles — circulation, owners, ever started, avg
+        * earned — each with a sub-hint under it, and then `COPIES BY TIER` as
+        * four more bars underneath. Twelve pieces of small type in a strip 60pt
+        * tall, followed by a second picture of the SAME fifteen copies. Two
+        * visualisations, one population, and neither of them a glance.
+        *
+        * The stacked bar is the population: composition and total in one
+        * object, in the tiers' own colours so it reads without consulting the
+        * legend. The three counts that were tiles become one grey line under
+        * it, because they are context rather than headline — a reader who wants
+        * "how many exist" has already read it in the section's hint.
+        */}
+      <Section
+        label="ACROSS THE COMMUNITY"
+        hint={`${totals.held} ${totals.held === 1 ? 'COPY' : 'COPIES'} · ${totals.owners} ${totals.owners === 1 ? 'OWNER' : 'OWNERS'}`}>
+        <TierComposition tiers={tiers} held={totals.held} />
 
-        {/* ---- tier histogram ------------------------------------------- */}
-        <View style={styles.block}>
-          <Text style={[Type.micro, { color: c.textTertiary }]}>COPIES BY TIER</Text>
-          {tiers.map((t) => (
-            <TierBar key={t.tier} row={t} max={Math.max(1, ...tiers.map((x) => x.copies))} />
-          ))}
-          <Text style={[Type.fine, { color: c.textTertiary }]}>
-            Tier is earned by starting a card, so this is a picture of how much this player has
-            actually been played — not of how rare he is.
-          </Text>
-        </View>
+        <Text style={[Type.fine, { color: c.textTertiary }]}>
+          {[
+            `${totals.minted} minted all time`,
+            totals.sold > 0 ? `${totals.sold} sold back` : null,
+            share === null ? null : `${totals.started} of ${totals.held} ever started`,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </Text>
+      </Section>
 
-        {/* ---- the best copy in the game --------------------------------- */}
-        <View style={[styles.best, { borderColor: c.border, backgroundColor: c.surfaceSunken }]}>
-          <Text style={[Type.micro, { color: c.textTertiary }]}>BEST COPY IN THE GAME</Text>
-          {top ? (
-            <>
-              <View style={styles.bestLine}>
-                <Text style={[Type.figure, NUMERIC, { color: c.text }]}>
-                  {top.careerFp.toFixed(1)}
-                </Text>
-                <Text style={[Type.fine, { color: c.textSecondary }]}>
-                  {`FP over ${top.lineupStarts} start${top.lineupStarts === 1 ? '' : 's'}`}
-                </Text>
-              </View>
-              <Text style={[Type.body, { color: c.textSecondary }]}>
-                {top.isYou ? (
-                  <Text style={{ color: c.positive }}>That one is yours.</Text>
-                ) : (
-                  `Held by ${top.displayName}`
-                )}
-                {top.season ? ` · ${top.season} card` : ''}
-                {` · ${top.tier} tier`}
-              </Text>
-            </>
-          ) : (
-            /* Every copy on zero means the "highest" is whichever row sorted
-               first — noise dressed as a leaderboard. Say the true thing. */
-            <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
-              Nobody has started a copy of this player yet, so no copy has earned anything. The
-              first person to play him takes this spot.
-            </Text>
-          )}
-        </View>
-
-        {/* ---- where you stand ------------------------------------------ */}
-        {yours ? (
-          <Text style={[Type.body, { color: c.textSecondary }]}>
-            {`You hold ${yours.copies} ${yours.copies === 1 ? 'copy' : 'copies'}. Your best is ${yours.bestTier} on ${yours.bestFp.toFixed(1)} FP — `}
-            <Text style={{ color: c.text }}>
-              {`#${yours.bestRank} of ${totals.held}`}
-            </Text>
-            {' in circulation.'}
-          </Text>
+      {/**
+        * WHERE THIS COPY SITS, which is the question the tiles were failing to
+        * answer between them. See `EarningsScale` for why it is a scale rather
+        * than the rank it replaced.
+        */}
+      <Section label="WHAT COPIES HAVE EARNED" hint={rankHint}>
+        {top && top.careerFp > 0 ? (
+          <EarningsScale
+            yours={yoursFp}
+            average={totals.avgFp}
+            best={top.careerFp}
+            marks={tiers.map((t) => t.bestFp ?? 0)}
+            bestLabel={
+              top.isYou
+                ? `The best copy in the game is yours, over ${top.lineupStarts} start${top.lineupStarts === 1 ? '' : 's'}.`
+                : `The best is ${top.displayName}'s ${top.tier}, over ${top.lineupStarts} start${top.lineupStarts === 1 ? '' : 's'}.`
+            }
+          />
         ) : (
-          <Text style={[Type.body, { color: c.textSecondary }]}>You hold no copies of him.</Text>
+          /* Every copy on zero. A scale would put every mark on one point and
+             say "you are level with the best copy in the game", which is true
+             and deeply misleading. */
+          <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
+            Nobody has started a copy of this player yet, so no copy has earned anything. The first
+            person to play him takes the top of this scale.
+          </Text>
         )}
+      </Section>
 
-        {/* ---- added to the set, per season ------------------------------ */}
-        {seasons.length > 0 ? (
+      {/* ---- added to the set, per season --------------------------------- */}
+      {seasons.length > 0 ? (
+        <Section label="ADDED TO THE SET">
           <View style={styles.block}>
-            <Text style={[Type.micro, { color: c.textTertiary }]}>ADDED TO THE SET</Text>
             {seasons.map((s) => (
               <View key={s.season} style={styles.seasonRow}>
                 <Text style={[Type.body, NUMERIC, styles.seasonYear, { color: c.text }]}>
@@ -168,112 +170,106 @@ export function CommunityPanel({ market }: { market: PlayerMarket | null }) {
               </View>
             ))}
           </View>
-        ) : null}
-      </View>
-    </Panel>
-  );
-}
-
-/** "3 sold back" is a fact about the player, so it rides with the headline. */
-function heldHint(market: PlayerMarket): string | undefined {
-  const gone = market.totals.minted - market.totals.held;
-  if (gone <= 0) return undefined;
-  return `${gone} sold back`;
-}
-
-function Figure({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-}) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-
-  return (
-    <View style={[styles.figure, { backgroundColor: c.backgroundElement }]}>
-      <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
-        {label}
-      </Text>
-      <Text numberOfLines={1} style={[Type.figure, NUMERIC, { color: c.text }]}>
-        {value}
-      </Text>
-      {hint ? (
-        <Text numberOfLines={1} style={[Type.fine, NUMERIC, { color: c.textTertiary }]}>
-          {hint}
-        </Text>
+        </Section>
       ) : null}
-    </View>
+    </>
   );
 }
 
 /**
- * One tier's share of the held copies.
+ * The rank, as the scale's hint.
  *
- * The bar is scaled to the BIGGEST tier rather than to the total, because the
- * question is "where do the copies sit", and against a total the three small
- * tiers of a heavily-bronze player all collapse to invisible slivers.
+ * Absent when you hold none of the player, because there is no position to
+ * report — the scale is then a picture of other people's copies, which is still
+ * worth showing to somebody deciding whether to chase one.
  */
-function TierBar({ row, max }: { row: MarketTier; max: number }) {
+function standingHint(yours: MarketYours | null, held: number): string | undefined {
+  if (!yours) return undefined;
+  return `#${yours.bestRank} OF ${held}`;
+}
+
+/**
+ * The held copies as one stacked bar.
+ *
+ * SCALED TO THE TOTAL, not to the biggest tier — the opposite of the bar chart
+ * this replaces, and correct for the opposite reason. Those were four separate
+ * bars answering "how does bronze compare to gold", where a shared total scale
+ * would have collapsed three of them to slivers. This is one bar answering
+ * "what is the shape of the population", and there the parts must add up.
+ *
+ * A tier with no copies contributes no segment at all rather than a zero-width
+ * one, and says so in the legend instead. A 2px gap between segments does the
+ * separating, so two adjacent tiers of similar colour — bronze against gold on
+ * a small bar — never read as one.
+ */
+function TierComposition({ tiers, held }: { tiers: MarketTier[]; held: number }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const t = useTierTheme(row.tier);
-  const width = row.copies === 0 ? 0 : Math.max(0.04, row.copies / max);
+
+  if (held <= 0) return null;
 
   return (
-    <View
-      accessible
-      accessibilityRole="text"
-      accessibilityLabel={`${row.tier} tier, ${row.copies} ${row.copies === 1 ? 'copy' : 'copies'}`}
-      style={styles.tierRow}>
-      {/* numberOfLines is load-bearing, not defensive: DIAMOND is the longest
-          tier name and wrapped to "DIAMON / D" at the original 54pt. */}
-      <Text numberOfLines={1} style={[Type.label, styles.tierName, { color: c.textSecondary }]}>
-        {row.tier.toUpperCase()}
-      </Text>
-      <View style={[styles.track, { backgroundColor: c.backgroundElement }]}>
-        <View
-          style={[
-            styles.fill,
-            { width: `${width * 100}%`, backgroundColor: t.colors.accent },
-          ]}
-        />
+    <View style={styles.block}>
+      <View style={styles.stack}>
+        {tiers
+          .filter((t) => t.copies > 0)
+          .map((t) => (
+            <View
+              key={t.tier}
+              accessible
+              accessibilityRole="text"
+              accessibilityLabel={`${t.tier} tier, ${t.copies} ${t.copies === 1 ? 'copy' : 'copies'}`}
+              style={[
+                styles.segment,
+                { flex: t.copies, backgroundColor: TierColors[scheme][t.tier].accent },
+              ]}
+            />
+          ))}
       </View>
-      <Text style={[Type.body, NUMERIC, styles.tierCount, { color: c.text }]}>{row.copies}</Text>
+
+      <View style={styles.legend}>
+        {tiers.map((t) => (
+          <View key={t.tier} style={styles.legendItem}>
+            <View
+              style={[
+                styles.swatch,
+                {
+                  backgroundColor:
+                    t.copies > 0 ? TierColors[scheme][t.tier].accent : c.backgroundElement,
+                },
+              ]}
+            />
+            <Text
+              style={[
+                Type.fine,
+                { color: t.copies > 0 ? c.textSecondary : c.textTertiary },
+              ]}>
+              {t.tier[0].toUpperCase() + t.tier.slice(1)}
+            </Text>
+            <Text
+              style={[
+                Type.fine,
+                NUMERIC,
+                { color: t.copies > 0 ? c.text : c.textTertiary },
+              ]}>
+              {t.copies}
+            </Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { padding: Spacing.two + 2, gap: Spacing.three },
-  /* Wraps, for the same reason the profile's own stat row does: four tiles
-     across a phone-width sheet leaves too little inside each one to hold both
-     the label and the figure. */
-  figures: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  figure: {
-    flexGrow: 1,
-    flexBasis: 130,
-    minWidth: 130,
-    borderRadius: Radius.chip,
-    padding: Spacing.two,
-    gap: 1,
-  },
-  block: { gap: Spacing.one + 2 },
-  tierRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  tierName: { width: 62 },
-  track: { flex: 1, height: 10, borderRadius: 5, overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: 5 },
-  tierCount: { width: 32, textAlign: 'right' },
-  best: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.panel,
-    padding: Spacing.two + 2,
-    gap: Spacing.one,
-  },
-  bestLine: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two },
+  block: { gap: Spacing.two + 2 },
+  /* The gap is the separator. Two adjacent segments in neighbouring tier
+     colours — bronze against gold at small sizes — otherwise read as one. */
+  stack: { flexDirection: 'row', gap: 2, height: 10, borderRadius: 5, overflow: 'hidden' },
+  segment: { height: '100%' },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1 },
+  swatch: { width: 7, height: 7, borderRadius: 2 },
   seasonRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two },
   seasonYear: { width: 44 },
 });

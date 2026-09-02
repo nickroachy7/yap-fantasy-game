@@ -29,7 +29,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TierBadge } from '@/components/cards/TierBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Panel } from '@/components/ui/Panel';
+import { Section } from './Section';
 import { Colors, NUMERIC, Spacing, Type, type CardTier } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -75,9 +75,10 @@ export function CardHistory({
   if (loading) return null;
 
   return (
-    <Panel
-      title="Your cards"
-      hint={cards.length > 1 ? `${cards.length} copies · open one to see where it ranks` : undefined}>
+    <Section
+      label="YOUR CARDS"
+      hint={cards.length > 1 ? `${cards.length} COPIES` : undefined}
+      flush={cards.length > 0}>
       {cards.length === 0 ? (
         <EmptyState
           title="You don’t hold this player"
@@ -139,7 +140,7 @@ export function CardHistory({
           );
         })
       )}
-    </Panel>
+    </Section>
   );
 }
 
@@ -148,7 +149,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
-    padding: Spacing.two + 2,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + 2,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   body: { flex: 1, minWidth: 0, gap: 1 },

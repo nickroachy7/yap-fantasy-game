@@ -56,6 +56,8 @@ import {
   type SetListFilter,
 } from '@/components/collection/sets';
 import { PlayerHero, type HeroFigure } from '@/components/players/PlayerHero';
+import { RecentForm, recentFormCount, recentFormHint } from '@/components/players/RecentForm';
+import { Section, SectionStack } from '@/components/players/Section';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { CardStanding } from '@/components/players/CardStanding';
 import { GameLogTab } from '@/components/players/GameLogTab';
@@ -100,6 +102,9 @@ import { WIDE_BREAKPOINT, useIsWide } from '@/components/shell/useResponsive';
 import { Colors, Spacing, Type, type CardTier, type Measure } from '@/constants/theme';
 import { PlayerContext, type PlayerState } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+
+/** Parsed once: three components in this file read the same fixture. */
+const MCCAFFREY_SECTIONS = parseGameLog(MCCAFFREY_GAME_LOG);
 
 /** What the directory profile puts in the header strip. See `PlayerHero`. */
 const HERO_FIGURES: HeroFigure[] = [
@@ -1042,6 +1047,16 @@ function ProfileFixture() {
       </Panel>
 
       {/* ---- Overview ---------------------------------------------------- */}
+      {/* The form line, in its section, so the one chart on the profile that
+          reads across seasons can be looked at against real fixtures. */}
+      <SectionStack>
+        <Section
+          label={`LAST ${recentFormCount(MCCAFFREY_SECTIONS)} WEEKS`}
+          hint={recentFormHint(MCCAFFREY_SECTIONS)}>
+          <RecentForm sections={MCCAFFREY_SECTIONS} />
+        </Section>
+      </SectionStack>
+
       <UsagePanel
         usage={withUsage?.usage ?? null}
         position={profile.player.positionAbbreviation}
@@ -1092,7 +1107,7 @@ function CardFixture({ payload }: { payload: typeof CARD_PROFILE_SAMPLE }) {
   if (!card) return null;
   return (
     <>
-      <CardStanding card={card.card} rank={card.rank} />
+      <CardStanding card={card.card} />
       <StartLog starts={card.starts} playerName={card.card.playerName} />
     </>
   );

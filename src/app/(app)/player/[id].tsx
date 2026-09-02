@@ -32,16 +32,19 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { CardHistory, type OwnedCard } from '@/components/players/CardHistory';
 import { CommunityPanel } from '@/components/players/CommunityPanel';
 import { GameLogTab } from '@/components/players/GameLogTab';
-import { OverviewTab } from '@/components/players/OverviewTab';
-import { PlayerHero } from '@/components/players/PlayerHero';
+import { currentRank, OverviewTab } from '@/components/players/OverviewTab';
+import { PlayerHero, type HeroFigure } from '@/components/players/PlayerHero';
 import { PlayerSheetFrame, SheetToneBand } from '@/components/players/PlayerSheetFrame';
+import { SectionStack } from '@/components/players/Section';
 import { usePlayerPage } from '@/components/players/use-player-page';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
 import { teamWash } from '@/constants/teams';
-import { Colors, Spacing, Type } from '@/constants/theme';
+import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 type ProfileTab = 'overview' | 'card' | 'log';
+
+const oneDp = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
 /**
  * The same three tabs as the card profile, in the same order and the same
@@ -126,6 +129,32 @@ export default function PlayerDetailScreen() {
       );
     }
 
+    /**
+     * The three the header carries on this page.
+     *
+     * SEASON, not career: the directory is a place you go to decide about this
+     * weekend, and a career total answers a different question the career table
+     * is already there for. The rank is the only one of the three that needs
+     * its pool, and it carries it inline — `QB4` on its own is a claim the data
+     * cannot support, which is the same rule `CareerTable` follows.
+     *
+     * GAMES came out of the old five-figure row and did not make it back in.
+     * The career table's first row prints it, and at three cells a label has
+     * room to be a word rather than an abbreviation.
+     */
+    const rank = currentRank(profile);
+    const figures: HeroFigure[] = [
+      { label: 'SEASON FP', value: oneDp(player.seasonFp) },
+      { label: 'FP / GAME', value: oneDp(player.fpPerGame) },
+      rank
+        ? {
+            label: rank.season === player.season ? 'RANK' : `RANK ${rank.season}`,
+            value: `${player.position ?? ''}${rank.rank}`,
+            hint: rank.pool ? `of ${rank.pool}` : undefined,
+          }
+        : { label: 'RANK', value: '—' },
+    ];
+
     return (
       <>
         <SheetToneBand tone={teamWash(player.team)}>
@@ -135,10 +164,33 @@ export default function PlayerDetailScreen() {
             team={player.team}
             position={player.position}
             injuryStatus={player.injuryStatus}
+            /* HOW MANY OF HIM YOU HOLD, which is the only thing on this page
+               that is about you rather than about him — and the reason to open
+               the Cards tab.
+
+               PRINTED AT NOUGHT TOO. Hiding it there was the first version and
+               it made the header two different shapes: on a directory that is
+               mostly players you do not own, the name would run wide on one
+               page and stop short on the next, and the row you were comparing
+               against had moved. A nought is also an answer. */
+            trailing={
+              <View style={styles.hold}>
+                <Text style={[Type.micro, { color: c.textTertiary }]}>YOU HOLD</Text>
+                <Text
+                  style={[
+                    Type.figure,
+                    NUMERIC,
+                    styles.holdValue,
+                    { color: owned.length > 0 ? c.text : c.textTertiary },
+                  ]}>
+                  {owned.length}
+                </Text>
+              </View>
+            }
+            figures={figures}
           />
 
-
-          <View style={[styles.tabBar, { borderColor: c.backgroundElement }]}>
+          <View style={styles.tabBar}>
             <Tabs
               tabs={TABS.map((t) => {
                 if (t.value === 'log' && sections.length > 0) {
@@ -158,11 +210,11 @@ export default function PlayerDetailScreen() {
         </SheetToneBand>
 
         {tab === 'overview' ? (
-          <OverviewTab player={player} profile={profile} market={market} sections={sections} />
+          <OverviewTab player={player} profile={profile} sections={sections} />
         ) : null}
 
         {tab === 'card' ? (
-          <>
+          <SectionStack>
             {/* Community first here, because this page is not about any one
                 copy — it is the page you open from the directory, before you
                 own anything. */}
@@ -173,7 +225,7 @@ export default function PlayerDetailScreen() {
               playerName={player.name}
               onOpen={openCard}
             />
-          </>
+          </SectionStack>
         ) : null}
 
         {tab === 'log' ? <GameLogTab profile={profile} sections={sections} /> : null}
@@ -213,5 +265,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.six,
   },
   centreText: { textAlign: 'center' },
-  tabBar: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 2 },
+  /* No bottom rule: the first `Section` under it draws one, and two hairlines
+     a gap apart is the box the sections exist to get rid of. */
+  tabBar: { paddingBottom: 2 },
+  hold: { alignItems: 'flex-end', gap: 1 },
+  holdValue: { lineHeight: 20 },
 });

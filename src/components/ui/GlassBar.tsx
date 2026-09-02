@@ -49,10 +49,12 @@
  */
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
-import { Colors, Spacing, TabPillHeight, TabPillInset } from '@/constants/theme';
+import { Icon } from '@/components/icons/Icon';
+import type { Glyph } from '@/components/icons/system';
+import { Colors, Spacing, TabPillHeight, TabPillInset, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 /** A device capability, so it is read once at module load and never per render. */
@@ -260,6 +262,14 @@ function at88(hex: string): string {
 }
 
 const styles = StyleSheet.create({
+  action: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.one + 2,
+  },
+  actionPressed: { opacity: 0.6 },
   /* The row is in flow — it is handed to a frame's footer slot, which is
      already outside the scroll — and only the scrim is lifted out of it. */
   wrap: { position: 'relative' },
@@ -309,3 +319,73 @@ const styles = StyleSheet.create({
   /* A mark centred in a circle needs no side air of its own. */
   contentCompact: { paddingHorizontal: 0 },
 });
+
+/**
+ * One action inside a `GlassPill`.
+ *
+ * IT LIVES HERE, WITH THE PILL IT GOES IN. It was private to `ContestView`, and
+ * the moment the card profile wanted the same bar that was a second copy
+ * waiting to be written. Two sheets whose action bars are separately maintained
+ * are two bars that agree until somebody retunes one of them.
+ *
+ * A GLYPH AND A WORD, AND NO TINT. Colouring the pills was tried and was wrong
+ * twice: a saturated hue at any useful alpha fills a capsule this small rather
+ * than rimming it, so the glass stops being glass; and the app's two most
+ * meaningful colours end up spent on a button. The glyph is the same mark the
+ * rest of the app uses for that idea, which says which action this is without
+ * spending a hue.
+ *
+ * DISABLED IS `textTertiary` AND NOT AN OPACITY. Opacity is what the material
+ * itself is made of; a control dimmed with it on glass reads as a rendering
+ * fault rather than as a state.
+ */
+export function BarAction({
+  glyph,
+  label,
+  hint,
+  primary = false,
+  enabled,
+  onPress,
+}: {
+  /** The mark beside the label, from the app's own set. */
+  glyph?: Glyph;
+  /** Absent on a mark-only pill, where the hint carries the whole meaning. */
+  label?: string;
+  /** What a screen reader says, where the label is shortened for the row. */
+  hint?: string;
+  primary?: boolean;
+  enabled: boolean;
+  onPress: () => void;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
+  return (
+    <Pressable
+      onPress={enabled ? onPress : undefined}
+      disabled={!enabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !enabled }}
+      accessibilityLabel={hint ?? label}
+      style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}>
+      {glyph ? (
+        <Icon
+          glyph={glyph}
+          color={enabled ? (primary ? c.text : c.textSecondary) : c.textTertiary}
+          size={15}
+          focused
+        />
+      ) : null}
+      {label ? (
+        <Text
+          numberOfLines={1}
+          style={[
+            primary ? Type.strong : Type.body,
+            { color: enabled ? (primary ? c.text : c.textSecondary) : c.textTertiary },
+          ]}>
+          {label}
+        </Text>
+      ) : null}
+    </Pressable>
+  );
+}

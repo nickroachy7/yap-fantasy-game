@@ -23,7 +23,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Panel } from '@/components/ui/Panel';
+import { Section } from './Section';
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { seasonTypeLabel, weekLabel } from './game-log';
@@ -31,10 +31,10 @@ import type { CardStart } from './card-profile';
 
 const DASH = '—';
 
-type Section = { key: string; label: string; starts: CardStart[]; total: number; scored: number };
+type StartSection = { key: string; label: string; starts: CardStart[]; total: number; scored: number };
 
 /** Newest season first; within a season the most recent week first. */
-function group(starts: CardStart[]): Section[] {
+function group(starts: CardStart[]): StartSection[] {
   const byKey = new Map<string, CardStart[]>();
   for (const s of starts) {
     const key = `${s.season}-${s.seasonType}`;
@@ -43,7 +43,7 @@ function group(starts: CardStart[]): Section[] {
     else byKey.set(key, [s]);
   }
 
-  const out: Section[] = [];
+  const out: StartSection[] = [];
   for (const [key, bucket] of byKey) {
     const scored = bucket.filter((s) => s.scored && s.points !== null);
     out.push({
@@ -63,12 +63,12 @@ export function StartLog({ starts, playerName }: { starts: CardStart[]; playerNa
 
   if (starts.length === 0) {
     return (
-      <Panel title="Weeks started">
+      <Section label="WEEKS STARTED">
         <EmptyState
           title="You have never started this card"
           body={`It has earned nothing, and it will stay at bronze until you play it. Put ${playerName} in a lineup and every week he scores lands here.`}
         />
-      </Panel>
+      </Section>
     );
   }
 
@@ -76,9 +76,13 @@ export function StartLog({ starts, playerName }: { starts: CardStart[]; playerNa
   const pending = starts.filter((s) => !s.scored).length;
 
   return (
-    <Panel
-      title="Weeks started"
-      hint={`${starts.length} start${starts.length === 1 ? '' : 's'} · this is everything the card has earned from`}>
+    <Section
+      label="WEEKS STARTED"
+      /* The sentence this replaces — "this is everything the card has earned
+         from" — is the same claim the standing section's hint makes, and the
+         table under it is self-evidently the receipt. */
+      hint={`${starts.length} START${starts.length === 1 ? '' : 'S'}`}
+      flush>
       <View>
         {sections.map((section) => (
           <View key={section.key}>
@@ -110,7 +114,7 @@ export function StartLog({ starts, playerName }: { starts: CardStart[]; playerNa
           </Text>
         ) : null}
       </View>
-    </Panel>
+    </Section>
   );
 }
 
@@ -156,7 +160,7 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: Spacing.two,
-    paddingHorizontal: Spacing.two + 2,
+    paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
@@ -165,7 +169,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     height: 30,
-    paddingHorizontal: Spacing.two + 2,
+    paddingHorizontal: Spacing.three,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   headRow: { height: 22 },
@@ -175,5 +179,5 @@ const styles = StyleSheet.create({
   slot: { width: 52 },
   share: { flex: 1, textAlign: 'right' },
   fp: { width: 56, textAlign: 'right' },
-  note: { paddingHorizontal: Spacing.two + 2, paddingVertical: Spacing.two },
+  note: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
 });

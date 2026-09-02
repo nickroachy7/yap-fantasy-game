@@ -80,39 +80,30 @@ export function BioFacts({ bio }: { bio: PlayerBio }) {
   if (facts.length === 0 && !bio.college) return null;
 
   return (
-    <View>
-      {facts.length > 0 ? (
-        <View style={styles.row}>
-          {facts.map((f) => {
-            const [figure, unit] = splitUnit(f.value);
-            return (
-              <View key={f.label} style={styles.cell}>
-                <Text style={[Type.micro, { color: c.textTertiary }]}>{f.label}</Text>
-                <Text numberOfLines={1} style={[styles.figure, NUMERIC, { color: c.text }]}>
-                  {figure}
-                  {unit ? (
-                    <Text style={[styles.unit, { color: c.textTertiary }]}>{` ${unit}`}</Text>
-                  ) : null}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-      ) : null}
+    <View style={styles.row}>
+      {facts.map((f) => {
+        const [figure, unit] = splitUnit(f.value);
+        return (
+          <View key={f.label} style={styles.cell}>
+            <Text style={[Type.micro, { color: c.textTertiary }]}>{f.label}</Text>
+            <Text numberOfLines={1} style={[styles.figure, NUMERIC, { color: c.text }]}>
+              {figure}
+              {unit ? <Text style={[styles.unit, { color: c.textTertiary }]}>{` ${unit}`}</Text> : null}
+            </Text>
+          </View>
+        );
+      })}
 
-      {/* College is not a measurement, so it does not get a cell in the row —
-          it is the one fact here that is a place rather than a quantity, and it
-          is the widest. A line under a hairline keeps the row's four columns
-          even instead of letting one long string stretch a fifth. */}
+      {/* College is not a measurement, and it is the widest thing here, so it
+          takes the last cell at half again the width rather than a line of its
+          own under a hairline. Under a `flex` of 1.5 a long one ellipsises
+          instead of stretching the four measurements out of true — which is
+          what a row of its own was there to prevent, at the cost of a whole
+          extra line for one word. */}
       {bio.college ? (
-        <View
-          style={[
-            styles.college,
-            facts.length > 0 && { marginTop: Spacing.two + 1, paddingTop: Spacing.two - 1, borderTopWidth: StyleSheet.hairlineWidth },
-            { borderTopColor: c.border },
-          ]}>
+        <View style={[styles.cell, styles.collegeCell]}>
           <Text style={[Type.micro, { color: c.textTertiary }]}>COLLEGE</Text>
-          <Text numberOfLines={1} style={[Type.fine, styles.collegeValue, { color: c.textSecondary }]}>
+          <Text numberOfLines={1} style={[styles.college, { color: c.text }]}>
             {bio.college}
           </Text>
         </View>
@@ -125,12 +116,14 @@ const styles = StyleSheet.create({
   /* No wrap. The cells divide the measure evenly however many there are, which
      is what lets them lose their boxes — a `flexBasis` is what let one long
      value escape onto a line of its own back when this was six tiles. */
-  row: { flexDirection: 'row' },
+  row: { flexDirection: 'row', gap: Spacing.two },
   cell: { flex: 1, minWidth: 0, gap: 2 },
+  /* Half again, because a college name is words where its neighbours are two
+     or three characters. */
+  collegeCell: { flex: 1.5 },
   /** The scale's 15pt step. An unboxed value has to carry its cell alone. */
   figure: { fontSize: 15, lineHeight: 19, fontWeight: '600' },
   /** Subordinate to the number it qualifies — see `splitUnit`. */
   unit: { fontSize: 10, fontWeight: '600' },
-  college: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  collegeValue: { flexShrink: 1 },
+  college: { fontSize: 13, lineHeight: 19, fontWeight: '500' },
 });
