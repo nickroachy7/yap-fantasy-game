@@ -249,7 +249,13 @@ export function LobbyView({
           'One card plays one contest a week';
 
   return (
+    /* `surface` — THE PINNED STRIP IS THE BAND, CONTINUED. Without it the
+       header that survives a scroll reverts to `surfaceSheet`, so the top of
+       the screen changes colour the moment the real band leaves it: the same
+       seam this sheet has now spent three passes closing, reappearing as soon
+       as you scroll. */
     <PlayerSheetFrame
+      surface={c.backgroundElement}
       title={
         view === 'recap' ? (reading?.name ?? 'Contest') : view === 'history' ? 'Recent contests' : 'Contests'
       }

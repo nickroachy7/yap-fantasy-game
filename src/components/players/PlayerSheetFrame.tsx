@@ -97,6 +97,7 @@ export function PlayerSheetFrame({
   dismissible = true,
   footerGlass = false,
   tone,
+  surface,
   pinned,
   pinnedAt,
   footer,
@@ -146,6 +147,19 @@ export function PlayerSheetFrame({
    * about a player and has neither a club nor a tier to be the colour of.
    */
   tone?: string | null;
+  /**
+   * A SOLID header colour instead of a tone wash — the frame's half of
+   * `SheetToneBand`'s `surface`.
+   *
+   * The floating header has always washed itself with `tone`, which is why a
+   * tier or club sheet keeps one colour from the grabber down through the
+   * pinned row. A sheet whose band is a step on the dark scale rather than a
+   * hue needs the same continuity and cannot get it from `tone`, because 26%
+   * of a grey is not that grey. Passed here it replaces `surfaceSheet` as the
+   * floating header's fill, so the strip that survives a scroll is the same
+   * colour as the band it replaces.
+   */
+  surface?: string | null;
   /**
    * A row that TAKES OVER from one in the content once that row has scrolled
    * under the bar — the set checklist's filters, which are the only control on
@@ -548,8 +562,13 @@ export function PlayerSheetFrame({
          at rest, as it always was: there is no control in it then. */
       pointerEvents={pinnedShown ? 'box-none' : 'none'}
       style={[styles.headerFloat, { opacity: titleFade }]}>
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: c.surfaceSheet }]} />
-      {tone ? (
+      <View
+        style={[StyleSheet.absoluteFill, { backgroundColor: surface ?? c.surfaceSheet }]}
+      />
+      {/* The wash goes on top of the sheet's own colour, so it is only ever
+          drawn where there IS a wash. `surface` has already replaced the fill
+          above and must not be washed a second time. */}
+      {tone && !surface ? (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: rgba(tone, TONE_PEAK) }]} />
       ) : null}
       {/* The two fills above are `absoluteFill`, so whatever this block grows to
