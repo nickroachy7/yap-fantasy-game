@@ -17,7 +17,7 @@ import { useCallback, useState } from 'react';
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
 import type { FieldWeek } from '@/components/lineup/field';
-import type { ContestTerms, WinCondition } from './contest-model';
+import type { ContestTerms, PayoutCurve, WinCondition } from './contest-model';
 
 export type MyContest = {
   id: string;
@@ -61,6 +61,22 @@ export type MyContest = {
    */
   winCondition: WinCondition;
   winRank: number | null;
+  /** For `top_pct`: the share of the field that wins, as a whole percent. */
+  winPct: number | null;
+  /** For `target`: the score to beat. Arrives in `cut` as well — see below. */
+  targetPoints: number | null;
+  /** How the pool is divided among the winners. */
+  payoutCurve: PayoutCurve;
+  /** Coins per fantasy point. The game's baseline, identical on every row. */
+  scoreRate: number;
+  /**
+   * THE NUMBER TO BEAT, whatever produces it.
+   *
+   * The lowest score still inside the paying places under `top_n` and
+   * `top_pct`, and the TARGET itself under `target` — the server puts all three
+   * in this one column (`20260901040000`) precisely so the scoreboard draws you
+   * against a number without learning which kind it is.
+   */
   cut: number | null;
 
   /** Coins collected by this contest that will be paid back out. */
@@ -120,6 +136,10 @@ type Row = {
   hearts_on_win: number;
   win_condition: WinCondition;
   win_rank: number | null;
+  win_pct: number | string | null;
+  target_points: number | string | null;
+  payout_curve: PayoutCurve;
+  score_rate: number | string | null;
   cut: number | string | null;
   prize_pool: number | string | null;
   my_prize: number | string | null;
@@ -246,6 +266,10 @@ export function useMyContests(includeCode?: string): MyContestsState {
         heartsOnWin: Number(r.hearts_on_win ?? 0),
         winCondition: r.win_condition,
         winRank: r.win_rank === null || r.win_rank === undefined ? null : Number(r.win_rank),
+        winPct: num(r.win_pct),
+        targetPoints: num(r.target_points),
+        payoutCurve: r.payout_curve ?? 'flat',
+        scoreRate: num(r.score_rate) ?? 0,
         cut: num(r.cut),
         prizePool: num(r.prize_pool) ?? 0,
         myPrize: num(r.my_prize),
@@ -289,6 +313,10 @@ export function termsOfEntry(c: MyContest): ContestTerms {
     heartsOnWin: c.heartsOnWin,
     winCondition: c.winCondition,
     winRank: c.winRank,
+    winPct: c.winPct,
+    targetPoints: c.targetPoints,
+    payoutCurve: c.payoutCurve,
+    scoreRate: c.scoreRate,
     prizePool: c.prizePool,
     entrants: c.field.entrants,
     maxEntrants: null,

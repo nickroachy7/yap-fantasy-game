@@ -195,12 +195,16 @@ const DEMO_FIELD_CUT: FieldWeek = {
 const KIT_TERMS_FREE: ContestTerms = {
   formatName: 'Full Roster', slotCount: 8, entryFeeCoins: 0,
   heartsAtRisk: 1, heartsOnWin: 0,
-  winCondition: 'median', winRank: null, prizePool: 0, entrants: 26, maxEntrants: null,
+  winCondition: 'median', winRank: null, winPct: null, targetPoints: null,
+  payoutCurve: 'flat', scoreRate: 1.5,
+  prizePool: 0, entrants: 26, maxEntrants: null,
 };
 const KIT_TERMS_MEDIAN: ContestTerms = {
   formatName: 'Flex Three', slotCount: 3, entryFeeCoins: 40,
   heartsAtRisk: 0, heartsOnWin: 0,
-  winCondition: 'median', winRank: null, prizePool: 120, entrants: 12, maxEntrants: null,
+  winCondition: 'median', winRank: null, winPct: null, targetPoints: null,
+  payoutCurve: 'flat', scoreRate: 1.5,
+  prizePool: 120, entrants: 12, maxEntrants: null,
 };
 /**
  * A field with one row per state the panel has to draw.
@@ -279,7 +283,9 @@ const KIT_LADDER: CarryRung[] = [
 const KIT_TERMS_TOP_N: ContestTerms = {
   formatName: 'WR Room', slotCount: 3, entryFeeCoins: 40,
   heartsAtRisk: 1, heartsOnWin: 1,
-  winCondition: 'top_n', winRank: 3, prizePool: 240, entrants: 6, maxEntrants: null,
+  winCondition: 'top_n', winRank: 3, winPct: null, targetPoints: null,
+  payoutCurve: 'steep', scoreRate: 1.5,
+  prizePool: 240, entrants: 6, maxEntrants: null,
 };
 
 const STARTERS: {

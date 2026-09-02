@@ -1,0 +1,67 @@
+-- Two more win conditions. This migration adds the WORDS and nothing else.
+--
+-- ---------------------------------------------------------------------------
+-- WHY IT IS ITS OWN FILE
+-- ---------------------------------------------------------------------------
+--
+-- `alter type ... add value` commits the label, and Postgres refuses to let the
+-- same transaction USE a value it has just added. `supabase db push` runs
+-- without a transaction, so a single file would work when pushed — and would
+-- fail the one cheap dry run this project has, which is
+--
+--     psql: begin; \i migration.sql; ...checks...; rollback;
+--
+-- and which caught a function-ordering break before it reached the project.
+-- Keeping a migration validatable is worth a file. So the labels land here and
+-- `20260901040000` — the check constraint, the columns, `contest_results` —
+-- is dry-runnable like everything else.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THEY ARE FOR
+-- ---------------------------------------------------------------------------
+--
+-- `target` — BEAT A NUMBER. The contest names a score and everyone who clears
+--   it wins. No field required.
+--
+--   This is the gap that matters most right now. `contest_results` returns NULL
+--   for every entrant when `entrants < 2`, and NULL again under `top_n` when
+--   `entrants <= win_rank`. In a four-tester beta that is not an edge case, it
+--   is Sunday: the WR Room pays three of a field that is regularly three or
+--   fewer, so it settles as nothing — no prize, no heart, no result, no reason
+--   given. A player who filed a lineup and beat everybody gets a blank.
+--
+--   A target has no such floor. One entrant is a contest. It is also the only
+--   honest way to run a FREE row with a reward on it: nothing is minted because
+--   nothing is paid in coins, and clearing a stated bar is a thing a player did
+--   rather than a thing the field failed to do.
+--
+-- `top_pct` — TOP N% OF THE FIELD. The share is fixed; the number of places
+--   moves with however many turned up.
+--
+--   Every cash-game shape in daily fantasy is a percentage: a 50/50 pays half,
+--   a double-up a bit under half, a triple-up a third, a tournament a fifth.
+--   `top_n` cannot express any of them, because the whole point is that the
+--   places scale. A "top 3" row is a soft contest at four entrants and a brutal
+--   one at forty — one phrase covering two completely different offers, which
+--   `contest-model.ts` already has to paper over by printing the field size
+--   next to it.
+--
+--   It also degrades correctly where `top_n` breaks. Top 50% of three is one
+--   place; top 50% of forty is twenty. The contest is the same contest.
+--
+-- ---------------------------------------------------------------------------
+-- STILL NOT head_to_head, AND STILL FOR `20260825130000`'S REASON
+-- ---------------------------------------------------------------------------
+--
+-- It needs a stored pairing per entrant per week, which means deciding what a
+-- bye is worth and what happens when somebody leaves before kickoff. Both new
+-- values here are pure reads of a rank or a total, re-runnable to the same
+-- answer, which is what keeps settlement idempotent.
+--
+-- A duel gets built out of `max_entrants = 2` and `top_n` at rank 1 instead —
+-- see `20260901050000`. Two people, one place, winner takes the pool. That is
+-- the whole of head-to-head that a player can feel, with no pairing table under
+-- it, and it settles through machinery that already exists.
+
+alter type public.contest_win_condition add value if not exists 'top_pct';
+alter type public.contest_win_condition add value if not exists 'target';

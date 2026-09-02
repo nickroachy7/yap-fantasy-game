@@ -779,6 +779,10 @@ const CONTEST_FIXTURES: MyContest[] = [
     heartsOnWin: 0,
     winCondition: 'median',
     winRank: null,
+    winPct: null,
+    targetPoints: null,
+    payoutCurve: 'flat',
+    scoreRate: 1.5,
     cut: null,
     prizePool: 0,
     myPrize: null,
@@ -815,11 +819,68 @@ const CONTEST_FIXTURES: MyContest[] = [
     heartsOnWin: 1,
     winCondition: 'top_n',
     winRank: 3,
+    winPct: null,
+    targetPoints: null,
+    /* STEEP, so the fixture exercises a curve that is not the default. Under
+       `flat` every top-three finisher takes 80 of a 240 pool; under this one
+       first takes 130, which is the whole reason the column exists. */
+    payoutCurve: 'steep',
+    scoreRate: 1.5,
     /* Above the median (31.5) and BELOW the cut — the exact state the old card
        could not draw. 27.1 reads as comfortably mid-field against a median and
        as fourth of six against the line that actually pays. */
     cut: 38.4,
     prizePool: 240,
+    myPrize: null,
+    myCoins: null,
+    recap: false,
+    weekLabel: 'PRE 4',
+    weekTitle: 'Preseason 4',
+  },
+  /* THE THIRD BRANCH, and it is here for the reason stated above the array: a
+     fixture set where every row takes the same path tests the path, not the
+     component.
+
+     A target contest is the only one whose line is known BEFORE anybody has
+     scored, so it is the only fixture where `cut` is populated on a week that
+     is not final — and `opponentOf` labels it `THE TARGET` rather than
+     `THE CUT`. 28.7 against 30.0 is the state worth drawing: behind, but by
+     less than one good catch, against a number that will not move. Every other
+     contest's line drifts all afternoon. */
+  {
+    id: 'fx-warmup',
+    code: 'warmup:2026:1:4',
+    kind: 'lobby',
+    name: 'The Warm-Up',
+    formatCode: 'flex3',
+    formatName: 'Flex Three',
+    slotCount: 3,
+    entryFeeCoins: 0,
+    lineupId: 'fx-lineup-warmup',
+    filled: 3,
+    field: {
+      week: 4,
+      entrants: 1,
+      low: 28.7,
+      median: 28.7,
+      average: 28.7,
+      high: 28.7,
+      final: false,
+      myPoints: 28.7,
+      myRank: 1,
+      ahead: 0,
+      result: null,
+    },
+    heartsAtRisk: 0,
+    heartsOnWin: 1,
+    winCondition: 'target',
+    winRank: null,
+    winPct: null,
+    targetPoints: 30.0,
+    payoutCurve: 'flat',
+    scoreRate: 1.5,
+    cut: 30.0,
+    prizePool: 0,
     myPrize: null,
     myCoins: null,
     recap: false,

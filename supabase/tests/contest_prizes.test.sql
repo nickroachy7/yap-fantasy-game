@@ -99,11 +99,19 @@ select 988002, 2026, 88, 1, now() + interval '9 days', 'scheduled', l.id, l.id
 -- Even money, and a top-two so the weighted split has two distinct shares to
 -- get wrong. No hearts on either: this suite is about coins, and a run in the
 -- middle of it would be a second thing failing for a different reason.
+--
+-- `payout_curve` IS STATED RATHER THAN LEFT TO THE DEFAULT, and that is the
+-- point of it existing. Until `20260901020000` the split was implied by the win
+-- condition — `top_n` always weighted by place — so this fixture said `top_n`
+-- and meant "2:1" without ever writing it down. It is a column now, because a
+-- top-two contest can equally pay its two winners the same (a double-up), and
+-- the two are different products. `linear` is the shape this suite asserts, so
+-- `linear` is what it asks for.
 insert into public.contests (code, kind, format_code, season, season_type, week, name,
                              entry_fee_coins, prize_pool_bps, win_condition, win_rank,
-                             hearts_at_risk, hearts_on_win)
-values ('test:pool:88', 'lobby', 'flex3', 2026, 1, 88, 'Test Pool', 40, 2500, 'median', null, 0, 0),
-       ('test:top2:88', 'lobby', 'wr_room', 2026, 1, 88, 'Test Top Two', 40, 2500, 'top_n', 2, 0, 0);
+                             payout_curve, hearts_at_risk, hearts_on_win)
+values ('test:pool:88', 'lobby', 'flex3', 2026, 1, 88, 'Test Pool', 40, 2500, 'median', null, 'flat', 0, 0),
+       ('test:top2:88', 'lobby', 'wr_room', 2026, 1, 88, 'Test Top Two', 40, 2500, 'top_n', 2, 'linear', 0, 0);
 
 -- ---------------------------------------------------------------------------
 -- THE CONSTRAINTS, which are the cheapest half of the guarantee.
@@ -482,9 +490,9 @@ begin
     raise exception 'FAIL: % players paid in a top-two contest, expected 2', v_count;
   end if;
 
-  -- 16. WEIGHTED `win_rank + 1 - rnk`, so top two is 2:1 — not an even split,
-  --     and not a hardcoded percentage that would drift the moment `win_rank`
-  --     changed. 20 and 10 out of 30.
+  -- 16. `linear` WEIGHTS BY PLACE, so top two is 2:1 — not an even split, and
+  --     not a hardcoded percentage that would drift the moment the number of
+  --     paying places changed. 20 and 10 out of 30.
   select coins into v_first  from public.contest_payouts(v_contest) where rnk = 1;
   select coins into v_second from public.contest_payouts(v_contest) where rnk = 2;
   if v_first <> 20 or v_second <> 10 then

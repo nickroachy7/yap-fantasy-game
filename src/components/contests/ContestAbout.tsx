@@ -42,7 +42,7 @@ import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import type { PlayerState } from '@/context/PlayerContext';
 
-import { formatLine, topPrize, winLine, type ContestTerms } from './contest-model';
+import { formatLine, payingPlaces, topPrize, winLine, type ContestTerms } from './contest-model';
 
 export function ContestAbout({
   terms,
@@ -90,6 +90,7 @@ export function ContestAbout({
 
   const top = topPrize(terms);
   const share = Math.round(prizePoolBps / 100);
+  const places = payingPlaces(terms);
 
   return (
     <Panel title={title} inset={false}>
@@ -102,9 +103,7 @@ export function ContestAbout({
         </Fact>
 
         <Fact term="Winning" body={winLine(terms)}>
-          {terms.winCondition === 'top_n' && terms.winRank !== null
-            ? `Only the first ${terms.winRank} places are paid, and the pool is weighted by place — first takes roughly twice what last of the paying places takes${top !== null ? `, about ${top} coins as the pool stands` : ''}. Most of this field loses.`
-            : `Every entry that beats the middle score of the field wins, and the winners split the pool equally. It is close to even money: what you are being paid for is finishing above half the people who filed.`}
+          {winningProse(terms, places, top)}
         </Fact>
 
         <Fact
@@ -118,8 +117,26 @@ export function ContestAbout({
           }>
           {terms.entryFeeCoins > 0
             ? `${share}% of every entry fee goes into the pool and the rest leaves the economy. It is funded by the people in it, so it is genuinely small in a young contest and grows with every entry. Nothing is ever minted to make it look bigger.`
-            : `A free contest collects nothing, so there is nothing to split. It pays on what you score instead — from 1.5 coins a point, multiplied by the tier of the card that scored them.`}
+            : `A free contest collects nothing, so there is nothing to split. What it pays is what every contest pays — see below.`}
         </Fact>
+
+        {/* THE BASELINE, ON EVERY CONTEST, IN THE SAME WORDS.
+
+            This row is not about this contest. That is the point of it: the
+            per-point rate is what a CARD earns for being started anywhere, and
+            printing it only where there was no pool to print instead — which is
+            what the app used to do — made the one universal thing in the game
+            look like the free contest's perk.
+
+            It reads as the floor under the whole lobby precisely because it is
+            identical on all nine rows. The rate itself comes down from
+            `score_rate()` and is never written here, so this sentence cannot
+            advertise a number the payout is not using. */}
+        {terms.scoreRate > 0 ? (
+        <Fact term="Every start" body={`${terms.scoreRate} coins a point`}>
+          {`Every card you field earns coins for what it scores, in this contest and in all of them — ${terms.scoreRate} a point, multiplied by that card's tier, from ×1.0 at bronze to ×1.4 at diamond. It is paid whether you win or lose${terms.entryFeeCoins > 0 ? ' and it is on top of anything the pool pays' : ''}, which is why a card sitting on your bench is the only card in your collection earning nothing at all.`}
+        </Fact>
+        ) : null}
 
         {terms.heartsAtRisk > 0 || terms.heartsOnWin > 0 ? (
           <Fact
@@ -226,6 +243,50 @@ export function ContestAbout({
  * stopped on that row. Both are always drawn, because a rule that hides its own
  * explanation behind a tap is a rule nobody reads.
  */
+/**
+ * WHAT "WINNING" MEANS HERE, in the two or three sentences the row has room for.
+ *
+ * One function rather than a ternary in the JSX because there are four rules
+ * now and each has a different thing worth saying — how many places pay, how
+ * hard the line is, and whether the pool is shared or concentrated. A nested
+ * conditional expression covering four cases is where this kind of copy goes to
+ * become unreadable and then wrong.
+ *
+ * THE CURVE IS THE HALF THAT USED TO BE MISSING. "Top 3 win" says who is paid
+ * and says nothing about whether first place is worth chasing, and those are
+ * different questions with the same answer only under `flat`. So the shape of
+ * the split is named in words wherever there is a top prize to name.
+ */
+function winningProse(
+  terms: ContestTerms,
+  places: number | null,
+  top: number | null,
+): string {
+  const asPool = top !== null ? `, about ${top} coins as the pool stands` : '';
+
+  if (terms.winCondition === 'target' && terms.targetPoints !== null) {
+    return `You need ${terms.targetPoints} points from ${terms.slotCount} cards. Everyone who clears the bar wins and everyone who does not loses — there is no field to beat, so this one settles even if you are the only entry, and nobody else scoring well can take it away from you.`;
+  }
+
+  if (terms.winCondition === 'top_pct' && terms.winPct !== null) {
+    const scaled =
+      places !== null
+        ? `With ${terms.entrants} in, that is ${places === 1 ? 'one place' : `${places} places`}.`
+        : 'The number of places grows with the field.';
+    return terms.payoutCurve === 'flat'
+      ? `The top ${terms.winPct}% are paid and every winner takes the same${asPool}. ${scaled} Scraping in pays exactly what running away with it pays, so this one is about not losing rather than about being first.`
+      : `The top ${terms.winPct}% are paid, weighted by place — first takes the largest share${asPool}. ${scaled}`;
+  }
+
+  if (terms.winCondition === 'top_n' && terms.winRank !== null) {
+    return terms.payoutCurve === 'winner_take_all'
+      ? `One place, and it takes the whole pool${asPool}. There is no second prize here.`
+      : `Only the first ${terms.winRank} places are paid, and the pool is weighted by place — first takes the largest share${asPool}. Most of this field loses.`;
+  }
+
+  return `Every entry that beats the middle score of the field wins, and the winners split the pool equally. It is close to even money: what you are being paid for is finishing above half the people who filed.`;
+}
+
 function Fact({
   term,
   body,

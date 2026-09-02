@@ -898,6 +898,9 @@ function TokenRow({
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  /* One token has room for its unit spelled out; a crowded side does not — see
+     `Token`. `keepUnit` is the exception, and it exists for rates alone: a bare
+     `◆ 1.5` reads as a coin and a half rather than as a rate. */
   const withUnits = tokens.length === 1;
 
   return (
@@ -925,7 +928,7 @@ function TokenRow({
                           : c.text,
                 },
               ]}>
-              {withUnits && t.unit ? `${t.value} ${t.unit}` : t.value}
+              {(withUnits || t.keepUnit) && t.unit ? `${t.value} ${t.unit}` : t.value}
             </Text>
           </View>
         ))}

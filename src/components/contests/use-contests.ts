@@ -28,7 +28,7 @@ import { useCallback, useState } from 'react';
 
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
-import type { ContestTerms } from './contest-model';
+import type { ContestTerms, PayoutCurve, WinCondition } from './contest-model';
 
 export type Contest = {
   id: string;
@@ -57,14 +57,31 @@ export type Contest = {
   affordable: boolean;
 
   /**
-   * HOW THIS CONTEST DECIDES A WINNER. `median` is even money — you beat the
-   * middle of the field or you do not. `top_n` pays only the first `winRank`
-   * places, so most of its field loses, which is why a row has to say which it
-   * is BEFORE a heart is committed to it.
+   * HOW THIS CONTEST DECIDES A WINNER.
+   *
+   *   `median`   even money — you beat the middle of the field or you do not.
+   *   `top_n`    only the first `winRank` places, so most of its field loses.
+   *   `top_pct`  the top `winPct` per cent, so the places scale with the field.
+   *   `target`   beat `targetPoints`. No field needed, so it settles even when
+   *              you are the only entrant.
+   *
+   * A row has to say which it is BEFORE a heart is committed to it.
    */
-  winCondition: 'median' | 'top_n';
+  winCondition: WinCondition;
   /** For `top_n`: the last place that still counts as a win. */
   winRank: number | null;
+  /** For `top_pct`: the share of the field that wins, as a whole percent. */
+  winPct: number | null;
+  /** For `target`: the score to beat. Set before the week opens. */
+  targetPoints: number | null;
+  /** How the pool is divided among the winners. */
+  payoutCurve: PayoutCurve;
+  /**
+   * Coins per fantasy point, before the card's tier multiplier. The same on
+   * every row — it is the game's baseline, not this contest's. Carried down so
+   * the app never hardcodes a rate the payout might not be using.
+   */
+  scoreRate: number;
   /** Hearts a loss here costs the run. 0 means it cannot end you. */
   heartsAtRisk: number;
   /** Hearts a win heals, capped at the run's maximum. */
@@ -75,14 +92,14 @@ export type Contest = {
   /**
    * Coins this contest has collected that it will pay back out.
    *
-   * LIVE, AND SMALL EARLY. The pool is funded by entries — 25% of the fees
-   * taken, see `20260826020000` — so it is genuinely nought before the first
+   * LIVE, AND SMALL EARLY. The pool is funded by entries — 90% of the fees
+   * taken, see `20260901020000` — so it is genuinely nought before the first
    * one and genuinely tiny in a four-tester week. The lobby draws the real
    * figure and says it grows; rounding it up to something respectable would be
    * the grant that inverts the fee's whole justification.
    */
   prizePool: number;
-  /** The share of collected fees paid out, in basis points. 2500 = 25%. */
+  /** The share of collected fees paid out, in basis points. 9000 = 90%. */
   prizePoolBps: number;
   /**
    * A contest from the week the board has already moved past, carried so its
@@ -110,8 +127,12 @@ type Row = {
   my_lineup_id: string | null;
   my_filled: number;
   affordable: boolean;
-  win_condition: 'median' | 'top_n';
+  win_condition: WinCondition;
   win_rank: number | null;
+  win_pct: number | null;
+  target_points: number | null;
+  payout_curve: PayoutCurve;
+  score_rate: number | null;
   hearts_at_risk: number;
   hearts_on_win: number;
   my_hearts: number | null;
@@ -156,6 +177,13 @@ export function useContests(): ContestsState {
         affordable: r.affordable,
         winCondition: r.win_condition,
         winRank: r.win_rank,
+        winPct: r.win_pct === null || r.win_pct === undefined ? null : Number(r.win_pct),
+        targetPoints:
+          r.target_points === null || r.target_points === undefined
+            ? null
+            : Number(r.target_points),
+        payoutCurve: r.payout_curve ?? 'flat',
+        scoreRate: Number(r.score_rate ?? 0),
         heartsAtRisk: Number(r.hearts_at_risk ?? 0),
         heartsOnWin: Number(r.hearts_on_win ?? 0),
         myHearts: r.my_hearts === null || r.my_hearts === undefined ? null : Number(r.my_hearts),
@@ -195,6 +223,10 @@ export function termsOfContest(c: Contest): ContestTerms {
     heartsOnWin: c.heartsOnWin,
     winCondition: c.winCondition,
     winRank: c.winRank,
+    winPct: c.winPct,
+    targetPoints: c.targetPoints,
+    payoutCurve: c.payoutCurve,
+    scoreRate: c.scoreRate,
     prizePool: c.prizePool,
     entrants: c.entrants,
     maxEntrants: c.maxEntrants,

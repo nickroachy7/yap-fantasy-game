@@ -696,13 +696,28 @@ function BarAction({
  */
 function lobbyStatus(
   mine: { filled: number } | null | undefined,
-  contest: { entryFeeCoins: number; affordable: boolean; slotCount: number },
+  contest: {
+    kind: 'free' | 'lobby';
+    entryFeeCoins: number;
+    affordable: boolean;
+    slotCount: number;
+  },
 ): { label: string; tone: 'positive' | 'warning' | 'neutral' } {
   if (!mine) {
     if (contest.entryFeeCoins > 0 && !contest.affordable) {
       return { label: 'Not enough coins', tone: 'neutral' };
     }
-    return { label: contest.entryFeeCoins > 0 ? 'Enter' : 'Not set', tone: 'warning' };
+    /* THE TEST IS `kind`, NOT THE FEE, and that distinction only started
+       mattering with The Warm-Up (`20260901050000`).
+
+       `Not set` is the free contest's word: you are already in it, you did not
+       choose to be, and there is nothing to enter — only a lineup you have not
+       filled. `Enter` is every other row's word. The fee used to stand in for
+       that difference because free and opt-in were the same set, and they are
+       not any more: The Warm-Up costs nothing and is still something you decide
+       to join. Reading it off the fee would greet the lobby's on-ramp with a
+       chip that gives the reader nothing to do. */
+    return { label: contest.kind === 'free' ? 'Not set' : 'Enter', tone: 'warning' };
   }
   return mine.filled < contest.slotCount
     ? { label: `${mine.filled} of ${contest.slotCount}`, tone: 'warning' }

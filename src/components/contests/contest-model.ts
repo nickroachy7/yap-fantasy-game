@@ -25,7 +25,18 @@
 import { MIN_ENTRANTS, type Result } from '@/components/lineup/field';
 
 /** How a contest decides a winner. Mirrors `public.contest_win_condition`. */
-export type WinCondition = 'median' | 'top_n';
+export type WinCondition = 'median' | 'top_n' | 'top_pct' | 'target';
+
+/**
+ * How the pool is DIVIDED once the winners are known. Mirrors
+ * `public.contest_payout_curve`.
+ *
+ * Deliberately independent of `WinCondition`, because the two answer different
+ * questions and a lobby with any shape needs both. "Top third wins" is a
+ * double-up when it pays `flat` and a tournament when it pays `steep`, and those
+ * are different products sharing one rule for deciding who won.
+ */
+export type PayoutCurve = 'flat' | 'linear' | 'steep' | 'winner_take_all';
 
 /**
  * The facts every surface prices a contest from.
@@ -42,6 +53,28 @@ export type ContestTerms = {
   heartsOnWin: number;
   winCondition: WinCondition;
   winRank: number | null;
+  /** For `top_pct`: the share of the field that wins, as a whole percent. */
+  winPct: number | null;
+  /** For `target`: the score an entry has to reach. Known before kickoff. */
+  targetPoints: number | null;
+  /** How the pool is split among the winners. */
+  payoutCurve: PayoutCurve;
+  /**
+   * COINS PER FANTASY POINT, BEFORE THE CARD'S TIER MULTIPLIER — the game's
+   * baseline, and the same number on every contest in the lobby.
+   *
+   * It is a property of the game and not of the row, and it is carried on the
+   * row anyway. That is the fix for how it used to read: the rate was printed
+   * on the free contest alone (it was the only row with no pool to print
+   * instead), so the one universal thing in the reward column looked like the
+   * free contest's perk. Every row states it now, identically, which is what
+   * makes it read as scenery rather than as a differentiator.
+   *
+   * Never hardcoded here. `score_rate()` is the server's own number, carried
+   * down by `contest_lobby` and `my_contest_cards` so the app cannot advertise
+   * a rate the payout does not use — see `20260901010000`.
+   */
+  scoreRate: number;
   /** Coins collected so far that will be paid back out. Grows with the field. */
   prizePool: number;
   entrants: number;
@@ -69,12 +102,72 @@ export type ContestTerms = {
  */
 export function winLine(t: ContestTerms, duel?: Duel | null): string {
   if (duel) return `Beat ${duel.handle}`;
+
+  /* A TARGET IS THE ONLY CONDITION THAT DOES NOT MENTION THE FIELD, because it
+     is the only one that does not depend on it. It also reads the same on the
+     Tuesday a contest opens as on the Sunday it settles, which none of the
+     others do. */
+  if (t.winCondition === 'target' && t.targetPoints !== null) {
+    return `Beat ${points(t.targetPoints)}`;
+  }
+
+  const places = payingPlaces(t);
+
+  /* THE SHARE IS STATED AS PLACES ONCE THERE IS A FIELD TO COUNT. "Top 50%" is
+     the rule and "Top 2 of 5 win" is the offer, and a player deciding whether
+     to spend a heart is buying the second one. Before the field is playable
+     there are no places to name, so the percentage stands alone. */
+  if (t.winCondition === 'top_pct' && t.winPct !== null) {
+    return places !== null && t.entrants >= MIN_ENTRANTS
+      ? `Top ${places} of ${t.entrants} win`
+      : `Top ${t.winPct}% win`;
+  }
+
   if (t.winCondition === 'top_n' && t.winRank !== null) {
+    /* "TOP 1 WIN" IS NOT A SENTENCE. One place is a different offer and reads
+       as one: against a capped field of two it is a person, and otherwise it is
+       first or nothing. The Duel is the first contest to pay a single place. */
+    if (t.winRank === 1) {
+      return t.maxEntrants === 2 ? 'Beat your opponent' : 'First place only';
+    }
     return t.entrants > t.winRank
       ? `Top ${t.winRank} of ${t.entrants} win`
       : `Top ${t.winRank} win`;
   }
   return 'Beat the median';
+}
+
+/**
+ * HOW MANY PLACES ACTUALLY PAY, or null where that is not knowable yet.
+ *
+ * The same arithmetic `contest_results` and `contest_payouts` use, deliberately
+ * written out again rather than shipped down as a number. It is three lines, it
+ * is pure, and having it here is what lets the lobby say "Top 2 of 5 win"
+ * before anybody has scored a point — a server-computed field would only exist
+ * after settlement, which is exactly when a player no longer needs it.
+ *
+ * FLOOR, MINIMUM ONE, matching `20260901040000` exactly. If these two ever
+ * disagree the lobby advertises a cut the settlement does not honour, so the
+ * rule is: change one, change both, and the SQL is the one that is right.
+ *
+ * Null under `median` and `target` — and that is not a gap. Neither has a fixed
+ * number of places: a median contest pays however many beat the middle, and a
+ * target pays however many clear it. Both are answered by the week, not in
+ * advance.
+ */
+export function payingPlaces(
+  t: Pick<ContestTerms, 'winCondition' | 'winRank' | 'winPct' | 'entrants'>,
+): number | null {
+  if (t.winCondition === 'top_n') return t.winRank;
+  if (t.winCondition === 'top_pct' && t.winPct !== null) {
+    return Math.max(1, Math.floor((t.entrants * t.winPct) / 100));
+  }
+  return null;
+}
+
+/** A score as the game writes them: one decimal, no trailing zero noise. */
+function points(n: number): string {
+  return Number.isInteger(n) ? `${n}` : n.toFixed(1);
 }
 
 /**
@@ -112,7 +205,7 @@ export function winLine(t: ContestTerms, duel?: Duel | null): string {
  * have one, which is the same condition the median has.
  */
 export function opponentOf(
-  t: Pick<ContestTerms, 'winCondition' | 'winRank'>,
+  t: Pick<ContestTerms, 'winCondition' | 'winRank' | 'winPct' | 'entrants'>,
   against: { median: number; cut: number | null; duel?: Duel | null },
 ): Opponent {
   /* A REAL PERSON BEATS EVERY DERIVED LINE. Where there is one there is nothing
@@ -120,8 +213,19 @@ export function opponentOf(
   if (against.duel) {
     return { label: against.duel.handle, value: against.duel.points, shape: 'duel' };
   }
-  if (t.winCondition === 'top_n' && t.winRank !== null) {
-    return { label: `THE CUT · ${ordinal(t.winRank)}`, value: against.cut, shape: 'field' };
+
+  /* THE TARGET ARRIVES IN `cut`, from `my_contest_cards`. It is the same kind of
+     thing — the number this entry has to be above — so it uses the same channel
+     and the band never learns a fourth shape. The one difference is that it is
+     never null: a cut waits for the field to score and a target is set before
+     the week opens, which is most of why the row exists. */
+  if (t.winCondition === 'target') {
+    return { label: 'THE TARGET', value: against.cut, shape: 'field' };
+  }
+
+  const places = payingPlaces(t);
+  if (places !== null) {
+    return { label: `THE CUT · ${ordinal(places)}`, value: against.cut, shape: 'field' };
   }
   return { label: 'COMMUNITY', value: against.median, shape: 'field' };
 }
@@ -370,7 +474,7 @@ export function rewardLines(t: ContestTerms, prize: number | null = null): Trade
           : 'Share of the pool',
     });
   } else {
-    lines.push({ text: 'From 1.5 coins a point' });
+    lines.push({ text: `From ${t.scoreRate} coins a point` });
   }
 
   if (t.heartsOnWin > 0) {
@@ -383,18 +487,47 @@ export function rewardLines(t: ContestTerms, prize: number | null = null): Trade
 /**
  * What the WINNER takes, when the split has a top place to speak of.
  *
- * `top_n` weights by place — `win_rank + 1 - rnk`, so top three is 3:2:1 — and
- * the first share is therefore `2 / (n + 1)` of the pool. Kept in step with
- * `contest_payouts` by being the same arithmetic, not the same constant.
+ * THE CURVE DECIDES, not the win condition. `contest_payouts` divides the pool
+ * by a weight per place, and this is that arithmetic run for place one — the
+ * same expressions, not the same constants, so the two cannot drift apart when
+ * a row is re-tuned from `flat` to `steep`.
  *
- * Null under `median`, and that is not a gap. A median contest pays everybody
- * who beat the middle an equal share, so what one winner takes depends entirely
- * on how many others also won — a number that does not exist until the week is
- * over. "Share of the pool" is the whole truth available in advance.
+ * Null under `median` and `target`, and that is not a gap. Both pay everybody
+ * who cleared the line an equal share, so what one winner takes depends entirely
+ * on how many others also cleared it — a number that does not exist until the
+ * week is over. "Share of the pool" is the whole truth available in advance.
+ *
+ * Under `top_pct` it is knowable as soon as anybody has entered, because the
+ * places come from the field size rather than from the scores.
  */
 export function topPrize(t: ContestTerms): number | null {
-  if (t.winCondition !== 'top_n' || t.winRank === null || t.prizePool <= 0) return null;
-  return Math.floor((t.prizePool * 2) / (t.winRank + 1));
+  if (t.prizePool <= 0) return null;
+
+  /* One place, everything. Nothing to divide and no field to know. */
+  if (t.payoutCurve === 'winner_take_all') return t.prizePool;
+
+  const places = payingPlaces(t);
+  if (places === null || places < 1) return null;
+
+  switch (t.payoutCurve) {
+    /* Every winner takes the same, so the top prize is the only prize. This is
+       what makes a double-up legible: `WIN 180` on a 100 coin entry IS the
+       offer, not a ceiling somebody else reaches. */
+    case 'flat':
+      return Math.floor(t.prizePool / places);
+
+    /* Weights run places..1 and sum to p(p+1)/2, so first place takes
+       2 / (p + 1) of the pool. Top three is 3:2:1. */
+    case 'linear':
+      return Math.floor((t.prizePool * 2) / (places + 1));
+
+    /* Weights are 1, 1/2 … 1/p, so first place takes 1/H(p). Top five is 44%. */
+    case 'steep': {
+      let harmonic = 0;
+      for (let i = 1; i <= places; i += 1) harmonic += 1 / i;
+      return Math.floor(t.prizePool / harmonic);
+    }
+  }
 }
 
 /* --------------------------------------------------------- the settlement */
@@ -611,6 +744,16 @@ export type Token = {
   value: string;
   /** Names the unit. Printed only where the side has room — see above. */
   unit?: string;
+  /**
+   * Print the unit even on a crowded side.
+   *
+   * For a RATE and only a rate. `◆ 120` is a hundred and twenty coins whether
+   * or not the word is there, but a bare `◆ 1.5` is a coin and a half — the
+   * number stops meaning anything without "a point" beside it. So the rate
+   * carries a short unit it never drops, and the model gives it the long form
+   * only when it is alone and there is room.
+   */
+  keepUnit?: boolean;
   tone?: 'positive' | 'negative';
   /** A heart that was taken, so `Heart` draws it torn rather than whole. */
   killed?: boolean;
@@ -628,11 +771,13 @@ export type Token = {
  * thing, and none of them said "beat this".
  */
 export function beatSource(
-  t: Pick<ContestTerms, 'winCondition' | 'winRank'>,
+  t: Pick<ContestTerms, 'winCondition' | 'winRank' | 'winPct' | 'entrants'>,
   duel?: Duel | null,
 ): string {
   if (duel) return duel.handle.toUpperCase();
-  if (t.winCondition === 'top_n' && t.winRank !== null) return ordinal(t.winRank);
+  if (t.winCondition === 'target') return 'TARGET';
+  const places = payingPlaces(t);
+  if (places !== null) return ordinal(places);
   return 'MEDIAN';
 }
 
@@ -676,8 +821,6 @@ export function winTokens(t: ContestTerms, prize: number | null = null): Token[]
     if (top !== null) out.push({ kind: 'coin', value: `${top}`, unit: 'coins' });
     else if (t.prizePool > 0) out.push({ kind: 'coin', value: `${t.prizePool}`, unit: 'coins' });
     else out.push({ kind: 'coin', value: 'share', unit: 'of the pool' });
-  } else {
-    out.push({ kind: 'coin', value: '1.5', unit: 'a point' });
   }
 
   if (t.heartsOnWin > 0) {
@@ -688,7 +831,52 @@ export function winTokens(t: ContestTerms, prize: number | null = null): Token[]
       tone: 'positive',
     });
   }
+
+  /* THE RATE, LAST, ON EVERY CONTEST.
+     -----------------------------------------------------------------------
+     It used to be the `else` branch above — printed only where there was no
+     pool to print instead, which meant only on the free contest. So the one
+     thing that is true of every row in the lobby appeared on exactly one of
+     them, and read as that row's reward.
+
+     It is the opposite of a perk. A paid row earns it too, on bench cards that
+     would otherwise be earning nothing, and that is the best argument for
+     entering one. Printing it identically everywhere is what turns it back into
+     what it is: the floor under the whole lobby, not a feature of any row.
+
+     LAST because it is the constant. The pool is what differs between two rows
+     a player is choosing between, so it leads; the rate is the same sentence on
+     both and settles behind it.
+
+     The long unit only where the token is alone — see `keepUnit`.
+
+     GUARDED ON A POSITIVE RATE, which is not defensiveness for its own sake.
+     `scoreRate` comes down from `score_rate()`, and an app build that reaches a
+     database where that column does not exist yet reads it as nought — the
+     ordinary state of an over-the-air update that lands before its migration.
+     A `◆ 0 a point` token would be the app confidently advertising that a start
+     earns nothing. Omitting it falls back to exactly what the card drew before
+     this change, which is wrong-but-familiar rather than wrong-and-alarming. */
+  if (t.scoreRate > 0) {
+    const alone = out.length === 0;
+    out.push({
+      kind: 'coin',
+      value: rate(t.scoreRate),
+      unit: alone ? 'a point' : '/pt',
+      keepUnit: true,
+    });
+  }
+
+  /* A paid contest with no pool yet and no rate to fall back on would otherwise
+     return an empty side, and an empty reward column reads as still loading. */
+  if (out.length === 0) out.push({ kind: 'coin', value: 'share', unit: 'of the pool' });
+
   return out;
+}
+
+/** The per-point rate as drawn: `1.5`, never `1.50` and never `1.4999`. */
+function rate(n: number): string {
+  return Number.isInteger(n) ? `${n}` : `${Math.round(n * 100) / 100}`;
 }
 
 /**

@@ -434,6 +434,71 @@ export type Database = {
         }
         Relationships: []
       }
+      contest_templates: {
+        Row: {
+          blurb: string | null
+          code: string
+          entry_fee_coins: number
+          format_code: string
+          hearts_at_risk: number
+          hearts_on_win: number
+          is_active: boolean
+          max_entrants: number | null
+          name: string
+          payout_curve: Database["public"]["Enums"]["contest_payout_curve"]
+          prize_pool_bps: number
+          sort_order: number
+          target_points: number | null
+          win_condition: Database["public"]["Enums"]["contest_win_condition"]
+          win_pct: number | null
+          win_rank: number | null
+        }
+        Insert: {
+          blurb?: string | null
+          code: string
+          entry_fee_coins?: number
+          format_code: string
+          hearts_at_risk?: number
+          hearts_on_win?: number
+          is_active?: boolean
+          max_entrants?: number | null
+          name: string
+          payout_curve?: Database["public"]["Enums"]["contest_payout_curve"]
+          prize_pool_bps?: number
+          sort_order: number
+          target_points?: number | null
+          win_condition: Database["public"]["Enums"]["contest_win_condition"]
+          win_pct?: number | null
+          win_rank?: number | null
+        }
+        Update: {
+          blurb?: string | null
+          code?: string
+          entry_fee_coins?: number
+          format_code?: string
+          hearts_at_risk?: number
+          hearts_on_win?: number
+          is_active?: boolean
+          max_entrants?: number | null
+          name?: string
+          payout_curve?: Database["public"]["Enums"]["contest_payout_curve"]
+          prize_pool_bps?: number
+          sort_order?: number
+          target_points?: number | null
+          win_condition?: Database["public"]["Enums"]["contest_win_condition"]
+          win_pct?: number | null
+          win_rank?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contest_templates_format_code_fkey"
+            columns: ["format_code"]
+            isOneToOne: false
+            referencedRelation: "contest_formats"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       contests: {
         Row: {
           code: string
@@ -446,11 +511,14 @@ export type Database = {
           kind: Database["public"]["Enums"]["contest_kind"]
           max_entrants: number | null
           name: string
+          payout_curve: Database["public"]["Enums"]["contest_payout_curve"]
           prize_pool_bps: number
           season: number
           season_type: number
+          target_points: number | null
           week: number
           win_condition: Database["public"]["Enums"]["contest_win_condition"]
+          win_pct: number | null
           win_rank: number | null
         }
         Insert: {
@@ -464,11 +532,14 @@ export type Database = {
           kind: Database["public"]["Enums"]["contest_kind"]
           max_entrants?: number | null
           name: string
+          payout_curve?: Database["public"]["Enums"]["contest_payout_curve"]
           prize_pool_bps?: number
           season: number
           season_type: number
+          target_points?: number | null
           week: number
           win_condition?: Database["public"]["Enums"]["contest_win_condition"]
+          win_pct?: number | null
           win_rank?: number | null
         }
         Update: {
@@ -482,11 +553,14 @@ export type Database = {
           kind?: Database["public"]["Enums"]["contest_kind"]
           max_entrants?: number | null
           name?: string
+          payout_curve?: Database["public"]["Enums"]["contest_payout_curve"]
           prize_pool_bps?: number
           season?: number
           season_type?: number
+          target_points?: number | null
           week?: number
           win_condition?: Database["public"]["Enums"]["contest_win_condition"]
+          win_pct?: number | null
           win_rank?: number | null
         }
         Relationships: [
@@ -1907,14 +1981,18 @@ export type Database = {
           my_hearts: number
           my_lineup_id: string
           name: string
+          payout_curve: Database["public"]["Enums"]["contest_payout_curve"]
           prize_pool: number
           prize_pool_bps: number
           recap: boolean
+          score_rate: number
           season: number
           season_type: number
           slot_count: number
+          target_points: number
           week: number
           win_condition: Database["public"]["Enums"]["contest_win_condition"]
+          win_pct: number
           win_rank: number
         }[]
       }
@@ -1972,9 +2050,14 @@ export type Database = {
       daily_pack_status: { Args: never; Returns: Json }
       daily_set_day: { Args: never; Returns: string }
       daily_set_position: { Args: { p_day: string }; Returns: string }
+      ensure_all_contests: { Args: never; Returns: number }
       ensure_free_contest: {
         Args: { p_season: number; p_season_type: number; p_week: number }
         Returns: string
+      }
+      ensure_week_contests: {
+        Args: { p_season: number; p_season_type: number; p_week: number }
+        Returns: number
       }
       game_config_value: {
         Args: { p_default?: number; p_key: string }
@@ -2069,14 +2152,18 @@ export type Database = {
           my_prize: number
           my_rank: number
           name: string
+          payout_curve: Database["public"]["Enums"]["contest_payout_curve"]
           prize_pool: number
           recap: boolean
           result: string
+          score_rate: number
           season: number
           season_type: number
           slot_count: number
+          target_points: number
           week: number
           win_condition: Database["public"]["Enums"]["contest_win_condition"]
+          win_pct: number
           win_rank: number
         }[]
       }
@@ -2128,6 +2215,7 @@ export type Database = {
       rotate_daily_set: { Args: never; Returns: Json }
       rotate_weekly_set: { Args: never; Returns: Json }
       run_carry_slots: { Args: { p_wins: number }; Returns: number }
+      score_rate: { Args: never; Returns: number }
       score_week: {
         Args: { p_season: number; p_season_type: number; p_week: number }
         Returns: Json
@@ -2195,6 +2283,10 @@ export type Database = {
           lineup_id: string
         }[]
       }
+      week_has_started: {
+        Args: { p_season: number; p_season_type: number; p_week: number }
+        Returns: boolean
+      }
       week_is_complete: {
         Args: { p_season: number; p_season_type: number; p_week: number }
         Returns: boolean
@@ -2229,7 +2321,8 @@ export type Database = {
         | "run_wipe"
         | "contest_prize"
       contest_kind: "free" | "lobby"
-      contest_win_condition: "median" | "top_n"
+      contest_payout_curve: "flat" | "linear" | "steep" | "winner_take_all"
+      contest_win_condition: "median" | "top_n" | "top_pct" | "target"
       rarity: "common" | "uncommon" | "rare" | "epic" | "legendary"
     }
     CompositeTypes: {
@@ -2246,12 +2339,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2275,11 +2368,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2300,11 +2393,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2325,11 +2418,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2342,11 +2435,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2380,7 +2473,8 @@ export const Constants = {
         "contest_prize",
       ],
       contest_kind: ["free", "lobby"],
-      contest_win_condition: ["median", "top_n"],
+      contest_payout_curve: ["flat", "linear", "steep", "winner_take_all"],
+      contest_win_condition: ["median", "top_n", "top_pct", "target"],
       rarity: ["common", "uncommon", "rare", "epic", "legendary"],
     },
   },
