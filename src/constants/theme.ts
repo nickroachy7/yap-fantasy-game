@@ -96,6 +96,19 @@ export const Colors = {
      * THE OUTLINE OF SOMETHING RAISED — the silhouette of an object sitting on
      * top of the page, rather than an edge lying flat in it.
      *
+     * NOTHING DRAWS AN OUTLINE WITH IT TODAY. `ContestCard` was the only caller
+     * and moved to `borderStrong` on 2026-09-02: at #5E5E5E this is 94 points
+     * over the page on a screen whose every other edge is #272727, and the card
+     * was reported as reading grey and pasted-on — a bright rectangle found
+     * before the score inside it. See that card's header for what replaced it.
+     * `EarningsScale` still uses the value, but as a FILL for the marks on a
+     * scale, which is a different job that happens to want the same grey.
+     *
+     * The account below is kept because it is the reference for why neither of
+     * the two obvious ways to raise a dark panel works, and `ContestCard` still
+     * points here for the one-colour-per-border constraint, which is a platform
+     * fact rather than a taste call.
+     *
      * ---------------------------------------------------------------------
      * WHY IT IS NOT `border` OR `borderStrong`
      * ---------------------------------------------------------------------

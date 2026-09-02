@@ -3,18 +3,18 @@
  * SIZE, in every state it can be in.
  *
  * ---------------------------------------------------------------------------
- * THREE ZONES: A LIT PLANE WITH A WELL CUT INTO IT
+ * THREE ZONES: ONE PLANE, SEAMED
  * ---------------------------------------------------------------------------
  *
  *     ┌──────────────────────────────────────────────────┐
- *     │ ▤ WR Room │ Top 3 of 24 win   24 entries │ LIVE  │  HEAD   34pt  plane
+ *     │ ▤ WR Room │ Top 3 of 24 win   24 entries │ LIVE  │  HEAD   34pt
  *     ├──────────────────────────────────────────────────┤
- *     │ YOU [6TH]              VS         [3RD] TO BEAT  │  SCORE  90pt  well
+ *     │ YOU [6TH]              VS         [3RD] TO BEAT  │  SCORE  90pt
  *     │ 88.1                  −9.4                 97.5  │
  *     │ PROJ —                                    PROJ — │
  *     │ ▬▬▬▬▬▬▬(6)▬▬▬┊▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬  │
  *     ├──────────────────────────────────────────────────┤
- *     │ RISK  ◆40  ♥1        │        ◆120  ♥+1  ▣1  WIN │  FOOT   29pt  plane
+ *     │ RISK  ◆40  ♥1        │        ◆120  ♥+1  ▣1  WIN │  FOOT   29pt
  *     └──────────────────────────────────────────────────┘
  *
  * Each zone answers exactly one question, and that is the organising idea of
@@ -26,40 +26,56 @@
  *           where the two sit on one scale.
  *   FOOT    the trade. What you put up, what you take.
  *
- * The card's structure is drawn in MATERIAL rather than in hairlines: three
- * near-invisible dividers on one flat fill was what made the previous card read
- * as six loose rows — see the surface note on `ContestCard` below.
+ * ONE FILL — `surface`, ON EVERY ZONE — AND THE SEAMS ARE HAIRLINES.
  *
- * WHICH BAND IS THE LIT ONE WAS THE OTHER WAY ROUND, and turning it over is
- * what made the card read as a raised object rather than a drawn box.
+ * THE CARD USED TO BE STRIPED, and that is what was wrong with it. Head and
+ * foot were `backgroundElement` with the score band recessed to `surface`: a
+ * lit plane with a well cut into it, on the argument that the head and foot are
+ * the card's SILHOUETTE and so should carry the light. The reasoning holds in
+ * isolation. What it missed is the screen it lands on.
  *
- * The middle used to be the light one, on the argument that the band a reader
- * came for should be the lit one. That is a true thing to want and it was being
- * paid for in the wrong currency, because the head and foot are the card's
- * SILHOUETTE — the first and last 34 and 29 points of it, the edge the eye uses
- * to separate the card from the page. Keeping them at `surface` meant the
- * outline of the card was its darkest part, only fifteen points off the page,
- * with the light band buried in the middle where no edge could use it. The card
- * sat IN the page instead of ON it.
+ * On the lineup board nothing else is elevated at all. The header, the tabs and
+ * every lineup row are flat on the page with hairline dividers, so the card was
+ * the one object in the view carrying a fill AND an outline AND internal bands,
+ * and it read as pasted on from somewhere else. Three numbers say it plainly:
+ * the page is #080808, the card's dominant bands were #212121, and the ring
+ * around them was #5E5E5E on a screen whose every other edge is #272727.
  *
- * So the head and foot take `backgroundElement` and the score band takes
- * `surface`: a lit plane with a well cut into it. The scoring band still reads
- * as its own thing — it is a step of material either way, and a recessed well
- * is if anything the more literal shape for a figure you are reading OUT of the
- * card. What changed is that the lift is now on the edge, where it does work.
+ * THE HEADER PILLS SETTLED IT. The hearts and coins balances in `AppHeader` are
+ * `surface` #171717 with NO border, they sit two inches above this card, and
+ * they read as distinct floating objects without either of the devices this
+ * card was spending. They are the app's existing answer to "an object on the
+ * near-black page", so the card is made of the same thing: `surface`, edge to
+ * edge, with the ring down to `borderStrong`.
  *
- * Together with the outline — a full point of `borderRaised`, one colour on all
- * four sides — that is the whole of the card's elevation. There is no shadow
- * and no lit top edge; `Colors.dark.borderRaised` explains why neither of the
- * two obvious ways to raise a dark panel works on this one, and `styles.card`
- * explains why the outline is not a hairline.
+ * THE WELL HAD TO GO RATHER THAN GET DARKER, and the second ground is why. This
+ * card is also drawn inside `ContestSheet`, whose floor is `surfaceSheet`
+ * #101010, and it draws the scoring band there. Once head and foot take #171717
+ * a recessed well lands around #121212 — two points over that floor, which is
+ * nothing. A step of material that only exists on one of the two grounds is not
+ * a step, so the zones are separated by `borderStrong` hairlines instead, which
+ * are the same mark and the same colour as the `Rule` already dividing fields
+ * INSIDE the head and foot.
+ *
+ * The old note here warned that hairlines on a flat fill are what made an
+ * earlier card read as six loose rows. That card had three near-invisible
+ * dividers and nothing else; this one keeps the whole zone structure — the
+ * fixed heights, the shared gutter, the grouping — and changes only what draws
+ * the two seams between them. Watch this if the card ever reads as loose again.
+ *
+ * The seams are `borderTopWidth` on the score and foot zones. React Native is
+ * border-box, so they sit INSIDE the declared heights and the card is still
+ * exactly 153pt with the band and 64 without — see the height contract below.
  *
  * ---------------------------------------------------------------------------
  * SEPARATORS HAVE A VOCABULARY, AND IT HAS TWO WORDS
  * ---------------------------------------------------------------------------
  *
- *   SOLID hairline — two things that sit side by side. The contest's name from
- *                    its win condition; the risk from the win.
+ *   SOLID hairline — two things that sit next to each other. The contest's name
+ *                    from its win condition; the risk from the win; and, since
+ *                    the zones stopped being steps of material, one zone from
+ *                    the next. All of them `borderStrong`, all of them the same
+ *                    mark, because they are all making the same claim.
  *   DASHED line    — the line you have to cross. Appears exactly once on the
  *                    card, on the pace bar, and never anywhere else.
  *
@@ -403,7 +419,7 @@ function Head({
   const formatMark = formatGlyphOf(terms.formatName);
 
   return (
-    <View style={[styles.zone, styles.head, { backgroundColor: c.backgroundElement }]}>
+    <View style={[styles.zone, styles.head, { backgroundColor: c.surface }]}>
       <View style={styles.headRow}>
         <View style={styles.headLeft}>
           {formatMark ? (
@@ -682,7 +698,12 @@ function Score({
   const markAt = beat === null ? 0 : Math.min(MARK_MAX, Math.max(MARK_MIN, at(beat)));
 
   return (
-    <View style={[styles.zone, styles.score, { backgroundColor: c.surface }]}>
+    <View
+      style={[
+        styles.zone,
+        styles.score,
+        { backgroundColor: c.surface, borderTopColor: c.borderStrong },
+      ]}>
       <View style={styles.cmp}>
         <Side
           label="YOU"
@@ -857,7 +878,12 @@ function Foot({
   const c = Colors[scheme];
 
   return (
-    <View style={[styles.zone, styles.foot, { backgroundColor: c.backgroundElement }]}>
+    <View
+      style={[
+        styles.zone,
+        styles.foot,
+        { backgroundColor: c.surface, borderTopColor: c.borderStrong },
+      ]}>
       <TokenRow
         label={settled ? 'STAKED' : 'RISK'}
         tokens={settled ? stakedTokens(terms, settled) : riskTokens(terms)}
@@ -990,28 +1016,36 @@ function Mark({ token, side }: { token: Token; side: 'risk' | 'win' }) {
  * The frame. Head, scoring, trade — always all three, always the same height.
  *
  * ---------------------------------------------------------------------------
- * THE SURFACES, AND WHY `level` IS GONE
+ * THE SURFACE, AND WHY `level` IS GONE
  * ---------------------------------------------------------------------------
  *
- * This card used to take a `level` prop, because it drew as one flat fill and
- * that fill had to be chosen against whatever it was placed on: `surfaceSheet`
- * on the board, `surface` inside a sheet, so the ramp kept stacking either way.
+ * This card used to take a `level` prop, because its one flat fill had to be
+ * chosen against whatever it was placed on: `surfaceSheet` on the board,
+ * `surface` inside a sheet, so the ramp kept stacking either way.
  *
- * It does not draw as one fill any more. The head and foot are
- * `backgroundElement` and the middle is `surface`, which is a ramp that works
- * on both grounds without being told which one it is on:
+ * It is one flat fill again — `surface`, every zone — but the prop has not come
+ * back, because `surface` clears BOTH grounds without being told which it is
+ * on:
  *
- *     on the page    #080808 → #212121 head/foot → #171717 well
- *     on a sheet     #101010 → #212121 head/foot → #171717 well
+ *     on the page    #080808 → #171717 card    (+15)
+ *     on a sheet     #101010 → #171717 card    (+7)
  *
- * Every step is positive from either ground, which is the property that made
- * `level` unnecessary: the well is still 15 points above the page and 7 above a
- * sheet, so the middle never sinks INTO whatever the card is lying on.
+ * That is the whole reason the striped version could be undone without
+ * reintroducing `level`. What the stripes were buying was a bigger number in
+ * the first row; what they cost was a card that did not look like the rest of
+ * the app. The header pills clear the page on +15 and no border at all, so +15
+ * plus a `borderStrong` ring is not a close call on the ground that matters.
  *
- * It also fixes a real inversion. On the lineup board the hearts tray under the
- * carousel is `surface`, and the card was `surfaceSheet` — one step DARKER — so
- * the accessory was brighter than the object it serves. The card is the top of
- * the stack on that screen now, and the tray was not touched to get there.
+ * +7 on a sheet is the thinner of the two and it is why the ring stayed. Drop
+ * the border entirely — the pills' own recipe — and the card is fine on the
+ * board and vague inside `ContestSheet`. The ring is what makes one fill work
+ * on two grounds.
+ *
+ * It also keeps a fix worth not losing. On the lineup board the hearts tray
+ * under the carousel is `surface`, and the card was once `surfaceSheet` — one
+ * step DARKER — so the accessory was brighter than the object it serves. The
+ * card and the tray are level now and the card has the outline, which is the
+ * right order without making the card louder to get there.
  */
 export function ContestCard({
   name,
@@ -1107,11 +1141,18 @@ export function ContestCard({
    * look lit from above, it was tried, and iOS draws a mixed-colour border by
    * hand and mitres it across the corners — which is what made them look
    * chewed. `Colors.dark.borderRaised` has the whole account.
+   *
+   * IT IS `borderStrong`, NOT `borderRaised`, AND THAT IS THE 2026-09-02 PASS.
+   * `borderRaised` is #5E5E5E — 94 points over an #080808 page, on a screen
+   * whose every other edge is a #272727 hairline. It was sized to carry the
+   * card's whole elevation single-handed, and what it produced was a bright
+   * rectangle that the eye found before it found the score. The card does not
+   * need the ring to do that job any more; see the header on the fill.
    */
   const edge = {
-    borderColor: c.borderRaised,
+    borderColor: c.borderStrong,
     /**
-     * THE CARD'S OWN FILL, under three zones that already paint their own.
+     * THE CARD'S OWN FILL, under zones that already paint their own.
      *
      * It is not redundant, and the corners are why. `overflow: 'hidden'` clips
      * the zones to the rounded outline, and a clip is antialiased — so along
@@ -1122,10 +1163,9 @@ export function ContestCard({
      * Barely visible at rest, and obvious the moment the card moved.
      *
      * One opaque fill behind the whole card and there is nothing to show
-     * through. It is `backgroundElement` because that is what the head and foot
-     * are — the corners belong to them — so nothing changes anywhere else.
+     * through. Every zone is `surface` now, so this is simply that.
      */
-    backgroundColor: c.backgroundElement,
+    backgroundColor: c.surface,
   };
 
   if (!onPress) {
@@ -1225,7 +1265,7 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: 8, lineHeight: 11, fontWeight: '700', letterSpacing: 0.4 },
 
-  score: { height: SCORE_H, gap: Spacing.two },
+  score: { height: SCORE_H, gap: Spacing.two, borderTopWidth: StyleSheet.hairlineWidth },
   cmp: { flexDirection: 'row', alignItems: 'center' },
   side: { flex: 1, minWidth: 0, gap: 2 },
   sideRight: { alignItems: 'flex-end' },
@@ -1285,7 +1325,12 @@ const styles = StyleSheet.create({
   },
   pipText: { fontSize: 9, lineHeight: 11, fontWeight: '800' },
 
-  foot: { height: FOOT_H, flexDirection: 'row', alignItems: 'stretch' },
+  foot: {
+    height: FOOT_H,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   half: {
     flex: 1,
     minWidth: 0,
