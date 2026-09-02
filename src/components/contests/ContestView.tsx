@@ -79,14 +79,12 @@
  */
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { ContestAbout } from './ContestAbout';
 import { ContestActions } from './ContestActions';
 import { ContestCard } from './ContestCard';
-import { Icon } from '@/components/icons/Icon';
 import { coin, formatRoster, runWiped } from '@/components/icons/glyphs';
-import type { Glyph } from '@/components/icons/system';
 import { ContestFieldPanel } from './ContestFieldPanel';
 import { EntryLineup } from './EntryLineup';
 import { formatLine, settlementOf } from './contest-model';
@@ -94,7 +92,7 @@ import { termsOfContest, useContests } from './use-contests';
 import { useContestField, useContestLineup } from './use-contest-field';
 import { useMyContests } from './use-my-contests';
 import { LineupEditor, type EntryActions, type EntryOffer } from '@/components/lineup/LineupEditor';
-import { GlassBar, GlassPill } from '@/components/ui/GlassBar';
+import { BarAction, GlassBar, GlassPill } from '@/components/ui/GlassBar';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -599,93 +597,6 @@ export function ContestView({
 }
 
 /**
- * One action on the glass bar, built the way a tab is.
- *
- * ---------------------------------------------------------------------------
- * NOTHING ON THIS BAR IS FILLED, AND THAT IS A RULE RATHER THAN A STYLE
- * ---------------------------------------------------------------------------
- *
- * The first version of the entry button painted `surface` while it waited, and
- * that opaque fill covered 44 of the capsule's 56 points — five rounds of
- * tuning the material went on underneath a control that was hiding it. The
- * lesson generalises past that one bug: a filled rectangle on glass is a hole
- * in the glass, and a bar made of them is a solid bar with a rim.
- *
- * So an action here is what a tab is: a full-height cell, no fill, state
- * carried entirely by the colour and weight of its label. That is also why the
- * two bars now read as the same object — the nav has never drawn a filled
- * control on its pill either.
- *
- * THE PRIMARY IS BRIGHTER, NOT BOXED. `text` against `textSecondary` is a
- * bigger step on a dark material than a fill would be, and it survives the
- * background moving underneath it, which a fill's edge does not.
- *
- * DISABLED IS `textTertiary` AND NOT AN OPACITY. Opacity is what the material
- * itself is made of; a control dimmed with it on glass reads as a rendering
- * fault rather than as a state.
- */
-function BarAction({
-  glyph,
-  label,
-  hint,
-  primary = false,
-  enabled,
-  onPress,
-}: {
-  /**
-   * The mark beside the label, from the app's own set.
-   *
-   * NO TINTED PILLS. These were coloured with `Brand.lime` and
-   * `selectionAccent` for a round, and it was wrong twice: a saturated hue at
-   * any useful alpha fills a pill this small rather than rimming it, so the
-   * glass stopped being glass; and the two most meaningful colours in this app
-   * were being spent on a convenience button. A glyph says which action this is
-   * without spending a hue, and it is the same glyph the rest of the app
-   * already uses for that idea.
-   */
-  glyph?: Glyph;
-  /** Absent on a mark-only pill, where the hint carries the whole meaning. */
-  label?: string;
-  /** What a screen reader says, where the label is shortened for the row. */
-  hint?: string;
-  primary?: boolean;
-  enabled: boolean;
-  onPress: () => void;
-}) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-
-  return (
-    <Pressable
-      onPress={enabled ? onPress : undefined}
-      disabled={!enabled}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !enabled }}
-      accessibilityLabel={hint ?? label}
-      style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
-      {glyph ? (
-        <Icon
-          glyph={glyph}
-          color={enabled ? (primary ? c.text : c.textSecondary) : c.textTertiary}
-          size={15}
-          focused
-        />
-      ) : null}
-      {label ? (
-        <Text
-          numberOfLines={1}
-          style={[
-            primary ? Type.strong : Type.body,
-            { color: enabled ? (primary ? c.text : c.textSecondary) : c.textTertiary },
-          ]}>
-          {label}
-        </Text>
-      ) : null}
-    </Pressable>
-  );
-}
-
-/**
  * The lobby's chip, in the lobby's own four states.
  *
  * The same function the lobby row runs, and it has to stay the same: a contest
@@ -728,15 +639,8 @@ const styles = StyleSheet.create({
   body: { gap: Spacing.three },
   /* A tab's cell: the bar's full height, an equal share of its width, and no
      fill of its own. See `BarAction`. */
-  action: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.one + 2,
-  },
-  pressed: { opacity: 0.6 },
-  /* The card profile's exactly, so two sheets with a tab set under a hero do
-     not draw two different rules under it. */
+  /* The profiles' tab bars lost this rule when their content became hairline
+     sections that draw their own — see `players/Section`. This sheet's content
+     is still panels, so it keeps the rule that separates the tabs from them. */
   tabBar: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 2 },
 });

@@ -1684,7 +1684,7 @@ function Kit() {
 
           <Section
             title="Card exits"
-            note="The two ways a card leaves your collection, as the card profile offers them. Five states: one set open, several (the button opens a picker), a spare copy held so the burn takes a different card, a player already IN his set, and a set that is full. The last two keep the button in place and grey it rather than dropping it — a card with one exit reads as a card sets never applied to, when the truth is usually that you already placed him. Pressing either hands the decision to a ConfirmDialog on the real screen; here it just reports what was pressed.">
+            note="The two ways a card leaves your collection, as the card profile offers them: the app's glass bar, the same material and geometry as the tab bar and the contest sheet's entry bar. On the real screen it floats over the Card tab; here six of them are stacked so every state is visible at once — one set open, several (the pill opens a picker above the bar), a spare copy held so the burn takes a different card, a player already IN his set, a set that is full, and a copy under a weekly's tier floor. The last three keep the pill in place and disable it rather than dropping it — a card with one exit reads as a card sets never applied to, when the truth is usually that you already placed him. The sentence that explains which is NOT in the bar: cardExitNote returns it and the page prints it in a section. Pressing either hands the decision to a ConfirmDialog on the real screen; here it just reports what was pressed.">
             <View style={styles.section}>
               <CardExits
                 playerName="Drew Allar"

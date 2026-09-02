@@ -29,7 +29,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { readCardActions, type CardActionSet, type CardActions } from '@/components/cards/card-actions';
-import { CardExits } from '@/components/cards/CardExits';
+import { CardExits, cardExitNote } from '@/components/cards/CardExits';
 import { PlayerAvatar } from '@/components/cards/PlayerAvatar';
 import { dropCards } from '@/components/collection/use-collection';
 import { invalidateSets } from '@/components/collection/use-sets';
@@ -37,8 +37,9 @@ import { CardStanding } from '@/components/players/CardStanding';
 import { CommunityPanel } from '@/components/players/CommunityPanel';
 import { GameLogTab } from '@/components/players/GameLogTab';
 import { OverviewTab } from '@/components/players/OverviewTab';
-import { HERO_PORTRAIT, PlayerHero } from '@/components/players/PlayerHero';
+import { HERO_PORTRAIT, PlayerHero, type HeroFigure } from '@/components/players/PlayerHero';
 import { PlayerSheetFrame, SheetToneBand } from '@/components/players/PlayerSheetFrame';
+import { Section, SectionStack } from '@/components/players/Section';
 import { StartLog } from '@/components/players/StartLog';
 import { startKey } from '@/components/players/GameLog';
 import { parseCardProfile, type CardProfile } from '@/components/players/card-profile';
@@ -261,6 +262,39 @@ export default function CardDetailScreen() {
 
     const k = card.card;
 
+    /**
+     * The three the header carries on this page.
+     *
+     * THE COPY, NOT THE PLAYER — which is the whole reason this route exists.
+     * They were the top third of `CardStanding`, on a tab you had to already be
+     * on; now Overview and Game log can be read without losing sight of what
+     * the copy is worth.
+     *
+     * The third cell changes shape at the top tier rather than printing a
+     * distance to a level that does not exist. See `CardStanding` for the same
+     * branch on the bar.
+     */
+    const toNext = k.nextTierAt === null ? null : Math.max(0, k.nextTierAt - k.careerFp);
+    const figures: HeroFigure[] = [
+      { label: 'THIS COPY', value: k.careerFp.toFixed(1), hint: 'FP' },
+      { label: 'STARTS', value: String(k.lineupStarts) },
+      toNext === null || k.nextTierLabel === null
+        ? { label: 'TIER', value: 'MAX' }
+        : {
+            label: `TO ${k.nextTierLabel.toUpperCase()}`,
+            value: toNext.toFixed(0),
+            hint: 'FP',
+          },
+    ];
+
+    /* The bar's caveat, printed in the page rather than under the capsules —
+       see `cardExitNote`. Null on the common path, and null outright on a copy
+       that has already left, where there is no offer to qualify. */
+    const exitNote =
+      k.soldAt || k.committedAt
+        ? null
+        : cardExitNote(can?.sets ?? [], k.playerName, can?.burnsThisCopy !== false);
+
     return (
       <>
         <SheetToneBand tone={TierColors.dark[k.tier].accent}>
@@ -278,10 +312,25 @@ export default function CardDetailScreen() {
             figure={
               <PlayerAvatar size={HERO_PORTRAIT} frameColor={TierColors.dark[k.tier].frame} />
             }
+            /* THE TIER, as a chip in the tier's own colour. It is the one fact
+               about a copy that moves, and the page it is on is already washed
+               in that colour — the chip is what names the colour so the wash
+               reads as information rather than decoration. */
+            trailing={
+              <View
+                style={[
+                  styles.tierChip,
+                  { backgroundColor: TierColors[scheme][k.tier].accentSoft },
+                ]}>
+                <Text style={[Type.micro, { color: TierColors[scheme][k.tier].accent }]}>
+                  {k.tier.toUpperCase()}
+                </Text>
+              </View>
+            }
+            figures={figures}
           />
 
-
-          <View style={[styles.tabBar, { borderColor: c.backgroundElement }]}>
+          <View style={styles.tabBar}>
             <Tabs
               tabs={TABS.map((t) =>
                 t.value === 'log' && page.sections.length > 0
@@ -297,20 +346,20 @@ export default function CardDetailScreen() {
         {/* Card is the DEFAULT tab here, unlike the player profile. You did not
             arrive at a specific copy to read a bio. */}
         {tab === 'card' ? (
-          <>
+          <SectionStack>
             {/* A sold copy still resolves — history has to keep working — so
                 say so plainly rather than 404ing an old link. */}
             {k.soldAt ? (
-              <View style={[styles.note, { backgroundColor: c.backgroundElement }]}>
+              <Section label="SOLD">
                 <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
                   {`You sold this copy on ${dateLabel(k.soldAt)}${k.soldFor === null ? '' : ` for ${k.soldFor} coins`}. It still counts in the lineups it started, but you no longer hold it.`}
                 </Text>
-              </View>
+              </Section>
             ) : k.committedAt ? (
               /* The other way a copy leaves, and it must not read as a sale.
                  This one went somewhere: the set is named, and it is still
                  there to look at. */
-              <View style={[styles.note, { backgroundColor: c.backgroundElement }]}>
+              <Section label="IN A SET">
                 <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
                   {`You added this copy to ${k.committedSetName ?? 'a set'} on ${dateLabel(k.committedAt)}${k.committedFor === null ? '' : ` for ${k.committedFor} coins`}. It is part of that set now — it still counts in the lineups it started, but it cannot be started or sold again.`}
                 </Text>
@@ -330,59 +379,38 @@ export default function CardDetailScreen() {
                     </Text>
                   </Pressable>
                 ) : null}
-              </View>
+              </Section>
             ) : null}
 
-            <Text style={[Type.fine, { color: c.textTertiary }]}>
-              {`${k.season ?? '—'} card · ${k.rarity ?? 'unknown'} · acquired ${dateLabel(k.acquiredAt)}${k.source ? ` from a ${k.source}` : ''}`}
-            </Text>
-
-            {/**
-              * WHAT YOU CAN DO WITH IT, above what it has done.
-              *
-              * The sale used to sit at the BOTTOM of this tab, under the start
-              * log and above the community panel — a defensible reading order
-              * (look, then decide) that was reported as the button not
-              * existing. On a card with fourteen starts the log is most of a
-              * screen, so "what can I do with this" was below the fold on the
-              * one screen that exists to answer it. Adding to a set was not
-              * offered here at all.
-              *
-              * Neither exit is offered on a copy that has already taken one,
-              * and BOTH are checked rather than just the sale: a committed copy
-              * with a live SELL button is a button whose only outcome is a
-              * Postgres error.
-              */}
-            {k.soldAt || k.committedAt ? null : (
-              <CardExits
-                playerName={k.playerName}
-                tier={k.tier}
-                sellValue={k.sellValue}
-                sets={can?.sets ?? []}
-                /* Defaults to "this one burns" while the offers are still in
-                   flight, which is the safe way round: it is the reading that
-                   makes the act sound MORE consequential, and no button is
-                   drawn from it until `sets` arrives anyway. */
-                burnsThisCopy={can?.burnsThisCopy !== false}
-                busy={busy}
-                onCommit={(set) => {
-                  setCommitError(null);
-                  setPendingSet(set);
-                }}
-                onSell={() => {
-                  setSellError(null);
-                  setSelling(true);
-                }}
-              />
-            )}
-
-            <CardStanding card={k} rank={card.rank} />
+            <CardStanding card={k} />
             <StartLog starts={card.starts} playerName={k.playerName} />
 
+            {exitNote ? (
+              <Section label="SETS">
+                <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>{exitNote}</Text>
+              </Section>
+            ) : null}
+
+            <Section label="ACQUIRED">
+              <Text style={[Type.body, { color: c.textSecondary }]}>
+                {`${k.season ?? '—'} card · ${k.rarity ?? 'unknown'}${k.source ? ` · from a ${k.source}` : ''} · ${dateLabel(k.acquiredAt)}`}
+              </Text>
+            </Section>
+
             {/* The same community view the directory page shows, underneath the
-                copy it gives context to. Rank means nothing without the pool. */}
-            <CommunityPanel market={page.market} />
-          </>
+                copy it gives context to — and told WHICH copy, so its earnings
+                scale marks this one rather than the best of the several you may
+                hold. The rank comes from `card_profile` for the same reason:
+                one number, one source. */}
+            <CommunityPanel
+              market={page.market}
+              copy={{
+                careerFp: k.careerFp,
+                rank: card.rank.amongPlayer,
+                pool: card.rank.playerPool,
+              }}
+            />
+          </SectionStack>
         ) : null}
 
         {tab === 'overview' ? (
@@ -390,7 +418,6 @@ export default function CardDetailScreen() {
             <OverviewTab
               player={page.player}
               profile={page.profile}
-              market={page.market}
               sections={page.sections}
               /* Names the copy without duplicating card content into a player
                  tab — otherwise this tab is a dead end on a card page. */
@@ -499,6 +526,59 @@ export default function CardDetailScreen() {
          the colour of its own page, which is the progression made visible on
          the screen you go to check it. */
       tone={card ? TierColors.dark[card.card.tier].accent : null}
+      /**
+       * WHAT YOU CAN DO WITH IT, PINNED.
+       *
+       * The two exits have now been in three places. At the BOTTOM of the Card
+       * tab, under the start log, they were reported as not existing: on a card
+       * with fourteen starts the log is most of a screen, so "what can I do
+       * with this" was below the fold on the one screen that exists to answer
+       * it. Moved to the TOP of the tab they were found, at a cost of two
+       * stacked 56pt slabs above every number on the page — the reading order
+       * inverted to fix a scrolling problem.
+       *
+       * A footer fixes the scrolling problem instead. The bar is always on
+       * screen and costs the content nothing, so the tab can go back to
+       * standing, log, provenance, community — look, then decide — with the
+       * deciding always to hand.
+       *
+       * TAB-SCOPED, not always on. Overview and Game log are about the
+       * footballer, and a SELL button under a paragraph about his college is
+       * the app talking over the page. Neither exit is offered on a copy that
+       * has already taken one, and BOTH are checked rather than just the sale:
+       * a committed copy with a live SELL button is a button whose only outcome
+       * is a Postgres error.
+       *
+       * `footerGlass` is what makes the bar FLOAT rather than sit in the flow —
+       * the frame drops its own gutter and rule, lets the content run under the
+       * capsules, and measures the bar so the scroll still ends clear of it.
+       * The same two props the contest sheet passes.
+       */
+      footerGlass
+      footer={
+        card && tab === 'card' && !card.card.soldAt && !card.card.committedAt ? (
+          <CardExits
+            playerName={card.card.playerName}
+            tier={card.card.tier}
+            sellValue={card.card.sellValue}
+            sets={can?.sets ?? []}
+            /* Defaults to "this one burns" while the offers are still in
+               flight, which is the safe way round: it is the reading that makes
+               the act sound MORE consequential, and no button is drawn from it
+               until `sets` arrives anyway. */
+            burnsThisCopy={can?.burnsThisCopy !== false}
+            busy={busy}
+            onCommit={(set) => {
+              setCommitError(null);
+              setPendingSet(set);
+            }}
+            onSell={() => {
+              setSellError(null);
+              setSelling(true);
+            }}
+          />
+        ) : undefined
+      }
       onClose={dismiss}>
       {body()}
     </PlayerSheetFrame>
@@ -513,9 +593,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.six,
   },
   centreText: { textAlign: 'center' },
-  tabBar: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 2 },
-  /* `gap` for the committed banner's link, which sits under its sentence. The
-     sold banner has no second child and is unaffected. */
-  note: { borderRadius: Radius.panel, padding: Spacing.two + 4, gap: Spacing.two },
+  /* No bottom rule: the first `Section` under it draws one, and two hairlines
+     a gap apart is the box the sections exist to get rid of. */
+  tabBar: { paddingBottom: 2 },
+  tierChip: { borderRadius: Radius.chip, paddingHorizontal: Spacing.two - 1, paddingVertical: 3 },
   pressed: { opacity: 0.65 },
 });

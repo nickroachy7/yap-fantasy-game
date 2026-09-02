@@ -6,7 +6,7 @@
  */
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import type { PlayerBio, TeamStandings } from './profile';
 
@@ -26,9 +26,13 @@ export function TeamContext({
   const diff = standings?.pointDifferential;
 
   return (
-    <View style={[styles.card, { backgroundColor: c.backgroundElement }]}>
-      <Text style={[styles.team, { color: c.text }]}>{bio.teamName}</Text>
-      {division ? <Text style={[styles.meta, { color: c.textSecondary }]}>{division}</Text> : null}
+    <View style={styles.wrap}>
+      <Text style={[styles.team, { color: c.text }]}>
+        {bio.teamName}
+        {division ? (
+          <Text style={[styles.meta, { color: c.textTertiary }]}>{`  ${division}`}</Text>
+        ) : null}
+      </Text>
 
       {standings ? (
         <Text style={[styles.meta, { color: c.textSecondary }]}>
@@ -44,7 +48,7 @@ export function TeamContext({
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 14, padding: Spacing.three, gap: 2 },
-  team: { fontSize: 15, fontWeight: '700' },
-  meta: { fontSize: 12, lineHeight: 17 },
+  wrap: { gap: 2 },
+  team: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
+  meta: { fontSize: 12, lineHeight: 17, fontWeight: '400' },
 });

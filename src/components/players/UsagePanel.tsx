@@ -1,23 +1,28 @@
 /**
- * Usage share — the honest stand-in for a depth chart.
+ * How much of his team's work this player actually gets.
  *
- * balldontlie serves no depth chart and no projections (checked: /depth_charts,
- * /rosters, /projections all 404). Rather than invent either, this shows what
- * the snaps we HAVE actually say: how much of the team's passing and running
- * work went to this player, and where he sits among his own position group by
- * points scored.
+ * THE PROVIDER SELLS NO DEPTH CHART AND NO PROJECTION, which is the hole this
+ * fills. Rather than invent either, it reports a measurement — share of the
+ * team's targets and carries in the games we have scored — and says so.
  *
- * That is a measurement, not a forecast, and the panel says so in as many
- * words. A number a reader mistakes for an official depth chart is worse than
- * no number.
+ * BARS, NOT A GRID OF PERCENTAGES
+ *
+ * This was four cells reading `TARGET SHARE 61.8%` / `CARRY SHARE 14.2%` and so
+ * on. A share is the one figure on either profile that is inherently a
+ * proportion of something, and a proportion set as a numeral makes the reader
+ * do the comparison in their head — 61.8 against 14.2 is arithmetic, two bars
+ * is a glance. The numeral stays on the right of its own bar, because the bar
+ * is the comparison and the number is the fact.
+ *
+ * The counts (how many targets, how many carries) ride under their share as the
+ * bar's caption. They are what the share is computed FROM, so they belong with
+ * it rather than in two more cells of their own.
  */
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import type { UsageShare } from './profile';
-
-const pct = (v: number | null) => (v === null ? null : `${(v * 100).toFixed(1)}%`);
 
 export function UsagePanel({
   usage,
@@ -31,67 +36,68 @@ export function UsagePanel({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
-  // No snaps yet is the normal state through preseason, when starters sit.
-  // Say that, rather than rendering a panel full of zeroes that reads as
-  // "this player is not being used".
   if (!usage || (usage.targets === 0 && usage.carries === 0)) {
     return (
-      <View style={[styles.card, { backgroundColor: c.backgroundElement }]}>
-        <Text style={[styles.title, { color: c.text }]}>Usage share</Text>
-        <Text style={[styles.body, { color: c.textSecondary }]}>
-          No touches recorded yet this season. Through preseason most starters
-          sit, so this fills in once the games count.
-        </Text>
-      </View>
+      <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
+        No touches recorded yet this season. Through preseason most starters sit, so this fills in
+        once the games count.
+      </Text>
     );
   }
 
-  const rows: { label: string; value: string }[] = [];
-  const t = pct(usage.targetShare);
-  const car = pct(usage.carryShare);
-  if (t) rows.push({ label: 'TARGET SHARE', value: t });
-  if (car) rows.push({ label: 'CARRY SHARE', value: car });
-  rows.push({ label: 'TARGETS', value: String(usage.targets) });
-  rows.push({ label: 'CARRIES', value: String(usage.carries) });
+  const bars: { label: string; share: number | null; count: number; unit: string }[] = [
+    { label: 'Targets', share: usage.targetShare, count: usage.targets, unit: 'target' },
+    { label: 'Carries', share: usage.carryShare, count: usage.carries, unit: 'carry' },
+  ];
 
   return (
-    <View style={[styles.card, { backgroundColor: c.backgroundElement }]}>
-      <Text style={[styles.title, { color: c.text }]}>Usage share</Text>
-
+    <View style={styles.wrap}>
       {usage.rankOnTeam !== null && usage.positionGroupSize !== null ? (
-        <Text style={[styles.headline, { color: c.text }]}>
-          {position ?? 'Player'} {usage.rankOnTeam} of {usage.positionGroupSize}
+        <Text style={[Type.strong, { color: c.text }]}>
+          {`${position ?? 'Player'} ${usage.rankOnTeam} of ${usage.positionGroupSize}`}
           {teamAbbreviation ? ` on ${teamAbbreviation}` : ''} by points
         </Text>
       ) : null}
 
-      <View style={styles.grid}>
-        {rows.map((r) => (
-          <View key={r.label} style={styles.cell}>
-            <Text style={[styles.cellLabel, { color: c.textSecondary }]}>{r.label}</Text>
-            <Text style={[styles.cellValue, NUMERIC, { color: c.text }]}>{r.value}</Text>
+      {bars.map((b) => (
+        <View key={b.label} style={styles.bar}>
+          <Text numberOfLines={1} style={[Type.body, styles.barLabel, { color: c.textSecondary }]}>
+            {b.label}
+          </Text>
+          <View style={[styles.track, { backgroundColor: c.backgroundElement }]}>
+            {b.share === null ? null : (
+              /* Clamped, because a share above 1 is a data fault rather than a
+                 player who took more carries than his team did — and a bar
+                 wider than its track paints over the figure beside it. */
+              <View
+                style={[
+                  styles.fill,
+                  { width: `${Math.min(1, Math.max(0, b.share)) * 100}%`, backgroundColor: c.text },
+                ]}
+              />
+            )}
           </View>
-        ))}
-      </View>
+          <Text numberOfLines={1} style={[Type.body, NUMERIC, styles.barValue, { color: c.text }]}>
+            {b.share === null ? '—' : `${(b.share * 100).toFixed(0)}%`}
+          </Text>
+        </View>
+      ))}
 
-      <Text style={[styles.caveat, { color: c.textSecondary }]}>
-        Measured from games we have scored — not an official depth chart, and
-        not a projection. Our provider publishes neither.
+      <Text style={[Type.fine, { color: c.textTertiary }]}>
+        {`${usage.targets} target${usage.targets === 1 ? '' : 's'} and ${usage.carries} carr${usage.carries === 1 ? 'y' : 'ies'} in the games we have scored.`}
       </Text>
     </View>
   );
 }
 
-const NUMERIC = { fontVariant: ['tabular-nums' as const] };
-
 const styles = StyleSheet.create({
-  card: { borderRadius: 14, padding: Spacing.three, gap: Spacing.two },
-  title: { fontSize: 15, fontWeight: '700' },
-  headline: { fontSize: 13, fontWeight: '600' },
-  body: { fontSize: 13, lineHeight: 18 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three },
-  cell: { minWidth: 84, gap: 1 },
-  cellLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.8 },
-  cellValue: { fontSize: 16, fontWeight: '700' },
-  caveat: { fontSize: 11, lineHeight: 15 },
+  wrap: { gap: Spacing.two },
+  bar: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two + 1 },
+  /* Fixed, so the two tracks start on the same line. Sized to `Carries`, which
+     is the longer of the two, with room for a third label if one is ever
+     added. */
+  barLabel: { width: 62 },
+  track: { flex: 1, height: 5, borderRadius: 3, overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: 3 },
+  barValue: { width: 34, textAlign: 'right' },
 });
