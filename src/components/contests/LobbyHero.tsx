@@ -15,7 +15,7 @@
  *
  * What is left is two lines, and only two:
  *
- *     Contests            [hearts riding]  [♥ 3]
+ *     Contests        1-0   [hearts riding]  [♥ 3]
  *     Week 1 · Lose 3 more and the run ends …
  *
  * ---------------------------------------------------------------------------
@@ -31,6 +31,9 @@
  * the middle of the board's week rail, one heart per heart staked, and this
  * header is now the same object in a second place. A reader who has learned
  * those glyphs on the board does not learn them again here.
+ *
+ * THE RECORD RIDES THE SAME ROW, ahead of both. It is what the run has done
+ * rather than what it is holding, so it leads the group instead of joining it.
  *
  * THE REMAINING COUNT KEEPS ITS PILL. That is the masthead's `♥ 3`, the same
  * shape in the same place it always is, so the header carries both halves of
@@ -89,6 +92,17 @@ export function LobbyHero({
       <View style={styles.titleRow}>
         <Text style={[Type.page, { color: c.text }]}>Contests</Text>
         <View style={styles.spacer} />
+        {/* THE RECORD LEADS THE RIGHT-HAND GROUP, and sits apart from it.
+            The two heart marks and the pill are one thought — what is riding,
+            what is left — and the record is a different one: what the run has
+            DONE. Putting it after the pill would read as a third heart figure;
+            putting it first, with the group's own gap between them, keeps the
+            hearts reading as a pair. */}
+        {run ? (
+          <Text style={[Type.strong, NUMERIC, { color: c.textSecondary }]}>
+            {`${run.wins}-${run.losses}`}
+          </Text>
+        ) : null}
         {staked.length > 0 ? <ContestHearts entries={staked} size={15} gap={5} /> : null}
         {run ? (
           <View style={[styles.pill, { backgroundColor: c.background }]}>
