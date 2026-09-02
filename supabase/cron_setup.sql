@@ -75,14 +75,17 @@ select cron.schedule(
 --   select reason, count(*), sum(amount) from public.coins_ledger group by reason;
 
 -- ---------------------------------------------------------------------------
--- NOT HERE: rotate-daily-set
+-- NOT HERE: rotate-daily-set, ensure-week-contests
 -- ---------------------------------------------------------------------------
 --
--- The hourly daily-set rotation is scheduled in the migration that introduced
--- it (20260824233000_daily_set_rotates.sql) rather than in this file. It needs
+-- Two jobs are scheduled in the migrations that introduced them rather than in
+-- this file: the hourly daily-set rotation (20260824233000_daily_set_rotates)
+-- and the nightly lobby materialisation, `ensure-week-contests`
+-- (20260902020000_a_new_week_gets_its_lobby_by_itself). It needs
 -- no Vault secret, so it does not need the deliberate per-environment
 -- application this file exists for — and the bug it fixes was precisely a
--- rotation that never ran because nothing had scheduled it. Listed here so
--- that this file is still the answer to "what is scheduled".
+-- rotation that never ran because nothing had scheduled it — and the second is
+-- the same bug in the lobby. Listed here so that this file is still the answer
+-- to "what is scheduled".
 --
 --   select jobname, schedule from cron.job order by jobname;
