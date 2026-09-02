@@ -53,6 +53,7 @@ import {
 
 import { RosterAlert } from '@/components/collection/RosterAlert';
 import { BenchBoard } from '@/components/lineup/BenchBoard';
+import { RowSkeleton } from '@/components/lineup/LineupRow';
 import { ContestCarousel } from '@/components/lineup/ContestCarousel';
 import { WelcomeBackBanner } from '@/components/contests/WelcomeBackBanner';
 import { useAuth } from '@/context/AuthContext';
@@ -105,6 +106,33 @@ export type LineupEditorProps = {
    * extraction exists to stop.
    */
   frame?: 'screen' | 'plain';
+  /**
+   * Whether the bench is drawn under the slots.
+   *
+   * TRUE ON THE BOARD, FALSE WHEN ENTERING A CONTEST. On the board the bench is
+   * the working surface: it is your whole collection for the week, you rummage
+   * in it, and dragging a card up out of it is how a season lineup gets built.
+   *
+   * Entering a contest is the other direction. There are three or six empty
+   * slots and one question per slot — who goes here — which `SwapSheet` already
+   * answers with only the cards eligible for THAT slot. The bench underneath
+   * was thirty rows of everything, most of it ineligible, pushing the slots and
+   * the entry bar apart on a page whose whole job is filling three of them.
+   */
+  bench?: boolean;
+  /**
+   * How many slot rows to draw while the data loads, in the plain frame.
+   *
+   * A SPINNER IS THE WRONG SHAPE. It is one short row, so the contest page
+   * rendered its card, a spinner, and the sections under it — then the slots
+   * arrived and everything below them jumped down the screen. That is the
+   * "refresh" a reader sees on opening a contest: not a reload, a re-layout.
+   *
+   * The caller knows the answer before the editor does — a contest row carries
+   * its `slotCount` — so the page can hold exactly the height it is about to
+   * need and nothing moves when the real rows replace the grey ones.
+   */
+  placeholderSlots?: number;
   /**
    * Fired once, when a submission has just BOUGHT the entry — not on the edits
    * that follow it.
@@ -218,6 +246,8 @@ const LIVE_POLL_MS = 60_000;
 export function LineupEditor({
   pinnedContest,
   frame = 'screen',
+  bench: showBench = true,
+  placeholderSlots,
   onEntered,
   onEntryOffer,
   entryRef,
@@ -1252,12 +1282,24 @@ export function LineupEditor({
   const results = useSettledResults(pinned);
 
   if (loading || (pinned && !current)) {
-    const spinner = <ActivityIndicator style={styles.pad} />;
+    /* Skeleton rows where the caller told us how many to expect, so the page
+       settles at its final height — see `placeholderSlots`. A spinner remains
+       the honest answer everywhere the count is unknown. */
+    const waiting =
+      frame === 'plain' && placeholderSlots ? (
+        <View style={styles.bleed}>
+          {Array.from({ length: placeholderSlots }, (_, i) => (
+            <RowSkeleton key={`slot-skeleton-${i}`} />
+          ))}
+        </View>
+      ) : (
+        <ActivityIndicator style={styles.pad} />
+      );
     return frame === 'plain' ? (
-      spinner
+      waiting
     ) : (
       <Screen title="Lineup" measure="table">
-        {spinner}
+        {waiting}
       </Screen>
     );
   }
@@ -1459,28 +1501,44 @@ export function LineupEditor({
             />
           </View>
 
-          <SectionHead
-            label="Bench"
-            hint={`${bench.length} card${bench.length === 1 ? '' : 's'}`}
-            tone={c.textTertiary}
-          />
-          <View style={styles.bleed}>
-            <BenchBoard
-              cards={bench}
-              targetSlotFor={targetSlotFor}
-              startableFor={startableFor}
-              lockedIds={unavailableIds}
-              onOpen={openBenchCard}
-              onOpenProfile={openProfile}
-              offSeasonCount={offSeasonCount}
-            />
-          </View>
+          {showBench ? (
+            <>
+              <SectionHead
+                label="Bench"
+                hint={`${bench.length} card${bench.length === 1 ? '' : 's'}`}
+                tone={c.textTertiary}
+              />
+              <View style={styles.bleed}>
+                <BenchBoard
+                  cards={bench}
+                  targetSlotFor={targetSlotFor}
+                  startableFor={startableFor}
+                  lockedIds={unavailableIds}
+                  onOpen={openBenchCard}
+                  onOpenProfile={openProfile}
+                  offSeasonCount={offSeasonCount}
+                />
+              </View>
+            </>
+          ) : null}
         </>
       )}
 
       {/* Where the save button was. It says what just happened rather than
           asking for permission to do it — and it is the only place a failed
-          write can be retried from. */}
+          write can be retried from.
+
+          IT RESERVES ITS HEIGHT WHETHER OR NOT IT HAS ANYTHING TO SAY, so a
+          save cannot make the page twitch. That is right on the board, where
+          every edit autosaves and this row is the only feedback there is.
+
+          NOT ON A PAGE THAT HAS THE BAR. Where the caller takes an
+          `onEntryOffer` it is drawing Enter with its own busy state, nothing
+          autosaves (`needsEntry`), and this row has nothing to report — so
+          reserving 32pt for it just leaves a hole between the last slot and
+          whatever the page puts next. The retry stays: a failed write needs
+          somewhere to be retried from wherever it happens. */}
+      {onEntryOffer && !blocked ? null : (
       <View style={styles.status} accessibilityLiveRegion="polite">
         {blocked ? (
           <Pressable
@@ -1507,6 +1565,7 @@ export function LineupEditor({
           <Text style={[Type.fine, { color: c.textTertiary }]}>Saved automatically.</Text>
         ) : null}
       </View>
+      )}
 
       {/* THE ENTRY BUTTON. Only for a paid contest you are not in yet — see
           `needsEntry`. It says the price because pressing it is when the price

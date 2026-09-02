@@ -575,6 +575,13 @@ export function ContestView({
                 <LineupEditor
                   pinnedContest={contest.code}
                   frame="plain"
+                  /* NO BENCH HERE — see the prop. Three empty slots and a
+                     swap sheet per slot is the whole interaction; the bench
+                     was thirty rows between them and the Enter button. */
+                  bench={false}
+                  /* The page knows the count before the editor does, so it can
+                     hold the height and stop the jump — see the prop. */
+                  placeholderSlots={contest.slotCount}
                   onEntryOffer={setOffer}
                   entryRef={acts}
                   onEntered={(enteredCode) => toBoard(enteredCode)}
