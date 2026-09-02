@@ -17,7 +17,6 @@ import {
   type HistoryEntry,
 } from '@/components/contests/use-contest-history';
 import { LobbyHero } from './LobbyHero';
-import { useRunLadder } from '@/components/runs/use-run-ladder';
 import { weekTitleOf } from '@/components/contests/use-my-contests';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
@@ -168,8 +167,6 @@ export function LobbyView({
    * is the board's own query, so nothing new is being asked of the server.
    */
   const { contests: mine } = useMyContests();
-  /* Four rows of config behind the header's ladder — see `useRunLadder`. */
-  const { rungs } = useRunLadder();
   const { coins, run } = usePlayer();
 
   /* THE OPEN LIST IS WHAT YOU ARE NOT ALREADY IN, which is now a statement
@@ -224,6 +221,17 @@ export function LobbyView({
      the device what week it is would be a second opinion that can differ. */
   const week = live.length > 0 ? weekTitleOf(live[0].seasonType, live[0].week) : undefined;
   const open = live.filter((c) => c.kind !== 'free' && c.mine === null);
+
+  /* ONE HEART PER HEART AT STAKE, which is `ContestCarousel`'s own mapping for
+     the rail this header now mirrors: a contest staking two contributes two.
+     Settled entries are excluded — a heart that has already been decided is
+     not riding on anything, whatever it did to the run. */
+  const staked = playing.flatMap((m) =>
+    Array.from({ length: Math.max(0, m.heartsAtRisk) }, () => ({
+      result: null,
+      entered: m.lineupId !== null,
+    })),
+  );
 
   /**
    * THE BAR, WITH THE COUNTS ON IT.
@@ -341,7 +349,7 @@ export function LobbyView({
           precisely so neither can happen. A surface rather than a tone: see
           the prop's own note. */}
       <SheetToneBand surface={c.backgroundElement}>
-        <LobbyHero run={run} rungs={rungs} week={week} />
+        <LobbyHero run={run} staked={staked} week={week} />
       </SheetToneBand>
 
       {run?.awaitingCarry ? <DeadRun run={run} onClaim={() => router.push('/run-over')} /> : null}

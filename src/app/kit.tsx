@@ -27,7 +27,6 @@ import type { ContestTerms, Duel, Settlement } from '@/components/contests/conte
 import { ContestAbout } from '@/components/contests/ContestAbout';
 import { ContestActions } from '@/components/contests/ContestActions';
 import { LobbyHero } from '@/components/contests/LobbyHero';
-import type { CarryRung } from '@/components/runs/use-run-ladder';
 import { ContestFieldList } from '@/components/contests/ContestFieldPanel';
 import type { FieldEntrant } from '@/components/contests/use-contest-field';
 import type { FieldWeek } from '@/components/lineup/field';
@@ -243,6 +242,13 @@ const KIT_FIELD: FieldEntrant[] = [
   },
 ];
 
+/* Two contests with a heart on each — the state the header is written for.
+   `ContestHearts` takes one entry per heart at stake, not one per contest. */
+const KIT_STAKED = [
+  { result: null, entered: true },
+  { result: null, entered: true },
+];
+
 /**
  * A run mid-way through: four pips, three still held, two of them staked.
  *
@@ -261,7 +267,7 @@ const KIT_RUN: Run = {
   losses: 1,
   endedAt: null,
   awaitingCarry: false,
-  /* CONSISTENT WITH `KIT_LADDER`, which is the real one: five wins stands on
+  /* Five wins stands on
      the 3-win rung and keeps one card, with the next rung at six. The fixture
      said three cards and a rung at eight — numbers from no ladder that has ever
      shipped — and the header drew them beside a table that disagreed. */
@@ -274,12 +280,6 @@ const KIT_RUN: Run = {
 /* The server's own four rows — `run_carry_ladder`, 20260825110000. Copied here
    rather than fetched because the kit has no session; the real header reads the
    table, which is the whole argument in `useRunLadder`. */
-const KIT_LADDER: CarryRung[] = [
-  { atWins: 0, cardSlots: 0 },
-  { atWins: 3, cardSlots: 1 },
-  { atWins: 6, cardSlots: 2 },
-  { atWins: 10, cardSlots: 3 },
-];
 
 const KIT_TERMS_TOP_N: ContestTerms = {
   formatName: 'WR Room', slotCount: 3, entryFeeCoins: 40,
@@ -825,18 +825,18 @@ function Kit() {
             <View style={{ gap: Spacing.four }}>
               {/* The band paints itself now — there is no wash to reproduce by
                   hand, which is what the removed first instance was for. */}
-              <LobbyHero run={KIT_RUN} rungs={KIT_LADDER} week="Preseason 4" />
+              <LobbyHero run={KIT_RUN} staked={KIT_STAKED} week="Preseason 4" />
               {/* A fresh run: no record, bottom rung, nothing carried. */}
               <LobbyHero
                 run={{ ...KIT_RUN, wins: 0, losses: 0, wagered: 0, wageredIn: 0, carrySlots: 0, nextRung: { atWins: 3, cardSlots: 1 } }}
-                rungs={KIT_LADDER}
+                staked={KIT_STAKED}
                 week="Preseason 4"
               />
               {/* One heart left, deep in the ladder — the week the sheet is
                   most worth reading and the state the copy is written for. */}
               <LobbyHero
                 run={{ ...KIT_RUN, hearts: 1, wagered: 1, wageredIn: 1, wins: 9, losses: 4 }}
-                rungs={KIT_LADDER}
+                staked={KIT_STAKED}
                 week="Week 1"
               />
             </View>
