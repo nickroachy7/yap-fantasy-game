@@ -65,6 +65,71 @@ export interface ProviderStatLine {
   raw: Record<string, unknown>;
 }
 
+/**
+ * ONE PLAYER'S FANTASY POINTS FOR ONE WEEK, as the PROVIDER scores them.
+ *
+ * ---------------------------------------------------------------------------
+ * THIS IS WHY `scoring.ts` IS NO LONGER THE AUTHORITY
+ * ---------------------------------------------------------------------------
+ *
+ * We wrote a scoring engine because `/stats` returns raw counting stats and no
+ * points, and the note recording that is still true as far as it goes. What it
+ * missed is `/fantasy/weekly_stats`, which returns points per player per week
+ * under three named formats with the full rule definitions inline.
+ *
+ * Measured against our own engine on 2025 week 1, 269 of 302 lines agreed to
+ * the cent. The 17 skill-position gaps were all exactly 3.00 — our yardage
+ * bonuses, which their PPR does not have. The other 16 were KICKERS, and there
+ * ours was simply worse: a flat 3 per field goal against their 3/4/5/6 by
+ * distance and −1 for a miss, so we were underpaying every kicker in the game
+ * by 1.2 a week.
+ *
+ * So their `ppr` format is our scoring now. The engine stays as a verifier and
+ * as the reader of `scoring_rules`, but the number that reaches the database is
+ * theirs — which is what makes a projection and a result the same currency by
+ * construction rather than by two implementations agreeing.
+ *
+ * `points` is the `ppr` format's `total_points`. The other two formats are
+ * carried in `byFormat` untouched, because a reconciliation that cannot see
+ * what it is reconciling against is not one.
+ */
+export interface ProviderFantasyPoints {
+  playerExternalId: number;
+  gameExternalId: number | null;
+  season: number;
+  week: number;
+  /** The format we run on. Null when the provider scored no PPR line. */
+  points: number | null;
+  /** Every format the provider returned, keyed by its own name. */
+  byFormat: Record<string, number>;
+  /**
+   * The provider's own position for this row.
+   *
+   * KEPT, AND NEVER JOINED ON. `/fantasy/*` says `K` where `/players` says
+   * `PK` for the same man — see the census note. Every join in this codebase is
+   * on the player id; this field exists so a mismatch can be SEEN in the row
+   * rather than silently dropping kickers.
+   */
+  position: string | null;
+}
+
+/**
+ * What a player is EXPECTED to do in a week that has not been played.
+ *
+ * The same shape as `ProviderFantasyPoints` plus the raw projected stat line,
+ * and deliberately so: a projection and a result differ in tense, not in kind,
+ * and the moment they stop sharing a shape is the moment a screen can print one
+ * where it means the other.
+ *
+ * `stats` is the 44-field projected line, kept verbatim. We do not score it —
+ * `points` already comes from the provider under the same format as the result
+ * it will be compared against — but it is what any future confidence interval,
+ * or any argument about why a projection was wrong, would have to be built on.
+ */
+export interface ProviderProjection extends ProviderFantasyPoints {
+  raw: Record<string, unknown>;
+}
+
 export interface ProviderInjury {
   playerExternalId: number;
   status: string | null;
@@ -134,6 +199,24 @@ export interface StatsProvider {
    * and lives in the interface so no caller can forget it.
    */
   listStatLines(gameExternalIds: number[], seasonType: SeasonType): Promise<ProviderStatLine[]>;
+  /**
+   * What every player scored in a week that has been PLAYED, as the provider
+   * scores it.
+   *
+   * Week is required and singular, exactly like `listStatLines`'s game ids: the
+   * endpoint takes one week, so a backfill is a loop and the signature says so
+   * rather than letting a caller reach for a `weeks[]` that does not exist.
+   */
+  listWeeklyFantasyPoints(season: number, week: number): Promise<ProviderFantasyPoints[]>;
+  /**
+   * What every player is expected to score in a week that has NOT been played.
+   *
+   * Same shape and same scoring format as `listWeeklyFantasyPoints`, which is
+   * the entire reason both live on this interface — a projection that could be
+   * fetched without its result being fetched the same way is a projection that
+   * will eventually be compared against a differently-scored number.
+   */
+  listProjections(season: number, week: number): Promise<ProviderProjection[]>;
   listInjuries(): Promise<ProviderInjury[]>;
   listSalaries(query: SalaryQuery): Promise<ProviderSalary[]>;
   /**

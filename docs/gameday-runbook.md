@@ -545,6 +545,62 @@ select pl.position_abbreviation, count(*), round(sum(v2.points - v1.points),1)
  where v2.points <> v1.points group by 1 order by 2 desc;
 ```
 
+### D9. The provider scores the week now — v3, and what changed operationally
+
+As of 2026-09-02 `fantasy_points` under **rules v3** is not computed by us at
+all. It is balldontlie's own `ppr` total, pulled by the `sync-fantasy` edge
+function from `/fantasy/weekly_stats`. See
+`20260903020000_the_provider_scores_the_week.sql` for the argument; the short
+version is that `/stats` does not emit distance-bucketed field goals, so no
+version of our engine can score a kicker correctly from anything we store.
+
+**D8 step 2 does not apply to v3.** There is nothing to recompute — `POST
+/rescore {"version":3}` would score v3 with our engine against our raw and
+produce exactly the wrong number, silently. The equivalent step is a **sync**:
+
+```
+POST /sync-fantasy {"season": 2025, "mode": "points"}
+```
+
+Every other step of D8 is unchanged, including the two that are easy to forget:
+`score_week` each week that has lineups, then
+`select public.refresh_player_season_ranks();`.
+
+**Coverage is a feature, not a shortfall.** The provider scores only
+fantasy-relevant positions. Measured on the 2025 regular season: QB, RB, WR, TE,
+PK and FB are at **100%**; LB, CB, DT, S, DE and P are at **0%**. Those have no
+lineup slot and our own v2 ruleset already scored them at zero, so a defensive
+line reading as unscored under v3 is correct. Do not treat the raw ratio
+(6,113 points against 16,370 stat lines) as a failed run — check it by position:
+
+```sql
+select coalesce(p.position_abbreviation,'(none)') as pos, count(*) as lines,
+       count(*) filter (where v3.points is not null) as with_v3
+  from public.stat_lines sl
+  join public.players p on p.id = sl.player_id
+  left join public.fantasy_points v3
+         on v3.stat_line_id = sl.id and v3.rules_version = 3
+ where sl.season = 2025 and sl.season_type = 2
+ group by 1 order by lines desc;
+```
+
+**`unknownPlayers` in the response is expected and is about OUR table.** It
+counts provider-scored players with no row in `players` — the long tail the
+reference sync has not picked up. It is worth watching for a jump, not for being
+non-zero.
+
+**Preseason is never scored by the provider.** `/fantasy/weekly_stats?season=2026
+&week=2` is empty and always will be; the endpoint is regular-season only
+(`week` 1–18). 2026 preseason stat lines therefore carry no v3 points, and those
+game logs read as unscored under v3. That was accepted knowingly — the slate had
+already rolled to 2026 regular week 1 when v3 was activated.
+
+**Projections come from the same function**, `mode: "projections"`, and land in
+`projections` rather than `fantasy_points`. A week the provider has not published
+returns nothing and is reported in `weeksWithNoProjection` — not an error. The
+board draws `PROJ —` for any player with no row, which is what that dash has
+always meant.
+
 ---
 
 ## Failure modes

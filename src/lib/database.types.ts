@@ -1198,6 +1198,73 @@ export type Database = {
         }
         Relationships: []
       }
+      projections: {
+        Row: {
+          collected_at: string | null
+          game_id: string | null
+          id: string
+          ingested_at: string
+          player_id: string
+          points_by_format: Json
+          projected_points: number | null
+          provider_position: string | null
+          raw: Json
+          season: number
+          season_type: number
+          week: number
+        }
+        Insert: {
+          collected_at?: string | null
+          game_id?: string | null
+          id?: string
+          ingested_at?: string
+          player_id: string
+          points_by_format?: Json
+          projected_points?: number | null
+          provider_position?: string | null
+          raw?: Json
+          season: number
+          season_type?: number
+          week: number
+        }
+        Update: {
+          collected_at?: string | null
+          game_id?: string | null
+          id?: string
+          ingested_at?: string
+          player_id?: string
+          points_by_format?: Json
+          projected_points?: number | null
+          provider_position?: string | null
+          raw?: Json
+          season?: number
+          season_type?: number
+          week?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projections_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projections_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["player_id"]
+          },
+          {
+            foreignKeyName: "projections_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       run_carry_ladder: {
         Row: {
           card_slots: number

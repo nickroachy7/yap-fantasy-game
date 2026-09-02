@@ -728,6 +728,11 @@ function weekFigure(card: LineupCard | null) {
   return {
     points: value === null ? null : value.toFixed(1),
     status: card?.game?.status ?? null,
+    /* THE SHEET SHOWS IT TOO, and that is the point of the sheet: it is where a
+       swap is chosen, so it is the one screen where a forecast is the number
+       you are actually comparing on. Same helper as the board, so the two
+       cannot disagree about what a player is projected for. */
+    projected: card?.form?.projectedFp ?? null,
   };
 }
 

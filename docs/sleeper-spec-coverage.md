@@ -95,16 +95,29 @@ Acquisition is packs. There is no wire and no draft.
 
 ### 3. The provider does not sell it
 
-Verified 404s against balldontlie NFL, recorded in the project's infra notes.
-These are not a tier upgrade away — they are absent from the API.
+Verified against balldontlie NFL. **This section was wrong for two weeks and the
+correction is worth reading before trusting any line in it.** The endpoint census
+behind it probed bare paths only: `/projections` 404s, so projections were
+recorded as "absent from the API, not a tier upgrade away". `/fantasy/projections`
+exists and always did. Same for rankings and advanced stats. A 400 means the route
+exists and wants parameters — never conclude "missing" without probing the
+namespaces too, and prefer the endpoint list scraped from
+<https://nfl.balldontlie.io/> over any remembered census.
 
-- **Projections.** The single most pervasive element in the spec: `PROJ`
-  columns, the `-` over projection pattern in every player row, projected team
-  totals, win probability. **Nothing in the app fabricates one.** Where Sleeper
-  shows a projection we show either a real past number or nothing.
+- ~~**Projections.**~~ **We have them, as of 2026-09-02.** `/fantasy/projections`
+  returns a weekly forecast for ~460 players plus 32 DST, with the scheduled
+  game and 44 projected stat fields attached. The `PROJ` slot on every lineup
+  row now carries the provider's own PPR total — the same format the settled
+  score above it is taken under, which is what makes the two comparable. The
+  rule that **nothing in the app fabricates a projection** is unchanged and
+  always was the important half: where the provider has not forecast a player,
+  the row still draws `PROJ —`.
 - §1.5 depth chart rail; §1.5 defensive and special-teams depth groupings
 - §1.5 `LATEST NEWS` with bylines
 - Weather / condition glyphs on kickoff lines
+
+Still genuinely absent, re-verified 2026-09-02: depth charts, news, box scores,
+splits.
 
 ### 4. Licensing
 

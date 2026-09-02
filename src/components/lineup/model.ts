@@ -73,6 +73,26 @@ export type SeasonForm = {
    * played whether or not you started him.
    */
   weekFp: number | null;
+  /**
+   * WHAT HE IS EXPECTED TO SCORE THIS WEEK, and null when nobody has said.
+   *
+   * Beside `weekFp` because it is the same claim in the other tense — this
+   * week, this player, in points — and the two are drawn one above the other in
+   * the row's right-hand column. Keeping them apart would have meant two
+   * lookups keyed the same way arriving by different routes.
+   *
+   * NULL IS COMMON AND MUST STAY DRAWABLE. The provider projects ~460 players a
+   * week; a roster of thirty can easily hold a third-string tight end nobody
+   * has forecast, and a bye week is projected for nobody at all. The board has
+   * drawn `PROJ —` since it was built and that is still the answer here — see
+   * `WeekFigure`. What has changed is that the dash is now a real absence
+   * rather than a permanent one.
+   *
+   * IT IS THE PROVIDER'S OWN NUMBER under the same PPR format the settled score
+   * is taken under, which is the only reason it may be printed directly beneath
+   * that score. See `20260903020000`.
+   */
+  projectedFp: number | null;
 };
 
 export type LineupCard = {

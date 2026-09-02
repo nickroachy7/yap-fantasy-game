@@ -302,7 +302,7 @@ const STARTERS: {
       id: 's1', playerId: 's1', name: 'Caleb Williams', position: 'QB', team: 'CHI',
       injuryStatus: null, tier: 'gold', careerFp: 812, season: 2026,
       nextTierAt: 2500, nextTierLabel: 'diamond',
-      form: { seasonFp: 288.1, gamesPlayed: 17, fpPerGame: 16.9, recent: [12.4, 22.1, 8.6, 26.9, 19.2], weekFp: 24.6 },
+      form: { seasonFp: 288.1, gamesPlayed: 17, fpPerGame: 16.9, recent: [12.4, 22.1, 8.6, 26.9, 19.2], weekFp: 24.6, projectedFp: 18.4 },
       // LIVE, with the provider's own clock. The 24.6 beside it is a number
       // that is still moving, and the row has to say so.
       game: {
@@ -319,7 +319,7 @@ const STARTERS: {
       injuryStatus: 'IR', tier: 'diamond', careerFp: 2610, season: 2026,
       // Top tier: no threshold above it, so the row says so instead of a ratio.
       nextTierAt: null, nextTierLabel: null,
-      form: { seasonFp: 198.2, gamesPlayed: 12, fpPerGame: 16.5, recent: [21.0, 4.2, 18.8], weekFp: null },
+      form: { seasonFp: 198.2, gamesPlayed: 12, fpPerGame: 16.5, recent: [21.0, 4.2, 18.8], weekFp: null, projectedFp: 21.1 },
       // No game: the bye case, which is the one people lose weeks to.
       game: null,
     },
@@ -338,7 +338,7 @@ const STARTERS: {
       nextTierAt: 200, nextTierLabel: 'silver',
       // Played and scored nothing, which a bare dash could never tell apart
       // from "has not kicked off". FINAL beside a 0.0 is the distinction.
-      form: { seasonFp: 14, gamesPlayed: 3, fpPerGame: 4.7, recent: [6.2, 7.8, 0], weekFp: 0 },
+      form: { seasonFp: 14, gamesPlayed: 3, fpPerGame: 4.7, recent: [6.2, 7.8, 0], weekFp: 0, projectedFp: 9.7 },
       game: {
         opponent: 'BUF', home: true, startsAt: '2026-09-13T17:00:00Z',
         status: 'final', statusText: 'Final/OT',
@@ -356,7 +356,7 @@ const STARTERS: {
       id: 's4', playerId: 's4', name: 'Cameron Dicker', position: 'PK', team: 'LAC',
       injuryStatus: null, tier: 'silver', careerFp: 402, season: 2026,
       nextTierAt: 750, nextTierLabel: 'gold',
-      form: { seasonFp: 148.0, gamesPlayed: 17, fpPerGame: 8.7, recent: [9, 11, 6, 8, 12], weekFp: null },
+      form: { seasonFp: 148.0, gamesPlayed: 17, fpPerGame: 8.7, recent: [9, 11, 6, 8, 12], weekFp: null, projectedFp: null },
       game: {
         opponent: 'DEN', home: true, startsAt: '2026-09-13T20:05:00Z',
         status: 'scheduled', statusText: '9/13 - 4:05 PM EDT',
@@ -375,7 +375,7 @@ const SWAP_OPTIONS: LineupCard[] = [
     id: 'o1', playerId: 'o1', name: 'Bijan Robinson', position: 'RB', team: 'ATL',
     injuryStatus: null, tier: 'gold', careerFp: 1420, season: 2026,
     nextTierAt: 2500, nextTierLabel: 'diamond',
-    form: { seasonFp: 262.4, gamesPlayed: 16, fpPerGame: 16.4, recent: [18.2, 24.6, 11.0, 27.4, 9.8], weekFp: 18.4 },
+    form: { seasonFp: 262.4, gamesPlayed: 16, fpPerGame: 16.4, recent: [18.2, 24.6, 11.0, 27.4, 9.8], weekFp: 18.4, projectedFp: null },
     game: {
       opponent: 'TB', home: true, startsAt: '2026-09-13T17:00:00Z',
       status: 'live', statusText: 'Q2 11:40',
@@ -386,7 +386,7 @@ const SWAP_OPTIONS: LineupCard[] = [
     injuryStatus: 'Questionable', tier: 'silver', careerFp: 402, season: 2026,
     nextTierAt: 750, nextTierLabel: 'gold',
     // Not yet swept, which is every row before kickoff.
-    form: { seasonFp: 96.2, gamesPlayed: 14, fpPerGame: 6.9, recent: [4.1, 9.8, 2.6, 11.4, 6.6], weekFp: null },
+    form: { seasonFp: 96.2, gamesPlayed: 14, fpPerGame: 6.9, recent: [4.1, 9.8, 2.6, 11.4, 6.6], weekFp: null, projectedFp: null },
     game: {
       opponent: 'IND', home: false, startsAt: '2026-09-13T17:00:00Z',
       status: 'scheduled', statusText: '9/13 - 1:00 PM EDT',

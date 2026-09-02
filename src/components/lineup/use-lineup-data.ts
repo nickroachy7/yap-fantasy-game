@@ -122,6 +122,48 @@ async function fetchCollection(): Promise<CollectionRow[]> {
   );
 }
 
+type ProjectionRow = { player_id: string; projected_points: number | string | null };
+
+/**
+ * THIS WEEK'S FORECAST for the players you hold.
+ *
+ * ONE WEEK, NOT A SEASON, which is the whole difference between this and
+ * `loadStatLines` beside it. Form is a shape built out of a season's history;
+ * a projection is a single perishable claim about the week in front of you, and
+ * there is nothing to aggregate.
+ *
+ * Chunked on the player ids for the same reason as the stat lines: a roster is
+ * small but `in()` on a URL is not, and the chunk size is already tuned.
+ */
+async function loadProjections(
+  season: number,
+  seasonType: number,
+  week: number,
+  playerIds: string[],
+): Promise<ProjectionRow[]> {
+  const chunks: string[][] = [];
+  for (let i = 0; i < playerIds.length; i += PLAYER_CHUNK) {
+    chunks.push(playerIds.slice(i, i + PLAYER_CHUNK));
+  }
+  const batches = await Promise.all(
+    chunks.map((ids) =>
+      fetchAllPages<ProjectionRow>((from, to) =>
+        supabase
+          .from('projections')
+          .select('player_id, projected_points')
+          .eq('season', season)
+          .eq('season_type', seasonType)
+          .eq('week', week)
+          .in('player_id', ids)
+          .order('player_id', { ascending: true })
+          .range(from, to)
+          .returns<ProjectionRow[]>(),
+      ),
+    ),
+  );
+  return batches.flat();
+}
+
 async function loadStatLines(season: number, playerIds: string[]): Promise<StatRow[]> {
   const chunks: string[][] = [];
   for (let i = 0; i < playerIds.length; i += PLAYER_CHUNK) {
@@ -167,7 +209,13 @@ async function loadStatLines(season: number, playerIds: string[]): Promise<StatR
  * so the newest computed row is the current one. A mismatch would move a
  * displayed average, never what gets submitted.
  */
-function aggregate(rows: StatRow[], slate: Slate | null): Map<string, SeasonForm> {
+function aggregate(
+  rows: StatRow[],
+  slate: Slate | null,
+  /* Player id -> this week's projected points. Empty until the ingester has
+     run for the week, which is a state the board already draws. */
+  projections: Map<string, number>,
+): Map<string, SeasonForm> {
   const byPlayer = new Map<string, { order: number; points: number; thisWeek: boolean }[]>();
 
   for (const row of rows) {
@@ -205,8 +253,28 @@ function aggregate(rows: StatRow[], slate: Slate | null): Map<string, SeasonForm
       // Absent, not zero. A game that has not been swept has no number at all,
       // and the row draws that differently from a player who blanked.
       weekFp: current ? current.points : null,
+      projectedFp: projections.get(playerId) ?? null,
     });
   }
+
+  /* A PLAYER WITH A PROJECTION AND NO HISTORY STILL NEEDS A ROW.
+     `byPlayer` is built from stat lines, so a rookie who has never played — or
+     anyone in week 1 of a season — appears nowhere in it, and a projection for
+     him would have been silently dropped by the loop above. That is exactly the
+     player whose forecast is worth the most, since there is no form to read
+     instead. */
+  for (const [playerId, projectedFp] of projections) {
+    if (out.has(playerId)) continue;
+    out.set(playerId, {
+      seasonFp: 0,
+      gamesPlayed: 0,
+      fpPerGame: 0,
+      recent: [],
+      weekFp: null,
+      projectedFp,
+    });
+  }
+
   return out;
 }
 
@@ -467,7 +535,7 @@ export function useLineupData(contestCode?: string, hint?: LineupContest | null)
        HOLD — all of it, in one batch, because none of it is big and picking a
        contest out of it afterwards is free. This is what makes a carousel
        swipe cost nothing; see the note on `contestRows`. */
-    const [contestsRes, fmtRes, minesRes, lock, gamesRes, stats] = await Promise.all([
+    const [contestsRes, fmtRes, minesRes, lock, gamesRes, stats, projRows] = await Promise.all([
       s
         ? supabase
             .from('contests')
@@ -516,6 +584,16 @@ export function useLineupData(contestCode?: string, hint?: LineupContest | null)
       s && playerIds.length > 0
         ? loadStatLines(s.season, playerIds).catch(() => [] as StatRow[])
         : Promise.resolve([] as StatRow[]),
+      /* THIS WEEK'S FORECAST, in the same batch as everything else.
+         Caught rather than thrown, like the format slots above: a projection is
+         the least important thing on this screen and must never be the reason
+         the lineup fails to draw. An empty list simply leaves every row showing
+         `PROJ —`, which is what the board did for its whole life until now. */
+      s && playerIds.length > 0
+        ? loadProjections(s.season, s.season_type, s.week, playerIds).catch(
+            () => [] as ProjectionRow[],
+          )
+        : Promise.resolve([] as ProjectionRow[]),
     ]);
 
     if (!live()) return;
@@ -547,7 +625,16 @@ export function useLineupData(contestCode?: string, hint?: LineupContest | null)
     setHasLiveGame(
       weekGames.some((g) => resolveStatus(g.status_state, g.starts_at) === 'live'),
     );
-    const form = aggregate(stats, s);
+    /* Numeric, not `numeric` — PostgREST returns a `numeric(7,2)` as a STRING,
+       and a string in this map would reach the row and render as "19.70" beside
+       figures set to one decimal. */
+    const projections = new Map<string, number>();
+    for (const row of projRows) {
+      if (row.projected_points === null) continue;
+      const points = Number(row.projected_points);
+      if (Number.isFinite(points)) projections.set(row.player_id, points);
+    }
+    const form = aggregate(stats, s, projections);
 
     setCards(
       owned.map((r) => ({

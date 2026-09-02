@@ -6,15 +6,24 @@
  *   - Base is /nfl/v1. Auth is a bare `Authorization: <key>` (no "Bearer").
  *   - Pagination is cursor-based via meta.next_cursor, per_page max 100.
  *   - /stats accepts game_ids[] but NOT weeks[]; only /games takes weeks[].
- *   - /stats returns no fantasy points. Scoring is ours.
+ *   - /stats returns no fantasy points — but /fantasy/weekly_stats DOES, and
+ *     /fantasy/projections does the same for weeks not yet played. Both carry
+ *     `total_points` per named scoring format. An earlier note here said
+ *     "scoring is ours"; it was true of /stats and false of the API, and it is
+ *     why this codebase carried a hand-written scoring engine for two weeks.
+ *     See `PPR_FORMAT` below and `ProviderFantasyPoints`.
+ *   - The `/fantasy/*` routes report kickers as `K`; `/players` reports the same
+ *     man as `PK`. Join on player id, never on position.
  *   - Array params use the `key[]=value` repeated form.
  *   - GOAT tier is 600 req/min.
  */
 
 import type {
   GameQuery,
+  ProviderFantasyPoints,
   ProviderGame,
   ProviderInjury,
+  ProviderProjection,
   ProviderPlayer,
   ProviderSalary,
   ProviderSeasonStat,
@@ -33,6 +42,68 @@ const MIN_REQUEST_INTERVAL_MS = 110;
 /** Keep request URLs short enough that no proxy truncates them. */
 const GAME_ID_CHUNK = 25;
 const MAX_RETRIES = 4;
+
+/**
+ * The provider format we score under, chosen 2026-09-02.
+ *
+ * `ppr` rather than `half_ppr` or `standard` because full PPR is what this game
+ * already paid — our own ruleset gave a reception a whole point — so adopting it
+ * changed nothing about how a catch is valued. What it DID change is kickers
+ * (theirs is 3/4/5/6 by distance, ours was a flat 3) and our three yardage
+ * bonuses, which their format does not have and which we gave up to get a
+ * number that can never disagree with the projection printed above it.
+ *
+ * A CONSTANT, NOT A SETTING. If this ever becomes configurable it has to become
+ * configurable in `scoring_rules` — the table is the authority for what version
+ * a stored point was computed under, and a format chosen at call time would
+ * make stored rows unexplainable.
+ */
+const PPR_FORMAT = 'ppr';
+
+/**
+ * Pull the scored formats off a `/fantasy/*` row.
+ *
+ * The two endpoints spell the same array differently — `fantasy_points` on a
+ * result, `projections` on a projection — which is the only difference between
+ * them and is not worth two parsers.
+ */
+function formatPoints(row: Record<string, any>): Record<string, number> {
+  const list = row.fantasy_points ?? row.projections ?? [];
+  const out: Record<string, number> = {};
+  for (const entry of Array.isArray(list) ? list : []) {
+    const key = entry?.scoring_format?.key;
+    const points = toNumber(entry?.total_points);
+    if (typeof key === 'string' && points !== null) out[key] = points;
+  }
+  return out;
+}
+
+/**
+ * The half of a `/fantasy/*` row that a result and a projection share.
+ *
+ * Returns null for a row with no player, which is how DST arrives — the API
+ * scores 32 team defences a week and this game has no slot for one. Dropping
+ * them here rather than at the call site means neither ingester has to know
+ * that DST exists.
+ */
+function fantasyRow(row: Record<string, any>): ProviderFantasyPoints | null {
+  const playerExternalId = toNumber(row?.player?.id);
+  if (playerExternalId === null) return null;
+
+  const byFormat = formatPoints(row);
+  const week = toNumber(row.week);
+  if (week === null) return null;
+
+  return {
+    playerExternalId,
+    gameExternalId: toNumber(row?.game?.id),
+    season: toNumber(row.season) ?? 0,
+    week,
+    points: byFormat[PPR_FORMAT] ?? null,
+    byFormat,
+    position: typeof row.position === 'string' ? row.position : null,
+  };
+}
 
 interface PagedResponse<T> {
   data: T[];
@@ -251,6 +322,43 @@ export class BalldontlieProvider implements StatsProvider {
         homeRecord: r.home_record ?? null,
         roadRecord: r.road_record ?? null,
       }));
+  }
+
+  /**
+   * What every player actually scored in a week that has been played.
+   *
+   * ONE REQUEST PER WEEK, walked to the last cursor — about 640 rows, of which
+   * ~32 are DST and dropped. There is no `weeks[]` form here any more than
+   * there is on `/stats`, so a backfill is a loop over weeks by the caller.
+   */
+  async listWeeklyFantasyPoints(season: number, week: number): Promise<ProviderFantasyPoints[]> {
+    const params = new URLSearchParams({ season: String(season), week: String(week) });
+    const rows = await this.#paginate<Record<string, any>>('/fantasy/weekly_stats', params);
+    return rows.map(fantasyRow).filter((r): r is ProviderFantasyPoints => r !== null);
+  }
+
+  /**
+   * What every player is EXPECTED to score in a week that has not been played.
+   *
+   * Same shape, same format, same request pattern — see `ProviderProjection`
+   * for why a projection and a result deliberately differ only in tense.
+   *
+   * `raw` keeps the 44 projected stat fields. We do not score them: `points` is
+   * the provider's own PPR total, computed under the same ruleset as the result
+   * that will replace it, which is the only way the two are comparable without
+   * a second implementation to keep in step.
+   */
+  async listProjections(season: number, week: number): Promise<ProviderProjection[]> {
+    const params = new URLSearchParams({ season: String(season), week: String(week) });
+    const rows = await this.#paginate<Record<string, any>>('/fantasy/projections', params);
+
+    const out: ProviderProjection[] = [];
+    for (const row of rows) {
+      const base = fantasyRow(row);
+      if (!base) continue;
+      out.push({ ...base, raw: (row.stats ?? {}) as Record<string, unknown> });
+    }
+    return out;
   }
 
   async listInjuries(): Promise<ProviderInjury[]> {

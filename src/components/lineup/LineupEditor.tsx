@@ -787,9 +787,12 @@ export function LineupEditor({
    * ---------------------------------------------------------------------------
    *
    * The obvious way to build this is to decide what "best" means — career FP,
-   * tier, closest to the next threshold — and there is no honest answer,
-   * because this app sells no projections and every one of those is a different
-   * bet. Worse, any answer would be a SECOND opinion: the swap sheet already
+   * tier, closest to the next threshold — and every one of those is a different
+   * bet. That argument used to lean on "the app has no projections"; it has them
+   * now (see `SeasonForm.projectedFp`), and ranking by the forecast is a
+   * genuinely defensible answer this control could take one day. It still does
+   * not, for the reason that never depended on projections: any answer would be
+   * a SECOND opinion, and the swap sheet already
    * orders each slot's candidates, by the reader's own `sort`, and an autofill
    * that disagreed with the list it is standing next to would be the app
    * arguing with itself about which card is better.

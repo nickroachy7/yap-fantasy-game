@@ -36,18 +36,29 @@
  * off against their own lines does that job with alignment instead, and the
  * chip on top of it was a frame around something already anchored.
  *
- * THE PROJECTION IS A DASH, AND MUST STAY ONE UNTIL IT ISN'T
+ * THE PROJECTION WAS A DASH, AND THE DAY IT STOPPED BEING ONE HAS COME
  *
- * balldontlie sells no projections — verified 404s, recorded in
- * docs/sleeper-spec-coverage.md — and the standing rule in this codebase is
- * that nothing fabricates one. `PlayerCard` draws the same empty slot for the
- * same reason. An average dressed as a forecast is that fabrication, so the
- * slot is drawn and labelled and holds the app's "not reported" mark: the
- * layout does not move on the day real projections arrive, and until then the
- * row says plainly that we do not have one.
+ * This slot was reserved on the argument that balldontlie sells no projections
+ * — "verified 404s" — and that nothing in this codebase may fabricate one. The
+ * second half stands and always will. The first half was simply wrong: the
+ * census that produced those 404s probed `/projections`, and never probed
+ * `/fantasy/projections`, which exists and returns a weekly forecast for ~460
+ * players. Two weeks of `PROJ —` rested on an untried URL.
  *
- * The label is what makes that legible. A bare em dash under a bare number is
- * punctuation; `PROJ —` is a statement.
+ * The reservation paid off exactly as intended: the layout did not move on the
+ * day real projections arrived, because the box was already the right size.
+ *
+ * WHAT ARRIVES IS THE PROVIDER'S OWN PPR TOTAL, under the same scoring format
+ * the figure ABOVE it is settled under — see `20260903020000`. That is the only
+ * reason these two numbers may be stacked in one column: a forecast scored by
+ * one ruleset above a result scored by another is two currencies pretending to
+ * be a comparison.
+ *
+ * THE DASH REMAINS FOR AN ABSENCE, and absences are common — a third-string
+ * tight end nobody forecast, a bye week, a season the ingester has not reached.
+ * What changed is that it now means "nobody has said" rather than "nobody can
+ * say". A bare em dash under a bare number is punctuation; `PROJ —` is a
+ * statement, and it is still the honest one when there is no number.
  *
  * NO STAT STRIP. The Cards directory row carries one — five season figures on
  * a tinted tray under the name — because that screen's whole job is ranking
@@ -341,7 +352,13 @@ export function StarterRow({
           width={BADGE_WIDTH}
         />
       }
-      right={<WeekFigure points={week} status={card?.game?.status ?? null} />}
+      right={
+        <WeekFigure
+          points={week}
+          status={card?.game?.status ?? null}
+          projected={card?.form?.projectedFp ?? null}
+        />
+      }
       /* NULL IS "NOT COUNTED YET", NOT NOUGHT. The slot shapes can be drawn
          before the collection lands (see `contestHint`), and at that moment
          nothing is known about how many cards fit — so the row invites the tap
@@ -434,7 +451,13 @@ export function BenchRow({
       badge={
         <PositionBadge label={BENCH_BADGE} size={BADGE_SIZE} width={BADGE_WIDTH} tone="neutral" />
       }
-      right={<WeekFigure points={week} status={card.game?.status ?? null} />}
+      right={
+        <WeekFigure
+          points={week}
+          status={card.game?.status ?? null}
+          projected={card.form?.projectedFp ?? null}
+        />
+      }
       selected={selected}
       disabled={disabled}
       dimmed={dimmed}
@@ -1035,7 +1058,20 @@ export function SettledFigure({
  * projection sits under it at reading weight, subordinate, which is the correct
  * relationship between a result and a guess even once we have real ones.
  */
-export function WeekFigure({ points, status }: { points: string | null; status: GameStatus | null }) {
+export function WeekFigure({
+  points,
+  status,
+  projected,
+}: {
+  points: string | null;
+  status: GameStatus | null;
+  /**
+   * The provider's PPR forecast for this player this week, or null where none
+   * was published. See the head of this file for why it may share a column with
+   * the score above it.
+   */
+  projected?: number | null;
+}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
@@ -1063,25 +1099,33 @@ export function WeekFigure({ points, status }: { points: string | null; status: 
         </Text>
       )}
       {/* PROJ KEEPS ITS LINE, and the state does not take it.
- 
+
           This slot briefly carried LIVE/FINAL instead, on the reasoning that a
           label printing a dash forever was dead space. It was the wrong trade
           twice over. The fixture line two lines left already says FINAL @ LAC
           and Q3 04:22 — so the state was being printed twice in one row — and
-          projections are coming, which makes this a reserved slot rather than
-          an empty one. Taking it would have meant giving it back later.
- 
+          projections were coming, which made this a reserved slot rather than
+          an empty one. Taking it would have meant giving it back later. It has
+          a number in it now, which settles that argument for good.
+
           What tells you a figure is live is the figure itself, in the positive
           colour, with the clock beside the fixture. That is one signal on the
           thing it is about, not two competing for the same row.
- 
-          A dash, and never a number we made up. See the head of this file. */}
+
+          STILL A DASH WHERE NOBODY HAS FORECAST, and never a number we made up.
+          The ~460 players the provider projects do not cover a deep roster, and
+          a bye is projected for no one. See the head of this file.
+
+          THE LABEL NEVER LEAVES, even with a figure beside it. `19.7` alone
+          under a settled score is a second unlabelled number in the same
+          glance, and the two are not the same quantity — one is Sunday and the
+          other is a guess about it. */}
       <View style={styles.projLine}>
         <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
           PROJ
         </Text>
         <Text numberOfLines={1} style={[styles.projValue, NUMERIC, { color: c.textTertiary }]}>
-          {DASH}
+          {projected === null || projected === undefined ? DASH : projected.toFixed(1)}
         </Text>
       </View>
     </View>
