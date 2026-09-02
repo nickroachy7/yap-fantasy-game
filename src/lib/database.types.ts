@@ -446,6 +446,8 @@ export type Database = {
           max_entrants: number | null
           name: string
           payout_curve: Database["public"]["Enums"]["contest_payout_curve"]
+          podium_coins: number
+          podium_places: number
           prize_pool_bps: number
           sort_order: number
           target_points: number | null
@@ -464,6 +466,8 @@ export type Database = {
           max_entrants?: number | null
           name: string
           payout_curve?: Database["public"]["Enums"]["contest_payout_curve"]
+          podium_coins?: number
+          podium_places?: number
           prize_pool_bps?: number
           sort_order: number
           target_points?: number | null
@@ -482,6 +486,8 @@ export type Database = {
           max_entrants?: number | null
           name?: string
           payout_curve?: Database["public"]["Enums"]["contest_payout_curve"]
+          podium_coins?: number
+          podium_places?: number
           prize_pool_bps?: number
           sort_order?: number
           target_points?: number | null
@@ -512,6 +518,8 @@ export type Database = {
           max_entrants: number | null
           name: string
           payout_curve: Database["public"]["Enums"]["contest_payout_curve"]
+          podium_coins: number
+          podium_places: number
           prize_pool_bps: number
           season: number
           season_type: number
@@ -533,6 +541,8 @@ export type Database = {
           max_entrants?: number | null
           name: string
           payout_curve?: Database["public"]["Enums"]["contest_payout_curve"]
+          podium_coins?: number
+          podium_places?: number
           prize_pool_bps?: number
           season: number
           season_type: number
@@ -554,6 +564,8 @@ export type Database = {
           max_entrants?: number | null
           name?: string
           payout_curve?: Database["public"]["Enums"]["contest_payout_curve"]
+          podium_coins?: number
+          podium_places?: number
           prize_pool_bps?: number
           season?: number
           season_type?: number
@@ -1798,6 +1810,10 @@ export type Database = {
         }
         Returns: Json
       }
+      award_weekly_podium: {
+        Args: { p_season: number; p_season_type: number; p_week: number }
+        Returns: Json
+      }
       backfill_week: {
         Args: { p_season: number; p_season_type: number; p_week: number }
         Returns: Json
@@ -1982,6 +1998,8 @@ export type Database = {
           my_lineup_id: string
           name: string
           payout_curve: Database["public"]["Enums"]["contest_payout_curve"]
+          podium_coins: number
+          podium_places: number
           prize_pool: number
           prize_pool_bps: number
           recap: boolean
@@ -1997,6 +2015,15 @@ export type Database = {
         }[]
       }
       contest_payouts: {
+        Args: { p_contest: string }
+        Returns: {
+          coins: number
+          lineup_id: string
+          rnk: number
+          user_id: string
+        }[]
+      }
+      contest_podium_payouts: {
         Args: { p_contest: string }
         Returns: {
           coins: number
@@ -2148,11 +2175,14 @@ export type Database = {
           low: number
           median: number
           my_coins: number
+          my_podium: number
           my_points: number
           my_prize: number
           my_rank: number
           name: string
           payout_curve: Database["public"]["Enums"]["contest_payout_curve"]
+          podium_coins: number
+          podium_places: number
           prize_pool: number
           recap: boolean
           result: string
@@ -2320,6 +2350,7 @@ export type Database = {
         | "contest_refund"
         | "run_wipe"
         | "contest_prize"
+        | "weekly_podium"
       contest_kind: "free" | "lobby"
       contest_payout_curve: "flat" | "linear" | "steep" | "winner_take_all"
       contest_win_condition: "median" | "top_n" | "top_pct" | "target"
@@ -2471,6 +2502,7 @@ export const Constants = {
         "contest_refund",
         "run_wipe",
         "contest_prize",
+        "weekly_podium",
       ],
       contest_kind: ["free", "lobby"],
       contest_payout_curve: ["flat", "linear", "steep", "winner_take_all"],

@@ -74,15 +74,16 @@ values (995001, 2026, 95, 1, now() + interval '7 days', 'scheduled'),
        (996001, 2026, 96, 1, now() + interval '7 days', 'scheduled'),
        (997001, 2026, 97, 1, now() + interval '7 days', 'scheduled');
 
--- The two shapes of stake. `median` is even money; `top_n` loses most of its
--- field and pays a heart back for winning, which is the only heart faucet in
--- the game.
+-- The two shapes of stake, both of which now only ever COST a heart. `median`
+-- is even money; `top_n` loses most of its field. Neither pays one back —
+-- `20260902030000` removed the heal, so `hearts_on_win` is nought everywhere
+-- and a check constraint holds it there.
 insert into public.contests (code, kind, format_code, season, season_type, week, name,
                              entry_fee_coins, win_condition, win_rank, hearts_at_risk, hearts_on_win)
 select 'test:median:' || w, 'lobby'::public.contest_kind, 'flex3', 2026, 1, w::integer, 'Test Median', 0, 'median'::public.contest_win_condition, null::integer, 1::smallint, 0::smallint
   from unnest(array[95,96,97]) w
 union all
-select 'test:top3:' || w, 'lobby'::public.contest_kind, 'wr_room', 2026, 1, w::integer, 'Test Top Three', 0, 'top_n'::public.contest_win_condition, 3, 1::smallint, 1::smallint
+select 'test:top3:' || w, 'lobby'::public.contest_kind, 'wr_room', 2026, 1, w::integer, 'Test Top Three', 0, 'top_n'::public.contest_win_condition, 3, 1::smallint, 0::smallint
   from unnest(array[95,96,97]) w;
 
 -- ---------------------------------------------------------------------------
@@ -353,13 +354,17 @@ begin
     raise exception 'FAIL: first of five in a top-three should be a win, got %', coalesce(v_res,'null');
   end if;
 
-  -- 10. THE WEEK NETS OUT AS ONE DELTA. A loss and a healing win on the same
-  --     slate cancel; if these were settled one at a time the answer would
-  --     depend on which row was processed first.
+  -- 10. THE WEEK SETTLES AS ONE DELTA, and since `20260902030000` that delta
+  --     can only ever be negative: a win pays coins, not hearts, so a 1-1 week
+  --     is a week that COST one. It used to cancel, back when the top-three
+  --     contest healed — this assertion is the same question with the heal
+  --     taken out, and it is the one that would catch the heal coming back by
+  --     accident.
   perform public.settle_run_week(2026, 1::smallint, 95);
   select hearts, wins into v_after, v_wins from public.runs where id = v_run;
-  if v_after <> v_before then
-    raise exception 'FAIL: a 1-1 week changed hearts from % to %', v_before, v_after;
+  if v_after <> v_before - 1 then
+    raise exception 'FAIL: a 1-1 week should cost exactly one heart, % -> %',
+      v_before, v_after;
   end if;
   if v_wins <> 1 then
     raise exception 'FAIL: the win was not counted, wins = %', v_wins;
@@ -374,11 +379,13 @@ begin
   end if;
 
   -- 11. EXACTLY ONCE. Re-running settlement is routine on gameday, and a second
-  --     pass must not take a second heart.
+  --     pass must not take a second heart. The expected figure is the same
+  --     `v_before - 1` that 10 just established — idempotency is that the
+  --     number does not MOVE AGAIN, not that it never moved.
   perform public.settle_run_week(2026, 1::smallint, 95);
   perform public.settle_run_week(2026, 1::smallint, 95);
   select hearts, wins into v_after, v_wins from public.runs where id = v_run;
-  if v_after <> v_before or v_wins <> 1 then
+  if v_after <> v_before - 1 or v_wins <> 1 then
     raise exception 'FAIL: settlement is not idempotent (hearts %, wins %)', v_after, v_wins;
   end if;
 
@@ -684,7 +691,7 @@ values (998001, 2026, 98, 1, now() - interval '1 day', 'final');
 insert into public.contests (code, kind, format_code, season, season_type, week, name,
                              entry_fee_coins, win_condition, win_rank, hearts_at_risk, hearts_on_win)
 values ('test:top3:98', 'lobby'::public.contest_kind, 'wr_room', 2026, 1, 98, 'Test Top Three',
-        0, 'top_n'::public.contest_win_condition, 3, 1::smallint, 1::smallint);
+        0, 'top_n'::public.contest_win_condition, 3, 1::smallint, 0::smallint);
 
 insert into public.lineups (user_id, season, season_type, week, contest_id, total_points, run_id)
 select u.id, 2026, 1::smallint, 98, c.id,
@@ -713,11 +720,16 @@ select l.id, 'WR1', ci.id
  where c.code = 'test:top3:98'
    and not exists (select 1 from public.lineup_slots s where s.lineup_id = l.id);
 
--- PINNED FOR THE SAME REASON THE DEATH CHAIN IS, and here it matters more: the
--- assertion below is that a heal WIDENS THE RACK, which can only be observed on
--- a run whose hearts and peak are equal and below the ceiling. A fresh run
--- satisfies that at any starting value, but the numbers it is checked against
--- are written down, so the fixture has to write the start down too.
+-- PINNED FOR THE SAME REASON THE DEATH CHAIN IS: the numbers below are written
+-- down, so the fixture has to write the starting point down too rather than
+-- leaning on `run_starting_hearts`.
+--
+-- This block used to prove that a win HEALED and that the rack widened to hold
+-- the extra heart. `20260902030000` removed the heal — a heart is the price of
+-- entering, and the pool is what winning pays — so the block now proves the
+-- opposite, on the same fixture. It is deliberately not deleted: an assertion
+-- that a win changes nothing is the only thing standing between a future edit
+-- and the silent return of a heart faucet.
 update public.runs
    set hearts = 3, peak_hearts = 3
  where user_id = '11111111-0000-0000-0000-000000000001' and ended_at is null;
@@ -737,16 +749,27 @@ begin
   perform public.settle_run_week(2026, 1::smallint, 98);
   select * into r from public.runs where user_id = a and ended_at is null;
 
-  -- 22. A WIN IN THE HEALING CONTEST ADDS A HEART...
-  if r.hearts <> 4 then
-    raise exception 'FAIL: a heal did not land, hearts = %', r.hearts;
+  -- 22. A WIN COSTS AND PAYS NOTHING IN HEARTS. Week 98 is a win in the
+  --     top-three contest and nothing else, so if any heal survived anywhere
+  --     this is where it would show.
+  if r.hearts <> 3 then
+    raise exception 'FAIL: a win moved hearts from 3 to %', r.hearts;
   end if;
-  -- 23. ...AND THE RACK WIDENS TO HOLD IT. Without this the fourth heart has
-  --     nowhere to be drawn, which is the failure mode a fixed starting-hearts
-  --     rack would have had.
-  if r.peak_hearts <> 4 then
-    raise exception 'FAIL: the rack did not grow with the heal, peak = %', r.peak_hearts;
+  -- 23. ...AND THE RACK DOES NOT WIDEN, because nothing widened it. `peak_hearts`
+  --     only ever grows to hold a heart that was actually gained.
+  if r.peak_hearts <> 3 then
+    raise exception 'FAIL: the rack grew without a heal, peak = %', r.peak_hearts;
   end if;
+
+  -- 24. AND THE CONSTRAINT IS THE REAL GUARD. The two assertions above would
+  --     both pass if somebody set hearts_on_win back to 1 on a DIFFERENT
+  --     contest; this refuses the value itself.
+  begin
+    update public.contests set hearts_on_win = 1 where code = 'test:top3:98';
+    raise exception 'FAIL: a contest was allowed to heal a heart';
+  exception when check_violation then
+    null;
+  end;
 
   raise notice 'runs suite: the rack passed';
 end $$;

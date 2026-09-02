@@ -36,10 +36,10 @@
 -- WHAT WOULD HAVE CAUGHT THE BUG THIS SUITE WAS WRITTEN AFTER
 -- ---------------------------------------------------------------------------
 --
--- Section 6. A contest with `hearts_at_risk = 0` and `hearts_on_win = 1` — The
--- Warm-Up's shape — reached settlement and moved nothing, because both
--- `set_lineup` and `settle_run_week` asked "does this risk a heart" when they
--- meant "does this move hearts". It recorded a win and paid no heart, silently.
+-- Sections 6 and 7. A contest that collects no fee can still pay, out of a
+-- minted podium — a route with no ledger behind it, so none of the fee-funded
+-- assertions above touch it. 7 is the one that matters: the only entrant in a
+-- quiet week must not collect a pot for beating nobody.
 --
 -- Everything is synthetic — its own team, player, cards, games and a week of
 -- its own — so the suite does not depend on which real fixtures have been
@@ -112,9 +112,11 @@ begin
     -- Top 10% of five floors to nought and is lifted to one place.
     ('test:tiny:87', 'lobby', 'flex3', 2026, 1, 87, 'T Tiny Share',
      100, 9000, 'top_pct', null, 10, null, 'flat', 0, 0),
-    -- Risks nothing, pays a heart. The Warm-Up's shape — section 6.
+    -- Risks nothing, charges nothing, and pays out of a minted podium. The
+    -- Warm-Up's shape — sections 6 and 7. Seeded with no podium so 6a can
+    -- prove a contest without one invents nothing.
     ('test:warm:87', 'lobby', 'flex3', 2026, 1, 87, 'T Warm Up',
-     0, 0, 'target', null, null, 35.00, 'flat', 0, 1),
+     0, 0, 'target', null, null, 35.00, 'flat', 0, 0),
     -- A SECOND top-40% row, identical to `dbl`, existing only so section 2 has
     -- a field it may shrink. Sections that mutate the fixture must not mutate a
     -- fixture another section reads — the first draft shrank `dbl` and section
@@ -409,91 +411,129 @@ begin
 
   raise notice 'contest formats: a shared place passed';
 end $$;
-
 -- ---------------------------------------------------------------------------
--- 6. A HEART CAN BE WON WITHOUT BEING RISKED.
+-- 6. A CONTEST WITH NO FEE STILL PAYS, OUT OF A MINTED PODIUM.
 -- ---------------------------------------------------------------------------
 --
--- THE REGRESSION THIS SUITE EXISTS FOR. `settle_run_week` gated on
--- `hearts_at_risk > 0`, which was the same set as "moves hearts" right up until
--- a contest paid a heart without staking one. The Warm-Up is exactly that, and
--- under the old gate it recorded a win and healed nothing — silently, with the
--- lobby still advertising `+1 heart`.
+-- This section used to prove that a heart could be WON without being risked —
+-- The Warm-Up's shape, and the regression `settle_run_week` had when it gated
+-- on `hearts_at_risk > 0` while meaning "moves hearts".
+--
+-- `20260902030000` removed the heal, so that scenario cannot arise: no contest
+-- pays a heart, `hearts_at_risk > 0` is once again exactly the set that moves
+-- them, and a check constraint refuses any other value. The old gate is correct
+-- again, and `runs.test.sql` assertion 24 is what now guards the constraint
+-- itself.
+--
+-- What replaced the heart is a minted podium (`20260902050000`), and that is
+-- what this section tests instead — because it is the new answer to the same
+-- underlying question: CAN A CONTEST THAT COLLECTS NOTHING PAY ANYTHING? The
+-- fee-funded path reads the ledger and would return nought here, so the podium
+-- is a genuinely separate route to a payout and needs its own proof.
 do $$
 declare
-  v_warm    uuid;
-  v_user    constant uuid := '87878787-0000-0000-0000-000000000001';
-  v_run     uuid;
-  v_before  smallint;
-  v_after   smallint;
-  v_lineup  uuid;
-  v_ci      uuid;
-  v_delta   smallint;
+  v_warm  uuid;
+  v_paid  integer;
+  v_top   integer;
+  v_rows  integer;
 begin
   select id into v_warm from public.contests where code = 'test:warm:87';
 
-  -- A live run, deliberately below its ceiling so a heal has somewhere to go.
-  -- `runs_one_live_per_user` is a partial unique index, so the synthetic user
-  -- may already own a live run from an earlier fixture; take it if so.
-  select id into v_run from public.runs
-   where user_id = v_user and ended_at is null;
-
-  if v_run is null then
-    insert into public.runs (user_id, hearts, max_hearts, peak_hearts)
-    values (v_user, 2, 5, 3) returning id into v_run;
-  else
-    update public.runs set hearts = 2, max_hearts = 5, peak_hearts = 3
-     where id = v_run;
+  -- The fixture's five entrants scored 10/20/30/40/50 and this contest has no
+  -- fee, so the fee-funded pool is nought by construction.
+  if public.contest_prize_pool(v_warm) <> 0 then
+    raise exception 'FAIL: a contest with no fee reported a collected pool of %',
+      public.contest_prize_pool(v_warm);
   end if;
 
-  -- The trigger stamps the run at INSERT, and these lineups were written before
-  -- the run existed, so this one is re-filed the way a real entry arrives.
-  delete from public.lineups where contest_id = v_warm and user_id = v_user;
+  -- 6a. NO PODIUM CONFIGURED, NO PAYOUT. The column defaults to nought, and a
+  --     contest that has not been given a pot must not invent one.
+  select count(*) into v_rows from public.contest_podium_payouts(v_warm);
+  if v_rows <> 0 then
+    raise exception 'FAIL: a contest with no podium paid % rows', v_rows;
+  end if;
+
+  -- Give it the shape the real Warm-Up carries: 100 coins, one place.
+  update public.contests set podium_coins = 100, podium_places = 1
+   where id = v_warm;
+
+  -- 6b. THE WINNER TAKES THE POT. One place, five entrants, so the whole 100
+  --     goes to the top score and nothing is left rounding away.
+  select count(*), coalesce(sum(coins), 0), max(coins)
+    into v_rows, v_paid, v_top
+    from public.contest_podium_payouts(v_warm);
+  if v_rows <> 1 then
+    raise exception 'FAIL: a one-place podium paid % places', v_rows;
+  end if;
+  if v_paid <> 100 or v_top <> 100 then
+    raise exception 'FAIL: a one-place podium paid % of 100', v_paid;
+  end if;
+
+  -- 6c. IT IS PAID BY RANK, NOT BY THE WIN CONDITION. This contest is a
+  --     `target` at 35.00, which two of the five clear — but the podium is one
+  --     place, so the SECOND clearer wins nothing. Those are two different
+  --     questions about one week and they are allowed to disagree; this is the
+  --     assertion that keeps them apart.
+  if (select count(*) from public.contest_results(v_warm) where result = 'W') <> 2 then
+    raise exception 'FAIL: fixture problem — the target should be cleared by two';
+  end if;
+
+  -- 6d. A PODIUM NEVER EXCEEDS ITS POT, on the same principle section 4 checks
+  --     for the fee-funded curves. Widen it past the field and the floor plus
+  --     the weight normalisation still cannot overpay.
+  update public.contests set podium_places = 3 where id = v_warm;
+  select coalesce(sum(coins), 0) into v_paid from public.contest_podium_payouts(v_warm);
+  if v_paid > 100 then
+    raise exception 'FAIL: a three-place podium paid % out of a 100 pot', v_paid;
+  end if;
+
+  raise notice 'contest formats: the minted podium passed';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 7. THERE MUST BE SOMEBODY TO HAVE BEATEN.
+-- ---------------------------------------------------------------------------
+--
+-- The closest thing this design has to an exploit: a minted pot is not funded
+-- by entries, so the first account to file in a quiet week would otherwise
+-- collect the lot for being the only entry. `least(podium_places, entrants - 1)`
+-- closes it with arithmetic rather than vigilance, and this is the proof.
+do $$
+declare
+  v_solo  uuid;
+  v_paid  integer;
+begin
+  -- Its own contest, so shrinking the field cannot disturb a fixture another
+  -- section reads — the rule this suite learned in section 2.
+  insert into public.contests (code, kind, format_code, season, season_type, week, name,
+                               entry_fee_coins, prize_pool_bps, win_condition,
+                               win_rank, win_pct, target_points, payout_curve,
+                               hearts_at_risk, hearts_on_win,
+                               podium_coins, podium_places)
+  values ('test:solo:87', 'lobby', 'flex3', 2026, 1, 87, 'T Solo',
+          0, 0, 'target', null, null, 35.00, 'flat', 0, 0, 100, 3)
+  returning id into v_solo;
+
+  -- Exactly one entrant, who clears the bar comfortably.
   insert into public.lineups (user_id, season, season_type, week, contest_id,
                               total_points, scored_at)
-  values (v_user, 2026, 1, 87, v_warm, 50, now())
-  returning id into v_lineup;
-
-  -- 6a. THE STAMP. A contest that pays a heart carries the run, even though it
-  --     risks none — which is what `set_lineup`'s own gate would not have done.
-  if (select run_id from public.lineups where id = v_lineup) is distinct from v_run then
-    raise exception 'FAIL: an entry into a heart-paying contest carried run %, expected %',
-      (select run_id from public.lineups where id = v_lineup), v_run;
-  end if;
-
-  -- A FRESH COPY. One card plays one contest a week, enforced by
-  -- `lineup_slots_one_contest_per_card`, and every copy this user owns is
-  -- already filed in one of the six contests above — so reusing an arbitrary
-  -- one is refused by name. Minting another is what a real player does when
-  -- they enter a second contest, which is the behaviour under test.
-  insert into public.card_instances (user_id, card_id)
-  select v_user, c.id from public.cards c
-    join public.players p on p.id = c.player_id
-   where p.external_id = 993001
-  returning id into v_ci;
-
+  values ('87878787-0000-0000-0000-000000000001', 2026, 1, 87, v_solo, 90, now());
   insert into public.lineup_slots (lineup_id, slot, card_instance_id)
-  values (v_lineup, 'FLEX1', v_ci);
+  select l.id, 'FLEX1', ci.id
+    from public.lineups l,
+         lateral (select id from public.card_instances
+                   where user_id = '87878787-0000-0000-0000-000000000001'
+                     and is_held
+                     and id not in (select card_instance_id from public.lineup_slots)
+                   limit 1) ci
+   where l.contest_id = v_solo;
 
-  select hearts into v_before from public.runs where id = v_run;
-  perform public.settle_run_week(2026, 1::smallint, 87);
-  select hearts into v_after from public.runs where id = v_run;
-
-  -- 6b. AND THE HEART ACTUALLY ARRIVES.
-  if v_after <> v_before + 1 then
-    raise exception 'FAIL: a won heart took the run from % to %, expected %',
-      v_before, v_after, v_before + 1;
+  select coalesce(sum(coins), 0) into v_paid from public.contest_podium_payouts(v_solo);
+  if v_paid <> 0 then
+    raise exception 'FAIL: the only entrant was paid % for beating nobody', v_paid;
   end if;
 
-  -- 6c. RECORDED AS A WIN WORTH ONE HEART, so the history says what happened
-  --     rather than leaving the wallet as the only evidence.
-  select hearts_delta into v_delta from public.run_contest_results
-   where run_id = v_run and contest_id = v_warm;
-  if v_delta is distinct from 1::smallint then
-    raise exception 'FAIL: the settled row recorded a heart delta of %, expected 1', v_delta;
-  end if;
-
-  raise notice 'contest formats: a free heart passed';
+  raise notice 'contest formats: a field of one pays nobody passed';
 end $$;
 
 rollback;

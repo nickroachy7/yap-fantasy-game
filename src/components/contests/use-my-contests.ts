@@ -81,6 +81,7 @@ export type MyContest = {
 
   /** Coins collected by this contest that will be paid back out. */
   prizePool: number;
+  podiumCoins: number;
   /**
    * This contest belongs to a week the board has already moved past, and is
    * being shown so the result does not vanish the moment the slate rolls.
@@ -142,6 +143,7 @@ type Row = {
   score_rate: number | string | null;
   cut: number | string | null;
   prize_pool: number | string | null;
+  podium_coins: number | string | null;
   my_prize: number | string | null;
   /* OPTIONAL, and that is the point: `20260831040000` adds this column and CI
      ships JS without running `db push`, so the update can land on a database
@@ -272,6 +274,7 @@ export function useMyContests(includeCode?: string): MyContestsState {
         scoreRate: num(r.score_rate) ?? 0,
         cut: num(r.cut),
         prizePool: num(r.prize_pool) ?? 0,
+        podiumCoins: num(r.podium_coins) ?? 0,
         myPrize: num(r.my_prize),
         /* Absent on an install talking to a database without
            `20260831040000`, which `num` reads as null — the same "still
@@ -318,6 +321,7 @@ export function termsOfEntry(c: MyContest): ContestTerms {
     payoutCurve: c.payoutCurve,
     scoreRate: c.scoreRate,
     prizePool: c.prizePool,
+    podiumCoins: c.podiumCoins,
     entrants: c.field.entrants,
     maxEntrants: null,
   };

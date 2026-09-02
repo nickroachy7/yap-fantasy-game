@@ -55,7 +55,7 @@ import {
   summariseSets,
   type SetListFilter,
 } from '@/components/collection/sets';
-import { PlayerHero } from '@/components/players/PlayerHero';
+import { PlayerHero, type HeroFigure } from '@/components/players/PlayerHero';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { CardStanding } from '@/components/players/CardStanding';
 import { GameLogTab } from '@/components/players/GameLogTab';
@@ -100,6 +100,13 @@ import { WIDE_BREAKPOINT, useIsWide } from '@/components/shell/useResponsive';
 import { Colors, Spacing, Type, type CardTier, type Measure } from '@/constants/theme';
 import { PlayerContext, type PlayerState } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+
+/** What the directory profile puts in the header strip. See `PlayerHero`. */
+const HERO_FIGURES: HeroFigure[] = [
+  { label: 'SEASON FP', value: '73.9' },
+  { label: 'FP / GAME', value: '14.8' },
+  { label: 'RANK', value: 'RB4', hint: 'of 84' },
+];
 
 const FIXTURE_PLAYER: PlayerState = {
   coins: 1240,
@@ -785,6 +792,7 @@ const CONTEST_FIXTURES: MyContest[] = [
     scoreRate: 1.5,
     cut: null,
     prizePool: 0,
+    podiumCoins: 0,
     myPrize: null,
     myCoins: null,
     recap: false,
@@ -831,6 +839,7 @@ const CONTEST_FIXTURES: MyContest[] = [
        as fourth of six against the line that actually pays. */
     cut: 38.4,
     prizePool: 240,
+    podiumCoins: 0,
     myPrize: null,
     myCoins: null,
     recap: false,
@@ -881,6 +890,7 @@ const CONTEST_FIXTURES: MyContest[] = [
     scoreRate: 1.5,
     cut: 30.0,
     prizePool: 0,
+    podiumCoins: 0,
     myPrize: null,
     myCoins: null,
     recap: false,
@@ -995,18 +1005,24 @@ function ProfileFixture() {
             team={profile.player.teamAbbreviation}
             position={profile.player.positionAbbreviation}
             injuryStatus={profile.player.injuryStatus}
+            figures={HERO_FIGURES}
           />
           <GameLogTab profile={profile} sections={parseGameLog(MCCAFFREY_GAME_LOG)} />
         </PlayerSheetFrame>
       ) : null}
 
-      {/* The shared hero, exactly as BOTH profiles draw it. */}
+      {/* The shared hero, exactly as BOTH profiles draw it — including the
+          figure strip, which is the part that differs between them: the copy's
+          earnings on `/card`, the player's season here. Drawn WITHOUT the tone
+          band behind it, so the strip's rules are the only thing holding it
+          together; on the real pages the wash does half that work. */}
       <PlayerHero
         name={profile.player.name}
         bio={profile.player}
         team={profile.player.teamAbbreviation}
         position={profile.player.positionAbbreviation}
         injuryStatus={profile.player.injuryStatus}
+        figures={HERO_FIGURES}
       />
 
       {/* Mirrors the real screens' tab split — same three, same order on both —

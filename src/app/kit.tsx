@@ -197,14 +197,16 @@ const KIT_TERMS_FREE: ContestTerms = {
   heartsAtRisk: 1, heartsOnWin: 0,
   winCondition: 'median', winRank: null, winPct: null, targetPoints: null,
   payoutCurve: 'flat', scoreRate: 1.5,
-  prizePool: 0, entrants: 26, maxEntrants: null,
+  prizePool: 0,
+  podiumCoins: 700, entrants: 26, maxEntrants: null,
 };
 const KIT_TERMS_MEDIAN: ContestTerms = {
   formatName: 'Flex Three', slotCount: 3, entryFeeCoins: 40,
   heartsAtRisk: 0, heartsOnWin: 0,
   winCondition: 'median', winRank: null, winPct: null, targetPoints: null,
   payoutCurve: 'flat', scoreRate: 1.5,
-  prizePool: 120, entrants: 12, maxEntrants: null,
+  prizePool: 120,
+  podiumCoins: 0, entrants: 12, maxEntrants: null,
 };
 /**
  * A field with one row per state the panel has to draw.
@@ -285,7 +287,8 @@ const KIT_TERMS_TOP_N: ContestTerms = {
   heartsAtRisk: 1, heartsOnWin: 1,
   winCondition: 'top_n', winRank: 3, winPct: null, targetPoints: null,
   payoutCurve: 'steep', scoreRate: 1.5,
-  prizePool: 240, entrants: 6, maxEntrants: null,
+  prizePool: 240,
+  podiumCoins: 0, entrants: 6, maxEntrants: null,
 };
 
 const STARTERS: {

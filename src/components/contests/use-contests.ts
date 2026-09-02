@@ -99,6 +99,7 @@ export type Contest = {
    * the grant that inverts the fee's whole justification.
    */
   prizePool: number;
+  podiumCoins: number;
   /** The share of collected fees paid out, in basis points. 9000 = 90%. */
   prizePoolBps: number;
   /**
@@ -137,6 +138,7 @@ type Row = {
   hearts_on_win: number;
   my_hearts: number | null;
   prize_pool: number;
+  podium_coins: number | null;
   prize_pool_bps: number;
   recap: boolean | null;
 };
@@ -188,6 +190,7 @@ export function useContests(): ContestsState {
         heartsOnWin: Number(r.hearts_on_win ?? 0),
         myHearts: r.my_hearts === null || r.my_hearts === undefined ? null : Number(r.my_hearts),
         prizePool: Number(r.prize_pool ?? 0),
+        podiumCoins: Number(r.podium_coins ?? 0),
         prizePoolBps: Number(r.prize_pool_bps ?? 0),
         recap: Boolean(r.recap),
       })),
@@ -228,6 +231,7 @@ export function termsOfContest(c: Contest): ContestTerms {
     payoutCurve: c.payoutCurve,
     scoreRate: c.scoreRate,
     prizePool: c.prizePool,
+    podiumCoins: c.podiumCoins,
     entrants: c.entrants,
     maxEntrants: c.maxEntrants,
   };

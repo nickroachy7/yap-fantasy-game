@@ -154,6 +154,7 @@ import {
   opponentOf,
   riskTokens,
   stakedTokens,
+  winLabel,
   winLine,
   winTokens,
   wonTokens,
@@ -863,7 +864,7 @@ function Foot({
       />
       <Rule tall />
       <TokenRow
-        label={settled ? 'WON' : 'WIN'}
+        label={winLabel(terms, settled !== null)}
         tokens={settled ? wonTokens(terms, settled, prize) : winTokens(terms, prize)}
         side="win"
       />

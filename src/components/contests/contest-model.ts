@@ -77,6 +77,19 @@ export type ContestTerms = {
   scoreRate: number;
   /** Coins collected so far that will be paid back out. Grows with the field. */
   prizePool: number;
+  /**
+   * A MINTED weekly pot paid to the top finishers by rank, flat rather than
+   * per-entrant. Nought on every contest funded by fees.
+   *
+   * It is a separate field from `prizePool` and not folded into it because the
+   * two are different money answering to different rules: `prizePool` is a
+   * share of what the ledger collected and moves as people enter, this is a
+   * fixed figure the game puts up. The card happens to draw them in the same
+   * place, which is a presentation decision and not a reason to merge them —
+   * `contest_payouts` and `contest_podium_payouts` split them by different
+   * rank rules and would disagree about a combined number.
+   */
+  podiumCoins: number;
   entrants: number;
   maxEntrants?: number | null;
 };
@@ -620,110 +633,79 @@ export function riskTokens(t: ContestTerms): Token[] {
  * token, the unit always prints. A bare `◆ 1.5` would read as a coin and a half.
  */
 export function winTokens(t: ContestTerms, prize: number | null = null): Token[] {
-  const out: Token[] = [];
-
+  /* WON: what settlement actually paid. Ends the question. */
   if (prize !== null && prize > 0) {
-    out.push({ kind: 'coin', value: `${prize}`, unit: 'coins', tone: 'positive' });
-  } else if (t.entryFeeCoins > 0) {
-    /* THE POOL, NOT A SLICE OF IT.
-       -----------------------------------------------------------------------
-       This drew `topPrize` — the winner's take — and on a young contest that
-       is a number nobody can act on. The WR Room read
-
-           RISK  ◆ 50  ♥ 1        WIN  ◆ 19  ♥ +1
-
-       which is a heart and fifty coins staked to win nineteen. Nothing was
-       wrong with the arithmetic: one entry had paid in, the pool was 36, and a
-       steep split over three places gives first 54% of it. The card was
-       honestly reporting a contest that had not been funded yet.
-
-       But a lobby row is read in about a second, and in that second `19` is
-       not "this contest is nearly empty", it is "this contest is a bad trade".
-       The player cannot tell a small pool from a bad offer, and the one figure
-       that distinguishes them — how much is actually on the table — was the
-       one being divided away.
-
-       So the token is the POOL. It is the number that grows as people join, it
-       is the same number the entrant is playing for whatever the split does
-       with it, and `winLine` directly above already says how it is divided
-       ("Top 3 win", "Top 50% win", "Beat your opponent"). Between them the two
-       lines say what is there and who gets it, which is what `topPrize` was
-       trying to compress into one figure and could not.
-
-       `topPrize` is not deleted — the contest SHEET still draws it, where there
-       is room to say "first place takes 19 of the 36 currently in the pool"
-       and have that be informative rather than alarming.
-
-       IT DOES NOT COUNT YOUR OWN ENTRY, and it must not. Adding the fee you
-       have not yet paid would be the client inventing a pool figure, which is
-       exactly what `20260826020000` forbids: the pool is what the LEDGER
-       collected. The number is honest and it is low because the contest is
-       empty — and `fillLine` beside it is already saying so in words. */
-    if (t.prizePool > 0) {
-      out.push({ kind: 'coin', value: `${t.prizePool}`, unit: 'pool', keepUnit: true });
-    } else {
-      out.push({ kind: 'coin', value: 'share', unit: 'of the pool' });
-    }
+    return [{ kind: 'coin', value: `${prize}`, unit: 'coins', tone: 'positive' }];
   }
 
-  if (t.heartsOnWin > 0) {
-    out.push({
-      kind: 'heart',
-      value: `+${t.heartsOnWin}`,
-      unit: t.heartsOnWin === 1 ? 'heart' : 'hearts',
-      tone: 'positive',
-    });
-  }
-
-  /* THE PER-POINT RATE IS NOT A CONTEST REWARD, so it is not in this column.
+  /* THE PRIZE POOL, AS A PLAIN NUMBER UNDER A LABEL THAT NAMES IT.
      -----------------------------------------------------------------------
-     A previous pass printed `◆ 1.5 /pt` on every row here, reasoning that a
-     thing true of every contest should appear on every contest. That was the
-     wrong conclusion from the right observation.
+     This column has now been wrong three ways and they were all the same
+     mistake: trying to make the token say what KIND of number it is.
 
-     What a card earns for its points is a property of THE CARD. It is paid on
-     every start in every lineup, it is multiplied by that card's own tier, and
-     it arrives whether the contest is won or lost — so it is not something a
-     contest offers in exchange for an entry fee, and putting it in the column
-     headed WIN said that it was. On the eight-row lobby it also printed the
-     identical token eight times down the right-hand edge, which is a lot of
-     ink spent telling the reader nothing that distinguishes one row from
-     another.
+       `19`                  the winner's slice of an unfunded pool, which
+                             read as a bad offer rather than an empty contest
+       `share of the pool`   a word where the number goes, under a label
+                             already saying WIN — so the card said "win share"
+       `36 pool`             a number with a noun stuck to it, which is not
+                             a phrase anybody writes
 
-     Its home is the card: `LineupRow` already draws the coins each start
-     actually earned, per card, next to that card's points. That is the same
-     fact with a real number instead of a rate, in the place the rate is a
-     property of.
+     The fix is not more words in the token. It is that the LABEL is where a
+     noun belongs, and this band has always had one — `RISK` / `STAKED` on the
+     left, `WIN` / `WON` on the right, changing with the state. So the label
+     becomes `PRIZE POOL` and the token goes back to being what every other
+     token here is: a quantity with its mark. See `winLabel`.
 
-     The contest SHEET still states it once, as prose rather than as a reward —
-     see the "Every start" fact in `ContestAbout`, which says in as many words
-     that it is paid "in this contest and in all of them". */
+         PRIZE POOL  ◆ 240 coins
 
-  /* WHAT IS LEFT WHEN A CONTEST PAYS NEITHER COINS NOR HEARTS.
-     -----------------------------------------------------------------------
-     The free weekly contest: no fee, so no pool, and it heals nothing. Until
-     the rate token was removed above it always had that to print and this case
-     could not arise; now the side would come back empty, and an empty reward
-     column reads as still loading.
+     which is the phrase daily fantasy has used for twenty years, and reads the
+     same at nought as it does at nine hundred.
 
-     Falling back to "share of the pool" — which is what the paid branch says
-     when its pool is nought — would be worse than blank. The free contest has
-     no pool and never will: `contests_free_pays_no_prize` forbids one, because
-     a prize on a contest that collects nothing could only be minted.
+     NOUGHT IS PRINTED, NOT HIDDEN. An empty contest genuinely has no pool yet,
+     `fillLine` beside it already says "Needs 2 entries", and the two lines
+     agree. Replacing the nought with a word is what produced `share of the
+     pool`: a phrase standing in for a number it could not supply.
 
-     What you actually win is the W. `median_record` scores every free-contest
-     week against the field's middle and that record is the season, which is the
-     whole reason this is the one contest nobody can leave. So the column names
-     it, as a word rather than a quantity. */
-  if (out.length === 0) {
-    return [
-      t.entryFeeCoins > 0
-        ? { kind: 'coin', value: 'share', unit: 'of the pool' }
-        : { kind: 'none', value: 'Season record' },
-    ];
+     IT DOES NOT COUNT YOUR OWN UNPAID ENTRY. The pool is what the ledger
+     collected (`20260826020000`); adding a fee nobody has paid would be the
+     client inventing one. */
+  if (t.entryFeeCoins > 0) {
+    return [{ kind: 'coin', value: `${t.prizePool}`, unit: 'coins' }];
   }
 
-  return out;
+  /* A MINTED PODIUM READS AS A POOL, because to the player it is one: a figure
+     on the table that the best finishers take. The difference between it and a
+     fee-funded pool is where the coin came from, which is the game's problem
+     and not something the reward column should make the reader carry.
+
+     It is FIXED rather than growing — 700 on the weekly contest, 100 on The
+     Warm-Up — so unlike the pool above it says the same number all week. */
+  if (t.podiumCoins > 0) {
+    return [{ kind: 'coin', value: `${t.podiumCoins}`, unit: 'coins' }];
+  }
+
+  /* The free weekly contest: no fee, so no pool, and
+     `contests_free_pays_no_prize` means there can never be one. What you win is
+     the W — `median_record` scores every week against the field's middle, and
+     that record is the season. A word, not a quantity. */
+  return [{ kind: 'none', value: 'Season record' }];
+}
+
+/**
+ * THE NOUN FOR THE RIGHT-HAND SIDE, which is where a noun belongs.
+ *
+ * The band's labels have always been state-dependent — `RISK` becomes `STAKED`
+ * once a week is settled — so this is the existing mechanism doing one more job
+ * rather than a new one. It exists because `winTokens` kept trying to name its
+ * own number; see the note there.
+ *
+ * `PRIZE POOL` only where there IS a pool to name. The free contest wins you a
+ * place in the season record, and calling that a prize pool would be the card
+ * inventing an economy the free contest is constitutionally barred from having.
+ */
+export function winLabel(t: ContestTerms, settled: boolean): string {
+  if (settled) return 'WON';
+  return t.entryFeeCoins > 0 || t.podiumCoins > 0 ? 'PRIZE POOL' : 'WIN';
 }
 
 /**
