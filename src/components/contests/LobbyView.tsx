@@ -695,14 +695,23 @@ function ArchiveLink({ onPress }: { onPress: () => void }) {
  * It is a footnote rather than a banner because it is a rule of the game and
  * not a warning about the current state — a banner would be shouting the same
  * sentence at somebody who has read it every week since the lobby opened.
+ *
+ * IT NO LONGER STATES THE RULE, only what the rule COSTS. Seen on a device, the
+ * sheet's own sticky subtitle says "One card plays one contest a week" a
+ * thumb's width above this, so the footnote's first sentence was the screen
+ * saying the same thing twice within one scroll. The subtitle is the better
+ * home for it — it is pinned, so it is there whichever part of the list you are
+ * looking at — and what only this line ever said is the consequence: that a
+ * second entry is paid for out of the BENCH. That is the half worth keeping,
+ * and it is the whole argument for the lobby existing.
  */
 function Footnote() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   return (
     <Text style={[Type.fine, styles.footnote, { color: c.textSecondary }]}>
-      A card can only play in one contest a week. Entering more means playing
-      deeper into your roster, not playing the same cards twice.
+      Entering more means playing deeper into your roster, not playing the same
+      cards twice.
     </Text>
   );
 }
