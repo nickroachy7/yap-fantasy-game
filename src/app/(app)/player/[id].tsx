@@ -35,7 +35,7 @@ import { GameLogTab } from '@/components/players/GameLogTab';
 import { currentRank, OverviewTab } from '@/components/players/OverviewTab';
 import { PlayerHero, type HeroFigure } from '@/components/players/PlayerHero';
 import { PlayerSheetFrame, SheetToneBand } from '@/components/players/PlayerSheetFrame';
-import { SectionStack } from '@/components/players/Section';
+import { Section, SectionStack } from '@/components/players/Section';
 import { usePlayerPage } from '@/components/players/use-player-page';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
 import { teamWash } from '@/constants/teams';
@@ -217,14 +217,28 @@ export default function PlayerDetailScreen() {
           <SectionStack>
             {/* Community first here, because this page is not about any one
                 copy — it is the page you open from the directory, before you
-                own anything. */}
-            <CommunityPanel market={market} />
-            <CardHistory
-              cards={owned}
-              loading={ownedLoading}
-              playerName={player.name}
-              onOpen={openCard}
-            />
+                own anything. The heading names the player rather than the room,
+                the same as its sibling. */}
+            <Section
+              label={`Every ${player.name}`}
+              hint={
+                market
+                  ? `${market.totals.held} ${market.totals.held === 1 ? 'COPY' : 'COPIES'} · ${market.totals.owners} ${market.totals.owners === 1 ? 'OWNER' : 'OWNERS'}`
+                  : undefined
+              }>
+              <CommunityPanel market={market} />
+            </Section>
+
+            <Section
+              label="Your cards"
+              hint={owned.length > 1 ? `${owned.length} COPIES` : undefined}>
+              <CardHistory
+                cards={owned}
+                loading={ownedLoading}
+                playerName={player.name}
+                onOpen={openCard}
+              />
+            </Section>
           </SectionStack>
         ) : null}
 

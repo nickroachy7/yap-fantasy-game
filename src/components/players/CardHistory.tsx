@@ -29,7 +29,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TierBadge } from '@/components/cards/TierBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Section } from './Section';
 import { Colors, NUMERIC, Spacing, Type, type CardTier } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -75,10 +74,7 @@ export function CardHistory({
   if (loading) return null;
 
   return (
-    <Section
-      label="YOUR CARDS"
-      hint={cards.length > 1 ? `${cards.length} COPIES` : undefined}
-      flush={cards.length > 0}>
+    <View style={styles.list}>
       {cards.length === 0 ? (
         <EmptyState
           title="You don’t hold this player"
@@ -140,11 +136,15 @@ export function CardHistory({
           );
         })
       )}
-    </Section>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  /* Cancels the zone's gutter so the pressable rows and their rules reach the
+     sheet's edges — a tappable row that stops short of the screen reads as a
+     card, and these are list items. */
+  list: { marginHorizontal: -Spacing.three },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

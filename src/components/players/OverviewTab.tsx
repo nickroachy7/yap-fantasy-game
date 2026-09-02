@@ -101,7 +101,7 @@ export function OverviewTab({
       {lead ? <Section>{lead}</Section> : null}
 
       {profile?.player.injuryComment ? (
-        <Section label={(player.injuryStatus ?? 'STATUS').toUpperCase()}>
+        <Section label={player.injuryStatus ?? 'Status'}>
           <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
             {profile.player.injuryComment}
           </Text>
@@ -115,7 +115,7 @@ export function OverviewTab({
           of the league in August. */}
       {recentFormCount(sections) >= 3 ? (
         <Section
-          label={`LAST ${recentFormCount(sections)} WEEKS`}
+          label={`Last ${recentFormCount(sections)} weeks`}
           hint={recentFormHint(sections)}>
           <RecentForm sections={sections} />
         </Section>
@@ -125,7 +125,7 @@ export function OverviewTab({
           says whether that is normal for him, and the Game log tab says which
           weeks made it up. */}
       {profile ? (
-        <Section label="SEASON BY SEASON" hint={`${player.gamesPlayed} GP THIS SEASON`} flush>
+        <Section label="Season by season" hint={`${player.gamesPlayed} GP THIS SEASON`} flush>
           <CareerTable career={profile.career} position={profile.player.positionAbbreviation} />
           {missingFromLog.length > 0 ? (
             <Text style={[Type.fine, styles.reconcile, { color: c.textTertiary }]}>
@@ -137,7 +137,7 @@ export function OverviewTab({
 
       {profile ? (
         <>
-          <Section label="USAGE SHARE" hint="MEASURED, NOT PROJECTED">
+          <Section label="Usage share" hint="MEASURED, NOT PROJECTED">
             <UsagePanel
               usage={profile.usage}
               position={profile.player.positionAbbreviation}
@@ -145,12 +145,12 @@ export function OverviewTab({
             />
           </Section>
 
-          <Section label="TEAM">
+          <Section label="Team">
             <TeamContext bio={profile.player} standings={profile.standings} />
           </Section>
 
           {/* THE PERSON, at the foot of the tab. */}
-          <Section label="PLAYER">
+          <Section label="Player">
             <BioFacts bio={profile.player} />
           </Section>
         </>
