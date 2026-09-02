@@ -203,6 +203,13 @@ export function RecentForm({ sections }: { sections: GameLogSection[] }) {
   );
 }
 
+/** The window's average, for the summary's FPTS/GAME group. */
+export function recentFormAverage(sections: GameLogSection[]): number | null {
+  const points = recent(sections);
+  if (points.length < 3) return null;
+  return points.reduce((a, p) => a + p.points, 0) / points.length;
+}
+
 /** The hint the section wears: what the dashed line is. */
 export function recentFormHint(sections: GameLogSection[]): string | undefined {
   const points = recent(sections);

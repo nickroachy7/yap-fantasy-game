@@ -31,10 +31,9 @@ import { Colors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { injuryWeight } from '@/lib/injury';
 import type { DirectoryPlayer } from '@/components/cards/player-directory';
-import { BioFacts } from './BioFacts';
 import type { GameLogSection } from './game-log';
-import { RecentForm, recentFormCount, recentFormHint } from './RecentForm';
-import { Figure, FigureRow, Section, SectionStack } from './Section';
+import { RecentForm, recentFormAverage, recentFormCount, recentFormHint } from './RecentForm';
+import { FigureGroup, GroupFigure, GroupRow, Row, Section, SectionStack } from './Section';
 import { TeamContext } from './TeamContext';
 import { UsagePanel } from './UsagePanel';
 import type { PlayerMarket } from './market';
@@ -90,6 +89,9 @@ export function OverviewTab({
   /* The comment takes the designation's own colour, from the same `injuryWeight`
      the hero's identity line runs — a player printing a red Q up there cannot
      print a grey warning down here. */
+  const rank = currentRank(profile);
+  const lastFive = recentFormAverage(sections);
+
   const weight = injuryWeight(player.injuryStatus);
   const commentColour = weight
     ? weight === 'blocking'
@@ -113,32 +115,67 @@ export function OverviewTab({
         * the strip: a figure printed twice on one screen is two figures that
         * can disagree, which is the bug the strip was built to close.
         */}
-      <Section label="Summary">
-        <FigureRow>
-          {/* NO HINT. It carried "2025 rank above" when the header's rank came
-              from a previous season — which points at nothing on the card page,
-              whose strip is the copy's earnings and holds no rank at all. The
-              directory's rank cell labels its own season. */}
-          <Figure label="GAMES" value={String(player.gamesPlayed)} />
-          {market ? (
-            <Figure
-              label="OWNERS"
-              value={String(market.totals.owners)}
-              /* A COUNT, NOT A PERCENTAGE. A share of a beta-sized user base
-                 reads 0% or 100% and teaches people to distrust the column,
-                 where "9 owners" is exactly as true at every scale. It becomes
-                 a percentage the day there is a denominator worth dividing by. */
-              hint={market.totals.owners === 1 ? 'holds him' : 'hold him'}
+      <Section label="Summary" hint={`${player.season} SEASON`}>
+        <GroupRow>
+          <FigureGroup label="PLAYER RANK">
+            <GroupFigure
+              value={rank ? `${player.position ?? ''}${rank.rank}` : '—'}
+              unit={rank && rank.season !== player.season ? `${rank.season} POS` : 'POSITION'}
+              missing={!rank}
             />
-          ) : null}
-          {market ? (
-            <Figure
-              label="COPIES"
-              value={String(market.totals.held)}
-              hint={`${market.totals.minted} minted`}
+            {/* THE DASH IS THE HONEST STATE. `player_profile` ranks within a
+                position and nowhere else, so an overall rank would have to be
+                invented. The cell holds its place so the group keeps its shape
+                and the gap reads as a gap rather than as a design choice. */}
+            <GroupFigure value="" unit="OVERALL" missing />
+          </FigureGroup>
+
+          <FigureGroup label="OWNERSHIP">
+            <GroupFigure
+              value={market ? String(market.totals.owners) : ''}
+              unit="OWNERS"
+              missing={!market}
             />
-          ) : null}
-        </FigureRow>
+            <GroupFigure
+              value={market ? String(market.totals.held) : ''}
+              unit="COPIES"
+              missing={!market}
+            />
+          </FigureGroup>
+        </GroupRow>
+
+        <GroupRow>
+          <FigureGroup label="FPTS / GAME">
+            <GroupFigure value={oneDp(player.fpPerGame)} unit="SEASON" />
+            <GroupFigure
+              value={lastFive === null ? '' : oneDp(lastFive)}
+              unit={`LAST ${recentFormCount(sections)}`}
+              missing={lastFive === null}
+            />
+          </FigureGroup>
+
+          {/* VITALS AS A GROUP, not a row at the foot of the tab. They are the
+              one thing here that never changes, so they read as identity rather
+              than as a measurement — which is exactly what a group of three
+              short figures under one label says. */}
+          <FigureGroup label="VITALS">
+            <GroupFigure
+              value={profile?.player.age === null || profile?.player.age === undefined ? '' : String(profile.player.age)}
+              unit="AGE"
+              missing={profile?.player.age === null || profile?.player.age === undefined}
+            />
+            <GroupFigure
+              value={profile?.player.height ?? ''}
+              unit="HT"
+              missing={!profile?.player.height}
+            />
+            <GroupFigure
+              value={experienceShort(profile?.player.experience ?? null)}
+              unit="EXP"
+              missing={!profile?.player.experience}
+            />
+          </FigureGroup>
+        </GroupRow>
       </Section>
 
       {profile?.player.injuryComment ? (
@@ -174,22 +211,32 @@ export function OverviewTab({
           </Section>
 
           {/**
-            * THE PERSON, LAST.
+            * COLLEGE ONLY, because age, height and experience have gone up into
+            * the summary's VITALS group where they read as identity rather than
+            * as a footnote. College is the one fact here that is a place rather
+            * than a quantity, and it is the widest — it does not fit a group
+            * cell and does not belong in one.
             *
-            * It is the only block on the tab that is read rather than scanned,
-            * and nothing in it changes a start/sit decision — a reader deciding
-            * about Sunday does not need his college. The written description
-            * this section is eventually for is not here: the provider does not
-            * sell one, and a stub that says "no description available" is worse
-            * than a section that does not exist.
+            * The written description this section is eventually for is not
+            * here: the provider does not sell one, and a stub saying "no
+            * description available" is worse than a section that does not
+            * exist.
             */}
-          <Section label="About him">
-            <BioFacts bio={profile.player} />
-          </Section>
+          {profile.player.college ? (
+            <Section label="About him">
+              <Row label="College" value={profile.player.college} />
+            </Section>
+          ) : null}
         </>
       ) : null}
     </SectionStack>
   );
 }
 
+const oneDp = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
+/** "2nd" out of "2nd Season" — the group cell has room for one word. */
+function experienceShort(raw: string | null): string {
+  if (!raw) return '';
+  return raw.replace(/\s*seasons?$/i, '').trim() || raw;
+}

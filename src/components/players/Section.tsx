@@ -193,6 +193,63 @@ export function Row({
   );
 }
 
+/**
+ * A caps label over two or three related figures.
+ *
+ * THE UNIT OF A SUMMARY IS A CONCEPT, NOT A NUMBER. The block this replaces was
+ * four independent tiles — each with a label, a figure and a sub-hint — which
+ * is twelve pieces of small type in a row with nothing saying which belong
+ * together. `PLAYER RANK` over `QB3 position` and `#41 overall` is one concept
+ * with two readings, and the eye takes it as one object.
+ *
+ * Two groups fit a phone row. Three figures inside a group is the ceiling, and
+ * only when the values are short — `6'2"` and `219` are fine, `1,284` is not.
+ */
+export function FigureGroup({ label, children }: { label: string; children: ReactNode }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
+  return (
+    <View style={styles.group}>
+      <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
+        {label}
+      </Text>
+      <View style={styles.groupCells}>{children}</View>
+    </View>
+  );
+}
+
+export function GroupFigure({
+  value,
+  unit,
+  /** A figure we cannot compute yet — drawn as a dash rather than omitted, so
+      the group keeps its shape and the gap is visibly a gap. */
+  missing = false,
+}: {
+  value: string;
+  unit: string;
+  missing?: boolean;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
+  return (
+    <View style={styles.groupCell}>
+      <Text numberOfLines={1} style={[NUMERIC, styles.groupValue, { color: missing ? c.textTertiary : c.text }]}>
+        {missing ? '—' : value}
+      </Text>
+      <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
+        {unit}
+      </Text>
+    </View>
+  );
+}
+
+/** Two groups across. A third does not fit a phone with units under it. */
+export function GroupRow({ children }: { children: ReactNode }) {
+  return <View style={styles.groupRow}>{children}</View>;
+}
+
 const styles = StyleSheet.create({
   stack: { marginHorizontal: -Spacing.three, marginTop: -Spacing.three },
   section: {
@@ -211,6 +268,11 @@ const styles = StyleSheet.create({
      a section title truncated is the one word the block exists to name. */
   headLabel: { flexShrink: 1, minWidth: 0 },
   figureRow: { flexDirection: 'row', gap: Spacing.two },
+  groupRow: { flexDirection: 'row', gap: Spacing.four },
+  group: { flex: 1, minWidth: 0, gap: Spacing.one + 2 },
+  groupCells: { flexDirection: 'row', gap: Spacing.three - 2 },
+  groupCell: { minWidth: 0, gap: 1 },
+  groupValue: { fontSize: 19, lineHeight: 23, fontWeight: '700', letterSpacing: -0.2 },
   figure: { flex: 1, minWidth: 0, gap: 1 },
   figureValue: { fontSize: 17, lineHeight: 21, fontWeight: '700' },
   figureLead: { fontSize: 22, lineHeight: 26, fontWeight: '800', letterSpacing: -0.3 },

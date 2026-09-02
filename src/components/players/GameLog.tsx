@@ -40,8 +40,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { careerColumnsFor } from './profile';
-import { weekLabel, type GameLogGame, type GameLogSection } from './game-log';
+import { careerColumnGroups, careerColumnsFor } from './profile';
+import { weekLabel, type GameLogGame, type GameLogSection, type GameLogStage } from './game-log';
 import { horizontalStrip } from '@/components/ui/scroll-strip';
 
 const DASH = '—';
@@ -173,6 +173,7 @@ function SeasonSection({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const columns = careerColumnsFor(position);
+  const groups = careerColumnGroups(position);
 
   return (
     <View style={[styles.section, { borderColor: c.border, backgroundColor: c.surface }]}>
@@ -230,6 +231,20 @@ function SeasonSection({
         <View>
           <ScrollView horizontal {...horizontalStrip} showsHorizontalScrollIndicator={false}>
             <View>
+              {/* The spanning band. Same construction and the same reason as
+                  `CareerTable`'s — see the note there. The leading spacer
+                  covers the fixture columns, which name themselves. */}
+              <View style={styles.bandRow}>
+                {startedWeeks ? <View style={styles.started} /> : null}
+                <View style={styles.wk} />
+                <View style={styles.opp} />
+                <View style={styles.result} />
+                <Band label="FANTASY" width={58} />
+                {groups.map((g) => (
+                  <Band key={g.family} label={g.family} width={62 * g.span + Spacing.two * (g.span - 1)} />
+                ))}
+              </View>
+
               <View style={[styles.row, styles.headRow, { borderColor: c.border }]}>
                 {startedWeeks ? (
                   <Text
@@ -272,7 +287,39 @@ function SeasonSection({
                     </View>
                   ) : null}
 
-              {stage.games.map((g) => {
+              {weeksWithByes(stage).map((entry) => {
+                if ('bye' in entry) {
+                  /* A WEEK OFF IS NOT A MISSING WEEK. Without a row the reader
+                     sees 8 then 10 and reads it as data we failed to ingest.
+                     The schedule is complete in the database — every team's 17
+                     fixtures across weeks 1 to 18 — so the one gap in a regular
+                     season is the bye, and saying so is both true and the more
+                     useful of the two readings. */
+                  return (
+                    <View
+                      key={`bye-${entry.bye}`}
+                      style={[styles.row, styles.bye, { borderColor: c.border }]}>
+                      {startedWeeks ? <View style={styles.started} /> : null}
+                      <Text style={[Type.body, styles.wk, NUMERIC, { color: c.textTertiary }]}>
+                        {entry.bye}
+                      </Text>
+                      <Text style={[Type.micro, styles.opp, { color: c.textTertiary }]}>BYE</Text>
+                      <Text style={[Type.body, styles.result, { color: c.textTertiary }]}>{DASH}</Text>
+                      <Text style={[Type.body, styles.fp, NUMERIC, { color: c.textTertiary }]}>
+                        {DASH}
+                      </Text>
+                      {columns.map((col) => (
+                        <Text
+                          key={col.key}
+                          style={[Type.body, styles.stat, NUMERIC, { color: c.textTertiary }]}>
+                          {DASH}
+                        </Text>
+                      ))}
+                    </View>
+                  );
+                }
+
+                const g = entry;
                 const result = resultOf(g);
                 const tone =
                   result.tone === 'win'
@@ -373,6 +420,51 @@ function SeasonSection({
   );
 }
 
+/**
+ * The weeks of a stage with its bye filled in.
+ *
+ * REGULAR SEASON ONLY. A preseason stage is not a fixed-length competition and
+ * a postseason one is elimination, so a week with no game in either is simply a
+ * week the team was not scheduled — calling that a bye would be inventing a
+ * fact. In a regular season the schedule is complete and every team plays 17 of
+ * 18 weeks, so the single gap is the bye by construction.
+ *
+ * Bounded by the fixtures we HAVE rather than by 18, so a partially ingested
+ * season produces no phantom byes past its last known week.
+ */
+function weeksWithByes(stage: GameLogStage): (GameLogGame | { bye: number })[] {
+  if (stage.seasonType !== 2) return stage.games;
+
+  const byWeek = new Map<number, GameLogGame>();
+  for (const g of stage.games) if (g.week !== null) byWeek.set(g.week, g);
+  if (byWeek.size === 0) return stage.games;
+
+  const weeks = [...byWeek.keys()];
+  const lo = Math.min(...weeks);
+  const hi = Math.max(...weeks);
+
+  const out: (GameLogGame | { bye: number })[] = [];
+  for (let w = lo; w <= hi; w += 1) {
+    const g = byWeek.get(w);
+    out.push(g ?? { bye: w });
+  }
+  return out;
+}
+
+/** One family's band: a label over a rule the width of its columns. */
+function Band({ label, width }: { label: string; width: number }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
+  return (
+    <View style={[styles.band, { width, borderBottomColor: c.borderStrong }]}>
+      <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 function Summary({ label, value }: { label: string; value: string }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -416,6 +508,11 @@ const styles = StyleSheet.create({
    * total a season is likely to carry, and a dash sits in the same track.
    */
   summaryCell: { alignItems: 'flex-end', gap: 0, minWidth: 36 },
+  bandRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.two, paddingBottom: 3, paddingHorizontal: Spacing.two + 2 },
+  band: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 2 },
+  /* Dimmed like an unscored week, because that is what it is: a row that will
+     never carry a figure. */
+  bye: { opacity: 0.45 },
   headRow: { paddingTop: 0 },
   row: {
     flexDirection: 'row',

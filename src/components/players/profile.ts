@@ -223,48 +223,81 @@ export function parseProfile(payload: Json): PlayerProfile | null {
  * The stat columns worth a career table, per position group. A running back's
  * passing line is noise; a quarterback's receptions are a curiosity at best.
  */
-export const CAREER_COLUMNS: Record<string, { key: string; label: string }[]> = {
+export type CareerColumn = {
+  key: string;
+  label: string;
+  /**
+   * The family the column belongs to, printed as a spanning header above it.
+   *
+   * `PASS YD / TD / INT / RUSH YD` on a quarterback is four abbreviations in a
+   * row where two of them belong to one act and two to another, and `TD` is
+   * ambiguous between them — the reader has to count across from the position
+   * to know which. A band above the group says it once. Consecutive columns
+   * sharing a family are spanned together, so the order here IS the grouping;
+   * do not interleave two families.
+   */
+  family: string;
+};
+
+export const CAREER_COLUMNS: Record<string, CareerColumn[]> = {
   QB: [
-    { key: 'passing_yards', label: 'PASS YD' },
-    { key: 'passing_touchdowns', label: 'TD' },
-    { key: 'passing_interceptions', label: 'INT' },
-    { key: 'rushing_yards', label: 'RUSH YD' },
+    { key: 'passing_yards', label: 'YD', family: 'PASSING' },
+    { key: 'passing_touchdowns', label: 'TD', family: 'PASSING' },
+    { key: 'passing_interceptions', label: 'INT', family: 'PASSING' },
+    { key: 'rushing_yards', label: 'YD', family: 'RUSHING' },
   ],
   RB: [
-    { key: 'rushing_attempts', label: 'ATT' },
-    { key: 'rushing_yards', label: 'RUSH YD' },
-    { key: 'rushing_touchdowns', label: 'TD' },
-    { key: 'receptions', label: 'REC' },
-    { key: 'receiving_yards', label: 'REC YD' },
+    { key: 'rushing_attempts', label: 'ATT', family: 'RUSHING' },
+    { key: 'rushing_yards', label: 'YD', family: 'RUSHING' },
+    { key: 'rushing_touchdowns', label: 'TD', family: 'RUSHING' },
+    { key: 'receptions', label: 'REC', family: 'RECEIVING' },
+    { key: 'receiving_yards', label: 'YD', family: 'RECEIVING' },
   ],
   WR: [
-    { key: 'receiving_targets', label: 'TGT' },
-    { key: 'receptions', label: 'REC' },
-    { key: 'receiving_yards', label: 'REC YD' },
-    { key: 'receiving_touchdowns', label: 'TD' },
+    { key: 'receiving_targets', label: 'TGT', family: 'RECEIVING' },
+    { key: 'receptions', label: 'REC', family: 'RECEIVING' },
+    { key: 'receiving_yards', label: 'YD', family: 'RECEIVING' },
+    { key: 'receiving_touchdowns', label: 'TD', family: 'RECEIVING' },
   ],
   TE: [
-    { key: 'receiving_targets', label: 'TGT' },
-    { key: 'receptions', label: 'REC' },
-    { key: 'receiving_yards', label: 'REC YD' },
-    { key: 'receiving_touchdowns', label: 'TD' },
+    { key: 'receiving_targets', label: 'TGT', family: 'RECEIVING' },
+    { key: 'receptions', label: 'REC', family: 'RECEIVING' },
+    { key: 'receiving_yards', label: 'YD', family: 'RECEIVING' },
+    { key: 'receiving_touchdowns', label: 'TD', family: 'RECEIVING' },
   ],
   PK: [
-    { key: 'field_goals_made', label: 'FG' },
-    { key: 'field_goal_attempts', label: 'FGA' },
-    { key: 'extra_points_made', label: 'XP' },
-    { key: 'long_field_goal_made', label: 'LONG' },
+    { key: 'field_goals_made', label: 'FG', family: 'KICKING' },
+    { key: 'field_goal_attempts', label: 'FGA', family: 'KICKING' },
+    { key: 'extra_points_made', label: 'XP', family: 'KICKING' },
+    { key: 'long_field_goal_made', label: 'LONG', family: 'KICKING' },
   ],
 };
 
 /** Anything not in the map still gets a table, just a generic one. */
-export const DEFAULT_CAREER_COLUMNS = [
-  { key: 'total_tackles', label: 'TKL' },
-  { key: 'defensive_sacks', label: 'SACK' },
-  { key: 'defensive_interceptions', label: 'INT' },
+export const DEFAULT_CAREER_COLUMNS: CareerColumn[] = [
+  { key: 'total_tackles', label: 'TKL', family: 'DEFENCE' },
+  { key: 'defensive_sacks', label: 'SACK', family: 'DEFENCE' },
+  { key: 'defensive_interceptions', label: 'INT', family: 'DEFENCE' },
 ];
 
 export function careerColumnsFor(position: string | null) {
   if (!position) return DEFAULT_CAREER_COLUMNS;
   return CAREER_COLUMNS[position] ?? DEFAULT_CAREER_COLUMNS;
+}
+
+/**
+ * The stat columns collapsed into their spanning bands, in order.
+ *
+ * Consecutive columns with the same `family` become one band of that width.
+ * Non-consecutive ones would become two bands with the same name, which is why
+ * the column lists are ordered by family and must stay that way.
+ */
+export function careerColumnGroups(position: string | null): { family: string; span: number }[] {
+  const out: { family: string; span: number }[] = [];
+  for (const col of careerColumnsFor(position)) {
+    const last = out[out.length - 1];
+    if (last && last.family === col.family) last.span += 1;
+    else out.push({ family: col.family, span: 1 });
+  }
+  return out;
 }

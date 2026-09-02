@@ -29,7 +29,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Colors, Spacing, TierColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { careerColumnsFor, type CareerSeason } from './profile';
+import { careerColumnGroups, careerColumnsFor, type CareerSeason } from './profile';
 import { horizontalStrip } from '@/components/ui/scroll-strip';
 
 const NUMERIC = { fontVariant: ['tabular-nums' as const] };
@@ -57,6 +57,20 @@ const HEAT_MAX = { light: 0.26, dark: 0.2 } as const;
  * anything unshadeable, so an unreported season stays visibly blank rather than
  * becoming the coldest cell in a column it never belonged to.
  */
+/** One family's band: a label over a rule the width of its columns. */
+function Band({ label, width }: { label: string; width: number }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
+  return (
+    <View style={[styles.band, { width, borderBottomColor: c.borderStrong }]}>
+      <Text numberOfLines={1} style={[styles.bandLabel, { color: c.textTertiary }]}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 function heat(
   value: number | null,
   max: number,
@@ -86,6 +100,7 @@ export function CareerTable({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const columns = careerColumnsFor(position);
+  const groups = careerColumnGroups(position);
 
   if (career.length === 0) {
     return (
@@ -116,6 +131,33 @@ export function CareerTable({
           column into unreadability on a phone. */}
       <ScrollView horizontal {...horizontalStrip} showsHorizontalScrollIndicator={false}>
         <View>
+          {/**
+            * THE SPANNING BAND, ABOVE THE COLUMN NAMES.
+            *
+            * A quarterback's row runs `YD TD INT YD` and a running back's runs
+            * `ATT YD TD REC YD` — abbreviations that repeat across families and
+            * mean different things in each, so a reader had to count across
+            * from the season to know whether a `TD` was thrown or run. The band
+            * says it once per family, which is what a wide table needs and what
+            * every stat page that works already does.
+            *
+            * The fixed columns get their own band. `FANTASY` over FP, FP/G and
+            * rank is the one grouping a reader never has to think about, and
+            * leaving it blank made the stat bands look like they had drifted
+            * off the left edge.
+            */}
+          <View style={styles.bandRow}>
+            <View style={styles.season} />
+            <Band label="FANTASY" width={44 + 58 + 44 + 66 + Spacing.two * 3} />
+            {groups.map((g) => (
+              <Band
+                key={g.family}
+                label={g.family}
+                width={62 * g.span + Spacing.two * (g.span - 1)}
+              />
+            ))}
+          </View>
+
           <View style={[styles.row, styles.headRow, { borderColor: c.backgroundElement }]}>
             <Text style={[styles.season, styles.head, { color: c.textSecondary }]}>SEASON</Text>
             <Text style={[styles.narrow, styles.head, { color: c.textSecondary }]}>GP</Text>
@@ -220,6 +262,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headRow: { paddingTop: 0 },
+  bandRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.two, paddingBottom: 3 },
+  /* Sits on a rule rather than in a box: the band is a bracket over its
+     columns, and a filled header would out-weigh the figures under it. */
+  band: { borderBottomWidth: StyleSheet.hairlineWidth, paddingBottom: 2, marginLeft: Spacing.two },
+  bandLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.8 },
   head: { fontSize: 9, fontWeight: '700', letterSpacing: 0.8 },
   cell: { fontSize: 13 },
   /* The wash needs to read as a band across the cell rather than a tint behind
