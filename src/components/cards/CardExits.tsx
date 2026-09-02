@@ -41,9 +41,10 @@
  * Dropping them would leave "his slot is filled" indistinguishable from "this
  * card is in no set at all", and only one of those is worth a shrug.
  *
- * THE PROSE IS NOT IN THE BAR. A caveat set under a floating capsule is a
- * sentence hanging in mid-air over the content it is covering. `cardExitNote`
- * returns it and the page prints it in a section, where a sentence belongs.
+ * THE PROSE IS NOT IN THE BAR, AND IT IS NOT PROSE ANY MORE. A caveat set under
+ * a floating capsule is a sentence hanging in mid-air over the content it is
+ * covering, so `cardExitNote` hands it to the page instead — as a few words for
+ * a `Row`, not the paragraph `commitBlockedBy` writes for the dialog.
  *
  * WHY IT IS A COMPONENT AND NOT JSX IN THE SCREEN: the card profile is behind a
  * sign-in, so this is the only way any of it can be put in front of a person
@@ -77,19 +78,23 @@ export function cardExitNote(
   const commitable = sets.filter((x) => x.canCommit);
   const blocked = sets.filter((x) => !x.canCommit);
 
-  /* WHICH set, and what is still true of the card. The pill says the state in
-     two words; this says which set it is about and — the part that stops a
-     disabled pill reading as "this card is finished" — that the copy is still
-     yours to sell or to start. */
+  /* WHICH set, and in how few words. `commitBlockedBy` writes a full sentence
+     for the confirm dialog — "Proven three only takes silver copies or better,
+     and yours is not there yet. Start Cam Ward in your lineup and this copy
+     will climb." — and that is right where a reader has asked for it and wrong
+     in a row, where it wrapped to two lines and then ellipsised the half that
+     said what to do. The set's name plus its label is the whole fact: `Proven
+     Three · needs silver`. The sentence still exists, in the dialog. */
   if (commitable.length === 0 && blocked.length > 0) {
-    return commitBlockedBy(blocked[0], playerName).body;
+    const why = commitBlockedBy(blocked[0], playerName);
+    return `${blocked[0].name} · ${why.label.toLowerCase()}`;
   }
 
   /* The spare-copy caveat, on the one path that never opens the picker the row
      version of it lives in. The dialog says it again on the way through; this
      is so it is knowable BEFORE the dialog. */
   if (commitable.length === 1 && !burnsThisCopy) {
-    return `You hold a spare of ${playerName}. Adding him burns your least valuable copy, which is not this one.`;
+    return 'Adding him burns your cheapest copy, not this one';
   }
 
   return null;
