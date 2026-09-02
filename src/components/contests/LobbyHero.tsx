@@ -15,7 +15,7 @@
  *
  * What is left is two lines, and only two:
  *
- *     Contests        1-0   [hearts riding]  [♥ 3]
+ *     Contests  1-0        [hearts riding]  [♥ 3]
  *     Week 1 · Lose 3 more and the run ends …
  *
  * ---------------------------------------------------------------------------
@@ -32,8 +32,10 @@
  * header is now the same object in a second place. A reader who has learned
  * those glyphs on the board does not learn them again here.
  *
- * THE RECORD RIDES THE SAME ROW, ahead of both. It is what the run has done
- * rather than what it is holding, so it leads the group instead of joining it.
+ * THE RECORD SITS ON THE TITLE. It is what the run has DONE — a fact about the
+ * whole run, like the title — while the marks on the right are about THIS
+ * WEEK: what is riding, and what is left. Grouped with those it read as a
+ * third heart figure.
  *
  * THE REMAINING COUNT KEEPS ITS PILL. That is the masthead's `♥ 3`, the same
  * shape in the same place it always is, so the header carries both halves of
@@ -91,18 +93,19 @@ export function LobbyHero({
     <View style={styles.band}>
       <View style={styles.titleRow}>
         <Text style={[Type.page, { color: c.text }]}>Contests</Text>
-        <View style={styles.spacer} />
-        {/* THE RECORD LEADS THE RIGHT-HAND GROUP, and sits apart from it.
-            The two heart marks and the pill are one thought — what is riding,
-            what is left — and the record is a different one: what the run has
-            DONE. Putting it after the pill would read as a third heart figure;
-            putting it first, with the group's own gap between them, keeps the
-            hearts reading as a pair. */}
+        {/* THE RECORD SITS ON THE TITLE, not with the hearts. It is what the
+            run has DONE, and the title is the only other thing on this row
+            that is about the run as a whole — the marks on the right are about
+            THIS WEEK, what is riding and what is left. Grouping it with those
+            made it read as a third heart figure.
+            Baseline-aligned, so a 13pt figure sits on a 26pt title's line
+            rather than floating half-way up it. */}
         {run ? (
-          <Text style={[Type.strong, NUMERIC, { color: c.textSecondary }]}>
+          <Text style={[Type.strong, NUMERIC, styles.record, { color: c.textTertiary }]}>
             {`${run.wins}-${run.losses}`}
           </Text>
         ) : null}
+        <View style={styles.spacer} />
         {staked.length > 0 ? <ContestHearts entries={staked} size={15} gap={5} /> : null}
         {run ? (
           <View style={[styles.pill, { backgroundColor: c.background }]}>
@@ -165,6 +168,10 @@ const styles = StyleSheet.create({
      escape and hang the fill 16pt off each edge of the screen. */
   band: { paddingTop: Spacing.two, paddingBottom: Spacing.two + 2, gap: Spacing.half },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  /* `Type.page` is 26 on a 30 line box and this is 13 on 17: centring the two
+     leaves the small one floating above the title's baseline. The offset is
+     the difference in their descenders. */
+  record: { alignSelf: 'flex-end', paddingBottom: 4 },
   spacer: { flex: 1 },
   /* The masthead's own pill, at the masthead's own size — see `AppHeader`. */
   pill: {
