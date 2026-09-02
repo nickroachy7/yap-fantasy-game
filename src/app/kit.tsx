@@ -86,8 +86,7 @@ import { SegmentedControl } from '@/components/shell/SegmentedControl';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { POSITION_ORDER, POSITIONS } from '@/constants/positions';
-import { Brand, Colors, Radius, Spacing, Type, selectionAccent } from '@/constants/theme';
-import { rgba } from '@/components/ui/gradient';
+import { Colors, Spacing, Type, selectionAccent } from '@/constants/theme';
 import { Icon } from '@/components/icons/Icon';
 import { GLYPHS } from '@/components/icons/glyphs';
 import { validateSet } from '@/components/icons/validate';
@@ -821,19 +820,11 @@ function Kit() {
 
           <Section
             title="Contests header"
-            note="The contests sheet’s hero, which is the set checklist’s hero pointed at a RUN — a name, a figure, the rule in full, a progress bar, and the ladder: every rung on it, what each wants, what each keeps, and which are behind you. That shape is why a set nobody will ever finish is still worth adding a card to, and the lobby has exactly the same question under it. A run is TWO numbers and neither can stand for the other: hearts are how long you last, and every contest below is priced in them, so the rack sits high and whole; wins are what you KEEP when the hearts run out, which is the ladder and the only reason a losing run is worth playing out. The figure is the record rather than the hearts because the bar and the table under it are about wins — a figure measuring one thing over a bar measuring another is the header disagreeing with itself. The mark on a rung is a PLACE, not a claim: a set rung is money you have or have not collected and gets a tick, a carry rung is where you are standing, so the one you are on is dotted and the ones behind it are unmarked — ticking them would promise four cards to somebody who keeps one. The ladder is the server’s table, never a constant: `run_carry_slots()` is what a death actually settles against, and its own migration says why it is a function. The band is washed in `Brand.lime` — shown here on the first of the three, at the sheet’s own `TONE_PEAK` of 0.26, where #C7F53D over #101010 resolves to a dark olive rather than the bright green the swatch suggests. It went up with no wash at all, on the argument that a tone is always the colour OF something and a run is not of anything; that was the right question and the wrong answer, because on every other sheet the band is also simply what makes a header read as one BLOCK. Lime is not a semantic hue anywhere in this codebase — it is the login mark and nothing else — so it says whose screen this is without claiming anything about the run inside it, which the two colours a run could otherwise claim would both do falsely: red is `negative`, worn by a lost heart and a dead run, and green is `positive`, which would congratulate every record equally. The marks inside stay `positive` teal so that green keeps meaning progress rather than meaning brand."
+            note="The contests sheet’s header. It was the set checklist’s hero pointed at a RUN — a figure at page size, the rule in full, a progress bar and the ladder as four rows — and on the set sheet that shape is right, because the set IS the page. A lobby is not: you come here to ENTER something, the contests are the page, and the run is the context you price them against. Measured off the real sheet on an iPhone 17 Pro, the header and its tab bar ran to 348pt of an 874pt screen — forty per cent — so the first contest sat below the fold on every visit and four of those rows were static config re-read every time. Every fact survives at a fraction of the height: the rack and the record ride the title line, the rack’s figure says how many hearts are free to STAKE rather than how many are held, the rule keeps only the half that is a number — how many hearts are left to lose — and the ladder went from four rows down the screen to four segments across it. Those segments ARE the progress bar; the old fill and the old rungs were one fact drawn twice in two places that could only agree. The mark on a rung is still a PLACE and not a claim: the rung you stand on is tinted `positive`, the ones behind it fall to `textTertiary` rather than getting ticks, because ticking them would promise four cards to somebody who keeps one. The ladder is the server’s table, never a constant — `run_carry_slots()` is what a death actually settles against. And the band lost its wash: it wore `Brand.lime` at the sheet’s `TONE_PEAK` of 0.26, where #C7F53D over #101010 resolves to a dark olive, and a brand hue at 26% is not read as brand — at that weight it reads as a STATE, which is the one thing a neutral header must not do. The band itself survives on `surfaceSheet`, because the argument for it was never about hue: a header needs a plane or it is a title with loose rows under it."
             >
             <View style={{ gap: Spacing.four }}>
-              {/* THE WASH, DRAWN THE WAY THE SHEET DRAWS IT. `SheetToneBand`
-                  cannot be used here — it climbs over a scroll container's
-                  inset with a negative margin, which inside the kit would pull
-                  it over the section above. So the fill is reproduced at the
-                  same colour and the same `TONE_PEAK`, which is the one number
-                  worth keeping in step by hand: the point of this section is
-                  judging the colour. */}
-              <View style={{ backgroundColor: rgba(Brand.lime, 0.26), padding: Spacing.three, borderRadius: Radius.panel }}>
-                <LobbyHero run={KIT_RUN} rungs={KIT_LADDER} week="Preseason 4" />
-              </View>
+              {/* The band paints itself now — there is no wash to reproduce by
+                  hand, which is what the removed first instance was for. */}
               <LobbyHero run={KIT_RUN} rungs={KIT_LADDER} week="Preseason 4" />
               {/* A fresh run: no record, bottom rung, nothing carried. */}
               <LobbyHero

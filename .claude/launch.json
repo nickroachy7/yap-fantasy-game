@@ -1,11 +1,7 @@
 {
   "version": "0.0.1",
+  "autoPort": true,
   "configurations": [
-    {
-      "name": "yap-fantasy-web",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "web"],
-      "port": 8081
-    }
+    { "name": "lane-contests-header", "runtimeExecutable": "npx", "runtimeArgs": ["expo", "start", "--web"], "port": 8082 }
   ]
 }

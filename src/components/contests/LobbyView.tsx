@@ -6,7 +6,7 @@ import { ContestCard, StatusWord } from '@/components/contests/ContestCard';
 import { settlementOf } from '@/components/contests/contest-model';
 import { termsOfContest, useContests, type Contest } from '@/components/contests/use-contests';
 import { termsOfEntry, useMyContests, type MyContest } from '@/components/contests/use-my-contests';
-import { PlayerSheetFrame, SheetToneBand } from '@/components/players/PlayerSheetFrame';
+import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import {
   ContestHistoryPanel,
   historySummary,
@@ -17,13 +17,11 @@ import {
   type HistoryEntry,
 } from '@/components/contests/use-contest-history';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Panel } from '@/components/ui/Panel';
 import { LobbyHero } from './LobbyHero';
 import { useRunLadder } from '@/components/runs/use-run-ladder';
 import { weekTitleOf } from '@/components/contests/use-my-contests';
-import { Tabs, type Tab } from '@/components/ui/Tabs';
 import { StatusChip } from '@/components/ui/StatusChip';
-import { Brand, Colors, Radius, Spacing, Type } from '@/constants/theme';
+import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -111,9 +109,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  */
 type View_ = 'open' | 'history' | 'recap';
 
-/** The lobby's four shelves. See `face`. */
-type Face = 'open' | 'entered' | 'recent' | 'friendly';
-
 export function LobbyView({
   arrivedOn,
   onClose,
@@ -137,8 +132,6 @@ export function LobbyView({
   /** Push a contest onto the sheet's stack, by code. Was `router.push`. */
   onOpenContest: (code: string) => void;
 }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
   const router = useRouter();
   const [view, setView] = useState<View_>(arrivedOn === 'history' ? 'history' : 'open');
   /**
@@ -155,7 +148,6 @@ export function LobbyView({
    * one is a paged season and the other is a single week read in full. A tab
    * bar is for things that are peers.
    */
-  const [face, setFace] = useState<Face>('open');
   /* The contest being read, carried rather than looked up: a row from week two
      is older than anything `contest_lobby` can answer about, and every figure
      the recap needs is already on the row. See `ContestRecapPanel`. */
@@ -231,7 +223,6 @@ export function LobbyView({
      the device what week it is would be a second opinion that can differ. */
   const week = live.length > 0 ? weekTitleOf(live[0].seasonType, live[0].week) : undefined;
   const open = live.filter((c) => c.kind !== 'free' && c.mine === null);
-  const entered = live.filter((c) => c.kind !== 'free' && c.mine !== null).length;
 
   /**
    * THE BAR, WITH THE COUNTS ON IT.
@@ -242,20 +233,10 @@ export function LobbyView({
    * `Friendly` never carries one — it is a promise, and a promise with a
    * quantity on it is a different and much bigger claim.
    */
-  const tabs: Tab<Face>[] = [
-    { value: 'open', label: 'Open', hint: open.length > 0 ? String(open.length) : undefined },
-    {
-      value: 'entered',
-      label: 'Entered',
-      hint: playing.length > 0 ? String(playing.length) : undefined,
-    },
-    {
-      value: 'recent',
-      label: 'Recent',
-      hint: finished.length > 0 ? String(finished.length) : undefined,
-    },
-    { value: 'friendly', label: 'Friendly' },
-  ];
+  /* Live entries then settled ones, as one list. `my_contest_cards` returns
+     both and flags which is which; the section head counts the pair because to
+     a reader they are one thing — the contests they are in this week. */
+  const myWeek = [...playing, ...finished];
 
   const context =
     view === 'recap'
@@ -320,130 +301,86 @@ export function LobbyView({
           A DEAD RUN IS NOT PART OF THE HEADER. It is a call to action with
           cards hanging on it, and it belongs where the eye lands after the
           header rather than inside a block about standings — see `RunRail`. */}
-      <SheetToneBand tone={Brand.lime}>
-        <LobbyHero run={run} rungs={rungs} week={week} />
+      {/* THE HEADER IS A BAND AND THE PAGE IS A LIST.
+          It was a band that ended on a four-tab bar — Open, Entered, Recent,
+          Friendly — and that bar was a real answer to a real problem: the four
+          shelves had been four stacked panels, so the sheet was four lists deep
+          and the one you came for was wherever the file happened to declare it.
+          Tabs made them peers, one tap apart.
 
-        {/* FOUR SECTIONS, FOUR TABS, AND THE SAME SHAPE AS A CONTEST'S OWN PAGE.
+          What tabs cost is that three quarters of the page is always hidden,
+          and on this sheet the hidden part is the part that changes. Your live
+          entry and the contest you might enter are the same object at two
+          moments; putting them behind different tabs made "how is my week
+          going" a question you answer by tapping around rather than by
+          scrolling. The old bar's own comment conceded the ranking problem and
+          then declined to rank — Sunday wants Entered, Monday wants Recent,
+          every other day wants Open.
 
-          They were four stacked panels — entered, recent, friendly, open — and
-          each is a list, so the sheet was four lists deep and the one a reader
-          came for was wherever the file happened to declare it. That forces a
-          ranking with no right answer, exactly as the contest page's did: what
-          you are IN matters most on a Sunday, what has FINISHED matters most on
-          the Monday, and what is OPEN matters most every other day.
+          ONE PAGE RANKS IT, and the ranking is by what you can still ACT on.
+          Your contests come first, live ones above settled, because a lineup
+          you can still change outranks a result that is finished. Open comes
+          second, because entering is the reason the sheet exists and it is the
+          only section that is never empty.
 
-          Under a bar they are peers, all of them one tap away, and the sheet is
-          one list tall instead of four. It also makes this page and a contest's
-          page the same object at two depths — a header, a bar, a face — which
-          is the uniformity a reader feels rather than notices.
-
-          THE COUNTS RIDE ON THE TABS. A section heading that has been replaced
-          by a tab loses the one thing headings were doing here, which is saying
-          how much is under them before you look. `Tab.hint` puts it back. */}
-        <View style={[styles.tabBar, { borderColor: c.backgroundElement }]}>
-          <Tabs tabs={tabs} value={face} onChange={setFace} />
-        </View>
-      </SheetToneBand>
+          FRIENDLY IS GONE. It was an empty shelf naming a feature that does not
+          exist — free as a tab nobody opened, dead weight as a section on a
+          page you scroll. It comes back when there is something on it. */}
+      <LobbyHero run={run} rungs={rungs} week={week} />
 
       {run?.awaitingCarry ? <DeadRun run={run} onClaim={() => router.push('/run-over')} /> : null}
 
-      {face === 'open' ? (
+      {myWeek.length > 0 ? (
         <>
+          <SectionHead label="Your contests" count={myWeek.length} />
           <View style={styles.stack}>
-            {open.length > 0 ? (
-              open.map((c) => (
-                <ContestEntry
-                  key={c.id}
-                  contest={c}
-                  coins={coins}
-                  onPress={() => onOpenContest(c.code)}
-                />
-              ))
-            ) : loading ? null : (
-              <EmptyState
-                pad={false}
-                title={entered > 0 ? "You're in everything that's open" : 'Nothing open right now'}
-                body={
-                  entered > 0
-                    ? 'Everything you have filed is under Entered.'
-                    : 'Extra contests appear here each week. Small formats, so there is no quarterback or kicker to find.'
-                }
-              />
-            )}
-          </View>
-          {/* THE EXCLUSIVITY RULE BELONGS TO THIS FACE and not to the sheet. It
-              is about what entering ANOTHER contest costs you, which is a
-              sentence for somebody looking at a list of contests to enter — on
-              the other three it would be a rule about a decision nobody on that
-              tab is making. */}
-          <Footnote />
-        </>
-      ) : face === 'entered' ? (
-        /* WHAT YOU ARE ALREADY IN, WHICH THIS SHEET USED NOT TO SHOW AT ALL.
-
-           "The lobby is what you are NOT already in" was the rule, and it was
-           right when it was made: your entries lived on the board's carousel
-           over the lineup each belongs to, and a second list here made "where
-           do I edit this" a question with two answers, with the losing answer
-           one tap away. That is how two editors get built.
-
-           What closed it is that a contest's page stopped being an editor — it
-           is a card, your lineup read-only, the field and the rules, and the
-           one editor is still the board behind a single button. A list pointing
-           at that page is a second way to READ something there is still only
-           one way to change.
-
-           The free contest is why it matters most. Nobody chooses it, nobody
-           can leave it, every player is in it every week — and it appeared on
-           no list anywhere in this sheet. */
-        <View style={styles.stack}>
-          {playing.length > 0 ? (
-            playing.map((m) => (
+            {playing.map((m) => (
               <LiveEntry key={m.id} entry={m} onPress={() => onOpenContest(m.code)} />
-            ))
-          ) : loading ? null : (
-            <EmptyState
-              pad={false}
-              title="Nothing filed yet"
-              body="The contests you enter show up here for the week, with your lineup and where you stand in each."
-            />
-          )}
-        </View>
-      ) : face === 'recent' ? (
-        /* THE WEEKS THAT ARE OVER, AS THE CARDS THEY ALREADY ARE.
-
-           It was a row that opened a list that opened a recap — three taps to
-           reach a result the reader came for, two of them spent on navigation
-           rather than on football. A finished contest is not a different kind
-           of object from a live one; it is the same card with its result in it.
-
-           THE ARCHIVE IS STILL A PAGE. What is inline is the two-week window
-           `my_contest_cards` carries; the season behind it is paged and grows
-           every week, so it stays a door — and the door has to be here whether
-           or not this fortnight has anything in it. */
-        <Panel action={<ArchiveLink onPress={() => setView('history')} />} inset={false}>
-          <View style={styles.stack}>
-            {finished.length > 0 ? (
-              finished.map((m) => (
-                <SettledEntry key={m.id} entry={m} onPress={() => onOpenContest(m.code)} />
-              ))
-            ) : loading ? null : (
-              <EmptyState
-                pad={false}
-                title="Nothing has finished yet"
-                body="Results land here when the week is swept. Everything older is behind All weeks."
-              />
-            )}
+            ))}
+            {finished.map((m) => (
+              <SettledEntry key={m.id} entry={m} onPress={() => onOpenContest(m.code)} />
+            ))}
           </View>
-        </Panel>
-      ) : (
-        /* THE SECOND LOBBY, NAMED BEFORE IT EXISTS. Friendly contests are not a
-           contest missing from the open list — they are a different lobby, with
-           no fee and a field you assemble yourself — so they get a shelf of
-           their own rather than a row at the bottom of the paid one. As a tab
-           the empty shelf costs nothing until somebody looks at it. */
-        <ComingSoon />
-      )}
+        </>
+      ) : null}
+
+      <SectionHead label="Open" count={open.length} />
+      <View style={styles.stack}>
+        {open.length > 0 ? (
+          open.map((c) => (
+            <ContestEntry key={c.id} contest={c} coins={coins} onPress={() => onOpenContest(c.code)} />
+          ))
+        ) : loading ? null : (
+          <EmptyState
+            pad={false}
+            title={myWeek.length > 0 ? "You're in everything that's open" : 'Nothing open right now'}
+            body={
+              myWeek.length > 0
+                ? 'Every contest on this week\u2019s slate is already above.'
+                : 'Extra contests appear here each week. Small formats, so there is no quarterback or kicker to find.'
+            }
+          />
+        )}
+      </View>
+      {/* THE EXCLUSIVITY RULE SITS UNDER THE OPEN LIST and nowhere else. It is
+          about what entering ANOTHER contest costs you, which is a sentence for
+          somebody looking at a list of contests to enter. */}
+      <Footnote />
+
+      {/* THE ARCHIVE DOOR, UNCONDITIONALLY.
+          The Recent tab used to carry this and its own comment said why it had
+          to be there "whether or not this fortnight has anything in it": what is
+          inline is the two-week window `my_contest_cards` returns, and the
+          season behind it is paged and grows every week.
+          The first draft of this page hung the link off the "Your contests"
+          head and only when `finished.length > 0` — which is the same door
+          locked in exactly the case a player is most likely to want it, a quiet
+          fortnight with a season behind it. It sits at the foot of the page
+          instead: always rendered, and where a reader who has scrolled past
+          everything current is already looking. */}
+      <View style={styles.archiveRow}>
+        <ArchiveLink onPress={() => setView('history')} />
+      </View>
         </>
       )}
     </PlayerSheetFrame>
@@ -699,6 +636,37 @@ function SettledEntry({ entry, onPress }: { entry: MyContest; onPress: () => voi
 }
 
 /**
+ * A section's name, its size, and anything it opens.
+ *
+ * This is what the tab bar's `hint` was doing — saying how much is under a
+ * heading before you look — put back on a heading now that there is no bar to
+ * carry it. `Type.micro` rather than a section face, because on a page whose
+ * content is cards this is scaffolding: it separates two lists and then gets
+ * out of the way.
+ */
+function SectionHead({
+  label,
+  count,
+  action,
+}: {
+  label: string;
+  count: number;
+  action?: React.ReactNode;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
+  return (
+    <View style={styles.sectionHead}>
+      <Text style={[Type.micro, { color: c.textSecondary }]}>{label.toUpperCase()}</Text>
+      <Text style={[Type.micro, NUMERIC, { color: c.textTertiary }]}>{String(count)}</Text>
+      <View style={styles.sectionSpacer} />
+      {action}
+    </View>
+  );
+}
+
+/**
  * The door to the season, on the title row rather than in the list.
  *
  * IT IS A LINK AND NOT A ROW, because what is behind it is no longer the point
@@ -720,40 +688,6 @@ function ArchiveLink({ onPress }: { onPress: () => void }) {
   );
 }
 
-/**
- * The friendly lobby's one row: an empty shelf that says what will be on it.
- *
- * IT IS NOT A CONTEST CARD AND MUST NOT BE ONE. A card with a raised outline, a
- * fill and a token foot is a thing you can enter, and there is nothing behind
- * this one — a placeholder wearing the exact clothes of the rows below it is a
- * dead tap waiting to happen. So it takes the card's WIDTH, RADIUS and gutter
- * and none of its material: no fill, a dashed outline at `border`, and text a
- * step quieter than a real row's.
- *
- * THE DASHES ARE NOT THE CARD'S DASHES. `ContestCard` spends its dashed line on
- * exactly one mark — the win condition on the pace bar — and that vocabulary is
- * internal to the card's own separators. This is an OUTLINE rather than a
- * divider, and on a row that draws no pace bar there is nothing to confuse it
- * with. (It degrades to a solid outline on Android, which does not draw dashed
- * borders under a corner radius. Nothing ships there, and a solid quiet outline
- * is the same row a shade less obviously provisional.)
- *
- * ONE LINE, AND IT IS NOT "COMING SOON". The panel's own hint says that
- * directly above; a row repeating it would be a box whose entire content is the
- * heading it sits under. What the row is for is saying what the thing IS, so
- * that an empty shelf is a promise rather than a gap.
- */
-function ComingSoon() {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  return (
-    <View style={[styles.soon, { borderColor: c.border }]}>
-      <Text style={[Type.strong, { color: c.textSecondary }]}>
-        Play a week against people you invite
-      </Text>
-    </View>
-  );
-}
 
 /**
  * The exclusivity rule, said once, under the list.
@@ -774,6 +708,21 @@ function Footnote() {
 }
 
 const styles = StyleSheet.create({
+  archiveRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.two,
+  },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.two,
+  },
+  sectionSpacer: { flex: 1 },
   /* The same shape as the dead-run row above it — a block of text and one
      affordance on the right — because they are the same kind of object: a thing
      on this sheet that opens a different screen. */
