@@ -815,10 +815,28 @@ export function PlayerSheetFrame({
  */
 export function SheetToneBand({
   tone,
+  surface,
   onLayout,
   children,
 }: {
   tone?: string | null;
+  /**
+   * A SOLID fill instead of a wash, for a header whose separation from the
+   * sheet is a step on the dark scale rather than a colour.
+   *
+   * `tone` paints `rgba(tone, TONE_PEAK)`, which is right when the band is the
+   * colour OF something — a tier, a club, a set — and has to sit at the same
+   * weight as every other sheet's. The contests header has no subject to take
+   * a colour from, so it takes a surface token instead. Going through this
+   * component rather than painting its own view is what keeps it the geometry
+   * below, which is the part that is easy to get wrong and invisible when it
+   * is: reaching up over the floating grabber, and reaching into the overscroll
+   * so a hard flick back to the top rubber-bands the band's own colour rather
+   * than the sheet's.
+   *
+   * Wins over `tone` when both are given.
+   */
+  surface?: string | null;
   /**
    * Where the band sits in the scroll content. Passed through for the one
    * caller that has to hand the frame a `pinnedAt`: an offset measured inside
@@ -846,7 +864,11 @@ export function SheetToneBand({
            shifted up by — so the band starts at the top of the scroll content
            however much is added here. See `OVERSCROLL_REACH`. */
         { marginTop: -(top + OVERSCROLL_REACH), paddingTop: top + OVERSCROLL_REACH },
-        tone ? { backgroundColor: rgba(tone, TONE_PEAK) } : null,
+        surface
+          ? { backgroundColor: surface }
+          : tone
+            ? { backgroundColor: rgba(tone, TONE_PEAK) }
+            : null,
       ]}>
       {children}
     </View>

@@ -6,7 +6,7 @@ import { ContestCard, StatusWord } from '@/components/contests/ContestCard';
 import { settlementOf } from '@/components/contests/contest-model';
 import { termsOfContest, useContests, type Contest } from '@/components/contests/use-contests';
 import { termsOfEntry, useMyContests, type MyContest } from '@/components/contests/use-my-contests';
-import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
+import { PlayerSheetFrame, SheetToneBand } from '@/components/players/PlayerSheetFrame';
 import {
   ContestHistoryPanel,
   historySummary,
@@ -131,6 +131,8 @@ export function LobbyView({
   /** Push a contest onto the sheet's stack, by code. Was `router.push`. */
   onOpenContest: (code: string) => void;
 }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
   const router = useRouter();
   const [view, setView] = useState<View_>(arrivedOn === 'history' ? 'history' : 'open');
   /**
@@ -322,7 +324,19 @@ export function LobbyView({
           contest sat under a heading about this week, inside its count. Two
           headings cost one line and stop the page claiming a week it is not
           about. */}
-      <LobbyHero run={run} rungs={rungs} week={week} />
+      {/* THE BAND CLIMBS OVER THE GRABBER AND INTO THE OVERSCROLL, which is
+          what `SheetToneBand` is for and why the header goes back inside it.
+          Painting the plane inside `LobbyHero` got the colour right and the
+          EXTENT wrong: the sheet's floating handle stayed on `surfaceSheet`
+          above a `backgroundElement` header, so the top of the screen was two
+          greys with a seam across it — and a hard flick back to the top
+          rubber-banded the sheet's colour into the gap above the band. This
+          reaches `HANDLE_BLOCK + OVERSCROLL_REACH` above its own content
+          precisely so neither can happen. A surface rather than a tone: see
+          the prop's own note. */}
+      <SheetToneBand surface={c.backgroundElement}>
+        <LobbyHero run={run} rungs={rungs} week={week} />
+      </SheetToneBand>
 
       {run?.awaitingCarry ? <DeadRun run={run} onClaim={() => router.push('/run-over')} /> : null}
 
@@ -345,7 +359,6 @@ export function LobbyView({
         label="Recent"
         count={finished.length}
         hint="Settled, with what each one paid."
-        action={<ArchiveLink onPress={() => setView('history')} />}
       />
       <View style={styles.stack}>
         {finished.length > 0 ? (
@@ -355,6 +368,16 @@ export function LobbyView({
         ) : loading ? null : (
           <SectionEmpty text="Results land here when the week is swept." />
         )}
+      </View>
+      {/* THE ARCHIVE IS ITS OWN LINE, LEFT, under the fortnight it continues.
+          It rode the `Recent` heading as a right-aligned action, which put a
+          door at the far end of a row whose other end was a title — two
+          unrelated things sharing a line because there was space for them.
+          What is inline above is the two-week window `my_contest_cards`
+          returns; this is the season behind it, so it reads after the list
+          rather than beside its name. */}
+      <View style={styles.archiveRow}>
+        <ArchiveLink onPress={() => setView('history')} />
       </View>
 
       {/* COMMUNITY, because that is what it is: the lobby everybody shares, as
@@ -790,7 +813,11 @@ const styles = StyleSheet.create({
      and every heading on the page was visibly out of line with its own list.
      The band escapes the same inset with a negative margin; this just accepts
      it. */
-  sectionHead: { paddingTop: Spacing.four, paddingBottom: Spacing.two + 2, gap: 2 },
+  /* `Spacing.three` on top, not `four`. A shelf is already separated from the
+     one before it by an 18pt name and a line of grey under it; 24pt of air as
+     well read as a gap between two pages rather than between two lists. */
+  sectionHead: { paddingTop: Spacing.three, paddingBottom: Spacing.two, gap: 2 },
+  archiveRow: { flexDirection: 'row', paddingTop: Spacing.two },
   sectionTop: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two },
   sectionSpacer: { flex: 1 },
   sectionEmpty: { paddingBottom: Spacing.two },

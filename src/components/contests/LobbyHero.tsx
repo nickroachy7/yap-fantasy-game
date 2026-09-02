@@ -59,11 +59,18 @@
  * and removing it took the separation too.
  *
  * `backgroundElement` is the step that does the job on the dark scale alone —
- * #212121 against the sheet's #101010, the same lift a card gets, with the
- * hairline underneath to close it. It is the plane the olive was, without
- * claiming a state. Everything inside keeps its own meaning: hearts stay
- * `negative`, reached rungs stay `positive`, and neither has a third colour to
- * compete with.
+ * #212121 against the sheet's #101010, the same lift a card gets. It is the
+ * plane the olive was, without claiming a state. Everything inside keeps its
+ * own meaning: hearts stay `negative`, reached rungs stay `positive`, and
+ * neither has a third colour to compete with.
+ *
+ * THE PLANE IS PAINTED BY `SheetToneBand`, not here. Painting it in this file
+ * got the colour right and the extent wrong twice over: the sheet's floating
+ * grabber kept its own grey, so the top of the screen was two greys with a
+ * seam across it, and a hard flick back to the top rubber-banded the sheet's
+ * colour into the gap above the band. That component already reaches
+ * `HANDLE_BLOCK + OVERSCROLL_REACH` past its content for exactly those two
+ * reasons; it just needed to be able to paint a surface instead of a wash.
  */
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -89,7 +96,7 @@ export function LobbyHero({
   const { here } = run && rungs ? standingOn(rungs, run.wins) : { here: null };
 
   return (
-    <View style={[styles.band, { backgroundColor: c.backgroundElement, borderBottomColor: c.border }]}>
+    <View style={styles.band}>
       {/* ONE LINE FOR WHO YOU ARE AND HOW YOU ARE DOING.
           The title anchors the left; the run's two numbers sit right, in the
           order they are felt — the rack first, because every stake below is
@@ -220,18 +227,14 @@ function wipeClause(run: Run): string {
 }
 
 const styles = StyleSheet.create({
-  band: {
-    /* FULL BLEED, by cancelling the scroller's own inset the way
-       `SheetToneBand` did — see its `band` style. Without this the plane stops
-       16pt short of each edge and reads as a card sitting on the sheet rather
-       than as the sheet's header, which is the whole job it was given back. */
-    marginHorizontal: -Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.three,
-    paddingBottom: Spacing.two + 2,
-    gap: Spacing.half,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
+  /* NO PLANE OF ITS OWN. `SheetToneBand` paints it and owns the geometry that
+     makes it reach — over the floating grabber, and into the overscroll. A
+     background or a negative margin here would double the escape and hang the
+     fill 16pt off each edge of the screen.
+     No bottom hairline either: at #212121 against the sheet's #101010 the step
+     already draws the edge, and a rule that stopped at the content inset while
+     the colour ran to the screen edge would be a line across the middle of it. */
+  band: { paddingTop: Spacing.two, paddingBottom: Spacing.two + 2, gap: Spacing.half },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   spacer: { flex: 1 },
   tick: { width: StyleSheet.hairlineWidth, height: 12 },
