@@ -83,7 +83,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { ContestAbout } from './ContestAbout';
 import { ContestCard } from './ContestCard';
-import { coin, formatRoster, runWiped } from '@/components/icons/glyphs';
+import { coin, formatRoster } from '@/components/icons/glyphs';
 import { ContestFieldPanel } from './ContestFieldPanel';
 import { EntryLineup } from './EntryLineup';
 import { formatLine, settlementOf } from './contest-model';
@@ -309,15 +309,22 @@ export function ContestView({
       footer={
         offer ? (
           <GlassBar>
-            {/* CLEAR IS A MARK AND NO WORD, which is what fits three actions on
-                one row without the other two abbreviating themselves. It is
-                also the quietest of the three by rank — the only one that
-                undoes rather than does — so a circle at the near end is the
-                right weight for it. `runWiped` is the app's own glyph for a
-                board being emptied. */}
-            <GlassPill compact>
+            {/* CLEAR SAYS CLEAR. It was `runWiped` alone in a compact circle, on
+                the argument that a mark and no word is what fits three actions
+                on one row without the other two abbreviating themselves. The
+                width was real and the trade was wrong: this is the button that
+                UNDOES the one beside it, so the pair only makes sense read
+                together — Pick for me fills the slots, Clear empties them —
+                and half that sentence was a symbol.
+
+                THE WORD REPLACES THE GLYPH RATHER THAN JOINING IT, which is
+                where the room comes from. `Pick for me` and `Enter for 40`
+                keep their marks because a roster and a coin say something the
+                label does not; there is no icon for undo that a reader would
+                recognise faster than the word. */}
+            <GlassPill>
               <BarAction
-                glyph={runWiped}
+                label="Clear"
                 hint="Empty every slot"
                 enabled={offer.canClear && !offer.busy}
                 onPress={() => acts.current?.clear()}
