@@ -92,15 +92,20 @@ export const SAMPLE_CARDS: Sample[] = [
 const INJURIES: (string | null)[] = [null, 'Questionable', 'Out', null];
 
 /**
- * Mirrors `tier_thresholds.sell_value`. A fixture, so it is allowed to restate
- * the server's numbers — but only here, and only so the gallery shows realistic
- * figures. Product code reads `sell_value` off `my_collection`.
+ * Roughly what `card_prices` pays at each tier for a mid-table player. A
+ * fixture, so it is allowed to restate the server's numbers — but only here,
+ * and only so the gallery shows realistic figures. Product code reads
+ * `sell_value` off `my_collection` and never computes a price.
+ *
+ * Since 20260902060000 the real figure is (player value + earned points) x tier
+ * rather than a flat per-tier constant, so these are illustrative rather than
+ * exact — which is all a gallery needs.
  */
 const FIXTURE_SELL_VALUE: Record<CollectionCard['tier'], number> = {
-  bronze: 8,
-  silver: 40,
-  gold: 150,
-  diamond: 500,
+  bronze: 24,
+  silver: 91,
+  gold: 385,
+  diamond: 1271,
 };
 
 export const OWNED_CARDS: CollectionCard[] = SAMPLE_CARDS.map((m, i) => ({
@@ -119,6 +124,11 @@ export const OWNED_CARDS: CollectionCard[] = SAMPLE_CARDS.map((m, i) => ({
   injuryStatus: INJURIES[i] ?? null,
   tier: m.tier,
   sellValue: FIXTURE_SELL_VALUE[m.tier],
+  // Spread across a plausible position pool, and the last sample is left
+  // unranked so the card is drawn at least once without a rank — the real state
+  // for the 40% of the set with no prior-season production.
+  posRank: i === SAMPLE_CARDS.length - 1 ? null : i + 1,
+  posPool: i === SAMPLE_CARDS.length - 1 ? null : 64,
   careerFp: m.careerFp,
   lineupStarts: m.starts,
   tierFloorFp: m.tierFloorFp,

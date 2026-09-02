@@ -811,6 +811,13 @@ export type Database = {
             foreignKeyName: "lineup_slots_card_instance_id_fkey"
             columns: ["card_instance_id"]
             isOneToOne: false
+            referencedRelation: "card_prices"
+            referencedColumns: ["card_instance_id"]
+          },
+          {
+            foreignKeyName: "lineup_slots_card_instance_id_fkey"
+            columns: ["card_instance_id"]
+            isOneToOne: false
             referencedRelation: "my_collection"
             referencedColumns: ["id"]
           },
@@ -996,6 +1003,78 @@ export type Database = {
           },
           {
             foreignKeyName: "player_season_stats_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player_values: {
+        Row: {
+          best_ppg: number | null
+          blended_ppg: number | null
+          current_games: number
+          current_ppg: number | null
+          player_id: string
+          pos_pool: number | null
+          pos_rank: number | null
+          position_abbreviation: string | null
+          prior_games: number | null
+          prior_ppg: number | null
+          replacement_ppg: number | null
+          season: number
+          source: string
+          source_season: number | null
+          updated_at: string
+          value_score: number
+        }
+        Insert: {
+          best_ppg?: number | null
+          blended_ppg?: number | null
+          current_games?: number
+          current_ppg?: number | null
+          player_id: string
+          pos_pool?: number | null
+          pos_rank?: number | null
+          position_abbreviation?: string | null
+          prior_games?: number | null
+          prior_ppg?: number | null
+          replacement_ppg?: number | null
+          season: number
+          source?: string
+          source_season?: number | null
+          updated_at?: string
+          value_score?: number
+        }
+        Update: {
+          best_ppg?: number | null
+          blended_ppg?: number | null
+          current_games?: number
+          current_ppg?: number | null
+          player_id?: string
+          pos_pool?: number | null
+          pos_rank?: number | null
+          position_abbreviation?: string | null
+          prior_games?: number | null
+          prior_ppg?: number | null
+          replacement_ppg?: number | null
+          season?: number
+          source?: string
+          source_season?: number | null
+          updated_at?: string
+          value_score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_values_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["player_id"]
+          },
+          {
+            foreignKeyName: "player_values_player_id_fkey"
             columns: ["player_id"]
             isOneToOne: false
             referencedRelation: "players"
@@ -1512,6 +1591,7 @@ export type Database = {
         Row: {
           coin_multiplier: number
           min_career_fp: number
+          sale_multiplier: number
           sell_value: number
           sort_order: number
           tier: Database["public"]["Enums"]["card_tier"]
@@ -1519,6 +1599,7 @@ export type Database = {
         Insert: {
           coin_multiplier?: number
           min_career_fp: number
+          sale_multiplier?: number
           sell_value?: number
           sort_order: number
           tier: Database["public"]["Enums"]["card_tier"]
@@ -1526,6 +1607,7 @@ export type Database = {
         Update: {
           coin_multiplier?: number
           min_career_fp?: number
+          sale_multiplier?: number
           sell_value?: number
           sort_order?: number
           tier?: Database["public"]["Enums"]["card_tier"]
@@ -1534,6 +1616,36 @@ export type Database = {
       }
     }
     Views: {
+      card_prices: {
+        Row: {
+          base_coins: number | null
+          card_id: string | null
+          card_instance_id: string | null
+          fp_coins: number | null
+          pos_pool: number | null
+          pos_rank: number | null
+          sale_multiplier: number | null
+          sell_value: number | null
+          tier: Database["public"]["Enums"]["card_tier"] | null
+          value_score: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["card_id"]
+          },
+        ]
+      }
       lineup_slot_config: {
         Row: {
           display_order: number | null
@@ -1566,13 +1678,17 @@ export type Database = {
           next_tier_label: Database["public"]["Enums"]["card_tier"] | null
           player_id: string | null
           player_name: string | null
+          pos_pool: number | null
+          pos_rank: number | null
           position_abbreviation: string | null
+          rarity: Database["public"]["Enums"]["rarity"] | null
           season: number | null
           sell_value: number | null
           team_abbreviation: string | null
           tier: Database["public"]["Enums"]["card_tier"] | null
           tier_floor_fp: number | null
           user_id: string | null
+          value_score: number | null
         }
         Relationships: [
           {
@@ -1619,13 +1735,17 @@ export type Database = {
           next_tier_label: Database["public"]["Enums"]["card_tier"] | null
           player_id: string | null
           player_name: string | null
+          pos_pool: number | null
+          pos_rank: number | null
           position_abbreviation: string | null
+          rarity: Database["public"]["Enums"]["rarity"] | null
           season: number | null
           sell_value: number | null
           team_abbreviation: string | null
           tier: Database["public"]["Enums"]["card_tier"] | null
           tier_floor_fp: number | null
           user_id: string | null
+          value_score: number | null
         }
         Relationships: [
           {
@@ -2241,10 +2361,22 @@ export type Database = {
         }[]
       }
       refresh_player_season_ranks: { Args: never; Returns: undefined }
+      refresh_player_values: {
+        Args: { p_production_season?: number; p_season?: number }
+        Returns: Json
+      }
       roster_status: { Args: never; Returns: Json }
       rotate_daily_set: { Args: never; Returns: Json }
       rotate_weekly_set: { Args: never; Returns: Json }
       run_carry_slots: { Args: { p_wins: number }; Returns: number }
+      sale_value: {
+        Args: {
+          p_settled_fp: number
+          p_tier: Database["public"]["Enums"]["card_tier"]
+          p_value_score: number
+        }
+        Returns: number
+      }
       score_rate: { Args: never; Returns: number }
       score_week: {
         Args: { p_season: number; p_season_type: number; p_week: number }

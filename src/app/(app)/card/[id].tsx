@@ -45,6 +45,7 @@ import { Section, SectionStack } from '@/components/players/Section';
 import { StartLog } from '@/components/players/StartLog';
 import { startKey } from '@/components/players/GameLog';
 import { parseCardProfile, type CardProfile } from '@/components/players/card-profile';
+import { sellBreakdown } from '@/components/players/sell-copy';
 import { sellErrorMessage } from '@/components/players/sell';
 import { usePlayerPage } from '@/components/players/use-player-page';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -590,7 +591,7 @@ export default function CardDetailScreen() {
         <ConfirmDialog
           visible={selling}
           title={`Sell this ${k.tier} card?`}
-          body={`${k.playerName} · ${k.season ?? '—'} card. You will receive ${k.sellValue} coins. The copy and everything it has earned — ${k.careerFp.toFixed(0)} FP over ${k.lineupStarts} start${k.lineupStarts === 1 ? '' : 's'} — are gone for good, and pulling him again starts a new card at bronze.`}
+          body={`${k.playerName} · ${k.season ?? '—'} card. ${sellBreakdown(k)} The copy and everything it has earned — ${k.careerFp.toFixed(0)} FP over ${k.lineupStarts} start${k.lineupStarts === 1 ? '' : 's'} — are gone for good, and pulling him again starts a new card at bronze.`}
           confirmLabel={`Sell for ${k.sellValue}`}
           destructive
           busy={busy}

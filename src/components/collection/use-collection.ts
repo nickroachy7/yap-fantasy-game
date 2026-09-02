@@ -52,7 +52,7 @@ import { supabase } from '@/lib/supabase';
 import { normaliseRow, type CollectionCard, type CollectionViewRow } from './types';
 
 const COLUMNS =
-  'id, card_id, player_name, position_abbreviation, team_abbreviation, injury_status, tier, career_fp, lineup_starts, tier_floor_fp, next_tier_at, next_tier_label, season, acquired_at, sell_value, fp_per_game, in_set';
+  'id, card_id, player_name, position_abbreviation, team_abbreviation, injury_status, tier, career_fp, lineup_starts, tier_floor_fp, next_tier_at, next_tier_label, season, acquired_at, sell_value, fp_per_game, in_set, pos_rank, pos_pool';
 
 /** Comfortably under the PostgREST 1000-row ceiling. */
 const PAGE_SIZE = 500;

@@ -30,6 +30,8 @@ export type CollectionViewRow = Pick<
   | 'sell_value'
   | 'fp_per_game'
   | 'in_set'
+  | 'pos_rank'
+  | 'pos_pool'
 >;
 
 /** One owned card instance, with every null resolved to something renderable. */
@@ -51,8 +53,22 @@ export type CollectionCard = {
   season: number | null;
   /** Epoch ms. 0 when the view gave us nothing, which sorts oldest-last. */
   acquiredAt: number;
-  /** Coins this copy sells for. Priced by the server from its tier. */
+  /**
+   * Coins this copy sells for, right now.
+   *
+   * (what the player is worth + what this copy has earned) x its tier, priced
+   * by the server and never re-derived here — see the header of
+   * 20260902060000. It MOVES: the player half is recomputed weekly off the
+   * season so far, so this is a current price rather than a constant.
+   */
   sellValue: number;
+  /**
+   * Where the player stands at his position — the 3 of "WR3" — out of
+   * `posPool`. Null when he has no value row yet, which is a real state: 40% of
+   * the set had no prior-season production to rank.
+   */
+  posRank: number | null;
+  posPool: number | null;
   /**
    * The PLAYER's fantasy points per scored game this season — NOT the card's.
    * Null until he has a scored game. Deliberately not a projection: the
@@ -171,6 +187,10 @@ export function normaliseRow(row: CollectionViewRow): CollectionCard {
     season: row.season,
     acquiredAt: Number.isNaN(acquired) ? 0 : acquired,
     sellValue: Number(row.sell_value ?? 0),
+    // Null-preserving, like fpPerGame below: "not ranked" is not "ranked last",
+    // and the card must not draw an unranked rookie as the worst player alive.
+    posRank: row.pos_rank == null ? null : num(row.pos_rank),
+    posPool: row.pos_pool == null ? null : num(row.pos_pool),
     // Null-preserving: "no scored games yet" is not "averages nothing", and
     // the card draws the two differently.
     fpPerGame: row.fp_per_game == null ? null : num(row.fp_per_game),

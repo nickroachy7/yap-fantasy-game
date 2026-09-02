@@ -47,8 +47,27 @@ export type CardIdentity = {
   committedFor: number | null;
   committedSetCode: string | null;
   committedSetName: string | null;
-  /** Coins this copy sells for, priced by the server from its tier. */
+  /**
+   * Coins this copy sells for, right now — (what the player is worth + what
+   * this copy has earned) x its tier. Priced by the server and never rebuilt
+   * here, so the number the screen shows is the number the wallet receives.
+   */
   sellValue: number;
+  /**
+   * What that total is made of. Published so the sell sheet can show its
+   * working rather than one figure the player has to take on trust:
+   * `baseCoins` is the player half, `fpCoins` the points this copy has settled.
+   * They will not add to `sellValue` exactly — the tier multiplies the sum and
+   * the result is floored — so display them, do not reconcile them.
+   */
+  baseCoins: number | null;
+  fpCoins: number | null;
+  /**
+   * What this copy would fetch one tier up, at its value and points as they
+   * stand. Null at diamond, which has no next tier. The argument for starting
+   * the card rather than selling it today.
+   */
+  nextTierSellValue: number | null;
   tierFloorFp: number | null;
   nextTierAt: number | null;
   nextTierLabel: string | null;
@@ -156,6 +175,9 @@ export function parseCardProfile(payload: Json): CardProfile | null {
       committedSetCode: str(c.committed_set_code),
       committedSetName: str(c.committed_set_name),
       sellValue: numOr(c.sell_value, 0),
+      baseCoins: num(c.base_coins),
+      fpCoins: num(c.fp_coins),
+      nextTierSellValue: num(c.next_tier_sell_value),
       tierFloorFp: num(c.tier_floor_fp),
       nextTierAt: num(c.next_tier_at),
       nextTierLabel: str(c.next_tier_label),
