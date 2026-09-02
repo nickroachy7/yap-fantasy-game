@@ -341,6 +341,7 @@ const styles = StyleSheet.create({
  */
 export function BarAction({
   glyph,
+  mark,
   label,
   hint,
   primary = false,
@@ -349,6 +350,19 @@ export function BarAction({
 }: {
   /** The mark beside the label, from the app's own set. */
   glyph?: Glyph;
+  /**
+   * A mark that is not a `Glyph` — drawn instead of one.
+   *
+   * FOR THE COIN, and for now only the coin. The app's coin is `Coin`, a view
+   * the masthead composes out of two circles rather than an entry in the glyph
+   * sheet, so a bar that could only take a `Glyph` was reaching for
+   * `glyphs.coin` — the faceted gem from before the currency was renamed. That
+   * left the sell bar and the Enter button showing a different object from the
+   * balance they are spending against.
+   *
+   * Wins over `glyph` when both are given.
+   */
+  mark?: ReactNode;
   /** Absent on a mark-only pill, where the hint carries the whole meaning. */
   label?: string;
   /** What a screen reader says, where the label is shortened for the row. */
@@ -368,14 +382,15 @@ export function BarAction({
       accessibilityState={{ disabled: !enabled }}
       accessibilityLabel={hint ?? label}
       style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}>
-      {glyph ? (
-        <Icon
-          glyph={glyph}
-          color={enabled ? (primary ? c.text : c.textSecondary) : c.textTertiary}
-          size={15}
-          focused
-        />
-      ) : null}
+      {mark ??
+        (glyph ? (
+          <Icon
+            glyph={glyph}
+            color={enabled ? (primary ? c.text : c.textSecondary) : c.textTertiary}
+            size={15}
+            focused
+          />
+        ) : null)}
       {label ? (
         <Text
           numberOfLines={1}

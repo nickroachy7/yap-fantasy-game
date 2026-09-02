@@ -83,7 +83,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { ContestAbout } from './ContestAbout';
 import { ContestCard } from './ContestCard';
-import { coin, formatRoster } from '@/components/icons/glyphs';
+import { formatRoster } from '@/components/icons/glyphs';
 import { ContestFieldPanel } from './ContestFieldPanel';
 import { EntryLineup } from './EntryLineup';
 import { formatLine, settlementOf } from './contest-model';
@@ -91,13 +91,14 @@ import { termsOfContest, useContests } from './use-contests';
 import { useContestField, useContestLineup } from './use-contest-field';
 import { useMyContests } from './use-my-contests';
 import { LineupEditor, type EntryActions, type EntryOffer } from '@/components/lineup/LineupEditor';
+import { Coin } from '@/components/shell/AppHeader';
 import { BarAction, GlassBar, GlassPill } from '@/components/ui/GlassBar';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { BackRow } from './ContestRecapPanel';
 import { supabase } from '@/lib/supabase';
-import { Colors, Spacing, Type } from '@/constants/theme';
+import { Colors, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useAuth } from '@/context/AuthContext';
@@ -392,7 +393,16 @@ export function ContestView({
                    a contest that costs nothing it would be pricing nothing —
                    and "Enter for 0" is a number where the reader expects a
                    cost. The Warm-Up just says Enter. */
-                glyph={offer.ready && offer.fee > 0 ? coin : undefined}
+                mark={
+                  offer.ready && offer.fee > 0 ? (
+                    <Coin
+                      size={15}
+                      color={
+                        offer.busy ? c.textTertiary : TierColors[scheme].gold.accent
+                      }
+                    />
+                  ) : undefined
+                }
                 label={
                   offer.ready
                     ? offer.fee > 0

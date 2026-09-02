@@ -55,9 +55,10 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { coin, sets as setsGlyph } from '@/components/icons/glyphs';
+import { sets as setsGlyph } from '@/components/icons/glyphs';
+import { Coin } from '@/components/shell/AppHeader';
 import { BarAction, GlassBar, GlassPill } from '@/components/ui/GlassBar';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Colors, Radius, Spacing, TierColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { commitBlockedBy, type CardActionSet } from './card-actions';
 import { SetPickRow } from './SetPickRow';
@@ -169,7 +170,10 @@ export function CardExits({
             shape under the thumb. */}
         <GlassPill>
           <BarAction
-            glyph={coin}
+            /* The masthead's coin, in the masthead's gold — what a sale pays
+               is the same currency the balance at the top of the screen counts,
+               and it was drawn as the old gem. */
+            mark={<Coin size={15} color={busy ? c.textTertiary : TierColors[scheme].gold.accent} />}
             label={`Sell for ${sellValue}`}
             hint={`Sell this ${tier} card for ${sellValue} coins`}
             enabled={!busy}
