@@ -33,6 +33,7 @@ import { CardExits, cardExitNote } from '@/components/cards/CardExits';
 import { PlayerAvatar } from '@/components/cards/PlayerAvatar';
 import { dropCards } from '@/components/collection/use-collection';
 import { invalidateSets } from '@/components/collection/use-sets';
+import { CardHistory } from '@/components/players/CardHistory';
 import { CardStanding } from '@/components/players/CardStanding';
 import { CommunityPanel } from '@/components/players/CommunityPanel';
 import { GameLogTab } from '@/components/players/GameLogTab';
@@ -65,12 +66,6 @@ const TABS: Tab<ProfileTab>[] = [
   { value: 'card', label: 'Card' },
   { value: 'log', label: 'Game log' },
 ];
-
-/** "15 COPIES · 9 OWNERS", for the community zone's heading row. */
-function communityHint(market: { totals: { held: number; owners: number } }): string {
-  const { held, owners } = market.totals;
-  return `${held} ${held === 1 ? 'COPY' : 'COPIES'} · ${owners} ${owners === 1 ? 'OWNER' : 'OWNERS'}`;
-}
 
 /** "4 Aug 2026". Short and unambiguous — no locale-dependent 8/4 vs 4/8. */
 function dateLabel(iso: string | null): string {
@@ -133,6 +128,11 @@ export default function CardDetailScreen() {
   /* Which weeks THIS copy was in the lineup, so the game log can mark them.
      The player's log and the copy's earnings are otherwise two lists you have
      to reconcile by eye — and the gap between them IS the bench rule. */
+  /* Every OTHER copy of this player you hold. The page is about one of them,
+     and listing it under "your other copies" is a row that navigates to the
+     page you are already on. */
+  const others = useMemo(() => page.owned.filter((x) => x.id !== id), [page.owned, id]);
+
   const startedWeeks = useMemo(
     () =>
       new Set((card?.starts ?? []).map((s) => startKey(s.season, s.seasonType, s.week))),
@@ -433,23 +433,36 @@ export default function CardDetailScreen() {
               {exitNote ? <Row label="Sets" value={exitNote} muted /> : null}
             </Section>
 
-            <Section
-              /* The player's name, because "Across the community" named the
-                 room rather than the subject — and on a page about one copy the
-                 question this zone answers is "how does mine compare to the
-                 others". A long name truncates to one line rather than pushing
-                 the count off the row. */
-              label={`Every ${k.playerName}`}
-              hint={page.market ? communityHint(page.market) : undefined}>
-              <CommunityPanel
-                market={page.market}
-                copy={{
-                  careerFp: k.careerFp,
-                  rank: card.rank.amongPlayer,
-                  pool: card.rank.playerPool,
-                }}
-              />
-            </Section>
+            {/* YOUR OTHER COPIES, between the one you opened and everyone
+                else's. It is the nearest comparison a reader has — two copies
+                of the same player in one collection can be worth very different
+                things — and it is the only list on the page they can act on.
+                Absent when this is the only one you hold, which is most of
+                them. */}
+            {others.length > 0 ? (
+              <Section label="Your other copies" hint={`${others.length} MORE`}>
+                <CardHistory
+                  cards={others}
+                  loading={page.ownedLoading}
+                  playerName={k.playerName}
+                  onOpen={(x) => router.replace({ pathname: '/card/[id]', params: { id: x.id } })}
+                />
+              </Section>
+            ) : null}
+
+            {/* The population, where this copy sits in it, and who is doing
+                best — three sections, drawn by `CommunityPanel` in that order.
+                Told WHICH copy, so the scale marks this one rather than the
+                best of the several you may hold. */}
+            <CommunityPanel
+              market={page.market}
+              playerName={k.playerName}
+              copy={{
+                careerFp: k.careerFp,
+                rank: card.rank.amongPlayer,
+                pool: card.rank.playerPool,
+              }}
+            />
           </SectionStack>
         ) : null}
 
@@ -458,6 +471,7 @@ export default function CardDetailScreen() {
             <OverviewTab
               player={page.player}
               profile={page.profile}
+              market={page.market}
               sections={page.sections}
               /* Names the copy without duplicating card content into a player
                  tab — otherwise this tab is a dead end on a card page. */

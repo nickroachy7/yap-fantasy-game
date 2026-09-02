@@ -33,16 +33,19 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { EarningsScale } from './EarningsScale';
-import { Row } from './Section';
+import { Row, Section } from './Section';
 import { Colors, NUMERIC, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { type MarketTier, type MarketTop, type PlayerMarket } from './market';
 
 export function CommunityPanel({
   market,
+  playerName,
   copy,
 }: {
   market: PlayerMarket | null;
+  /** Names the population section — "Every Cam Ward" rather than "the community". */
+  playerName: string;
   /**
    * The ONE copy the page is about, on the card profile.
    *
@@ -78,65 +81,75 @@ export function CommunityPanel({
 
   if (totals.minted === 0) {
     return (
-      <Row
-        label="Copies"
-        value="None yet — every card enters the game from a pack"
-        muted
-      />
+      <Section label={`Every ${playerName}`}>
+        <Row
+          label="Copies"
+          value="None yet — every card enters the game from a pack"
+          muted
+        />
+      </Section>
     );
   }
 
   return (
-    <View style={styles.zone}>
+    <>
       {/**
-        * ONE BAR IS THE POPULATION.
+        * THREE SECTIONS, IN THE ORDER A READER ASKS THEM.
         *
-        * This was four figure tiles — circulation, owners, ever started, avg
-        * earned — each with a sub-hint under it, and then `COPIES BY TIER` as
-        * four more bars underneath, and then a `BEST COPY` block, and then a
-        * paragraph about where you stood. Four headings and twelve pieces of
-        * small type, all describing the SAME fifteen copies.
-        *
-        * It is one zone now. The stacked bar is the composition; the scale is
-        * the spread; the rows are the counts. Everything else the block used to
-        * say in sentences is a labelled pair with its value on the right edge,
-        * which is what makes the whole thing skimmable rather than readable.
+        * How many exist and at what tier, then where mine sits among them, then
+        * who is doing best. It was one block of four figure tiles plus a
+        * four-row bar chart plus a best-copy panel plus a paragraph — four
+        * headings describing the same population, and no order to them at all.
         */}
-      <TierComposition tiers={tiers} held={totals.held} />
+      <Section
+        label={`Every ${playerName}`}
+        hint={`${totals.held} ${totals.held === 1 ? 'COPY' : 'COPIES'} · ${totals.owners} ${totals.owners === 1 ? 'OWNER' : 'OWNERS'}`}>
+        <TierComposition tiers={tiers} held={totals.held} />
+        <Row label="Minted" value={mintedValue(totals)} />
+        <Row label="Ever started" value={`${totals.started} of ${totals.held}`} />
+        {seasons.map((s) => (
+          <Row
+            key={s.season}
+            label={`${s.season} printing`}
+            value={
+              s.minted === s.held
+                ? `${s.held} held`
+                : `${s.held} held · ${s.minted - s.held} sold back`
+            }
+          />
+        ))}
+      </Section>
 
-      {top && top.careerFp > 0 ? (
-        <EarningsScale
-          yours={yoursFp}
-          average={totals.avgFp}
-          best={top.careerFp}
-          marks={tiers.map((t) => t.bestFp ?? 0)}
-        />
+      {/* Only when there is a position to report. On a player you hold none of,
+          the scale would be a chart about other people with no mark on it. */}
+      {yoursFp !== null && top && top.careerFp > 0 ? (
+        <Section label="Where yours ranks" hint={rankValue ?? undefined}>
+          <EarningsScale
+            yours={yoursFp}
+            average={totals.avgFp}
+            best={top.careerFp}
+            marks={tiers.map((t) => t.bestFp ?? 0)}
+          />
+        </Section>
       ) : null}
 
-      <Row label="Minted" value={mintedValue(totals)} />
-      <Row label="Ever started" value={`${totals.started} of ${totals.held}`} />
-      <Row
-        label="Best copy"
-        value={bestValue(top)}
-        muted={!top || top.careerFp <= 0}
-      />
-      {rankValue ? <Row label="Your best" value={rankValue} /> : null}
-
-      {/* The one season fact worth keeping from the block this replaced: which
-          printings exist, and how many of each survived. It is a row per season
-          rather than a heading of its own. */}
-      {seasons.map((s) => (
-        <Row
-          key={s.season}
-          label={`${s.season} printing`}
-          value={
-            s.minted === s.held
-              ? `${s.held} held`
-              : `${s.held} held · ${s.minted - s.held} sold back`
-          }
-        />
-      ))}
-    </View>
+      <Section label="Best copies">
+        {/* ONE COPY, BECAUSE THE SERVER RETURNS ONE. `player_market` gives a
+            single `top`; a leaderboard of three needs it to return a list, and
+            inventing the other two from the tier bests would be a chart of
+            different players' cards dressed as a ranking. */}
+        <Row label="Best" value={bestValue(top)} muted={!top || top.careerFp <= 0} />
+        {tiers
+          .filter((t) => t.copies > 0 && (t.bestFp ?? 0) > 0)
+          .map((t) => (
+            <Row
+              key={t.tier}
+              label={`Best ${t.tier}`}
+              value={`${(t.bestFp as number).toFixed(0)} FP · ${t.copies} ${t.copies === 1 ? 'copy' : 'copies'}`}
+            />
+          ))}
+      </Section>
+    </>
   );
 }
 
@@ -233,7 +246,6 @@ function TierComposition({ tiers, held }: { tiers: MarketTier[]; held: number })
 }
 
 const styles = StyleSheet.create({
-  zone: { gap: Spacing.two + 2 },
   block: { gap: Spacing.two + 2 },
   /* The gap is the separator. Two adjacent segments in neighbouring tier
      colours — bronze against gold at small sizes — otherwise read as one. */
