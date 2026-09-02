@@ -25,18 +25,19 @@
  * who he is. No boxes — see `Section`.
  */
 import type { ReactNode } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Text } from 'react-native';
 
-import { Colors, Spacing, Type } from '@/constants/theme';
+import { Colors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { injuryWeight } from '@/lib/injury';
 import type { DirectoryPlayer } from '@/components/cards/player-directory';
 import { BioFacts } from './BioFacts';
-import { CareerTable } from './CareerTable';
 import type { GameLogSection } from './game-log';
 import { RecentForm, recentFormCount, recentFormHint } from './RecentForm';
-import { Section, SectionStack } from './Section';
+import { Figure, FigureRow, Section, SectionStack } from './Section';
 import { TeamContext } from './TeamContext';
 import { UsagePanel } from './UsagePanel';
+import type { PlayerMarket } from './market';
 import type { PlayerProfile } from './profile';
 
 /**
@@ -70,68 +71,92 @@ export function currentRank(profile: PlayerProfile | null): {
 export function OverviewTab({
   player,
   profile,
+  market,
   lead,
   sections,
 }: {
   player: DirectoryPlayer;
   profile: PlayerProfile | null;
+  /** For the summary's ownership figures. Null until the market read lands. */
+  market: PlayerMarket | null;
   /** A line of card context, on the card profile only. */
   lead?: ReactNode;
-  /**
-   * The game log's sections, used only to reconcile them against the career
-   * table below — see the note this renders. The tab does not draw games.
-   */
+  /** The game log's sections, for the form line. The tab draws no games. */
   sections: GameLogSection[];
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  const rank = currentRank(profile);
 
-  /* The career table is built from SEASON aggregates and the game log from
-     per-game rows, so one can know about seasons the other does not. Saying so
-     is better than letting the reader find a season here and not in the log and
-     conclude the page is broken. */
-  const careerSeasons = new Set((profile?.career ?? []).map((s) => s.season));
-  const loggedSeasons = new Set(sections.map((s) => s.season));
-  const missingFromLog = [...careerSeasons]
-    .filter((s) => !loggedSeasons.has(s))
-    .sort((a, b) => b - a);
+  /* The comment takes the designation's own colour, from the same `injuryWeight`
+     the hero's identity line runs — a player printing a red Q up there cannot
+     print a grey warning down here. */
+  const weight = injuryWeight(player.injuryStatus);
+  const commentColour = weight
+    ? weight === 'blocking'
+      ? c.negative
+      : c.warning
+    : c.textSecondary;
 
   return (
     <SectionStack>
       {lead ? <Section>{lead}</Section> : null}
 
+      {/**
+        * A SUMMARY BLOCK, WHICH THE TAB DID NOT HAVE.
+        *
+        * It opened straight into a chart. The figures a reader wants first are
+        * the ones that place him — where he ranks, and how many people hold
+        * him — and only two of those fit the header strip, which is spoken for
+        * by season FP, FP per game and positional rank.
+        *
+        * So this holds what the strip cannot. It deliberately does NOT repeat
+        * the strip: a figure printed twice on one screen is two figures that
+        * can disagree, which is the bug the strip was built to close.
+        */}
+      <Section label="Summary">
+        <FigureRow>
+          <Figure
+            label="GAMES"
+            value={String(player.gamesPlayed)}
+            hint={rank && rank.season !== player.season ? `${rank.season} rank above` : undefined}
+          />
+          {market ? (
+            <Figure
+              label="OWNERS"
+              value={String(market.totals.owners)}
+              /* A COUNT, NOT A PERCENTAGE. A share of a beta-sized user base
+                 reads 0% or 100% and teaches people to distrust the column,
+                 where "9 owners" is exactly as true at every scale. It becomes
+                 a percentage the day there is a denominator worth dividing by. */
+              hint={market.totals.owners === 1 ? 'holds him' : 'hold him'}
+            />
+          ) : null}
+          {market ? (
+            <Figure
+              label="COPIES"
+              value={String(market.totals.held)}
+              hint={`${market.totals.minted} minted`}
+            />
+          ) : null}
+        </FigureRow>
+      </Section>
+
       {profile?.player.injuryComment ? (
         <Section label={player.injuryStatus ?? 'Status'}>
-          <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
+          <Text style={[Type.bodyRelaxed, { color: commentColour }]}>
             {profile.player.injuryComment}
           </Text>
         </Section>
       ) : null}
 
-      {/* RECENT FORM FIRST, because it is the only thing on the tab that
-          answers "is he playing well right now" — the header says the season,
-          the table says the career, and neither says this week. It draws
-          nothing on a player with fewer than three scored games, which is most
-          of the league in August. */}
+      {/* THE START/SIT SIGNALS, in the order they answer the question: how has
+          he been scoring, and is his side still giving him the ball. */}
       {recentFormCount(sections) >= 3 ? (
         <Section
           label={`Last ${recentFormCount(sections)} weeks`}
           hint={recentFormHint(sections)}>
           <RecentForm sections={sections} />
-        </Section>
-      ) : null}
-
-      {/* SEASON BY SEASON. The header says how he is doing now; this
-          says whether that is normal for him, and the Game log tab says which
-          weeks made it up. */}
-      {profile ? (
-        <Section label="Season by season" hint={`${player.gamesPlayed} GP THIS SEASON`} flush>
-          <CareerTable career={profile.career} position={profile.player.positionAbbreviation} />
-          {missingFromLog.length > 0 ? (
-            <Text style={[Type.fine, styles.reconcile, { color: c.textTertiary }]}>
-              {`${missingFromLog.join(', ')} ${missingFromLog.length === 1 ? 'has' : 'have'} season totals but no per-game rows ingested, so ${missingFromLog.length === 1 ? 'it appears' : 'they appear'} here and not in the game log.`}
-            </Text>
-          ) : null}
         </Section>
       ) : null}
 
@@ -149,8 +174,17 @@ export function OverviewTab({
             <TeamContext bio={profile.player} standings={profile.standings} />
           </Section>
 
-          {/* THE PERSON, at the foot of the tab. */}
-          <Section label="Player">
+          {/**
+            * THE PERSON, LAST.
+            *
+            * It is the only block on the tab that is read rather than scanned,
+            * and nothing in it changes a start/sit decision — a reader deciding
+            * about Sunday does not need his college. The written description
+            * this section is eventually for is not here: the provider does not
+            * sell one, and a stub that says "no description available" is worse
+            * than a section that does not exist.
+            */}
+          <Section label="About him">
             <BioFacts bio={profile.player} />
           </Section>
         </>
@@ -159,6 +193,4 @@ export function OverviewTab({
   );
 }
 
-const styles = StyleSheet.create({
-  reconcile: { paddingHorizontal: Spacing.three },
-});
+

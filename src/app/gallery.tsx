@@ -1092,8 +1092,8 @@ function ProfileFixture() {
       {/* ---- Card: both states of each, because the interesting one is the
            empty one. A market nobody has played and a card never started are
            what the whole beta looks like for a month. ---------------------- */}
-      <CommunityPanel market={parseMarket(MARKET_SAMPLE)} />
-      <CommunityPanel market={parseMarket(MARKET_UNPLAYED)} />
+      <CommunityPanel market={parseMarket(MARKET_SAMPLE)} playerName={profile.player.name} />
+      <CommunityPanel market={parseMarket(MARKET_UNPLAYED)} playerName={profile.player.name} />
 
       <CardFixture payload={CARD_PROFILE_SAMPLE} />
       <CardFixture payload={CARD_PROFILE_NEVER_STARTED} />

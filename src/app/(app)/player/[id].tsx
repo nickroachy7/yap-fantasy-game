@@ -210,7 +210,7 @@ export default function PlayerDetailScreen() {
         </SheetToneBand>
 
         {tab === 'overview' ? (
-          <OverviewTab player={player} profile={profile} sections={sections} />
+          <OverviewTab player={player} profile={profile} market={market} sections={sections} />
         ) : null}
 
         {tab === 'card' ? (
@@ -219,16 +219,9 @@ export default function PlayerDetailScreen() {
                 copy — it is the page you open from the directory, before you
                 own anything. The heading names the player rather than the room,
                 the same as its sibling. */}
-            <Section
-              label={`Every ${player.name}`}
-              hint={
-                market
-                  ? `${market.totals.held} ${market.totals.held === 1 ? 'COPY' : 'COPIES'} · ${market.totals.owners} ${market.totals.owners === 1 ? 'OWNER' : 'OWNERS'}`
-                  : undefined
-              }>
-              <CommunityPanel market={market} />
-            </Section>
-
+            {/* YOUR COPIES FIRST here, unlike the card page — the one thing on
+                this tab you can act on, and the answer to the question the
+                header's `YOU HOLD` raises. Then the population. */}
             <Section
               label="Your cards"
               hint={owned.length > 1 ? `${owned.length} COPIES` : undefined}>
@@ -239,6 +232,8 @@ export default function PlayerDetailScreen() {
                 onOpen={openCard}
               />
             </Section>
+
+            <CommunityPanel market={market} playerName={player.name} />
           </SectionStack>
         ) : null}
 
