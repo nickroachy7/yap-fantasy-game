@@ -16,7 +16,6 @@ import {
   useContestHistory,
   type HistoryEntry,
 } from '@/components/contests/use-contest-history';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { LobbyHero } from './LobbyHero';
 import { useRunLadder } from '@/components/runs/use-run-ladder';
 import { weekTitleOf } from '@/components/contests/use-my-contests';
@@ -233,10 +232,6 @@ export function LobbyView({
    * `Friendly` never carries one — it is a promise, and a promise with a
    * quantity on it is a different and much bigger claim.
    */
-  /* Live entries then settled ones, as one list. `my_contest_cards` returns
-     both and flags which is which; the section head counts the pair because to
-     a reader they are one thing — the contests they are in this week. */
-  const myWeek = [...playing, ...finished];
 
   const context =
     view === 'recap'
@@ -301,7 +296,7 @@ export function LobbyView({
           A DEAD RUN IS NOT PART OF THE HEADER. It is a call to action with
           cards hanging on it, and it belongs where the eye lands after the
           header rather than inside a block about standings — see `RunRail`. */}
-      {/* THE HEADER IS A BAND AND THE PAGE IS A LIST.
+      {/* THE HEADER IS A BAND AND THE PAGE IS FOUR NAMED LISTS.
           It was a band that ended on a four-tab bar — Open, Entered, Recent,
           Friendly — and that bar was a real answer to a real problem: the four
           shelves had been four stacked panels, so the sheet was four lists deep
@@ -309,78 +304,88 @@ export function LobbyView({
           Tabs made them peers, one tap apart.
 
           What tabs cost is that three quarters of the page is always hidden,
-          and on this sheet the hidden part is the part that changes. Your live
-          entry and the contest you might enter are the same object at two
-          moments; putting them behind different tabs made "how is my week
-          going" a question you answer by tapping around rather than by
-          scrolling. The old bar's own comment conceded the ranking problem and
-          then declined to rank — Sunday wants Entered, Monday wants Recent,
-          every other day wants Open.
+          and on this sheet the hidden part is the part that changes. The old
+          bar's own comment conceded the ranking problem and then declined to
+          rank — Sunday wants Entered, Monday wants Recent, every other day
+          wants the open lobby.
 
-          ONE PAGE RANKS IT, and the ranking is by what you can still ACT on.
-          Your contests come first, live ones above settled, because a lineup
-          you can still change outranks a result that is finished. Open comes
-          second, because entering is the reason the sheet exists and it is the
-          only section that is never empty.
+          SO THE SHELVES SURVIVED AND THE BAR DID NOT. They are headings on one
+          scroll, in the order a week is lived: what you are IN, what has
+          FINISHED, what you can still enter, and the lobby that does not exist
+          yet. Nothing is behind a tap, and the ranking a tab bar refused to
+          make is made by the order.
 
-          FRIENDLY IS GONE. It was an empty shelf naming a feature that does not
-          exist — free as a tab nobody opened, dead weight as a section on a
-          page you scroll. It comes back when there is something on it. */}
+          AN EARLIER DRAFT MERGED ENTERED AND RECENT into one "Your contests"
+          list on the argument that they are the same object at two moments.
+          They are, and it still read wrong: `recap_slate()` keeps LAST week's
+          result on screen until there is new football, so a settled preseason
+          contest sat under a heading about this week, inside its count. Two
+          headings cost one line and stop the page claiming a week it is not
+          about. */}
       <LobbyHero run={run} rungs={rungs} week={week} />
 
       {run?.awaitingCarry ? <DeadRun run={run} onClaim={() => router.push('/run-over')} /> : null}
 
-      {myWeek.length > 0 ? (
-        <>
-          <SectionHead label="Your contests" count={myWeek.length} />
-          <View style={styles.stack}>
-            {playing.map((m) => (
-              <LiveEntry key={m.id} entry={m} onPress={() => onOpenContest(m.code)} />
-            ))}
-            {finished.map((m) => (
-              <SettledEntry key={m.id} entry={m} onPress={() => onOpenContest(m.code)} />
-            ))}
-          </View>
-        </>
-      ) : null}
+      <SectionHead label="Entered" count={playing.length} />
+      <View style={styles.stack}>
+        {playing.length > 0 ? (
+          playing.map((m) => (
+            <LiveEntry key={m.id} entry={m} onPress={() => onOpenContest(m.code)} />
+          ))
+        ) : loading ? null : (
+          <SectionEmpty text="Nothing filed yet. What you enter shows up here for the week." />
+        )}
+      </View>
 
-      <SectionHead label="Open" count={open.length} />
+      <SectionHead
+        label="Recent"
+        count={finished.length}
+        action={<ArchiveLink onPress={() => setView('history')} />}
+      />
+      <View style={styles.stack}>
+        {finished.length > 0 ? (
+          finished.map((m) => (
+            <SettledEntry key={m.id} entry={m} onPress={() => onOpenContest(m.code)} />
+          ))
+        ) : loading ? null : (
+          <SectionEmpty text="Results land here when the week is swept." />
+        )}
+      </View>
+
+      {/* COMMUNITY, because that is what it is: the lobby everybody shares, as
+          opposed to the one you assemble yourself below. It was called "Open",
+          which described its STATE rather than its kind — and once Friendly
+          sits under it on the same scroll, "open" stops distinguishing the two
+          (a friendly contest is open too). */}
+      <SectionHead label="Community" count={open.length} />
       <View style={styles.stack}>
         {open.length > 0 ? (
           open.map((c) => (
             <ContestEntry key={c.id} contest={c} coins={coins} onPress={() => onOpenContest(c.code)} />
           ))
         ) : loading ? null : (
-          <EmptyState
-            pad={false}
-            title={myWeek.length > 0 ? "You're in everything that's open" : 'Nothing open right now'}
-            body={
-              myWeek.length > 0
-                ? 'Every contest on this week\u2019s slate is already above.'
-                : 'Extra contests appear here each week. Small formats, so there is no quarterback or kicker to find.'
+          <SectionEmpty
+            text={
+              playing.length > 0
+                ? "You're in everything this week's slate has."
+                : 'Extra contests appear here each week.'
             }
           />
         )}
       </View>
-      {/* THE EXCLUSIVITY RULE SITS UNDER THE OPEN LIST and nowhere else. It is
-          about what entering ANOTHER contest costs you, which is a sentence for
-          somebody looking at a list of contests to enter. */}
+      {/* THE EXCLUSIVITY RULE SITS UNDER THE COMMUNITY LIST and nowhere else.
+          It is about what entering ANOTHER contest costs you, which is a
+          sentence for somebody looking at a list of contests to enter. */}
       <Footnote />
 
-      {/* THE ARCHIVE DOOR, UNCONDITIONALLY.
-          The Recent tab used to carry this and its own comment said why it had
-          to be there "whether or not this fortnight has anything in it": what is
-          inline is the two-week window `my_contest_cards` returns, and the
-          season behind it is paged and grows every week.
-          The first draft of this page hung the link off the "Your contests"
-          head and only when `finished.length > 0` — which is the same door
-          locked in exactly the case a player is most likely to want it, a quiet
-          fortnight with a season behind it. It sits at the foot of the page
-          instead: always rendered, and where a reader who has scrolled past
-          everything current is already looking. */}
-      <View style={styles.archiveRow}>
-        <ArchiveLink onPress={() => setView('history')} />
-      </View>
+      {/* FRIENDLY, NAMED BEFORE IT EXISTS.
+          A previous pass deleted this as "an empty shelf naming a feature that
+          does not exist". That was the wrong call: a lobby with one kind of
+          contest in it does not tell a player the other kind is coming, and the
+          shelf is one quiet row. It is the cheapest possible promise. */}
+      <SectionHead label="Friendly" count={0} />
+      <ComingSoon />
+
         </>
       )}
     </PlayerSheetFrame>
@@ -638,11 +643,24 @@ function SettledEntry({ entry, onPress }: { entry: MyContest; onPress: () => voi
 /**
  * A section's name, its size, and anything it opens.
  *
- * This is what the tab bar's `hint` was doing — saying how much is under a
- * heading before you look — put back on a heading now that there is no bar to
- * carry it. `Type.micro` rather than a section face, because on a page whose
- * content is cards this is scaffolding: it separates two lists and then gets
- * out of the way.
+ * IT WAS A 9pt UPPERCASE MICRO LABEL and it read as a caption on the card
+ * below it rather than as a heading over a list. That size was inherited from
+ * the tab bar's `hint`, which had a bar's worth of chrome around it to look
+ * like a control; standing alone on a dark page with nothing but air above it,
+ * the same 9pt is just small.
+ *
+ * `Type.figure` sets the hierarchy the page needs, and it is the one size that
+ * was missing from it: the sheet title is 26, a contest's name is 15, and a
+ * heading has to be bigger than the things under it or it is one of them.
+ * 26 / 18 / 15 reads as page, section, item at a glance.
+ *
+ * SENTENCE CASE, because the uppercase was doing the work the size should have
+ * done. Small caps shout to be noticed; a heading with enough weight does not
+ * have to.
+ *
+ * THE COUNT IS NOT IN THE NAME. It sits after it at the same size in
+ * `textTertiary` — the figure is a fact about the list, not part of what the
+ * list is called, and at this size a bracketed number would read as a badge.
  */
 function SectionHead({
   label,
@@ -658,13 +676,45 @@ function SectionHead({
 
   return (
     <View style={styles.sectionHead}>
-      <Text style={[Type.micro, { color: c.textSecondary }]}>{label.toUpperCase()}</Text>
-      <Text style={[Type.micro, NUMERIC, { color: c.textTertiary }]}>{String(count)}</Text>
+      <Text style={[Type.figure, { color: c.text }]}>{label}</Text>
+      {count > 0 ? (
+        <Text style={[Type.figure, NUMERIC, { color: c.textTertiary }]}>{String(count)}</Text>
+      ) : null}
       <View style={styles.sectionSpacer} />
       {action}
     </View>
   );
 }
+
+/**
+ * A section with nothing in it, in one line.
+ *
+ * `EmptyState` is a title, a body and room around them — right for a whole
+ * screen with nothing on it, far too much for one of four shelves that happens
+ * to be empty this week. Four of those on a page a reader is scrolling past
+ * would be more empty state than contest.
+ */
+function SectionEmpty({ text }: { text: string }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  return <Text style={[Type.body, styles.sectionEmpty, { color: c.textTertiary }]}>{text}</Text>;
+}
+
+/**
+ * The friendly lobby's one row: an empty shelf that says what will be on it.
+ */
+function ComingSoon() {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  return (
+    <View style={[styles.soon, { borderColor: c.border }]}>
+      <Text style={[Type.strong, { color: c.textSecondary }]}>
+        Play a week against people you invite
+      </Text>
+    </View>
+  );
+}
+
 
 /**
  * The door to the season, on the title row rather than in the list.
@@ -717,21 +767,16 @@ function Footnote() {
 }
 
 const styles = StyleSheet.create({
-  archiveRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.two,
-  },
   sectionHead: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     gap: Spacing.two,
     paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.three,
-    paddingBottom: Spacing.two,
+    paddingTop: Spacing.four,
+    paddingBottom: Spacing.two + 2,
   },
   sectionSpacer: { flex: 1 },
+  sectionEmpty: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
   /* The same shape as the dead-run row above it — a block of text and one
      affordance on the right — because they are the same kind of object: a thing
      on this sheet that opens a different screen. */
@@ -801,6 +846,9 @@ const styles = StyleSheet.create({
    * much is coming.
    */
   soon: {
+    /* Its own inset now. It used to sit inside a `Panel`, which supplied one;
+       on a single page it is a bare row like every other section's body. */
+    marginHorizontal: Spacing.three,
     justifyContent: 'center',
     borderWidth: 1,
     borderStyle: 'dashed',

@@ -49,11 +49,21 @@
  * that weight it reads as a STATE, and olive is not a state anybody wants to be
  * told they are in, on the screen they open most.
  *
- * The band survives, because the argument for it was never about hue. It is
- * `surfaceSheet` now — the near-black the sheet already uses — separated from
- * the page by a hairline instead of by a colour. Everything inside it that
- * carries meaning keeps its own: hearts stay `negative`, reached rungs stay
- * `positive`, and neither has a third colour to compete with any more.
+ * The band survives, because the argument for it was never about hue — a
+ * header needs a PLANE or it is a title with loose rows under it.
+ *
+ * The first draft of that fix went to `surfaceSheet`, which is the exact colour
+ * `PlayerSheetFrame` already paints the sheet: the band and the page were the
+ * same #101010, so there was no plane at all and the header went back to being
+ * a title with loose rows under it. The wash had been carrying the separation
+ * and removing it took the separation too.
+ *
+ * `backgroundElement` is the step that does the job on the dark scale alone —
+ * #212121 against the sheet's #101010, the same lift a card gets, with the
+ * hairline underneath to close it. It is the plane the olive was, without
+ * claiming a state. Everything inside keeps its own meaning: hearts stay
+ * `negative`, reached rungs stay `positive`, and neither has a third colour to
+ * compete with.
  */
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -79,7 +89,7 @@ export function LobbyHero({
   const { here } = run && rungs ? standingOn(rungs, run.wins) : { here: null };
 
   return (
-    <View style={[styles.band, { backgroundColor: c.surfaceSheet, borderBottomColor: c.border }]}>
+    <View style={[styles.band, { backgroundColor: c.backgroundElement, borderBottomColor: c.border }]}>
       {/* ONE LINE FOR WHO YOU ARE AND HOW YOU ARE DOING.
           The title anchors the left; the run's two numbers sit right, in the
           order they are felt — the rack first, because every stake below is
@@ -172,7 +182,7 @@ function Rung({
       <View
         style={[
           styles.rungBar,
-          { backgroundColor: reached || standing ? c.positive : c.backgroundElement },
+          { backgroundColor: reached || standing ? c.positive : c.borderStrong },
         ]}
       />
       <Text style={[Type.micro, NUMERIC, { color: standing ? c.positive : c.textTertiary }]}>
@@ -211,6 +221,11 @@ function wipeClause(run: Run): string {
 
 const styles = StyleSheet.create({
   band: {
+    /* FULL BLEED, by cancelling the scroller's own inset the way
+       `SheetToneBand` did — see its `band` style. Without this the plane stops
+       16pt short of each edge and reads as a card sitting on the sheet rather
+       than as the sheet's header, which is the whole job it was given back. */
+    marginHorizontal: -Spacing.three,
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.three,
     paddingBottom: Spacing.two + 2,
