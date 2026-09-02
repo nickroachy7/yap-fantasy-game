@@ -12,9 +12,23 @@
  * that says "these are different", which is the one thing they are not, and the
  * page ends up a stack of cards inside a sheet that is already a card.
  *
- * So a section is a RULE and a LABEL. It costs a hairline. The saving is real —
- * four blocks of Overview lost about a screen of height — and what is left on
+ * So a section is a RULE and a HEADING. It costs a hairline. The saving is real
+ * — four blocks of Overview lost about a screen of height — and what is left on
  * the page is the numbers, which is what a reader came for.
+ *
+ * THE HEADING IS 15pt AND WHITE, AND THAT INVERSION IS MOST OF THE POINT
+ *
+ * It was 9pt tertiary caps: the same size and colour as the least important
+ * text on the page, which meant one type level was doing the work of three and
+ * nothing caught the eye at scrolling speed. Nine of them in a column read as a
+ * wall whatever the content was. A profile is skimmed — find the part you came
+ * for, decide, leave — and skimming needs something to catch on.
+ *
+ * So the heading takes `Type.section`, the same 15pt the old `Panel` title had,
+ * and 9pt tertiary caps drops to being the SMALLEST level, for column heads and
+ * the hint. The hint keeps the caps because it is a qualifier on the heading
+ * rather than a heading of its own, and because a right-aligned grey line at
+ * that size is furniture the eye skips, which is exactly what it should be.
  *
  * FULL BLEED, BY CANCELLING THE FRAME'S GUTTER
  *
@@ -71,11 +85,11 @@ export function Section({
 
   return (
     <View
-      style={[styles.section, flush && styles.sectionFlush, { borderTopColor: c.border }]}>
+      style={[styles.section, flush && styles.sectionFlush, { borderTopColor: c.borderStrong }]}>
       {label || hint ? (
         <View style={[styles.head, flush && styles.headFlush]}>
           {label ? (
-            <Text numberOfLines={1} style={[Type.micro, styles.headLabel, { color: c.textTertiary }]}>
+            <Text numberOfLines={1} style={[Type.section, styles.headLabel, { color: c.text }]}>
               {label}
             </Text>
           ) : (
@@ -139,16 +153,59 @@ export function Figure({
   );
 }
 
+/**
+ * One fact, as a labelled pair.
+ *
+ * THE VALUE IS ON THE RIGHT EDGE, and that is the whole reason this exists.
+ * These blocks were sentences and left-aligned fragments, so the measure sat
+ * half empty and the eye had no column to run down — the page read as ragged
+ * text rather than as a set of answers. A grey label at the left and a value at
+ * the right gives skimming a line to follow, and it is the same shape the
+ * lineup row and the contest card already use.
+ *
+ * It also absorbs the prose. "Proven three only takes silver copies or better,
+ * and yours is not there yet" is three lines of body copy saying what `Sets ·
+ * Proven Three needs silver` says in one row; the long form still exists where
+ * a reader has asked for it, in the confirm dialog.
+ */
+export function Row({
+  label,
+  value,
+  /** For a value that is a state rather than a figure — quieter by a step. */
+  muted = false,
+}: {
+  label: string;
+  value: string;
+  muted?: boolean;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
+  return (
+    <View style={[styles.row, { borderTopColor: c.border }]}>
+      <Text numberOfLines={1} style={[Type.body, styles.rowLabel, { color: c.textTertiary }]}>
+        {label}
+      </Text>
+      <Text numberOfLines={2} style={[Type.strong, styles.rowValue, { color: muted ? c.textSecondary : c.text }]}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   stack: { marginHorizontal: -Spacing.three, marginTop: -Spacing.three },
   section: {
+    /* `borderStrong` rather than `border`: there are fewer sections now and
+       each is a heavier thing, so the rule between two of them is a division
+       rather than a ruled line in a table. */
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two + 4,
-    gap: Spacing.two + 1,
+    paddingVertical: Spacing.three - 2,
+    gap: Spacing.two + 2,
   },
   sectionFlush: { paddingHorizontal: 0 },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
+  head: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: Spacing.two },
   headFlush: { paddingHorizontal: Spacing.three },
   /* Only the label gives way. A hint truncated to "EXCLUDES BONU…" is noise;
      a section title truncated is the one word the block exists to name. */
@@ -157,4 +214,17 @@ const styles = StyleSheet.create({
   figure: { flex: 1, minWidth: 0, gap: 1 },
   figureValue: { fontSize: 17, lineHeight: 21, fontWeight: '700' },
   figureLead: { fontSize: 22, lineHeight: 26, fontWeight: '800', letterSpacing: -0.3 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
+    paddingVertical: Spacing.one + 2,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  rowLabel: { flexShrink: 0 },
+  /* The value is what gives way, because a truncated label leaves a row that
+     names nothing. It is also the side allowed to wrap: two lines of value
+     under a one-line label still reads as a pair. */
+  rowValue: { flexShrink: 1, textAlign: 'right' },
 });

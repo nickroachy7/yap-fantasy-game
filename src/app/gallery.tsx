@@ -1051,7 +1051,7 @@ function ProfileFixture() {
           reads across seasons can be looked at against real fixtures. */}
       <SectionStack>
         <Section
-          label={`LAST ${recentFormCount(MCCAFFREY_SECTIONS)} WEEKS`}
+          label={`Last ${recentFormCount(MCCAFFREY_SECTIONS)} weeks`}
           hint={recentFormHint(MCCAFFREY_SECTIONS)}>
           <RecentForm sections={MCCAFFREY_SECTIONS} />
         </Section>

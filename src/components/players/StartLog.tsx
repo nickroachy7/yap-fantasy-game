@@ -22,8 +22,7 @@
  */
 import { StyleSheet, Text, View } from 'react-native';
 
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Section } from './Section';
+import { Row } from './Section';
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { seasonTypeLabel, weekLabel } from './game-log';
@@ -61,60 +60,78 @@ export function StartLog({ starts, playerName }: { starts: CardStart[]; playerNa
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
+  /**
+   * A TABLE ONLY WHEN THERE IS SOMETHING IN IT.
+   *
+   * A copy started once in a week that has not swept produced a section
+   * heading, a season band, four column heads and one row of two dashes — most
+   * of a screen of furniture around a single fact, on the card where a new
+   * player spends their first minutes. Three states now, and only the last one
+   * is a table:
+   *
+   *   never started   one row, and the reason it matters
+   *   started, none scored yet   one row saying how many and that they have not
+   *   something scored   the table, which is now a receipt for real numbers
+   */
   if (starts.length === 0) {
     return (
-      <Section label="WEEKS STARTED">
-        <EmptyState
-          title="You have never started this card"
-          body={`It has earned nothing, and it will stay at bronze until you play it. Put ${playerName} in a lineup and every week he scores lands here.`}
-        />
-      </Section>
+      <Row
+        label="Started"
+        value={`Never — it earns nothing until you play ${playerName}`}
+        muted
+      />
+    );
+  }
+
+  const scored = starts.filter((s) => s.scored).length;
+
+  if (scored === 0) {
+    return (
+      <Row
+        label="Started"
+        value={`${starts.length} week${starts.length === 1 ? '' : 's'} · not scored yet`}
+        muted
+      />
     );
   }
 
   const sections = group(starts);
-  const pending = starts.filter((s) => !s.scored).length;
+  const pending = starts.length - scored;
 
   return (
-    <Section
-      label="WEEKS STARTED"
-      /* The sentence this replaces — "this is everything the card has earned
-         from" — is the same claim the standing section's hint makes, and the
-         table under it is self-evidently the receipt. */
-      hint={`${starts.length} START${starts.length === 1 ? '' : 'S'}`}
-      flush>
-      <View>
-        {sections.map((section) => (
-          <View key={section.key}>
-            <View style={[styles.sectionHead, { borderColor: c.border, backgroundColor: c.surfaceSunken }]}>
-              <Text style={[Type.strong, { color: c.text }]}>{section.label}</Text>
-              <Text style={[Type.body, NUMERIC, { color: c.textSecondary }]}>
-                {section.scored > 0
-                  ? `${section.total.toFixed(1)} FP · ${(section.total / section.scored).toFixed(1)} avg`
-                  : 'not scored yet'}
-              </Text>
-            </View>
-
-            <View style={[styles.row, styles.headRow, { borderColor: c.border }]}>
-              <Text style={[Type.micro, styles.wk, { color: c.textTertiary }]}>WK</Text>
-              <Text style={[Type.micro, styles.slot, { color: c.textTertiary }]}>SLOT</Text>
-              <Text style={[Type.micro, styles.share, { color: c.textTertiary }]}>OF LINEUP</Text>
-              <Text style={[Type.micro, styles.fp, { color: c.textTertiary }]}>FP</Text>
-            </View>
-
-            {section.starts.map((s) => (
-              <StartRow key={`${s.season}-${s.seasonType}-${s.week}-${s.slot}`} start={s} />
-            ))}
+    <View>
+      {sections.map((section) => (
+        <View key={section.key}>
+          <View style={styles.sectionHead}>
+            <Text style={[Type.strong, { color: c.text }]}>{section.label}</Text>
+            <Text style={[Type.body, NUMERIC, { color: c.textSecondary }]}>
+              {section.scored > 0
+                ? `${section.total.toFixed(1)} FP · ${(section.total / section.scored).toFixed(1)} avg`
+                : 'not scored yet'}
+            </Text>
           </View>
-        ))}
 
-        {pending > 0 ? (
-          <Text style={[Type.fine, styles.note, { color: c.textTertiary }]}>
-            {`${pending} start${pending === 1 ? '' : 's'} not yet scored. Those weeks show no figure rather than a nought — the sweep has not run on them.`}
-          </Text>
-        ) : null}
-      </View>
-    </Section>
+          <View style={[styles.row, styles.headRow, { borderColor: c.border }]}>
+            <Text style={[Type.micro, styles.wk, { color: c.textTertiary }]}>WK</Text>
+            <Text style={[Type.micro, styles.slot, { color: c.textTertiary }]}>SLOT</Text>
+            <Text style={[Type.micro, styles.share, { color: c.textTertiary }]}>OF LINEUP</Text>
+            <Text style={[Type.micro, styles.fp, { color: c.textTertiary }]}>FP</Text>
+          </View>
+
+          {section.starts.map((s) => (
+            <StartRow key={`${s.season}-${s.seasonType}-${s.week}-${s.slot}`} start={s} />
+          ))}
+        </View>
+      ))}
+
+      {/* The sweep's own caveat, and only on the card it is actually true of.
+          It used to print under every start log. */}
+      {pending > 0 ? (
+        <Text style={[Type.fine, styles.note, { color: c.textTertiary }]}>
+          {`${pending} start${pending === 1 ? '' : 's'} not yet scored — those weeks show no figure rather than a nought.`}
+        </Text>
+      ) : null}
+    </View>
   );
 }
 
@@ -155,21 +172,20 @@ function StartRow({ start }: { start: CardStart }) {
 }
 
 const styles = StyleSheet.create({
+  /* No fill and no full-bleed band any more: the zone above supplies the
+     heading, so this only has to separate one season from the next. */
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
     gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingBottom: Spacing.one + 2,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    height: 30,
-    paddingHorizontal: Spacing.three,
+    height: 28,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   headRow: { height: 22 },
@@ -179,5 +195,5 @@ const styles = StyleSheet.create({
   slot: { width: 52 },
   share: { flex: 1, textAlign: 'right' },
   fp: { width: 56, textAlign: 'right' },
-  note: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
+  note: { paddingTop: Spacing.two },
 });

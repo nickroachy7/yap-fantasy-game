@@ -39,7 +39,7 @@ import { GameLogTab } from '@/components/players/GameLogTab';
 import { OverviewTab } from '@/components/players/OverviewTab';
 import { HERO_PORTRAIT, PlayerHero, type HeroFigure } from '@/components/players/PlayerHero';
 import { PlayerSheetFrame, SheetToneBand } from '@/components/players/PlayerSheetFrame';
-import { Section, SectionStack } from '@/components/players/Section';
+import { Row, Section, SectionStack } from '@/components/players/Section';
 import { StartLog } from '@/components/players/StartLog';
 import { startKey } from '@/components/players/GameLog';
 import { parseCardProfile, type CardProfile } from '@/components/players/card-profile';
@@ -65,6 +65,12 @@ const TABS: Tab<ProfileTab>[] = [
   { value: 'card', label: 'Card' },
   { value: 'log', label: 'Game log' },
 ];
+
+/** "15 COPIES · 9 OWNERS", for the community zone's heading row. */
+function communityHint(market: { totals: { held: number; owners: number } }): string {
+  const { held, owners } = market.totals;
+  return `${held} ${held === 1 ? 'COPY' : 'COPIES'} · ${owners} ${owners === 1 ? 'OWNER' : 'OWNERS'}`;
+}
 
 /** "4 Aug 2026". Short and unambiguous — no locale-dependent 8/4 vs 4/8. */
 function dateLabel(iso: string | null): string {
@@ -277,7 +283,16 @@ export default function CardDetailScreen() {
     const toNext = k.nextTierAt === null ? null : Math.max(0, k.nextTierAt - k.careerFp);
     const figures: HeroFigure[] = [
       { label: 'THIS COPY', value: k.careerFp.toFixed(1), hint: 'FP' },
-      { label: 'STARTS', value: String(k.lineupStarts) },
+      /* SCORED, not STARTS — and the word is doing real work. `lineup_starts`
+         is computed by the sweep as `count(*) filter (where l.scored_at is not
+         null)`, so it counts weeks that have been SETTLED, while `StartLog`
+         directly below lists every week the copy was in a lineup. On a card
+         started once in a week that has not swept, `STARTS 0` sat a thumb's
+         width above `1 START` — two numbers for one word, both honest, and the
+         disagreement only became visible when this strip put them on the same
+         screen. `SCORED 0` over `1 START` reads correctly instead: you started
+         it once, nothing has scored yet. */
+      { label: 'SCORED', value: String(k.lineupStarts) },
       toNext === null || k.nextTierLabel === null
         ? { label: 'TIER', value: 'MAX' }
         : {
@@ -350,7 +365,7 @@ export default function CardDetailScreen() {
             {/* A sold copy still resolves — history has to keep working — so
                 say so plainly rather than 404ing an old link. */}
             {k.soldAt ? (
-              <Section label="SOLD">
+              <Section label="Sold">
                 <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
                   {`You sold this copy on ${dateLabel(k.soldAt)}${k.soldFor === null ? '' : ` for ${k.soldFor} coins`}. It still counts in the lineups it started, but you no longer hold it.`}
                 </Text>
@@ -359,7 +374,7 @@ export default function CardDetailScreen() {
               /* The other way a copy leaves, and it must not read as a sale.
                  This one went somewhere: the set is named, and it is still
                  there to look at. */
-              <Section label="IN A SET">
+              <Section label="In a set">
                 <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>
                   {`You added this copy to ${k.committedSetName ?? 'a set'} on ${dateLabel(k.committedAt)}${k.committedFor === null ? '' : ` for ${k.committedFor} coins`}. It is part of that set now — it still counts in the lineups it started, but it cannot be started or sold again.`}
                 </Text>
@@ -382,34 +397,59 @@ export default function CardDetailScreen() {
               </Section>
             ) : null}
 
-            <CardStanding card={k} />
-            <StartLog starts={card.starts} playerName={k.playerName} />
-
-            {exitNote ? (
-              <Section label="SETS">
-                <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>{exitNote}</Text>
-              </Section>
-            ) : null}
-
-            <Section label="ACQUIRED">
-              <Text style={[Type.body, { color: c.textSecondary }]}>
-                {`${k.season ?? '—'} card · ${k.rarity ?? 'unknown'}${k.source ? ` · from a ${k.source}` : ''} · ${dateLabel(k.acquiredAt)}`}
-              </Text>
+            {/**
+              * TWO ZONES, AND THAT IS THE WHOLE TAB.
+              *
+              * It was nine sections at one type weight, and on a card pulled an
+              * hour ago six of them said "nothing has happened yet" in six
+              * different sentences — a progress bar with nothing on it, a start
+              * table of one dashed row, a paragraph about the sweep, a
+              * paragraph about a set that will not take it, a community block
+              * of four counts all reading 1, and a paragraph about nobody
+              * having earned anything. That is not information overload, it is
+              * six apologies for having no information, each formatted as
+              * importantly as a real finding.
+              *
+              * The split is by SUBJECT, which is also the only division a
+              * reader is looking for: this object, and every other copy of him.
+              * Everything that was prose is a labelled pair with its value on
+              * the right edge — see `Row`.
+              */}
+            <Section
+              label="This copy"
+              hint={
+                toNext === null || k.nextTierLabel === null
+                  ? 'TOP TIER'
+                  : `${toNext.toFixed(0)} FP TO ${k.nextTierLabel.toUpperCase()}`
+              }>
+              <CardStanding card={k} />
+              <StartLog starts={card.starts} playerName={k.playerName} />
+              <Row
+                label="Acquired"
+                value={`${k.rarity ?? 'Unknown'}${k.source ? `, from a ${k.source}` : ''} · ${dateLabel(k.acquiredAt)}`}
+              />
+              {/* The bar's caveat, as a row rather than the paragraph it was.
+                  See `cardExitNote`. */}
+              {exitNote ? <Row label="Sets" value={exitNote} muted /> : null}
             </Section>
 
-            {/* The same community view the directory page shows, underneath the
-                copy it gives context to — and told WHICH copy, so its earnings
-                scale marks this one rather than the best of the several you may
-                hold. The rank comes from `card_profile` for the same reason:
-                one number, one source. */}
-            <CommunityPanel
-              market={page.market}
-              copy={{
-                careerFp: k.careerFp,
-                rank: card.rank.amongPlayer,
-                pool: card.rank.playerPool,
-              }}
-            />
+            <Section
+              /* The player's name, because "Across the community" named the
+                 room rather than the subject — and on a page about one copy the
+                 question this zone answers is "how does mine compare to the
+                 others". A long name truncates to one line rather than pushing
+                 the count off the row. */
+              label={`Every ${k.playerName}`}
+              hint={page.market ? communityHint(page.market) : undefined}>
+              <CommunityPanel
+                market={page.market}
+                copy={{
+                  careerFp: k.careerFp,
+                  rank: card.rank.amongPlayer,
+                  pool: card.rank.playerPool,
+                }}
+              />
+            </Section>
           </SectionStack>
         ) : null}
 

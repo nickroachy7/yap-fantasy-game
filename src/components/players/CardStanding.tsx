@@ -32,7 +32,6 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useTierTheme } from '@/components/cards/use-tier-theme';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Section } from './Section';
 import { tierProgress, type CardIdentity } from './card-profile';
 
 export function CardStanding({ card }: { card: CardIdentity }) {
@@ -44,7 +43,7 @@ export function CardStanding({ card }: { card: CardIdentity }) {
   const toNext = card.nextTierAt === null ? null : Math.max(0, card.nextTierAt - card.careerFp);
 
   return (
-    <Section>
+    <>
       {progress === null || toNext === null || card.nextTierLabel === null ? (
         <Text style={[Type.body, { color: c.textSecondary }]}>
           This copy is at the top tier. There is nothing above diamond.
@@ -64,7 +63,7 @@ export function CardStanding({ card }: { card: CardIdentity }) {
           </View>
         </>
       )}
-    </Section>
+    </>
   );
 }
 
