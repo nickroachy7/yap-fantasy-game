@@ -41,7 +41,11 @@ function BenchBoardImpl({
   targetSlotFor: (card: LineupCard) => string | null;
   /** Whether any slot at all accepts him — a taken slot still counts. */
   startableFor: (card: LineupCard) => boolean;
-  /** Which cards have kicked off, by id. See the note on SlotBoard. */
+  /**
+   * Which cards cannot be brought in, by id — kicked off, or already playing
+   * in one of your other contests this week. See the note on SlotBoard, and
+   * `unavailableIds` in `LineupEditor` for the two reasons.
+   */
   lockedIds: Set<string>;
   /** The badge opens the swap sheet for this card. */
   onOpen: (card: LineupCard) => void;
@@ -73,6 +77,16 @@ function BenchBoardImpl({
             card={card}
             destination={targetSlotFor(card)}
             disabled={cardLocked || !startableFor(card)}
+            /* AND IT LOOKS UNAVAILABLE, which it did not before. The swap sheet
+               greys these exact cards and says why — a kickoff, or a lineup you
+               already put them in — but the bench they came from drew them at
+               full weight, so the only way to learn that four of your sixteen
+               bench players are spoken for was to open a picker per slot and
+               read the dimmed half of each list.
+               NOT `startableFor`, deliberately. A card no slot accepts is a
+               fact about the FORMAT, not about the card's week, and greying a
+               kicker on a board with no K slot would say the wrong thing. */
+            dimmed={cardLocked}
             onSwap={!cardLocked && startableFor(card) ? () => onOpen(card) : undefined}
             /* Every owned card has an instance id, which is all the card
                profile needs — the old guard was on `playerId`, required only

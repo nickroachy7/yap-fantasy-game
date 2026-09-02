@@ -1142,7 +1142,7 @@ function Kit() {
 
           <Section
             title="Lineup rows"
-            note="Starters then bench, one row component, no frame. The BADGE opens the swap — BN marks a bench card — and the rest of the row opens the player. Bye, injury and empty slot are all here.">
+            note="Starters then bench, one row component, no frame. The BADGE opens the swap — BN marks a bench card — and the rest of the row opens the player. Bye, injury and empty slot are all here. The second bench row is DIMMED: that card is spoken for this week — kicked off, or already playing in one of your other contests — and the board now says so at full size, the way the swap sheet always has. Before this the fact only existed inside a picker, so the only way to find the four cards you could not use was to open eight of them.">
             {STARTERS.map((s) => (
               <StarterRow
                 key={s.slot}
@@ -1165,7 +1165,12 @@ function Kit() {
                 // The third has nowhere free to go, which is the state that
                 // used to render as a dead tap.
                 destination={i === 0 ? 'RB2' : i === 1 ? 'FLEX' : null}
-                onSwap={() => {}}
+                // The second is unavailable, not merely unswappable: dimming
+                // is a fact about the CARD's week, so the whole row recedes.
+                // The profile still opens — it always does.
+                disabled={i === 1}
+                dimmed={i === 1}
+                onSwap={i === 1 ? undefined : () => {}}
                 onOpenProfile={() => {}}
               />
             ))}

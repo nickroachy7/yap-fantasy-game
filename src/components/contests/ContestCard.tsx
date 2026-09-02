@@ -963,16 +963,22 @@ function Mark({ token, side }: { token: Token; side: 'risk' | 'win' }) {
      draws its marks through `Icon` while the rest of the app draws coins with
      `Coin` — the masthead's own disc. Two different pictures of one currency,
      on the two screens a player checks their balance against. */
-  /* GOLD ON THE WIN SIDE, and it is the masthead's own gold — `TierColors.gold
+  /* GOLD ON BOTH SIDES, and it is the masthead's own gold — `TierColors.gold
      .accent`, the colour the coin balance is drawn in at the top of every
      screen. A coin you are being offered should be the same coin you count in
      your wallet, and `positive` teal made the prize read as a status rather
      than as money.
-     The RISK side keeps `textSecondary`, deliberately: what you pay is stated
-     quietly and what you win is not, which is the same ranking the heart
-     already follows on this row. */
+     THE RISK SIDE USED TO KEEP `textSecondary`, on the argument that what you
+     pay should be stated more quietly than what you win. That is a sound
+     ranking and this was the wrong thing to spend it on: it made the currency
+     itself change colour halfway across one row, so a grey disc and a gold disc
+     sat eight characters apart both meaning "coin". A reader has to learn the
+     glyph before the hierarchy is worth anything, and two of them teaches it
+     twice. The RANKING SURVIVES ELSEWHERE — the heart is still `negative` on
+     the risk side and `positive` on the win side, and the label above says RISK
+     — so nothing is lost by letting one currency have one colour. */
   if (token.kind === 'coin') {
-    return <Coin size={11} color={side === 'win' ? TierColors[scheme].gold.accent : tint} />;
+    return <Coin size={11} color={TierColors[scheme].gold.accent} />;
   }
   if (token.kind === 'pack') return <Icon glyph={packStandard} color={tint} size={11} focused />;
   return null;

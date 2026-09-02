@@ -407,9 +407,19 @@ export function BenchRow({
   destination,
   selected,
   disabled,
+  dimmed,
   onSwap,
   onOpenProfile,
-}: LineupRowProps & { card: LineupCard; destination: string | null }) {
+}: LineupRowProps & {
+  card: LineupCard;
+  destination: string | null;
+  /**
+   * Present, readable, and plainly not choosable — the same mark the swap
+   * sheet puts on a card it lists but will not let you pick. See `dimmed` on
+   * `Row` for why the bench needed it when `disabled` alone was not enough.
+   */
+  dimmed?: boolean;
+}) {
   /* Same rule as a starter's, deliberately. The two figures come from different
      places — a slot's credit against a player's own line — but "has this number
      happened yet" is a question about the fixture, and answering it two ways in
@@ -427,6 +437,7 @@ export function BenchRow({
       right={<WeekFigure points={week} status={card.game?.status ?? null} />}
       selected={selected}
       disabled={disabled}
+      dimmed={dimmed}
       onSwap={onSwap}
       onOpenProfile={onOpenProfile}
       swapLabel={
@@ -465,6 +476,7 @@ function Row({
   emptySecondary,
   selected,
   disabled,
+  dimmed,
   onSwap,
   onOpenProfile,
   accessibilityLabel,
@@ -478,6 +490,20 @@ function Row({
   emptySecondary?: string;
   selected?: boolean;
   disabled?: boolean;
+  /**
+   * NOT THE SAME CLAIM AS `disabled`, which is why it is a second prop.
+   *
+   * `disabled` says the BADGE does nothing — the row keeps its full weight,
+   * because the player is still worth reading and his profile still opens.
+   * `dimmed` says the CARD is unavailable this week, which is a fact about the
+   * card and not about one control on it, so the whole row recedes.
+   *
+   * The swap sheet has drawn exactly this all along (see `PlayerBand`): a card
+   * that has kicked off, or is already playing in another contest, is listed
+   * rather than withheld and greyed rather than hidden. The bench was the one
+   * place that fact stayed invisible until you opened a picker to go find it.
+   */
+  dimmed?: boolean;
   onSwap?: () => void;
   onOpenProfile?: () => void;
   accessibilityLabel: string;
@@ -500,7 +526,10 @@ function Row({
         { backgroundColor: selected ? c.backgroundSelected : c.background },
         pressed && { backgroundColor: c.backgroundElement },
       ]}>
-      <View style={styles.content}>
+      {/* THE CONTENT DIMS, NOT THE ROW. The rule below is drawn as a child, and
+          fading it along with everything else would break the rhythm of the
+          list at exactly the rows the eye is trying to skim past. */}
+      <View style={[styles.content, dimmed && styles.dimmed]}>
         <View style={styles.badgeCol}>
           {canSwap ? (
             <Pressable

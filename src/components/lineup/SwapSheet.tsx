@@ -49,17 +49,42 @@
  * moment you were comparing them. One figure survives the loss of the columns,
  * and it follows the sort — see `figureFor`.
  *
+ * AND IT IS DISMISSED THE WAY IT LOOKS DISMISSED
+ *
+ * The bottom sheet used to carry a grabber that did nothing and a full-width
+ * Close row pinned under the options. Those two facts were the same mistake
+ * seen twice: the mark that means "pull me down" failed silently, so the only
+ * working exit was a permanent 44pt band of chrome spent on an action every
+ * other sheet in this app gets from a gesture. The grabber now pulls and the
+ * row is gone. What is left to close it: the pull, the backdrop, Escape on
+ * web, and Android's back button.
+ *
+ * ON AN IPHONE THE PULL IS UIKIT'S, not ours, and so is the corner — this is a
+ * `pageSheet` there, the same presentation the contest lobby and both profile
+ * sheets use. `nativeSheet` has the whole reason, including why the hand-rolled
+ * version could not have worked.
+ *
  * The Modal-with-sibling-backdrop construction is the same as `DropdownChip`
  * and `ConfirmDialog` — a Pressable WRAPPING the sheet renders a <button>
  * containing <button>s on web, which React rejects at runtime.
  */
-import { useEffect } from 'react';
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Animated,
+  Modal,
+  PanResponder,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DASH } from '@/components/ui/DataTable';
 import { PositionBadge, positionsForSlot, slotBadgeLabel } from '@/components/ui/PositionBadge';
-import { Colors, Spacing, Type } from '@/constants/theme';
+import { Colors, SheetCorner, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import { BADGE_SIZE, BADGE_WIDTH, PlayerBand, WeekFigure } from './LineupRow';
@@ -140,6 +165,117 @@ export function SwapSheet({
     return () => window.removeEventListener('keydown', onKey);
   }, [request, onClose]);
 
+  /**
+   * ON A PHONE THIS IS UIKIT'S PAGE SHEET, NOT A VIEW WE DRAW.
+   *
+   * The first attempt at fixing the dead grabber hand-rolled a `PanResponder`
+   * drag here, the way `PlayerSheetFrame` does for web. It could not work, and
+   * the reason is in React Native's own iOS code rather than in anything on
+   * this side of the bridge:
+   *
+   *   `presentationConfiguration()` in `RCTModalHostViewComponentView.mm`
+   *   returns `UIModalPresentationOverFullScreen` the moment `transparent` is
+   *   true, and never looks at `presentationStyle` at all. `overFullScreen`
+   *   has no interactive dismissal in UIKit, and it has no sheet corner
+   *   either — so a transparent Modal cannot be pulled down, and every rounded
+   *   edge on it is one we painted ourselves at whatever radius we guessed.
+   *
+   * That is the whole bug, and it is also why the corner never quite matched
+   * the contest lobby: the lobby is a ROUTE presented `modal` (see the
+   * `sheetOptions` note in `app/(app)/_layout.tsx`), which is a real page
+   * sheet, so iOS draws its corner and owns its drag. Guessing a radius was
+   * always going to be a near-miss against a number the system picks.
+   *
+   * So this stops guessing. On an iPhone the Modal is opaque and `pageSheet`,
+   * which is the same presentation the lobby, the profiles and the set
+   * checklist all use — the corner is iOS's, the drag is iOS's, and
+   * `allowSwipeDismissal` routes the pull back through `onRequestClose`, which
+   * is already wired to `onClose`.
+   *
+   * WE STILL DRAW THE GRABBER. `sheetGrabberVisible` is ignored on anything but
+   * `formSheet`, which this app deliberately moved off — `PlayerSheetFrame`
+   * documents that and draws its own bar for the same reason. One bar, one
+   * meaning, on both sheets.
+   *
+   * WEB AND ANDROID KEEP THE SHEET WE DRAW, because neither has a page sheet to
+   * ask for: `presentationStyle` is iOS-only, and on web the Modal is a div.
+   * There the `PanResponder` below is the gesture, exactly as it is on
+   * `PlayerSheetFrame`'s web sheet.
+   */
+  const nativeSheet = Platform.OS === 'ios' && !wide;
+  const canDrag = !wide && !nativeSheet;
+  const [dragY] = useState(() => new Animated.Value(0));
+  const [sheetHeight, setSheetHeight] = useState(0);
+
+  /**
+   * The Modal STAYS MOUNTED between opens — `visible` is derived from
+   * `request`, and the whole component is rendered by the screen once. So the
+   * offset a dismissing drag left behind is still there the next time, and
+   * without this the second swap sheet would slide up already pulled halfway
+   * down. `PlayerSheetFrame` never had to think about it: it is a route, and it
+   * unmounts.
+   */
+  useEffect(() => {
+    if (request !== null) dragY.setValue(0);
+  }, [request, dragY]);
+
+  /**
+   * Where the sheet goes when the finger leaves it.
+   *
+   * Idempotent by construction: it only ever starts one of two animations to a
+   * fixed target, so being called twice — which the three hooks below make
+   * possible — costs a redundant animation to the place it is already going.
+   */
+  const settle = useMemo(
+    () => (dy: number, vy: number) => {
+      /* Distance OR speed. A short flick is as clear an instruction as a long
+         pull, and requiring the distance makes a fast one feel ignored. */
+      if (dy > DISMISS_AFTER || vy > FLICK_VELOCITY) {
+        Animated.timing(dragY, {
+          /* Off the bottom of its own height, so the sheet is GONE rather than
+             merely low when the Modal's own slide-out takes over. Falls back to
+             a generous constant if the layout has not reported a height yet. */
+          toValue: sheetHeight || 900,
+          duration: 160,
+          useNativeDriver: false,
+        }).start(onClose);
+        return;
+      }
+      Animated.spring(dragY, {
+        toValue: 0,
+        useNativeDriver: false,
+        bounciness: 0,
+        speed: 18,
+      }).start();
+    },
+    [dragY, sheetHeight, onClose],
+  );
+
+  const drag = useMemo(
+    () =>
+      PanResponder.create({
+        /* Claimed on MOVE, not on grant, and only downward: a tap on the
+           grabber should still be a tap, and an upward drag belongs to nobody
+           here. The axis test stops a horizontal swipe stealing the sheet. */
+        onMoveShouldSetPanResponder: (_e, g) => g.dy > 4 && Math.abs(g.dy) > Math.abs(g.dx),
+        onPanResponderMove: (_e, g) => {
+          /* Downward only. Following a negative dy would lift the sheet off the
+             bottom edge it is anchored to and show the page under it. */
+          if (g.dy > 0) dragY.setValue(g.dy);
+        },
+        /**
+         * ONE SETTLE, ON EVERY WAY THE GESTURE CAN END. A responder that ends
+         * without settling leaves the sheet parked halfway down the screen with
+         * the board behind it — the single worst state this can be in, and with
+         * the bottom Close gone there is nothing left to recover it with.
+         */
+        onPanResponderEnd: (_e, g) => settle(g.dy, g.vy),
+        onPanResponderRelease: (_e, g) => settle(g.dy, g.vy),
+        onPanResponderTerminate: () => settle(0, 0),
+      }),
+    [dragY, settle],
+  );
+
   const title =
     request === null
       ? ''
@@ -147,112 +283,144 @@ export function SwapSheet({
         ? `Start at ${request.slot}`
         : `Move ${request.card.name}`;
 
+  /**
+   * The top of the sheet: grabber, title, count.
+   *
+   * ON WEB AND ANDROID IT IS ALSO THE DRAG TARGET. The bar alone is 36pt of a
+   * gesture that has to be findable with a thumb, and `PlayerSheetFrame` solves
+   * that with a 48pt transparent strip floated over its content. Here the whole
+   * top of the sheet is already inert — a centred title and a count, nothing
+   * pressable on a phone — so the responder can just own it, which gives a
+   * target about 70pt tall without a single absolute position. The ✕ inside it
+   * is wide-only, and `canDrag` is false there, so the button and the responder
+   * are never on screen together.
+   *
+   * On the iOS page sheet `canDrag` is false and this is just the header: the
+   * pull belongs to UIKit, and a responder competing with it would be a worse
+   * copy of a gesture the device already does perfectly.
+   */
+  const chrome = (
+    <View style={canDrag ? styles.dragZone : undefined} {...(canDrag ? drag.panHandlers : null)}>
+      {/* Same weight as the profile sheets' grabber — one bar, one colour, and
+          `borderStrong` was too faint to find. Drawn by us even on the page
+          sheet: `sheetGrabberVisible` is ignored on anything but `formSheet`.
+          See `PlayerSheetFrame`, whose geometry this matches exactly. */}
+      {wide ? null : <View style={[styles.handle, { backgroundColor: c.textTertiary }]} />}
+
+      {request === null ? null : (
+        /* Centred, and without a badge or a ✕ on a phone. The badge said the
+           same thing as the badge on the subject row two lines below it. What
+           is left is the one sentence the sheet is about. */
+        <View style={styles.header}>
+          <Text numberOfLines={1} style={[Type.section, styles.title, { color: c.text }]}>
+            {title}
+          </Text>
+          <Text numberOfLines={1} style={[Type.fine, styles.title, { color: c.textTertiary }]}>
+            {request.kind === 'slot'
+              ? countLabel(request)
+              : `${request.card.team ?? DASH} · ${matchupLabel(request.card.game)}`}
+          </Text>
+          {/* A dialog has no drag to dismiss it, so it keeps a button. */}
+          {wide ? (
+            <Pressable
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              hitSlop={10}
+              style={({ pressed }) => [
+                styles.close,
+                { borderColor: c.border },
+                pressed && styles.pressed,
+              ]}>
+              <Text style={[Type.strong, { color: c.textSecondary }]}>✕</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      )}
+    </View>
+  );
+
+  const scroller =
+    request === null ? null : (
+      <ScrollView
+        style={styles.scroll}
+        /* THE SAFE AREA MOVED HERE when the Close row went. It was the footer's
+           `paddingBottom`, and dropping the footer without it would have put the
+           last option under the home indicator. */
+        contentContainerStyle={[
+          styles.scrollBody,
+          wide ? null : { paddingBottom: Spacing.two + (bottom || Spacing.two) },
+        ]}
+        showsVerticalScrollIndicator={false}>
+        {request.kind === 'slot' ? (
+          <SlotBody
+            request={request}
+            wide={wide}
+            sort={sort}
+            onSort={onSort}
+            onPick={onPick}
+            onClear={onClear}
+          />
+        ) : (
+          <BenchBody request={request} wide={wide} onPick={onPick} />
+        )}
+      </ScrollView>
+    );
+
   return (
     <Modal
       visible={request !== null}
-      transparent
+      /* OPAQUE ON THE PAGE SHEET, and it is not a style choice: `transparent`
+         is what forces `overFullScreen` in RN's iOS code, taking the corner and
+         the drag with it. See `nativeSheet`. */
+      transparent={!nativeSheet}
+      presentationStyle={nativeSheet ? 'pageSheet' : undefined}
+      /* UIKit's own pull-down. It reports through `onRequestClose`, which RN
+         requires alongside this prop precisely so the two cannot disagree about
+         whether the sheet is open. */
+      allowSwipeDismissal={nativeSheet || undefined}
       // Slide on a phone because the sheet comes from the edge it is anchored
       // to; fade on a dialog, which has no edge to come from.
       animationType={wide ? 'fade' : 'slide'}
       onRequestClose={onClose}>
-      <View style={[styles.backdrop, wide ? styles.backdropCentre : styles.backdropBottom]}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-          onPress={onClose}
-        />
-        <View
-          style={[
-            styles.sheet,
-            wide ? styles.dialog : styles.bottomSheet,
-            /* `surfaceSheet`, the same layer both profile sheets and the set
-               checklist sit on. This was `surface` — a panel's fill, one step
-               too high — while the profile sheet was `background`, one step too
-               low, so the app's two sheets disagreed about what a sheet is
-               made of. One token now, and neither can drift. */
-            { backgroundColor: c.surfaceSheet, borderColor: c.borderStrong },
-          ]}>
-          {/* The grab handle is decoration — this sheet is not draggable — but
-              it is the standard mark for "this came from the bottom and goes
-              back there", and its absence made the panel read as a page. */}
-          {/* Same weight as the profile sheets' grabber — one bar, one colour,
-              and `borderStrong` was too faint to find. See `PlayerSheetFrame`. */}
-          {wide ? null : <View style={[styles.handle, { backgroundColor: c.textTertiary }]} />}
-
-          {request === null ? null : (
-            <>
-              {/* Centred, and without a badge or a ✕ on a phone.
-                  The badge said the same thing as the badge on the subject row
-                  two lines below it, and the ✕ duplicated the Close button at
-                  the bottom — where a thumb already is. What is left is the one
-                  sentence the sheet is about. */}
-              <View style={styles.header}>
-                <Text numberOfLines={1} style={[Type.section, styles.title, { color: c.text }]}>
-                  {title}
-                </Text>
-                <Text numberOfLines={1} style={[Type.fine, styles.title, { color: c.textTertiary }]}>
-                  {request.kind === 'slot'
-                    ? countLabel(request)
-                    : `${request.card.team ?? DASH} · ${matchupLabel(request.card.game)}`}
-                </Text>
-                {/* A dialog has no drag and no bottom Close, so it keeps one. */}
-                {wide ? (
-                  <Pressable
-                    onPress={onClose}
-                    accessibilityRole="button"
-                    accessibilityLabel="Close"
-                    hitSlop={10}
-                    style={({ pressed }) => [
-                      styles.close,
-                      { borderColor: c.border },
-                      pressed && styles.pressed,
-                    ]}>
-                    <Text style={[Type.strong, { color: c.textSecondary }]}>✕</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-
-              <ScrollView
-                style={styles.scroll}
-                contentContainerStyle={styles.scrollBody}
-                showsVerticalScrollIndicator={false}>
-                {request.kind === 'slot' ? (
-                  <SlotBody
-                    request={request}
-                    wide={wide}
-                    sort={sort}
-                    onSort={onSort}
-                    onPick={onPick}
-                    onClear={onClear}
-                  />
-                ) : (
-                  <BenchBody request={request} wide={wide} onPick={onPick} />
-                )}
-              </ScrollView>
-            </>
-          )}
-
-          {/* A bottom sheet's own dismiss control belongs at the bottom, under
-              the thumb. The dialog has the ✕ and the Escape key and does not
-              need a second one taking up a row. */}
-          {wide ? null : (
-            <View style={[styles.footer, { borderColor: c.border, paddingBottom: bottom || Spacing.two }]}>
-              <Pressable
-                onPress={onClose}
-                accessibilityRole="button"
-                accessibilityLabel="Close without changing anything"
-                style={({ pressed }) => [
-                  styles.footerButton,
-                  { backgroundColor: c.backgroundElement },
-                  pressed && styles.pressed,
-                ]}>
-                <Text style={[Type.strong, { color: c.text }]}>Close</Text>
-              </Pressable>
-            </View>
-          )}
+      {nativeSheet ? (
+        /* THE PAGE SHEET. No backdrop — UIKit dims and scales the app behind
+           it — and no corner, no border and no height cap, because those are
+           the presentation's now and anything we drew would be a second sheet
+           inside the real one. What is left is the surface, which we DO have to
+           paint: a page sheet separates itself from what it covers by dimming
+           it, and this app's page is #000, so there is nothing to dim. Same
+           reasoning, same token, as `PlayerSheetFrame`. */
+        <View style={[styles.pageSheet, { backgroundColor: c.surfaceSheet }]}>
+          {chrome}
+          {scroller}
         </View>
-      </View>
+      ) : (
+        <View style={[styles.backdrop, wide ? styles.backdropCentre : styles.backdropBottom]}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            onPress={onClose}
+          />
+          <Animated.View
+            onLayout={(e) => setSheetHeight(e.nativeEvent.layout.height)}
+            style={[
+              styles.sheet,
+              wide ? styles.dialog : styles.bottomSheet,
+              /* `surfaceSheet`, the same layer both profile sheets and the set
+                 checklist sit on. This was `surface` — a panel's fill, one step
+                 too high — while the profile sheet was `background`, one step
+                 too low, so the app's two sheets disagreed about what a sheet
+                 is made of. One token now, and neither can drift. */
+              { backgroundColor: c.surfaceSheet, borderColor: c.borderStrong },
+              canDrag && { transform: [{ translateY: dragY }] },
+            ]}>
+            {chrome}
+            {scroller}
+          </Animated.View>
+        </View>
+      )}
     </Modal>
   );
 }
@@ -585,28 +753,60 @@ function Divider({ children }: { children: string }) {
   );
 }
 
+/**
+ * How far the sheet has to be pulled before letting go dismisses it, and how
+ * fast a flick has to be to count instead. Both are `PlayerSheetFrame`'s
+ * numbers verbatim — one pull, one meaning, on every sheet in the app.
+ */
+const DISMISS_AFTER = 110;
+const FLICK_VELOCITY = 0.7;
+
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
   backdropBottom: { justifyContent: 'flex-end' },
   backdropCentre: { alignItems: 'center', justifyContent: 'center', padding: Spacing.four },
+  /* The iOS page sheet's content. No corner, no border, no height cap — the
+     presentation owns all three. `flex: 1` because the sheet IS the frame here,
+     so the scroller has to be able to fill it. */
+  pageSheet: { flex: 1 },
   sheet: { borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   /* Tall enough to be the screen while leaving the board visible above it —
      the whole reason this is a sheet and not a route. */
+  /* `SheetCorner`, not a number of its own. This was 18 against the profile
+     sheet's 20 — close enough that neither looked wrong alone and far enough
+     that the two never quite agreed, on two sheets a reader opens within
+     seconds of each other. One token, and they cannot drift again. */
   bottomSheet: {
     width: '100%',
     maxHeight: '88%',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    borderTopLeftRadius: SheetCorner,
+    borderTopRightRadius: SheetCorner,
     borderBottomWidth: 0,
   },
-  dialog: { width: '100%', maxWidth: 620, maxHeight: '84%', borderRadius: 16 },
+  dialog: { width: '100%', maxWidth: 620, maxHeight: '84%', borderRadius: SheetCorner },
+  /* 36x5 and 5pt down: UIKit's own grabber, which is what `PlayerSheetFrame`
+     draws. This was 38x4, near enough to read as a mistake beside it. */
   handle: {
-    width: 38,
-    height: 4,
-    borderRadius: 2,
+    width: 36,
+    height: 5,
+    borderRadius: 2.5,
     alignSelf: 'center',
-    marginTop: Spacing.one + 2,
+    marginTop: 5,
   },
+  /**
+   * The block the pull gesture owns: grabber, title, count.
+   *
+   * `touchAction: 'none'` IS THE GESTURE ON WEB. Without it there is no drag at
+   * all on a real phone browser, and the reason is invisible from the JS side:
+   * the browser decides who owns a vertical touch BEFORE any handler runs, the
+   * default owner is the scroller, and PanResponder is simply never granted.
+   * Nothing errors. It is scoped to this block precisely so the list below
+   * keeps native scrolling. See the longer note in `PlayerSheetFrame`.
+   */
+  dragZone: Platform.select({
+    web: { touchAction: 'none' as const, userSelect: 'none' as const, cursor: 'pointer' as const },
+    default: {},
+  }),
   header: {
     alignItems: 'center',
     gap: 2,
@@ -631,6 +831,7 @@ const styles = StyleSheet.create({
   /* `flexShrink` rather than `flex: 1`: a two-option sheet should be two
      options tall, not 88% of the screen with white space under it. */
   scroll: { flexShrink: 1 },
+  /* The narrow sheet overrides this with the safe area — see the use. */
   scrollBody: { paddingBottom: Spacing.two },
   section: { gap: Spacing.one },
   divider: {
@@ -666,16 +867,5 @@ const styles = StyleSheet.create({
   },
   clearLines: { flex: 1, minWidth: 0, gap: 2 },
   empty: { padding: Spacing.three },
-  footer: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: Spacing.three,
-    paddingTop: Spacing.two,
-  },
-  footerButton: {
-    height: 44,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   pressed: { opacity: 0.7 },
 });
