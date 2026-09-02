@@ -24,6 +24,7 @@
 import { useCallback, useState } from 'react';
 
 import { useLoader, type Load } from '@/hooks/use-loader';
+import { sessionCache } from '@/lib/session-cache';
 import { supabase } from '@/lib/supabase';
 
 import type { Result } from '@/components/lineup/field';
@@ -74,8 +75,52 @@ type Row = {
 const num = (v: number | string | null | undefined): number | null =>
   v === null || v === undefined ? null : Number(v);
 
+/**
+ * THE FIELD, HELD BETWEEN VISITS.
+ *
+ * Unlike the slot shapes this is live: entrants arrive, lineups fill, scores
+ * move on a Sunday. So it is cached to be SHOWN and never to be trusted — the
+ * hook seeds from memory, then invalidates and re-reads on every mount, which
+ * is what `useLoader` was already doing. What changes is only what the reader
+ * looks at while that runs: the field as it was a moment ago, not a hole.
+ *
+ * Keyed by contest, so opening a second contest does not show the first one's
+ * entrants for a frame.
+ */
+const fieldCache = sessionCache<string, FieldEntrant[]>(async (contestId) => {
+  const { data, error } = await supabase.rpc('contest_field', { p_contest: contestId });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Row[]).map((r) => ({
+    userId: r.user_id,
+    displayName: r.display_name,
+    avatarKey: r.avatar_key,
+    lineupId: r.lineup_id,
+    filled: Number(r.filled ?? 0),
+    points: num(r.points) ?? 0,
+    rank: Number(r.rnk ?? 0),
+    result: (r.result as Result) ?? null,
+    prize: num(r.prize),
+    isMe: Boolean(r.is_me),
+    locked: Boolean(r.locked),
+  }));
+});
+
+/**
+ * Forget every contest's field. The rows carry `is_me` and the reader's own
+ * entry, so they are this account's view and must not outlive the account.
+ * See `forgetUserData`.
+ */
+export function invalidateContestFields(): void {
+  fieldCache.invalidate();
+}
+
 export function useContestField(contestId: string | null) {
-  const [entrants, setEntrants] = useState<FieldEntrant[] | null>(null);
+  /* Seeded from memory so a revisit draws the field it already knows on the
+     first paint. Null on a contest never opened, which is what the panel's
+     skeleton is for. */
+  const [entrants, setEntrants] = useState<FieldEntrant[] | null>(() =>
+    contestId ? (fieldCache.peek(contestId) ?? null) : null,
+  );
 
   const load = useCallback<Load>(
     async (live) => {
@@ -83,25 +128,24 @@ export function useContestField(contestId: string | null) {
         setEntrants(null);
         return null;
       }
-      const { data, error } = await supabase.rpc('contest_field', { p_contest: contestId });
-      if (!live()) return null;
-      if (error) return error.message;
-
-      setEntrants(
-        ((data ?? []) as Row[]).map((r) => ({
-          userId: r.user_id,
-          displayName: r.display_name,
-          avatarKey: r.avatar_key,
-          lineupId: r.lineup_id,
-          filled: Number(r.filled ?? 0),
-          points: num(r.points) ?? 0,
-          rank: Number(r.rnk ?? 0),
-          result: (r.result as Result) ?? null,
-          prize: num(r.prize),
-          isMe: Boolean(r.is_me),
-          locked: Boolean(r.locked),
-        })),
-      );
+      /* INVALIDATED BEFORE EVERY READ, which is the whole trick and is easy to
+         get wrong. `sessionCache.read` does not re-fetch after a success — it
+         holds the resolved promise until something invalidates the key, which
+         is right for immutable config and would freeze a live field: entrants
+         arrive, lineups fill, scores move on a Sunday, and this would go on
+         answering with the first version it ever saw.
+         Clearing the key first forces the network every time. What survives is
+         the copy already in component state, seeded from `peek` above, so the
+         reader looks at the field as it was a moment ago instead of a hole. */
+      fieldCache.invalidate(contestId);
+      try {
+        const rows = await fieldCache.read(contestId);
+        if (!live()) return null;
+        setEntrants(rows);
+      } catch (err) {
+        if (!live()) return null;
+        return err instanceof Error ? err.message : 'Could not load the field.';
+      }
       return null;
     },
     [contestId],

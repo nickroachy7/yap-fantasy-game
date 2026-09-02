@@ -6,11 +6,13 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
 import { Platform } from 'react-native';
 
+import { forgetUserData } from '@/lib/forget-user-data';
 import { supabase } from '@/lib/supabase';
 
 type AuthState = {
@@ -42,16 +44,43 @@ function tokensFromUrl(url: string): { access_token: string; refresh_token: stri
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [initialising, setInitialising] = useState(true);
+
+  /**
+   * WHO THE CACHES ARE HOLDING DATA FOR.
+   *
+   * The in-memory caches outlive a session — they are module state, so signing
+   * out does not touch them. Signing in as somebody else would then be served
+   * the previous account's collection, sets and contest fields from memory.
+   * See `forgetUserData`.
+   *
+   * KEYED ON THE USER CHANGING, NOT ON THE EVENT. `onAuthStateChange` also
+   * fires for `TOKEN_REFRESHED` and `USER_UPDATED`, which are the same person
+   * and happen while they are using the app — clearing on every event would
+   * throw the caches away on a routine refresh and undo the point of having
+   * them. Comparing ids covers sign-out, sign-in, and the switch between two
+   * accounts in one gesture, which no single event name does.
+   *
+   * A ref rather than state: this is a comparison made inside a subscription,
+   * and re-rendering because it changed would be a render for nobody.
+   */
+  const heldFor = useRef<string | null>(null);
+
   useEffect(() => {
     let active = true;
 
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
+      heldFor.current = data.session?.user.id ?? null;
       setSession(data.session);
       setInitialising(false);
     });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((_event, next) => {
+      const nextUser = next?.user.id ?? null;
+      if (nextUser !== heldFor.current) {
+        heldFor.current = nextUser;
+        forgetUserData();
+      }
       setSession(next);
     });
 

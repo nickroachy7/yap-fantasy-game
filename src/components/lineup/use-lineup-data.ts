@@ -88,7 +88,28 @@ const PLAYER_CHUNK = 100;
  * career_fp is not unique, so `id` is the tiebreak: paging over a non-unique
  * sort key can repeat or drop rows between requests.
  */
+const collectionCache = sessionCache<'mine', CollectionRow[]>(() => fetchCollection());
+
+/**
+ * Forget the cards. Call after anything that changes what you hold — a pack, a
+ * sale, a commit — alongside `invalidateCollection`, which clears the OTHER
+ * cache over the same table.
+ *
+ * THEY ARE TWO CACHES ON PURPOSE, for now. `useCollection` reads
+ * `my_collection` into `CollectionCard`, this reads it into `CollectionRow`,
+ * and the two shapes carry different columns for different screens. Merging
+ * them is worth doing and is not this change; what matters here is that the
+ * lineup's copy stops being fetched from scratch on every mount.
+ */
+export function invalidateLineupCollection(): void {
+  collectionCache.invalidate();
+}
+
 async function loadCollection(): Promise<CollectionRow[]> {
+  return collectionCache.read('mine');
+}
+
+async function fetchCollection(): Promise<CollectionRow[]> {
   return fetchAllPages<CollectionRow>((from, to) =>
     supabase
       .from('my_collection')
@@ -692,6 +713,10 @@ export function useLineupData(contestCode?: string): LineupData {
     useCallback(() => {
       if (seenCards.current === collectionVersion()) return;
       seenCards.current = collectionVersion();
+      /* The version bumped, so the cards changed — a pack, a sale, a commit.
+         Drop this hook's own copy before refreshing, or the refresh is served
+         the rows the bump was telling us are wrong. */
+      invalidateLineupCollection();
       void refresh();
     }, [refresh]),
   );
