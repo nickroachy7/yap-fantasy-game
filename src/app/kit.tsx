@@ -1009,7 +1009,7 @@ function Kit() {
             />
             {/* A PAID CONTEST, WON, WITH A HEAL. Three things were paid and the
                 band reserves two rows, so this is the card that proves the
-                ranking in `takeLines`: the prize leads because it is what
+                ranking in `wonTokens`: the prize leads because it is what
                 entering was for, the heart follows because hearts are the
                 scarcest thing in the game, and the card coins drop — they are
                 the one line restated in full one figure per row directly

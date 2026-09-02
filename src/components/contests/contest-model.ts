@@ -260,7 +260,6 @@ export type Opponent = {
 
 const ORDINALS = ['0TH', '1ST', '2ND', '3RD'] as const;
 
-
 /** Uppercase throughout: every caller sets it in a 9pt micro label. */
 function ordinal(n: number): string {
   if (n > 0 && n < ORDINALS.length) return ORDINALS[n];
@@ -382,107 +381,6 @@ export function formatLine(t: ContestTerms, name?: string): string {
 }
 
 /* ------------------------------------------------------------ the trade */
-
-/**
- * One line of the risk or reward column.
- *
- * `heart` is what makes the glyph appear beside it. It is a mark a reader stops
- * on where a sentence is a thing they skim past, which is the whole reason the
- * stake is drawn on the row rather than left to the contest page to disclose
- * after the tap.
- */
-export type TradeLine = { text: string; heart?: boolean; tone?: 'positive' | 'negative' };
-
-/**
- * WHAT YOU PUT UP.
- *
- * Ordered coins-then-hearts because that is the order they are felt: the coins
- * go the moment you file, the heart only if you lose. A contest that risks
- * neither says so in a word rather than showing an empty column.
- */
-export function riskLines(t: ContestTerms): TradeLine[] {
-  const lines: TradeLine[] = [];
-  if (t.entryFeeCoins > 0) lines.push({ text: `${t.entryFeeCoins} coins` });
-  if (t.heartsAtRisk > 0) {
-    lines.push({ text: t.heartsAtRisk === 1 ? '1 heart' : `${t.heartsAtRisk} hearts`, heart: true });
-  }
-  if (lines.length === 0) lines.push({ text: 'Nothing' });
-  return lines;
-}
-
-/**
- * WHAT YOU CAN TAKE, DENOMINATED IN COINS.
- *
- * ---------------------------------------------------------------------------
- * A REWARD HAS TO BE IN A CURRENCY THE PLAYER KEEPS SCORE IN
- * ---------------------------------------------------------------------------
- *
- * This column used to end with "Career FP on 3 cards", on the argument that
- * tier is the real reason to enter — which it is, and which is why the fee is
- * priced the way it is. But career_fp is not a thing anybody has a balance of.
- * It accrues invisibly, it pays off weeks later in a tier threshold, and next
- * to "40 coins" on the risk side it read as the small print rather than as the
- * other half of a trade. A reward column where the risk is a number and the
- * reward is a concept is not a comparison a reader can make.
- *
- * So: coins, always, and the tier argument moved to the contest sheet's prose
- * where there is room to actually make it.
- *
- * ---------------------------------------------------------------------------
- * WHERE THE COINS COME FROM, AND WHY IT CANNOT BE A FLAT PRIZE
- * ---------------------------------------------------------------------------
- *
- * Where there is an entry fee, from the POOL those fees collected — 25% of
- * them, see `20260826020000`. That is redistribution and it is safe.
- *
- * Where there is no fee there is no pool, and this is the line to be careful
- * about: a fixed coin prize on a contest that collects nothing could only ever
- * be MINTED, which is the one thing the economy forbids outright and the exact
- * inversion the entry fee exists to prevent. The free contest still pays coins —
- * every entry does — but through `award_score_coins`, at 1.5 a point times the
- * card's tier multiplier (1.0 bronze to 1.4 diamond). "From 1.5 coins a point"
- * is the floor and it is a real, earned number rather than an advertised one.
- *
- * A PAID CONTEST EARNS THAT TOO and does not say so here. Naming both would put
- * two coin lines in a column that is trying to answer one question, and the pool
- * is the part that is specific to THIS contest. The score rate is the baseline
- * every entry gets, worth naming only where there is nothing more specific.
- */
-export function rewardLines(t: ContestTerms, prize: number | null = null): TradeLine[] {
-  const lines: TradeLine[] = [];
-
-  /* A SETTLED PRIZE REPLACES THE POOL, because the pool has stopped being a
-     question. Never a running "you would win 60" — that is a projection and
-     this app does not sell them.
-
-     EVERY LINE HERE FITS ON ONE. The trade band reserves a fixed number of
-     single-line rows so the card's height cannot move — see `TRADE_LINES` in
-     `ContestCard` — so a string that needs two is a string that gets clipped.
-     "Coin pool, once entries start" was that string, and it is "Share of the
-     pool" now: the same sentence as the funded case rather than a separate
-     apology for an empty one. */
-  if (prize !== null && prize > 0) {
-    lines.push({ text: `Won ${prize} coins`, tone: 'positive' });
-  } else if (t.entryFeeCoins > 0) {
-    const top = topPrize(t);
-    lines.push({
-      text:
-        t.prizePool > 0
-          ? top !== null
-            ? `Up to ${top} coins`
-            : `Share of ${t.prizePool} coins`
-          : 'Share of the pool',
-    });
-  } else {
-    lines.push({ text: `From ${t.scoreRate} coins a point` });
-  }
-
-  if (t.heartsOnWin > 0) {
-    lines.push({ text: t.heartsOnWin === 1 ? '+1 heart' : `+${t.heartsOnWin} hearts`, heart: true });
-  }
-
-  return lines;
-}
 
 /**
  * What the WINNER takes, when the split has a top place to speak of.
@@ -609,96 +507,6 @@ export function settlementOf(entry: {
   return { result: entry.field.result, coins: entry.myCoins };
 }
 
-/**
- * WHAT IT COST, now that the answer is known.
- *
- * The coins went at submission and do not come back, so they read exactly as
- * they did on the offer. The heart is the line that changes: `hearts_delta` is
- * `-hearts_at_risk` on a loss and nothing at all otherwise, which is the whole
- * of what settlement does to a run (see `20260825170000`).
- *
- * A NULL RESULT PASSES NO VERDICT, and this is the case to be careful about.
- * The band turns over when the WEEK is final, and `settle_run_hearts` runs
- * after that — so there is an interval where the games are done and nothing
- * has been decided, and a contest whose field was too small to score never
- * decides at all. Neither is a heart kept and neither is a heart lost, so
- * neither gets a word: the line reverts to the bare noun the offer carried,
- * and gains its verdict when there is one to gain.
- *
- * COLOURED IN BOTH DIRECTIONS, which is why `TradeLine` grew a second tone. A
- * kept heart is the good half of this receipt and the only place the card can
- * say so; a lost one is the whole reason a run ends, and it must not be drawn
- * in the same ink as the entry fee beside it.
- */
-export function stakeLines(t: ContestTerms, s: Settlement): TradeLine[] {
-  const lines: TradeLine[] = [];
-  if (t.entryFeeCoins > 0) lines.push({ text: `${t.entryFeeCoins} coins` });
-  if (t.heartsAtRisk > 0) {
-    const noun = t.heartsAtRisk === 1 ? '1 heart' : `${t.heartsAtRisk} hearts`;
-    if (s.result === 'L') lines.push({ text: `${noun} lost`, heart: true, tone: 'negative' });
-    else if (s.result !== null) {
-      lines.push({ text: `${noun} kept`, heart: true, tone: 'positive' });
-    } else lines.push({ text: noun, heart: true });
-  }
-  if (lines.length === 0) lines.push({ text: 'Nothing' });
-  return lines;
-}
-
-/**
- * WHAT CAME BACK, in the order of what a reader would be sorry to lose.
- *
- * Three things can be paid and the band has room for two, so the order is the
- * ranking and it is deliberate:
- *
- *   1. THE PRIZE, where there is one. It is specific to this contest, it is
- *      the largest figure on the card, and it is the thing entering was for.
- *   2. THE HEART, where the contest heals and the entry won. Hearts are the
- *      scarcest thing in the game and the only place they come from is here.
- *   3. THE CARD COINS. The baseline every entry earns — and the one line that
- *      is restated in full directly underneath, one figure per row of the
- *      lineup, which is what makes it the safe one to drop.
- *
- * On the free contest, which is the contest every player is in, there is no
- * prize and usually no heal, so the card coins are the whole of it — and they
- * are the sum of the per-row figures below. That closure is the point: a
- * player can read the total on the card and then see which cards made it.
- *
- * THE QUALIFIER APPEARS ONLY WHEN IT IS NEEDED. With a prize on the line above
- * it, a bare "42 coins" would be a second unexplained sum next to a first one;
- * on its own there is nothing to tell it apart from, and the shorter string is
- * the one that cannot be clipped.
- *
- * AND "STILL SETTLING" IS NOT "NOTHING". `award_score_coins` runs after the
- * week completes, so there is a real interval — minutes, and longer if a
- * provider is slow — where the scores are final and nothing has been paid.
- * That is the state a player refreshing on a Tuesday morning is most likely to
- * catch, and reporting it as a week that earned nothing would be the worst
- * available lie.
- */
-export function takeLines(
-  t: ContestTerms,
-  s: Settlement,
-  prize: number | null = null,
-): TradeLine[] {
-  const lines: TradeLine[] = [];
-  const paid = prize !== null && prize > 0;
-
-  if (paid) lines.push({ text: `Won ${prize} coins`, tone: 'positive' });
-  if (t.heartsOnWin > 0 && s.result === 'W') {
-    lines.push({
-      text: t.heartsOnWin === 1 ? '+1 heart' : `+${t.heartsOnWin} hearts`,
-      heart: true,
-      tone: 'positive',
-    });
-  }
-  if (s.coins !== null && s.coins > 0) {
-    lines.push({ text: paid ? `${s.coins} coins from cards` : `${s.coins} coins` });
-  }
-
-  if (lines.length === 0) lines.push({ text: s.coins === null ? 'Still settling' : 'Nothing' });
-  return lines;
-}
-
 /* -------------------------------------------------------------- the tokens */
 
 /**
@@ -817,10 +625,45 @@ export function winTokens(t: ContestTerms, prize: number | null = null): Token[]
   if (prize !== null && prize > 0) {
     out.push({ kind: 'coin', value: `${prize}`, unit: 'coins', tone: 'positive' });
   } else if (t.entryFeeCoins > 0) {
-    const top = topPrize(t);
-    if (top !== null) out.push({ kind: 'coin', value: `${top}`, unit: 'coins' });
-    else if (t.prizePool > 0) out.push({ kind: 'coin', value: `${t.prizePool}`, unit: 'coins' });
-    else out.push({ kind: 'coin', value: 'share', unit: 'of the pool' });
+    /* THE POOL, NOT A SLICE OF IT.
+       -----------------------------------------------------------------------
+       This drew `topPrize` — the winner's take — and on a young contest that
+       is a number nobody can act on. The WR Room read
+
+           RISK  ◆ 50  ♥ 1        WIN  ◆ 19  ♥ +1
+
+       which is a heart and fifty coins staked to win nineteen. Nothing was
+       wrong with the arithmetic: one entry had paid in, the pool was 36, and a
+       steep split over three places gives first 54% of it. The card was
+       honestly reporting a contest that had not been funded yet.
+
+       But a lobby row is read in about a second, and in that second `19` is
+       not "this contest is nearly empty", it is "this contest is a bad trade".
+       The player cannot tell a small pool from a bad offer, and the one figure
+       that distinguishes them — how much is actually on the table — was the
+       one being divided away.
+
+       So the token is the POOL. It is the number that grows as people join, it
+       is the same number the entrant is playing for whatever the split does
+       with it, and `winLine` directly above already says how it is divided
+       ("Top 3 win", "Top 50% win", "Beat your opponent"). Between them the two
+       lines say what is there and who gets it, which is what `topPrize` was
+       trying to compress into one figure and could not.
+
+       `topPrize` is not deleted — the contest SHEET still draws it, where there
+       is room to say "first place takes 19 of the 36 currently in the pool"
+       and have that be informative rather than alarming.
+
+       IT DOES NOT COUNT YOUR OWN ENTRY, and it must not. Adding the fee you
+       have not yet paid would be the client inventing a pool figure, which is
+       exactly what `20260826020000` forbids: the pool is what the LEDGER
+       collected. The number is honest and it is low because the contest is
+       empty — and `fillLine` beside it is already saying so in words. */
+    if (t.prizePool > 0) {
+      out.push({ kind: 'coin', value: `${t.prizePool}`, unit: 'pool', keepUnit: true });
+    } else {
+      out.push({ kind: 'coin', value: 'share', unit: 'of the pool' });
+    }
   }
 
   if (t.heartsOnWin > 0) {
@@ -832,51 +675,55 @@ export function winTokens(t: ContestTerms, prize: number | null = null): Token[]
     });
   }
 
-  /* THE RATE, LAST, ON EVERY CONTEST.
+  /* THE PER-POINT RATE IS NOT A CONTEST REWARD, so it is not in this column.
      -----------------------------------------------------------------------
-     It used to be the `else` branch above — printed only where there was no
-     pool to print instead, which meant only on the free contest. So the one
-     thing that is true of every row in the lobby appeared on exactly one of
-     them, and read as that row's reward.
+     A previous pass printed `◆ 1.5 /pt` on every row here, reasoning that a
+     thing true of every contest should appear on every contest. That was the
+     wrong conclusion from the right observation.
 
-     It is the opposite of a perk. A paid row earns it too, on bench cards that
-     would otherwise be earning nothing, and that is the best argument for
-     entering one. Printing it identically everywhere is what turns it back into
-     what it is: the floor under the whole lobby, not a feature of any row.
+     What a card earns for its points is a property of THE CARD. It is paid on
+     every start in every lineup, it is multiplied by that card's own tier, and
+     it arrives whether the contest is won or lost — so it is not something a
+     contest offers in exchange for an entry fee, and putting it in the column
+     headed WIN said that it was. On the eight-row lobby it also printed the
+     identical token eight times down the right-hand edge, which is a lot of
+     ink spent telling the reader nothing that distinguishes one row from
+     another.
 
-     LAST because it is the constant. The pool is what differs between two rows
-     a player is choosing between, so it leads; the rate is the same sentence on
-     both and settles behind it.
+     Its home is the card: `LineupRow` already draws the coins each start
+     actually earned, per card, next to that card's points. That is the same
+     fact with a real number instead of a rate, in the place the rate is a
+     property of.
 
-     The long unit only where the token is alone — see `keepUnit`.
+     The contest SHEET still states it once, as prose rather than as a reward —
+     see the "Every start" fact in `ContestAbout`, which says in as many words
+     that it is paid "in this contest and in all of them". */
 
-     GUARDED ON A POSITIVE RATE, which is not defensiveness for its own sake.
-     `scoreRate` comes down from `score_rate()`, and an app build that reaches a
-     database where that column does not exist yet reads it as nought — the
-     ordinary state of an over-the-air update that lands before its migration.
-     A `◆ 0 a point` token would be the app confidently advertising that a start
-     earns nothing. Omitting it falls back to exactly what the card drew before
-     this change, which is wrong-but-familiar rather than wrong-and-alarming. */
-  if (t.scoreRate > 0) {
-    const alone = out.length === 0;
-    out.push({
-      kind: 'coin',
-      value: rate(t.scoreRate),
-      unit: alone ? 'a point' : '/pt',
-      keepUnit: true,
-    });
+  /* WHAT IS LEFT WHEN A CONTEST PAYS NEITHER COINS NOR HEARTS.
+     -----------------------------------------------------------------------
+     The free weekly contest: no fee, so no pool, and it heals nothing. Until
+     the rate token was removed above it always had that to print and this case
+     could not arise; now the side would come back empty, and an empty reward
+     column reads as still loading.
+
+     Falling back to "share of the pool" — which is what the paid branch says
+     when its pool is nought — would be worse than blank. The free contest has
+     no pool and never will: `contests_free_pays_no_prize` forbids one, because
+     a prize on a contest that collects nothing could only be minted.
+
+     What you actually win is the W. `median_record` scores every free-contest
+     week against the field's middle and that record is the season, which is the
+     whole reason this is the one contest nobody can leave. So the column names
+     it, as a word rather than a quantity. */
+  if (out.length === 0) {
+    return [
+      t.entryFeeCoins > 0
+        ? { kind: 'coin', value: 'share', unit: 'of the pool' }
+        : { kind: 'none', value: 'Season record' },
+    ];
   }
 
-  /* A paid contest with no pool yet and no rate to fall back on would otherwise
-     return an empty side, and an empty reward column reads as still loading. */
-  if (out.length === 0) out.push({ kind: 'coin', value: 'share', unit: 'of the pool' });
-
   return out;
-}
-
-/** The per-point rate as drawn: `1.5`, never `1.50` and never `1.4999`. */
-function rate(n: number): string {
-  return Number.isInteger(n) ? `${n}` : `${Math.round(n * 100) / 100}`;
 }
 
 /**

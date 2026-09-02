@@ -1232,7 +1232,7 @@ function Card({
   const terms = termsOfEntry(contest);
 
   /**
-   * THE WEEK IS OVER, SO THE TRADE BAND CHANGES TENSE. See `stakeLines`.
+   * THE WEEK IS OVER, SO THE TRADE BAND CHANGES TENSE. See `stakedTokens`.
    *
    * KEYED ON THE WEEK BEING FINAL, NOT ON `recap`. `recap` means the board has
    * moved on to a new slate, which happens days after the last whistle — so

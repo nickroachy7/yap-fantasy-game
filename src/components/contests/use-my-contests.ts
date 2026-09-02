@@ -126,7 +126,7 @@ export type MyContest = {
    * NULL UNTIL THE PAYOUT HAS RUN, never zero. A week is final for a while
    * before `award_score_coins` reaches it, and a nought drawn in that window
    * reports a week as having earned nothing at the moment a player is looking to
-   * find out what it earned. See `takeLines`.
+   * find out what it earned. See `wonTokens`.
    */
   myCoins: number | null;
 };
