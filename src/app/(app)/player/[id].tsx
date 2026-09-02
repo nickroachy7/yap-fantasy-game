@@ -228,9 +228,7 @@ export default function PlayerDetailScreen() {
               <CardHistory
                 cards={owned}
                 loading={ownedLoading}
-                playerName={player.name}
-                position={player.position}
-                team={player.team}
+                player={player}
                 onOpen={openCard}
               />
             </Section>
@@ -238,8 +236,7 @@ export default function PlayerDetailScreen() {
             <CommunityPanel
               market={market}
               playerName={player.name}
-              position={player.position}
-              team={player.team}
+              directoryPlayer={player}
             />
           </SectionStack>
         ) : null}
