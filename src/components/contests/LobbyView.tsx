@@ -340,57 +340,53 @@ export function LobbyView({
 
       {run?.awaitingCarry ? <DeadRun run={run} onClaim={() => router.push('/run-over')} /> : null}
 
-      <SectionHead
+      <Section
         label="Entered"
         count={playing.length}
-        hint="Filed for this week. Tap one to see the field."
-      />
-      <View style={styles.stack}>
+        hint="Filed for this week. Tap one to see the field.">
+        <View style={styles.stack}>
         {playing.length > 0 ? (
           playing.map((m) => (
             <LiveEntry key={m.id} entry={m} onPress={() => onOpenContest(m.code)} />
           ))
         ) : loading ? null : (
           <SectionEmpty text="Nothing filed yet. What you enter shows up here for the week." />
-        )}
-      </View>
+          )}
+        </View>
+      </Section>
 
-      <SectionHead
+      {/* THE ARCHIVE RIDES THE HEADING, right-aligned. It was tried on its own
+          line under the list, on the argument that a door and a title are two
+          unrelated things to share a row. On screen the opposite reads better:
+          a bare link floating between two shelves has nothing to belong to,
+          while up here it is unmistakably the rest of THIS list — the two-week
+          window is inline, the season is one tap further on. */}
+      <Section
         label="Recent"
         count={finished.length}
         hint="Settled, with what each one paid."
-      />
-      <View style={styles.stack}>
+        action={<ArchiveLink onPress={() => setView('history')} />}>
+        <View style={styles.stack}>
         {finished.length > 0 ? (
           finished.map((m) => (
             <SettledEntry key={m.id} entry={m} onPress={() => onOpenContest(m.code)} />
           ))
         ) : loading ? null : (
           <SectionEmpty text="Results land here when the week is swept." />
-        )}
-      </View>
-      {/* THE ARCHIVE IS ITS OWN LINE, LEFT, under the fortnight it continues.
-          It rode the `Recent` heading as a right-aligned action, which put a
-          door at the far end of a row whose other end was a title — two
-          unrelated things sharing a line because there was space for them.
-          What is inline above is the two-week window `my_contest_cards`
-          returns; this is the season behind it, so it reads after the list
-          rather than beside its name. */}
-      <View style={styles.archiveRow}>
-        <ArchiveLink onPress={() => setView('history')} />
-      </View>
+          )}
+        </View>
+      </Section>
 
       {/* COMMUNITY, because that is what it is: the lobby everybody shares, as
           opposed to the one you assemble yourself below. It was called "Open",
           which described its STATE rather than its kind — and once Friendly
           sits under it on the same scroll, "open" stops distinguishing the two
           (a friendly contest is open too). */}
-      <SectionHead
+      <Section
         label="Community"
         count={open.length}
-        hint="Open to every manager. A new slate each week."
-      />
-      <View style={styles.stack}>
+        hint="Open to every manager. A new slate each week.">
+        <View style={styles.stack}>
         {open.length > 0 ? (
           open.map((c) => (
             <ContestEntry key={c.id} contest={c} coins={coins} onPress={() => onOpenContest(c.code)} />
@@ -403,8 +399,9 @@ export function LobbyView({
                 : 'Extra contests appear here each week.'
             }
           />
-        )}
-      </View>
+          )}
+        </View>
+      </Section>
       {/* THE EXCLUSIVITY RULE SITS UNDER THE COMMUNITY LIST and nowhere else.
           It is about what entering ANOTHER contest costs you, which is a
           sentence for somebody looking at a list of contests to enter. */}
@@ -415,12 +412,9 @@ export function LobbyView({
           does not exist". That was the wrong call: a lobby with one kind of
           contest in it does not tell a player the other kind is coming, and the
           shelf is one quiet row. It is the cheapest possible promise. */}
-      <SectionHead
-        label="Friendly"
-        count={0}
-        hint="Play a week against people you invite."
-      />
-      <ComingSoon />
+      <Section label="Friendly" count={0} hint="Play a week against people you invite.">
+        <ComingSoon />
+      </Section>
 
         </>
       )}
@@ -677,53 +671,54 @@ function SettledEntry({ entry, onPress }: { entry: MyContest; onPress: () => voi
 }
 
 /**
- * A section's name, its size, and anything it opens.
+ * A shelf: its name, how much is on it, one line on what it holds, and the list.
  *
- * IT WAS A 9pt UPPERCASE MICRO LABEL and it read as a caption on the card
- * below it rather than as a heading over a list. That size was inherited from
- * the tab bar's `hint`, which had a bar's worth of chrome around it to look
- * like a control; standing alone on a dark page with nothing but air above it,
- * the same 9pt is just small.
+ * ---------------------------------------------------------------------------
+ * IT IS ONE CHILD OF THE SCROLLER, AND THAT IS THE WHOLE POINT
+ * ---------------------------------------------------------------------------
  *
- * `Type.figure` sets the hierarchy the page needs, and it is the one size that
- * was missing from it: the sheet title is 26, a contest's name is 15, and a
- * heading has to be bigger than the things under it or it is one of them.
- * 26 / 18 / 15 reads as page, section, item at a glance.
+ * The head and the list used to be siblings, and `PlayerSheetFrame`'s content
+ * container sets `gap: Spacing.three` between every child it holds. So the page
+ * put 16pt between a heading and the list it names — the same distance it puts
+ * between two unrelated blocks — and no amount of `paddingBottom` on the head
+ * could take it away, because padding adds to a gap rather than replacing it.
+ * Two rounds of tightening moved 4pt and left 16 untouched.
  *
- * SENTENCE CASE, because the uppercase was doing the work the size should have
- * done. Small caps shout to be noticed; a heading with enough weight does not
- * have to.
- *
- * THE COUNT IS NOT IN THE NAME. It sits after it at the same size in
- * `textTertiary` — the figure is a fact about the list, not part of what the
- * list is called, and at this size a bracketed number would read as a badge.
+ * Wrapping the pair makes the container's gap do what it is for: separating
+ * SHELVES. Inside one, the spacing is this component's own — `Spacing.two`
+ * between the name block and the list, and nothing but the type's own leading
+ * between the name and its description.
  */
-function SectionHead({
+function Section({
   label,
   count,
   hint,
   action,
+  children,
 }: {
   label: string;
   count: number;
-  /** One line on what the shelf holds. See the note on `sectionHint`. */
   hint: string;
   action?: React.ReactNode;
+  children: React.ReactNode;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
   return (
-    <View style={styles.sectionHead}>
-      <View style={styles.sectionTop}>
-        <Text style={[Type.figure, { color: c.text }]}>{label}</Text>
-        {count > 0 ? (
-          <Text style={[Type.figure, NUMERIC, { color: c.textTertiary }]}>{String(count)}</Text>
-        ) : null}
-        <View style={styles.sectionSpacer} />
-        {action}
+    <View style={styles.section}>
+      <View>
+        <View style={styles.sectionTop}>
+          <Text style={[Type.figure, { color: c.text }]}>{label}</Text>
+          {count > 0 ? (
+            <Text style={[Type.figure, NUMERIC, { color: c.textTertiary }]}>{String(count)}</Text>
+          ) : null}
+          <View style={styles.sectionSpacer} />
+          {action}
+        </View>
+        <Text style={[Type.body, { color: c.textTertiary }]}>{hint}</Text>
       </View>
-      <Text style={[Type.body, { color: c.textTertiary }]}>{hint}</Text>
+      {children}
     </View>
   );
 }
@@ -816,8 +811,12 @@ const styles = StyleSheet.create({
   /* `Spacing.three` on top, not `four`. A shelf is already separated from the
      one before it by an 18pt name and a line of grey under it; 24pt of air as
      well read as a gap between two pages rather than between two lists. */
-  sectionHead: { paddingTop: Spacing.three, paddingBottom: Spacing.two, gap: 2 },
-  archiveRow: { flexDirection: 'row', paddingTop: Spacing.two },
+  /* `Spacing.two` between the name block and its list, and NOTHING between the
+     name and its description — both lines carry their own leading (18 set on
+     22, 12 on 16), so about 4pt of air is already baked in and a gap on top of
+     it pays for the same space twice. The 16pt that separates one shelf from
+     the next is the scroller's own `gap`, which is why this is one child. */
+  section: { gap: Spacing.two },
   sectionTop: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two },
   sectionSpacer: { flex: 1 },
   sectionEmpty: { paddingBottom: Spacing.two },
