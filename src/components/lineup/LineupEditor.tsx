@@ -477,8 +477,31 @@ export function LineupEditor({
    * It is only ever true before the entry exists. Once the fee is paid the
    * board goes back to autosaving like any other, because from then on it IS
    * only editing.
+   *
+   * ---------------------------------------------------------------------------
+   * A FREE LOBBY CONTEST IS STILL AN ENTRY
+   * ---------------------------------------------------------------------------
+   *
+   * This read `entryFeeCoins > 0` alone, and the reasoning was about money: no
+   * fee, nothing to spend, so nothing to confirm. That is true and it is not
+   * the whole job. Entering a lobby contest also spends the scarcer thing —
+   * `20260825010000`'s rule is one card, one contest, one week, so filling
+   * three slots here takes those three cards off every other contest on the
+   * slate for the week. That is a commitment whether or not a coin moves.
+   *
+   * It also showed: The Warm-Up is the one free row in the lobby, and it was
+   * the one row with no bar on it — no Clear, no Pick for me, no Enter —
+   * because the offer is published from this flag. One row out of seven
+   * behaving unlike the rest is not a considered exception, it is the fee
+   * condition leaking into a question about entry.
+   *
+   * THE FREE WEEKLY CONTEST IS NOT THIS. `kind === 'free'` is the one nobody
+   * chooses and nobody can leave; it autosaves like the board it is on,
+   * because there is no act of entering it to confirm.
    */
-  const needsEntry = Boolean(contest?.unentered && contest.entryFeeCoins > 0);
+  const needsEntry = Boolean(
+    contest?.unentered && (contest.entryFeeCoins > 0 || contest.kind === 'lobby'),
+  );
 
   /**
    * OVER THE ROSTER CAP, which is the one refusal that is about none of the

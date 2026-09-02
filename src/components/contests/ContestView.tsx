@@ -349,9 +349,26 @@ export function ContestView({
                 needs in order to do something about it. */}
             <GlassPill grow>
               <BarAction
-                glyph={offer.ready ? coin : undefined}
-                label={offer.ready ? `Enter for ${offer.fee}` : `${offer.slots - offer.filled} slots left`}
-                hint={offer.ready ? `Enter this contest for ${offer.fee} coins` : `Fill all ${offer.slots} slots to enter`}
+                /* NO COIN ON A FREE ROW. The glyph is there to price the act in
+                   the same vocabulary the card above states its RISK in, so on
+                   a contest that costs nothing it would be pricing nothing —
+                   and "Enter for 0" is a number where the reader expects a
+                   cost. The Warm-Up just says Enter. */
+                glyph={offer.ready && offer.fee > 0 ? coin : undefined}
+                label={
+                  offer.ready
+                    ? offer.fee > 0
+                      ? `Enter for ${offer.fee}`
+                      : 'Enter'
+                    : `${offer.slots - offer.filled} slots left`
+                }
+                hint={
+                  offer.ready
+                    ? offer.fee > 0
+                      ? `Enter this contest for ${offer.fee} coins`
+                      : 'Enter this contest'
+                    : `Fill all ${offer.slots} slots to enter`
+                }
                 primary
                 enabled={offer.ready && !offer.busy}
                 onPress={() => acts.current?.submit()}
