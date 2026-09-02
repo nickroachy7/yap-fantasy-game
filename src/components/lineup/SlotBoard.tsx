@@ -23,6 +23,7 @@ function SlotBoardImpl({
   byId,
   picks,
   eligibleCounts,
+  countsKnown = true,
   openSlot,
   lockedIds,
   savedPoints,
@@ -35,6 +36,8 @@ function SlotBoardImpl({
   picks: Record<string, string>;
   /** How many cards could start in each slot. Drawn on the empty rows. */
   eligibleCounts: Map<string, number>;
+  /** False while the collection is loading, so the rows omit the count. */
+  countsKnown?: boolean;
   /** The slot whose sheet is open, so its row stays visibly the subject. */
   openSlot: string | null;
   /**
@@ -74,7 +77,7 @@ function SlotBoardImpl({
           scored={scored}
           selected={openSlot === cfg.slot}
           disabled={slotLocked}
-          eligibleCount={eligibleCounts.get(cfg.slot) ?? 0}
+          eligibleCount={countsKnown ? (eligibleCounts.get(cfg.slot) ?? 0) : null}
           eligiblePositions={cfg.eligible_positions.join('/')}
           onSwap={slotLocked ? undefined : () => onOpenSlot(cfg.slot)}
           /* An EMPTY slot has no card to open and stays undefined; a filled

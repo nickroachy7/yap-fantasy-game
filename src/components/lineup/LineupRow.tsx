@@ -287,7 +287,8 @@ export function StarterRow({
   /** This slot's scored points. Null when the week has not been swept. */
   points: number | null;
   scored: boolean;
-  eligibleCount: number;
+  /** Null while the collection is still loading — see the note at the use. */
+  eligibleCount: number | null;
   eligiblePositions: string;
   selected: boolean;
   disabled: boolean;
@@ -341,8 +342,24 @@ export function StarterRow({
         />
       }
       right={<WeekFigure points={week} status={card?.game?.status ?? null} />}
-      emptyPrimary={eligibleCount > 0 ? `Choose a ${eligiblePositions}` : `No ${eligiblePositions} cards`}
-      emptySecondary={eligibleCount > 0 ? `${eligibleCount} eligible` : 'Open a pack to fill this slot'}
+      /* NULL IS "NOT COUNTED YET", NOT NOUGHT. The slot shapes can be drawn
+         before the collection lands (see `contestHint`), and at that moment
+         nothing is known about how many cards fit — so the row invites the tap
+         it always would and simply says nothing underneath. Treating unknown as
+         nought would put "No RB cards · Open a pack to fill this slot" over a
+         bench that has six, which is worse than the wait it replaced. */
+      emptyPrimary={
+        eligibleCount === null || eligibleCount > 0
+          ? `Choose a ${eligiblePositions}`
+          : `No ${eligiblePositions} cards`
+      }
+      emptySecondary={
+        eligibleCount === null
+          ? undefined
+          : eligibleCount > 0
+            ? `${eligibleCount} eligible`
+            : 'Open a pack to fill this slot'
+      }
       selected={selected}
       disabled={disabled}
       onSwap={onSwap}
@@ -351,7 +368,9 @@ export function StarterRow({
       accessibilityLabel={
         card
           ? `${slot}: ${describe(card, week)}. Tap to open this card.`
-          : `${slot} is empty. ${eligibleCount} eligible ${eligiblePositions} cards. Tap to choose.`
+          : eligibleCount === null
+            ? `${slot} is empty. Tap to choose a ${eligiblePositions}.`
+            : `${slot} is empty. ${eligibleCount} eligible ${eligiblePositions} cards. Tap to choose.`
       }
     />
   );

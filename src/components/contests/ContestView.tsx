@@ -239,6 +239,37 @@ export function ContestView({
     entered ? (contest?.id ?? null) : null,
     me,
   );
+  /**
+   * The contest, in the shape the editor's own hook returns.
+   *
+   * MEMOISED, and that is not tidiness. It is a dependency of a `useMemo`
+   * inside `useLineupData`, so a fresh object on every render would recompute
+   * the contest on every render — and the editor publishes its entry offer
+   * from that, which sets state up here, which renders again. The identity has
+   * to be as stable as the row it is copied from.
+   *
+   * `unentered: true` is safe rather than assumed: the editor is only mounted
+   * on the branch where `entered` is false.
+   */
+  const hint = useMemo(
+    () =>
+      contest
+        ? {
+            id: contest.id,
+            code: contest.code,
+            name: contest.name,
+            kind: contest.kind,
+            formatCode: contest.formatCode,
+            entryFeeCoins: contest.entryFeeCoins,
+            unentered: true,
+          }
+        : null,
+    /* The row itself. `useContests` rebuilds its array only on a load, so this
+       identity is stable between them — listing the fields instead would be
+       the same recompute with a longer list and a lint suppression. */
+    [contest],
+  );
+
   const full =
     contest?.maxEntrants != null && contest.entrants >= contest.maxEntrants && !entered;
   const broke = Boolean(contest && !entered && !contest.affordable);
@@ -589,6 +620,12 @@ export function ContestView({
                   /* The page knows the count before the editor does, so it can
                      hold the height and stop the jump — see the prop. */
                   placeholderSlots={contest.slotCount}
+                  /* THE CONTEST WE ALREADY HAVE. The lobby fetched every field
+                     the editor needs to draw its slots, so handing it over
+                     means they are on screen before a request is made rather
+                     than after two waves of them. It is superseded by the
+                     server's own row the moment that lands. */
+                  contestHint={hint}
                   onEntryOffer={setOffer}
                   entryRef={acts}
                   onEntered={(enteredCode) => toBoard(enteredCode)}

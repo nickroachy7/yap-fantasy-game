@@ -394,7 +394,7 @@ export function invalidateFormatSlots(): void {
   formatSlotCache.invalidate();
 }
 
-export function useLineupData(contestCode?: string): LineupData {
+export function useLineupData(contestCode?: string, hint?: LineupContest | null): LineupData {
   const [slate, setSlate] = useState<Slate | null>(null);
   /**
    * EVERYTHING FOR THE WHOLE SLATE, HELD RAW, and this is what makes swiping
@@ -583,8 +583,25 @@ export function useLineupData(contestCode?: string): LineupData {
    * changes `contestCode`, these memos recompute, and no request is sent.
    * ------------------------------------------------------------------ */
 
+  /**
+   * THE CONTEST, FROM THE CALLER UNTIL THE SERVER CATCHES UP.
+   *
+   * `contestRows` arrives in the second of two waves, and the slots cannot be
+   * drawn without it — which is most of why opening a contest to enter had a
+   * visible wait. But the page that opened it already HAS the contest: the
+   * lobby fetched every field this needs (`id`, `code`, `name`, `kind`,
+   * `format_code`, `entry_fee_coins`) to draw the row that was just tapped.
+   *
+   * So a caller may hand it over, and the fetched row supersedes the hint the
+   * moment it lands. They cannot disagree about anything that matters — same
+   * table, same columns — except `unentered`, which the hint's owner knows
+   * from its own read and which is re-derived here from `myLineups` as soon as
+   * those arrive. Erring is safe in the direction it errs: a hint that says
+   * "unentered" when you are in fact entered shows an Enter button for a
+   * moment, and `set_lineup` is idempotent on the fee either way.
+   */
   const contest = useMemo<LineupContest | null>(() => {
-    if (contestRows.length === 0) return null;
+    if (contestRows.length === 0) return hint ?? null;
     const row = contestCode
       ? contestRows.find((r) => r.code === contestCode)
       : contestRows.find((r) => r.kind === 'free');
@@ -600,7 +617,7 @@ export function useLineupData(contestCode?: string): LineupData {
          makes the fee idempotent server-side. See `20260825050000`. */
       unentered: !myLineups.some((l) => l.contest_id === row.id),
     };
-  }, [contestRows, contestCode, myLineups]);
+  }, [contestRows, contestCode, myLineups, hint]);
 
   const slots = useMemo<SlotConfig[]>(
     () => (contest ? (formatSlots.get(contest.formatCode) ?? []) : []),

@@ -78,7 +78,7 @@ import {
   type LineupCard,
   type SortKey,
 } from '@/components/lineup/model';
-import { useLineupData } from '@/components/lineup/use-lineup-data';
+import { useLineupData, type LineupContest } from '@/components/lineup/use-lineup-data';
 import { Screen } from '@/components/shell/Screen';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { Colors, Spacing, Type } from '@/constants/theme';
@@ -133,6 +133,15 @@ export type LineupEditorProps = {
    * need and nothing moves when the real rows replace the grey ones.
    */
   placeholderSlots?: number;
+  /**
+   * The contest, from a caller that already has it.
+   *
+   * The lobby fetched every field the editor needs to draw empty slots, so a
+   * page opened FROM the lobby need not wait for this component to fetch the
+   * same row again. With it, and with the slot shapes cached, the slots are on
+   * screen before any request is made. See `useLineupData`.
+   */
+  contestHint?: LineupContest | null;
   /**
    * Fired once, when a submission has just BOUGHT the entry — not on the edits
    * that follow it.
@@ -248,6 +257,7 @@ export function LineupEditor({
   frame = 'screen',
   bench: showBench = true,
   placeholderSlots,
+  contestHint,
   onEntered,
   onEntryOffer,
   entryRef,
@@ -354,7 +364,15 @@ export function LineupEditor({
     : (board.length ? board[cardIndex] : null);
   /* The free contest is the default and passes no code, which is what every
      caller written before the lobby existed meant. */
-  const contestCode = current && current.kind !== 'free' ? current.code : undefined;
+  /* PINNED, THE CODE IS THE PROP. It used to be read off `current`, which is
+     the row `useMyContests` returns — a third fetch this component then waited
+     on before it could ask for anything. The caller pinned it by code; that is
+     the answer, and it is available on the first render. */
+  const contestCode = pinned
+    ? (pinnedContest as string)
+    : current && current.kind !== 'free'
+      ? current.code
+      : undefined;
 
   /** Measured, not derived from the window — see `ContestCarousel.width`. */
   const [cardWidth, setCardWidth] = useState(0);
@@ -376,7 +394,7 @@ export function LineupEditor({
     error: loadError,
     reload,
     reloadLineup,
-  } = useLineupData(contestCode);
+  } = useLineupData(contestCode, contestHint);
   const { run, roster } = usePlayer();
 
   /**
@@ -1281,7 +1299,17 @@ export function LineupEditor({
      is off entirely when `pinned`, and its own reads are gated. */
   const results = useSettledResults(pinned);
 
-  if (loading || (pinned && !current)) {
+  /* WHAT IS ACTUALLY NEEDED TO DRAW EMPTY SLOTS: the slot shapes, and the
+     contest they belong to. Both can be in hand before any request — the
+     shapes from `formatSlotCache`, the contest from `contestHint` — so a page
+     that supplies a hint stops waiting on `loading`, which is the flag for
+     everything ELSE this hook fetches: your collection, the field, the stats,
+     the schedule. Those fill the rows in afterwards; they do not decide
+     whether there are rows.
+     `countsKnown` is the honest half of that bargain — see `SlotBoard`. */
+  const canDrawSlots = slots.length > 0 && contest !== null;
+
+  if ((loading && !canDrawSlots) || (pinned && !current && !contestHint)) {
     /* Skeleton rows where the caller told us how many to expect, so the page
        settles at its final height — see `placeholderSlots`. A spinner remains
        the honest answer everywhere the count is unknown. */
@@ -1492,6 +1520,7 @@ export function LineupEditor({
               byId={byId}
               picks={picks}
               eligibleCounts={eligibleCounts}
+              countsKnown={!loading}
               openSlot={swap?.kind === 'slot' ? swap.slot : null}
               lockedIds={unavailableIds}
               savedPoints={savedPoints}
