@@ -33,7 +33,8 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { EarningsScale } from './EarningsScale';
-import { CopyRow } from './CopyRow';
+import { PlayerRow } from '@/components/cards/PlayerRow';
+import type { DirectoryPlayer } from '@/components/cards/player-directory';
 import { Row, Section } from './Section';
 import { Colors, NUMERIC, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -42,15 +43,20 @@ import { type MarketTier, type PlayerMarket } from './market';
 export function CommunityPanel({
   market,
   playerName,
-  position,
-  team,
+  directoryPlayer,
   copy,
 }: {
   market: PlayerMarket | null;
-  /** For the leaderboard row's identity block. */
   playerName: string;
-  position: string | null;
-  team: string | null;
+  /**
+   * The player, for the leaderboard's row.
+   *
+   * It is the DIRECTORY's row — same identity block as the player list and as
+   * your own copies above — with the tray carrying who holds the copy and how
+   * many weeks they have played it, since a copy that is not yours has no tier
+   * threshold we hold and no progress to report.
+   */
+  directoryPlayer?: DirectoryPlayer | null;
   /**
    * The ONE copy the page is about, on the card profile.
    *
@@ -68,6 +74,9 @@ export function CommunityPanel({
    */
   copy?: { careerFp: number; rank: number; pool: number } | null;
 }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
   if (!market) return null;
 
   const { totals, tiers, top, yours, seasons } = market;
@@ -151,27 +160,35 @@ export function CommunityPanel({
         * would put three different people's cards in a column ordered by tier
         * rather than by score, which is a ranking of nothing.
         */}
-      {top && top.careerFp > 0 ? (
+      {top && top.careerFp > 0 && directoryPlayer ? (
         <Section label="Best copies" hint="ACROSS EVERY OWNER">
-          <CopyRow
-            card={{
-              name: playerName,
-              position,
-              team,
-              tier: top.tier,
-              careerFp: top.careerFp,
-              nextTierAt: null,
-              nextTierLabel: null,
-            }}
-            badge={<RankMark rank={1} />}
-            right={<TopFigure value={top.careerFp} />}
-            progress={{
-              text: top.isYou
-                ? `Yours · ${top.lineupStarts} start${top.lineupStarts === 1 ? '' : 's'}`
-                : `${top.displayName} · ${top.lineupStarts} start${top.lineupStarts === 1 ? '' : 's'}`,
-            }}
-            accessibilityLabel={`Best copy, ${top.careerFp.toFixed(0)} points, held by ${top.isYou ? 'you' : top.displayName}`}
-          />
+          <View style={styles.rows}>
+            <PlayerRow
+              player={directoryPlayer}
+              onPress={() => {}}
+              figure={{ value: top.careerFp.toFixed(1), label: 'FP' }}
+              strip={
+                <>
+                  <View style={styles.holder}>
+                    <Text numberOfLines={1} style={[Type.micro, styles.unit, { color: c.textTertiary }]}>
+                      {`#1 · ${top.tier.toUpperCase()}`}
+                    </Text>
+                    <Text numberOfLines={1} style={[Type.body, { color: c.textSecondary }]}>
+                      {top.isYou ? 'Yours' : top.displayName}
+                    </Text>
+                  </View>
+                  <View style={styles.holder}>
+                    <Text numberOfLines={1} style={[Type.body, NUMERIC, { color: c.textSecondary }]}>
+                      {top.lineupStarts}
+                    </Text>
+                    <Text numberOfLines={1} style={[Type.micro, styles.unit, { color: c.textTertiary }]}>
+                      {top.lineupStarts === 1 ? 'START' : 'STARTS'}
+                    </Text>
+                  </View>
+                </>
+              }
+            />
+          </View>
         </Section>
       ) : null}
     </>
@@ -258,7 +275,9 @@ function TierComposition({ tiers, held }: { tiers: MarketTier[]; held: number })
 
 const styles = StyleSheet.create({
   block: { gap: Spacing.two + 2 },
-  rank: { alignItems: 'center' },
+  rows: { marginHorizontal: -Spacing.three },
+  holder: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1, flexShrink: 0 },
+  unit: { flexShrink: 0, lineHeight: 16 },
   /* The gap is the separator. Two adjacent segments in neighbouring tier
      colours — bronze against gold at small sizes — otherwise read as one. */
   stack: { flexDirection: 'row', gap: 2, height: 10, borderRadius: 5, overflow: 'hidden' },
@@ -270,21 +289,4 @@ const styles = StyleSheet.create({
   seasonYear: { width: 44 },
 });
 
-/** The rank, in the badge column a lineup row spends on a slot. */
-function RankMark({ rank }: { rank: number }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  return (
-    <View style={styles.rank}>
-      <Text style={[Type.strong, NUMERIC, { color: c.textSecondary }]}>{`#${rank}`}</Text>
-    </View>
-  );
-}
 
-function TopFigure({ value }: { value: number }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  return (
-    <Text style={[Type.figure, NUMERIC, { color: c.text }]}>{value.toFixed(1)}</Text>
-  );
-}

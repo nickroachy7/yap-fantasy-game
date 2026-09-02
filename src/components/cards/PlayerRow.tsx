@@ -75,7 +75,7 @@
  * tray is picked per scheme and the reason is written down here rather than
  * inferred from two hex values.
  */
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { PlayerAvatar, AVATAR_SIZE } from './PlayerAvatar';
@@ -161,9 +161,25 @@ export type PlayerRowProps = {
   /** "Sun 1:05p vs BUF" or "BYE". Absent when the schedule has not loaded. */
   fixture?: string | null;
   figure?: RowFigure;
+  /**
+   * Replaces the tray's contents.
+   *
+   * The default strip is a HISTOGRAM OF A PLAYER — how many copies of him exist
+   * at each tier, and what the best one has scored. That is the right answer on
+   * the directory, where every row is a different player and the question is
+   * which of them to chase.
+   *
+   * On the card profile every row is the SAME player, so that strip would
+   * repeat itself down the list while saying nothing about the thing that
+   * actually differs: which copy this is. The tray becomes the caller's, and
+   * everything above it stays exactly as the directory draws it — which is the
+   * point of reusing the row at all. It keeps its own height and fill, because
+   * `getItemLayout` is promised that both bands sum to `PLAYER_ROW_HEIGHT`.
+   */
+  strip?: ReactNode;
 };
 
-function PlayerRowInner({ player, onPress, fixture, figure }: PlayerRowProps) {
+function PlayerRowInner({ player, onPress, fixture, figure, strip }: PlayerRowProps) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const accent = positionColors(player.position, scheme).accent;
@@ -316,6 +332,8 @@ function PlayerRowInner({ player, onPress, fixture, figure }: PlayerRowProps) {
       {/* Full-bleed, so the tray runs edge to edge and the band reads as a
           band rather than an inset card. The gutter is on the contents. */}
       <View style={[styles.strip, { backgroundColor: tray }]}>
+        {strip ?? (
+          <>
         <View style={styles.tiers}>
           {tierCounts(player.market ?? EMPTY_MARKET).map((t) => (
             <View key={t.tier} style={styles.tierPair}>
@@ -346,6 +364,8 @@ function PlayerRowInner({ player, onPress, fixture, figure }: PlayerRowProps) {
             FPTS
           </Text>
         </View>
+          </>
+        )}
       </View>
     </Pressable>
   );

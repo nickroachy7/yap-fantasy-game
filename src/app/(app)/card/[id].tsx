@@ -31,11 +31,11 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { readCardActions, type CardActionSet, type CardActions } from '@/components/cards/card-actions';
 import { CardExits, cardExitNote } from '@/components/cards/CardExits';
 import { PlayerAvatar } from '@/components/cards/PlayerAvatar';
-import { TierMark } from '@/components/cards/TierMark';
 import { dropCards } from '@/components/collection/use-collection';
 import { invalidateSets } from '@/components/collection/use-sets';
 import { CardHistory } from '@/components/players/CardHistory';
-import { CopyRow } from '@/components/players/CopyRow';
+import { PlayerRow } from '@/components/cards/PlayerRow';
+import { CardStrip } from '@/components/players/CardStrip';
 import { CommunityPanel } from '@/components/players/CommunityPanel';
 import { GameLogTab } from '@/components/players/GameLogTab';
 import { OverviewTab } from '@/components/players/OverviewTab';
@@ -49,7 +49,7 @@ import { sellErrorMessage } from '@/components/players/sell';
 import { usePlayerPage } from '@/components/players/use-player-page';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
-import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
+import { Colors, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
@@ -68,28 +68,12 @@ const TABS: Tab<ProfileTab>[] = [
   { value: 'log', label: 'Game log' },
 ];
 
-/**
- * The copy's history, as the one line that hangs under its row.
- *
- * Ordered by how often it is the reason someone looked: how many weeks it has
- * been started, then what a set will do with it, then where it came from. The
- * set clause is dropped on a copy with nothing to say about sets, rather than
- * printed as "no sets" — an absent clause is shorter than a negative one and
- * says the same thing.
- */
-function copyMeta(
-  card: { season: number | null; rarity: string | null; source: string | null; acquiredAt: string | null },
-  starts: number,
-  exitNote: string | null,
-): string {
-  return [
-    starts === 0 ? 'Never started' : `${starts} start${starts === 1 ? '' : 's'}`,
-    exitNote,
-    `${card.rarity ?? 'Unknown'}${card.source ? `, from a ${card.source}` : ''}`,
-    dateLabel(card.acquiredAt),
-  ]
-    .filter(Boolean)
-    .join(' · ');
+/** "27 Aug". The tray has room for a day and a month, not a year. */
+function shortDate(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
 /** "4 Aug 2026". Short and unambiguous — no locale-dependent 8/4 vs 4/8. */
@@ -455,35 +439,44 @@ export default function CardDetailScreen() {
               * Those were four labelled pairs and a progress bar, describing a
               * card that in the common case has done nothing yet.
               */}
+            {/**
+              * THE COPY AS THE DIRECTORY'S ROW.
+              *
+              * It was a progress bar over four labelled pairs — the only card
+              * in the app drawn unlike every other card, and the one a reader
+              * came to look at. `PlayerRow` is the row the player list draws,
+              * so the object you tapped looks like the same object when it
+              * opens; only the grey tray changes, and it changes because the
+              * directory's tray is a fact about the player rather than about
+              * this copy. See `CardStrip`.
+              */}
             <Section label="This copy">
-              <CopyRow
-                card={{
-                  name: k.playerName,
-                  position: k.positionAbbreviation,
-                  team: k.teamAbbreviation,
-                  injuryStatus: k.injuryStatus,
-                  tier: k.tier,
-                  careerFp: k.careerFp,
-                  nextTierAt: k.nextTierAt,
-                  nextTierLabel: k.nextTierLabel,
-                }}
-                badge={<TierMark tier={k.tier} size={18} />}
-                right={
-                  <Text style={[Type.figure, NUMERIC, { color: c.text }]}>
-                    {k.careerFp.toFixed(1)}
-                  </Text>
-                }
-                meta={copyMeta(k, card.starts.length, exitNote)}
-                accessibilityLabel={`Your ${k.tier} ${k.playerName} card`}
-              />
+              {page.player ? (
+                <View style={styles.rows}>
+                  <PlayerRow
+                    player={page.player}
+                    onPress={() => {}}
+                    figure={{ value: k.careerFp.toFixed(1), label: 'FP' }}
+                    strip={
+                      <CardStrip
+                        tier={k.tier}
+                        starts={card.starts.length}
+                        rarity={k.rarity}
+                        setNote={exitNote}
+                        acquired={shortDate(k.acquiredAt)}
+                      />
+                    }
+                  />
+                </View>
+              ) : null}
 
               {/* THE RECEIPT, ONLY ONCE THERE IS SOMETHING TO RECEIPT.
                   `career_fp` moves in exactly one way — a week this copy was in
                   a lineup and that week was scored — and on a card with
                   fourteen starts that table is the only place the total can be
                   checked. On a card with none it was a season band, four column
-                  heads and a row of dashes around a fact the meta line above
-                  already states, so it does not draw at all. */}
+                  heads and a row of dashes around a fact the tray above already
+                  states, so it does not draw at all. */}
               {scoredStarts > 0 ? (
                 <StartLog starts={card.starts} playerName={k.playerName} />
               ) : null}
@@ -495,14 +488,12 @@ export default function CardDetailScreen() {
                 things — and it is the only list on the page they can act on.
                 Absent when this is the only one you hold, which is most of
                 them. */}
-            {others.length > 0 ? (
+            {others.length > 0 && page.player ? (
               <Section label="Your other copies" hint={`${others.length} MORE`}>
                 <CardHistory
                   cards={others}
                   loading={page.ownedLoading}
-                  playerName={k.playerName}
-                  position={k.positionAbbreviation}
-                  team={k.teamAbbreviation}
+                  player={page.player}
                   onOpen={(x) => router.replace({ pathname: '/card/[id]', params: { id: x.id } })}
                 />
               </Section>
@@ -515,8 +506,7 @@ export default function CardDetailScreen() {
             <CommunityPanel
               market={page.market}
               playerName={k.playerName}
-              position={k.positionAbbreviation}
-              team={k.teamAbbreviation}
+              directoryPlayer={page.player}
               copy={{
                 careerFp: k.careerFp,
                 rank: card.rank.amongPlayer,
@@ -710,6 +700,8 @@ const styles = StyleSheet.create({
   /* No bottom rule: the first `Section` under it draws one, and two hairlines
      a gap apart is the box the sections exist to get rid of. */
   tabBar: { paddingBottom: 2 },
+  /* The directory row draws its own gutter, so the section cancels its. */
+  rows: { marginHorizontal: -Spacing.three },
   tierChip: { borderRadius: Radius.chip, paddingHorizontal: Spacing.two - 1, paddingVertical: 3 },
   pressed: { opacity: 0.65 },
 });

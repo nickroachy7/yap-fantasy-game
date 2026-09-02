@@ -25,13 +25,13 @@
  * the gap between a player's production and your copy's earnings is a fact you
  * can see only with his stats next to it.
  */
-import { Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { TierMark } from '@/components/cards/TierMark';
-import { CopyRow } from './CopyRow';
+import { PlayerRow } from '@/components/cards/PlayerRow';
+import type { DirectoryPlayer } from '@/components/cards/player-directory';
+import { CardStrip } from './CardStrip';
 import { Row } from './Section';
-import { Colors, NUMERIC, Type, type CardTier } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Spacing, type CardTier } from '@/constants/theme';
 
 export type OwnedCard = {
   id: string;
@@ -47,34 +47,35 @@ export type OwnedCard = {
   sellValue: number;
 };
 
-/** "4 Aug 2026". Short and unambiguous — no locale-dependent 8/4 vs 4/8. */
+/** "4 Aug". The tray has room for a day and a month, not a year. */
 function acquiredLabel(iso: string | null): string {
-  if (!iso) return 'Date unknown';
+  if (!iso) return '—';
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'Date unknown';
-  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
 export function CardHistory({
   cards,
   loading,
-  playerName,
-  position,
-  team,
+  player,
   onOpen,
 }: {
   cards: OwnedCard[];
   loading: boolean;
-  playerName: string;
-  /** For the row's identity block, which draws the club and position colour. */
-  position: string | null;
-  team: string | null;
+  /**
+   * The player every row is about.
+   *
+   * The rows ARE the directory's rows, so they take the directory's player.
+   * Every one of them draws the same identity — same name, same fixture, same
+   * ranks — because that is true: these are copies of one man. What differs is
+   * the tray, which each row fills with its own copy. See `CardStrip`.
+   */
+  player: DirectoryPlayer;
+  fixture?: string | null;
   /** Opens the card profile for one copy. */
   onOpen?: (card: OwnedCard) => void;
 }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-
   // Silent while loading rather than flashing "you own none of this player" at
   // someone who owns three. A wrong answer is worse than a late one here.
   if (loading) return null;
@@ -83,44 +84,28 @@ export function CardHistory({
     return (
       <Row
         label="Copies"
-        value={`None — cards arrive from packs, and nothing here changes that`}
+        value="None — cards arrive from packs, and nothing here changes that"
         muted
       />
     );
   }
 
   return (
-    <View>
+    <View style={styles.list}>
       {cards.map((card) => (
-        <CopyRow
+        <PlayerRow
           key={card.id}
-          card={{
-            name: playerName,
-            position,
-            team,
-            tier: card.tier,
-            careerFp: card.careerFp,
-            nextTierAt: card.nextTierAt,
-            nextTierLabel: card.nextTierLabel,
-          }}
-          badge={<TierMark tier={card.tier} size={18} />}
-          right={
-            <Text style={[Type.figure, NUMERIC, { color: c.text }]}>
-              {card.careerFp.toFixed(1)}
-            </Text>
-          }
-          /* THE HISTORY, ON ONE LINE UNDER THE ROW. It was three stacked lines
-             inside a bespoke row — season, acquired, "N FP earned over M
-             starts" — which is the row saying in prose what the identity block
-             above it now says in its own vocabulary. What is left is the two
-             facts the row cannot carry: when it arrived, and how many weeks it
-             has actually been played. */
-          meta={`${card.season ?? '—'} card · acquired ${acquiredLabel(card.acquiredAt)} · ${card.lineupStarts} start${card.lineupStarts === 1 ? '' : 's'}`}
-          onPress={onOpen ? () => onOpen(card) : undefined}
-          accessibilityLabel={
-            `${playerName}, ${card.season ?? 'unknown season'} card, ${card.tier} tier, ` +
-            `${card.careerFp.toFixed(0)} points over ${card.lineupStarts} starts` +
-            (onOpen ? '. Opens this card.' : '')
+          player={player}
+          onPress={() => onOpen?.(card)}
+          figure={{ value: card.careerFp.toFixed(1), label: 'FP' }}
+          strip={
+            <CardStrip
+              tier={card.tier}
+              starts={card.lineupStarts}
+              rarity={null}
+              setNote={null}
+              acquired={acquiredLabel(card.acquiredAt)}
+            />
           }
         />
       ))}
@@ -128,3 +113,8 @@ export function CardHistory({
   );
 }
 
+const styles = StyleSheet.create({
+  /* The rows draw their own gutter, so the list cancels the section's — a
+     directory row inset twice is a card, and these are list items. */
+  list: { marginHorizontal: -Spacing.three },
+});

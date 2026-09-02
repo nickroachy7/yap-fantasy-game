@@ -1094,14 +1094,10 @@ function ProfileFixture() {
       <CommunityPanel
         market={parseMarket(MARKET_SAMPLE)}
         playerName={profile.player.name}
-        position={profile.player.positionAbbreviation}
-        team={profile.player.teamAbbreviation}
       />
       <CommunityPanel
         market={parseMarket(MARKET_UNPLAYED)}
         playerName={profile.player.name}
-        position={profile.player.positionAbbreviation}
-        team={profile.player.teamAbbreviation}
       />
 
       <CardFixture payload={CARD_PROFILE_SAMPLE} />
