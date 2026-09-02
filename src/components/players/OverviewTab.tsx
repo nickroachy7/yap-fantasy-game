@@ -86,7 +86,6 @@ export function OverviewTab({
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const rank = currentRank(profile);
 
   /* The comment takes the designation's own colour, from the same `injuryWeight`
      the hero's identity line runs — a player printing a red Q up there cannot
@@ -116,11 +115,11 @@ export function OverviewTab({
         */}
       <Section label="Summary">
         <FigureRow>
-          <Figure
-            label="GAMES"
-            value={String(player.gamesPlayed)}
-            hint={rank && rank.season !== player.season ? `${rank.season} rank above` : undefined}
-          />
+          {/* NO HINT. It carried "2025 rank above" when the header's rank came
+              from a previous season — which points at nothing on the card page,
+              whose strip is the copy's earnings and holds no rank at all. The
+              directory's rank cell labels its own season. */}
+          <Figure label="GAMES" value={String(player.gamesPlayed)} />
           {market ? (
             <Figure
               label="OWNERS"
