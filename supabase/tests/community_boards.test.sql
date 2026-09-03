@@ -270,7 +270,7 @@ begin
     from public.card_instances ci
     join public.card_prices cp on cp.card_instance_id = ci.id
     join public.cards c on c.id = ci.card_id
-   where ci.user_id = v_a and ci.sold_at is null and c.season = v_season;
+   where ci.user_id = v_a and ci.is_held and c.season = v_season;
 
   v_expect_a := v_expect;
   select * into v_row from public.board_collection(v_season, 500) where user_id = v_a;
@@ -279,17 +279,19 @@ begin
       v_row.held, v_row.players, v_row.value_coins, v_expect;
   end if;
 
-  -- C HOLDS ONE DIAMOND AND HAS BURNT ANOTHER, and since 20260824200600 both
-  -- count. That migration reversed the rule this assertion used to encode:
-  -- selling REMOVES a card and committing only immobilises one, so a committed
-  -- copy stays on the board frozen at the tier it went in at. `held` stays 1
-  -- and `in_sets` carries the other, which is the distinction that lets the
-  -- board show how much of a shelf can still grow.
+  -- C HOLDS ONE DIAMOND AND HAS COMMITTED ANOTHER, and only the held one is on
+  -- the figure. This assertion has now encoded the rule in both directions:
+  -- 20260824200600 made a committed copy count, and 20260903200000 took it back
+  -- out when the board became ROSTER value. A card committed to a set is off
+  -- your roster — that is what committing is — so the number matches the one
+  -- the Collect page shows for the same shelf, which is the whole point of the
+  -- change. `in_sets` still carries the other copy, and `in_sets_coins` still
+  -- prices it; they are facts about a manager rather than parts of this figure.
   select coalesce(sum(cp.sell_value), 0)::bigint into v_expect
     from public.card_instances ci
     join public.card_prices cp on cp.card_instance_id = ci.id
     join public.cards c on c.id = ci.card_id
-   where ci.user_id = v_c and ci.sold_at is null and c.season = v_season;
+   where ci.user_id = v_c and ci.is_held and c.season = v_season;
   select coalesce(sum(cp.sell_value), 0)::bigint into v_expect_sets
     from public.card_instances ci
     join public.card_prices cp on cp.card_instance_id = ci.id
