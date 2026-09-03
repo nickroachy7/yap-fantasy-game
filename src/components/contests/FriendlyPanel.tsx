@@ -130,6 +130,9 @@ export function FriendlyPanel({
 
   const inRoom = (members ?? []).filter((m) => !m.declined);
   const entered = inRoom.filter((m) => m.entered).length;
+  /* Who has not answered at all — the only number a host can act on, so it is
+     the only one worth a sentence of its own below. */
+  const unanswered = inRoom.filter((m) => !m.accepted && !m.entered).length;
   /* Friends who are not already in the room. A friend who DECLINED stays out of
      this list: the server will not re-invite them (`on conflict do nothing`
      leaves the declined row alone), so offering the button would be offering
@@ -149,7 +152,10 @@ export function FriendlyPanel({
       </View>
       <Text style={[Type.body, { color: c.textTertiary }]}>
         {mine
-          ? `${entered} of ${inRoom.length} have filed a lineup.`
+          ? `${entered} of ${inRoom.length} have filed a lineup` +
+            (unanswered > 0
+              ? `, and ${unanswered} ${unanswered === 1 ? 'has' : 'have'} not answered yet.`
+              : '.')
           : `${creatorName ?? 'A manager'} built this one. ${entered} of ${inRoom.length} have filed.`}
       </Text>
 
@@ -174,13 +180,20 @@ export function FriendlyPanel({
                 {m.name}
               </Text>
               {m.isOwner ? <StatusChip label="Host" tone="neutral" /> : null}
-              {/* IN, or ASKED. Two states and no third — "declined" is not
-                  drawn because those rows are filtered out above: a list of
-                  people who said no is a scoreboard of refusals, and the
-                  creator can do nothing about any of them. */}
+              {/* THREE STATES, AND THE MIDDLE ONE IS WHY.
+                  PLAYING is in the field. IN has said yes and not picked a team
+                  — nothing for the host to do. ASKED has not answered, and is
+                  the only row here that is a prompt to go and nudge somebody.
+                  Drawing the middle as ASKED, which is what this did before
+                  `accept_friendly` existed, tells the host to chase people who
+                  have already agreed.
+
+                  DECLINED is not a fourth state because those rows are filtered
+                  out above: a list of people who said no is a scoreboard of
+                  refusals, and the host can do nothing about any of it. */}
               <StatusChip
-                label={m.entered ? 'In' : 'Asked'}
-                tone={m.entered ? 'positive' : 'warning'}
+                label={m.entered ? 'Playing' : m.accepted ? 'In' : 'Asked'}
+                tone={m.entered ? 'positive' : m.accepted ? 'neutral' : 'warning'}
               />
             </Pressable>
           ))}

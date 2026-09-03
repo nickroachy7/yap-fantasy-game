@@ -97,12 +97,23 @@ export type ContestInvite = {
   createdAt: string;
 };
 
-/** Somebody in the room, whether or not they have filed. */
+/**
+ * Somebody in the room, at whichever of the three stages they have reached.
+ *
+ * `accepted` and `entered` are not the same fact and the panel draws them
+ * differently: somebody who has said yes needs no chasing, and somebody who has
+ * only been asked does. Before `accept_friendly` existed there were two states
+ * and this type had one flag; collapsing them again would tell a host that a
+ * person who already agreed still needs asking.
+ */
 export type Member = {
   userId: string;
   name: string;
   /** False when they let themselves in with the join code. */
   invited: boolean;
+  /** Said yes — or built it, or used the code. Costs nothing, enters nothing. */
+  accepted: boolean;
+  /** Filed a lineup. The only one of the three that is in the field. */
   entered: boolean;
   declined: boolean;
   isOwner: boolean;
@@ -348,6 +359,22 @@ export async function joinFriendly(
   return { code: String(r.code), name: String(r.name), joined: Boolean(r.joined) };
 }
 
+/**
+ * Yes.
+ *
+ * IT COSTS NOTHING AND ENTERS NOTHING. Accepting moves the contest onto your
+ * Friendly shelf and takes it off the header's badge; entering is still
+ * `set_lineup`, still takes the fee, and is still the only thing that puts you
+ * in the field. That split is the whole reason the verb exists — see the
+ * migration: without it the only way to clear a badge would be to file a
+ * lineup, so accepting on Tuesday and picking your team on Sunday would mean
+ * five days of being told to do something you had already done.
+ */
+export async function acceptFriendly(code: string): Promise<void> {
+  const { error } = await supabase.rpc('accept_friendly', { p_contest_code: code });
+  if (error) throw new Error(error.message);
+}
+
 /** No thanks. The row stops being offered and cannot be re-offered. */
 export async function declineFriendly(code: string): Promise<void> {
   const { error } = await supabase.rpc('decline_friendly', { p_contest_code: code });
@@ -411,6 +438,7 @@ export async function fetchMembers(code: string): Promise<Member[]> {
     userId: r.user_id,
     name: r.name,
     invited: Boolean(r.invited),
+    accepted: Boolean(r.accepted),
     entered: Boolean(r.entered),
     declined: Boolean(r.declined),
     isOwner: Boolean(r.is_owner),

@@ -439,6 +439,7 @@ export type Database = {
       }
       contest_invites: {
         Row: {
+          accepted_at: string | null
           contest_id: string
           created_at: string
           declined_at: string | null
@@ -446,6 +447,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          accepted_at?: string | null
           contest_id: string
           created_at?: string
           declined_at?: string | null
@@ -453,6 +455,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          accepted_at?: string | null
           contest_id?: string
           created_at?: string
           declined_at?: string | null
@@ -2179,6 +2182,7 @@ export type Database = {
       }
     }
     Functions: {
+      accept_friendly: { Args: { p_contest_code: string }; Returns: Json }
       apply_injuries: { Args: { payload: Json }; Returns: number }
       apply_market_blend: {
         Args: { p_format?: string; p_season?: number }
@@ -2525,6 +2529,7 @@ export type Database = {
       friendly_members: {
         Args: { p_contest_code: string }
         Returns: {
+          accepted: boolean
           declined: boolean
           entered: boolean
           invited: boolean

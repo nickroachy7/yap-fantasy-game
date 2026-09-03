@@ -196,13 +196,64 @@ begin
   select count(*) into n from public.contest_lobby() where code = v_code;
   if n <> 1 then raise exception 'FAIL: the host cannot see their own contest'; end if;
 
-  -- The invited friend sees it, and it is on their to-do list.
+  -- ======================================================================
+  -- AN UNANSWERED INVITATION IS A QUESTION, NOT A CONTEST YOU HAVE
+  -- ======================================================================
+  --
+  -- `20260903190000`. The invited friend has it on their INVITES list and NOT
+  -- on the lobby's shelf — being in both at once is the bug that migration
+  -- exists to prevent, because answering would then move a row into a list it
+  -- was already in, which reads as nothing happening.
   perform set_config('request.jwt.claims',
     '{"sub":"ffffffff-0000-0000-0000-00000000f002","role":"authenticated"}', true);
-  select count(*) into n from public.contest_lobby() where code = v_code;
-  if n <> 1 then raise exception 'FAIL: an invited friend cannot see the contest'; end if;
+
   select count(*) into n from public.my_friendly_invites() where code = v_code;
   if n <> 1 then raise exception 'FAIL: the invitation is not on the friend''s list'; end if;
+
+  select count(*) into n from public.contest_lobby() where code = v_code;
+  if n <> 0 then
+    raise exception 'FAIL: an unanswered invitation is already on the lobby shelf';
+  end if;
+
+  -- But it is READABLE, because they were asked: `can_see_contest` is about
+  -- whether the room is yours to look into, not about whether you said yes.
+  if not public.can_see_contest(v_id) then
+    raise exception 'FAIL: an invited manager cannot look at the contest';
+  end if;
+
+  -- YES. Costs nothing, enters nothing, and moves it across.
+  perform public.accept_friendly(v_code);
+
+  select count(*) into n from public.my_friendly_invites() where code = v_code;
+  if n <> 0 then raise exception 'FAIL: accepting did not clear the invitation'; end if;
+  select count(*) into n from public.contest_lobby() where code = v_code;
+  if n <> 1 then raise exception 'FAIL: accepting did not put it on the shelf'; end if;
+  select count(*) into n from public.lineups
+   where contest_id = v_id and user_id = 'ffffffff-0000-0000-0000-00000000f002';
+  if n <> 0 then raise exception 'FAIL: accepting filed an entry'; end if;
+  if (select balance from public.coin_balances
+       where user_id = 'ffffffff-0000-0000-0000-00000000f002') <> 5000 then
+    raise exception 'FAIL: accepting charged the entry fee';
+  end if;
+
+  -- Idempotent: a second yes is not an error and does not double anything.
+  perform public.accept_friendly(v_code);
+  select count(*) into n from public.contest_lobby() where code = v_code;
+  if n <> 1 then raise exception 'FAIL: accepting twice broke the shelf'; end if;
+
+  -- Declining after accepting takes it back off the shelf, and the invitation
+  -- does NOT come back — it was answered, and a decline is a second answer.
+  perform public.decline_friendly(v_code);
+  select count(*) into n from public.contest_lobby() where code = v_code;
+  if n <> 0 then raise exception 'FAIL: a declined contest is still on the shelf'; end if;
+  select count(*) into n from public.my_friendly_invites() where code = v_code;
+  if n <> 0 then raise exception 'FAIL: declining put the invitation back'; end if;
+
+  -- And changing your mind is yours to do, which is the rule the CREATOR does
+  -- not get: they cannot re-ask past a no, but you may re-answer your own.
+  perform public.accept_friendly(v_code);
+  select count(*) into n from public.contest_lobby() where code = v_code;
+  if n <> 1 then raise exception 'FAIL: could not un-decline my own answer'; end if;
 
   -- A STRANGER SEES NOTHING, through every door there is.
   perform set_config('request.jwt.claims',
@@ -249,6 +300,16 @@ begin
    where code = v_code and join_code is not null;
   if n <> 0 then raise exception 'FAIL: a guest was given the join code'; end if;
 
+  -- Nobody can accept their way into a room they were not asked to. The
+  -- stranger got in with the CODE above, so this is checked before that — see
+  -- the ordering: at this point f003 has joined, so a fresh check needs a
+  -- contest they have no row in at all.
+  begin
+    perform public.accept_friendly('friendly:0000000000000000000000000000dead');
+    raise exception 'FAIL: accepted an invitation to a contest that does not exist';
+  exception when sqlstate '22023' then null;
+  end;
+
   -- ======================================================================
   -- ONLY THE HOST HOLDS THE DOOR
   -- ======================================================================
@@ -274,6 +335,32 @@ begin
        array['ffffffff-0000-0000-0000-00000000f003']::uuid[]) <> 0 then
     raise exception 'FAIL: a non-friend was invited';
   end if;
+
+  -- ======================================================================
+  -- THE ROOM REPORTS THREE STATES, NOT TWO
+  -- ======================================================================
+  --
+  -- `20260903193000`. The host's panel chases people who have not answered, so
+  -- "accepted but has not picked a team" must not read as "asked". f002
+  -- accepted above and has filed nothing; f003 came in on the code, which is
+  -- an answer too.
+  select count(*) into n from public.friendly_members(v_code)
+   where user_id = 'ffffffff-0000-0000-0000-00000000f002'
+     and accepted and not entered and not declined;
+  if n <> 1 then
+    raise exception 'FAIL: an accepted guest does not read as accepted';
+  end if;
+
+  select count(*) into n from public.friendly_members(v_code)
+   where user_id = 'ffffffff-0000-0000-0000-00000000f003' and accepted;
+  if n <> 1 then
+    raise exception 'FAIL: joining with a code did not count as an answer';
+  end if;
+
+  -- The host's own seat is answered by construction — they built the thing.
+  select count(*) into n from public.friendly_members(v_code)
+   where is_owner and accepted;
+  if n <> 1 then raise exception 'FAIL: the host is not marked as in'; end if;
 
   -- ======================================================================
   -- A SHAPE THE GAME ALREADY RUNS IS THAT FORMAT, not a copy of it

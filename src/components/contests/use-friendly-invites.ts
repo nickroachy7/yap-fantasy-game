@@ -29,7 +29,13 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 
 import { useLoader, type Load } from '@/hooks/use-loader';
-import { declineFriendly, fetchInvites, joinFriendly, type ContestInvite } from './friendly';
+import {
+  acceptFriendly,
+  declineFriendly,
+  fetchInvites,
+  joinFriendly,
+  type ContestInvite,
+} from './friendly';
 
 export type InvitesState = {
   invites: ContestInvite[] | null;
@@ -38,13 +44,32 @@ export type InvitesState = {
   loading: boolean;
   error: string | null;
   reload: () => void;
+  /**
+   * Say yes. Costs nothing and enters nothing — the contest moves onto the
+   * Friendly shelf and off the badge. Resolves once the list has been re-read.
+   */
+  accept: (code: string) => Promise<void>;
   /** Say no. Resolves once the list has been re-read. */
   decline: (code: string) => Promise<void>;
   /** Let yourself in with a code. Returns the contest to open. */
   join: (joinCode: string) => Promise<{ code: string; name: string; joined: boolean }>;
 };
 
-export function useFriendlyInvites(): InvitesState {
+export function useFriendlyInvites(
+  /**
+   * The lobby's own `reload`. Called after every answer.
+   *
+   * NOT OPTIONAL IN PRACTICE, and it is a parameter rather than something this
+   * hook reaches for because the two reads are genuinely separate RPCs and
+   * neither owns the other. Answering an invitation changes BOTH: the invite
+   * leaves `my_friendly_invites`, and the contest arrives in `contest_lobby`.
+   * Reloading only this one is not a stale list, it is a DISAPPEARANCE — the
+   * row leaves the inbox and the contest it became does not show up on the
+   * shelf until something else happens to refetch. Which is exactly what
+   * shipped for about ten minutes before a browser pass caught it.
+   */
+  alsoReload?: () => void,
+): InvitesState {
   const [invites, setInvites] = useState<ContestInvite[] | null>(null);
 
   const load = useCallback<Load>(async (live) => {
@@ -68,24 +93,37 @@ export function useFriendlyInvites(): InvitesState {
   );
 
   /* NO OPTIMISTIC REMOVAL, for `friends.ts`' reason: the server is the only
-     thing that knows whether the row is still there to decline — the creator
-     may have called the whole contest off while this sheet was open. */
+     thing that knows whether the row is still there to answer — the creator
+     may have called the whole contest off, or given the last seat away, while
+     this sheet was open. Both come back as a refusal rather than as a row that
+     quietly vanished from a list it is still in. */
+  const accept = useCallback(
+    async (code: string) => {
+      await acceptFriendly(code);
+      reload();
+      alsoReload?.();
+    },
+    [reload, alsoReload],
+  );
+
   const decline = useCallback(
     async (code: string) => {
       await declineFriendly(code);
       reload();
+      alsoReload?.();
     },
-    [reload],
+    [reload, alsoReload],
   );
 
   const join = useCallback(
     async (joinCode: string) => {
       const r = await joinFriendly(joinCode);
       reload();
+      alsoReload?.();
       return r;
     },
-    [reload],
+    [reload, alsoReload],
   );
 
-  return { invites, count: invites?.length ?? 0, loading, error, reload, decline, join };
+  return { invites, count: invites?.length ?? 0, loading, error, reload, accept, decline, join };
 }
