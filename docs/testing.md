@@ -10,8 +10,10 @@ and one exit code.
 
 The SQL suites are the only part that needs setup. Without `DATABASE_URL` they
 **skip with a notice and `npm test` still passes** — that is the normal state on
-a fresh clone and in CI. Skipped is not passed; before a release, run them for
-real (see below).
+a fresh clone. It is no longer the state in CI: since 2026-09-03 the workflow
+runs them against the live project on every push to `main`, and both shipping
+jobs wait on the result. See [CI](#ci). Skipped is still not passed, so on a
+clone without the env var, run them for real before you trust a green `npm test`.
 
 | Command | What it runs |
 |---|---|
@@ -114,12 +116,38 @@ Two corollaries worth knowing:
 ## CI
 
 `.github/workflows/ci.yml` runs on push and PR to `main`: Node from `.nvmrc`,
-`npm ci` with the npm cache, then typecheck, lint, and the Deno unit tests.
+`npm ci` with the npm cache, then typecheck, lint, the icon-set lint and the
+Deno unit tests — the `check` job.
 
-It deliberately does **not** run the SQL suites. They need a live database and a
-`DATABASE_URL` secret that is not set on the repository, and a CI job that fails
-for infrastructure reasons is a job people learn to ignore. The workflow prints
-a step saying they were skipped and where to run them. Until that secret exists,
-green CI means "the client code compiles, lints, and the scoring maths is
-right" — it does not mean the server guards still hold. Run `npm run test:sql`
-before a release.
+**The SQL suites run too, in their own `sql` job, and both shipping jobs wait on
+it.** They did not until 2026-09-03, and the argument for wiring them in is the
+thing that happened that day: a price change made buying a pack to dump it
+profitable — free coins, unbounded — and it was invisible to typecheck, lint and
+every unit test. It shipped. `card_prices.test.sql` had been asserting against it
+all along, on somebody's laptop.
+
+Three things about that job are worth knowing before you change it:
+
+- **It talks to the real project**, because the alternative does not exist. The
+  migration chain does not replay from scratch (it breaks at
+  `20260818045000_my_collection_view.sql`), and the suites assert against a real
+  league anyway — 976 priced players, the live `packs` rows, real games walked
+  through a real week. Every suite is `begin … rollback`, which is the property
+  the whole directory is built on; nothing it writes survives.
+- **Pushes to `main` only, one at a time.** Not PRs: secrets are not exposed to
+  fork PRs, so there the job could only fail for an infrastructure reason, and a
+  gate that fails for infrastructure reasons is a gate people learn to ignore.
+  The serialisation is because `slate_transition` takes row locks on `games`
+  inside its transaction, and the gameday sweep runs every minute.
+- **A missing `DATABASE_URL` secret is a SKIP, not a failure** (`--skip-without-db`).
+  So a fork is not broken by the job's existence — but skipped is not passed, and
+  the log says which it was.
+
+The secret is the session-pooler URI (port **5432**), the same string this file
+tells you to export locally. The transaction pooler on 6543 hands out a different
+backend per statement, so `begin` and its `rollback` land in different sessions;
+the job checks for that explicitly and fails with an explanation rather than
+letting the suites break in ways that look like the code.
+
+**When the database is unreachable, nothing ships.** That is the cost of the
+gate, stated plainly: re-run the job once it is back.

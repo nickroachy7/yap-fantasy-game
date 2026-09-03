@@ -62,21 +62,120 @@ jobs:
       - name: Unit tests (Deno)
         run: npm run test:unit
 
-      - name: SQL suites — not run here
+
+  # ── THE SERVER GUARDS ────────────────────────────────────────────────────
+  #
+  # The 23 suites in supabase/tests/*.test.sql, which is where every rule the
+  # client cannot be trusted with is actually checked: RLS scoping, the lineup
+  # and pack refusals, the coin ledger reconciling, and — the one that earned
+  # this job — that buying a pack to dump it loses money. That last property
+  # was silently false for a day in September while the client compiled, linted
+  # and shipped. `check` above cannot see any of it.
+  #
+  # ---------------------------------------------------------------------------
+  # WHY IT TALKS TO THE REAL DATABASE, WHICH IS THE UNCOMFORTABLE PART
+  # ---------------------------------------------------------------------------
+  #
+  # The obvious design is a Postgres service container built from
+  # supabase/migrations. It cannot work, for two independent reasons:
+  #
+  #   1. THE MIGRATION CHAIN DOES NOT REPLAY. It breaks at
+  #      20260818045000_my_collection_view.sql, which does a bare `create view`
+  #      over a view an earlier migration already created — remote was
+  #      reconciled by repair, not by replay. Fixing that is its own job.
+  #   2. THE SUITES NEED A REAL LEAGUE. card_prices asserts against 976 priced
+  #      players and the live `packs` rows; slate_transition walks real games
+  #      through a real week. A schema-only database has none of it, and a
+  #      fixture that invented it would be asserting against itself.
+  #
+  # So: the live project, and every suite is `begin … rollback` by construction
+  # — that is the property the whole directory is written around, not a hope.
+  # Nothing it writes survives, including the accounts and the shifted kickoffs.
+  #
+  # ---------------------------------------------------------------------------
+  # THE THREE RULES THAT MAKE THAT SAFE ENOUGH
+  # ---------------------------------------------------------------------------
+  #
+  # PUSHES TO MAIN ONLY. Not pull requests. A PR is unmerged code, and secrets
+  # are not exposed to fork PRs anyway — so on a fork this job would fail for
+  # an infrastructure reason, which is how a gate becomes something people
+  # learn to ignore.
+  #
+  # ONE AT A TIME. `slate_transition` updates every game outside the preseason
+  # inside its transaction, so two runs overlapping would sit on each other's
+  # row locks — and the gameday sweep runs every minute against the same table.
+  # The group is deliberately NOT cancel-in-progress: a cancelled psql is a
+  # dropped connection, which rolls back cleanly, but there is no reason to
+  # start a second run before the first has let go.
+  #
+  # A MISSING SECRET IS A SKIP, NOT A FAILURE. `--skip-without-db` exits 0 when
+  # DATABASE_URL is unset, so a fork, or this repo before the secret existed,
+  # is not broken by the presence of this job. A suite that actually FAILS is
+  # still a failure. Skipped is not passed — read the log.
+  sql:
+    name: SQL suites
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Serialised across runs — see the note above. A distinct group from the
+    # workflow-level one, or the job would be waiting on its own workflow.
+    concurrency:
+      group: sql-suites
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # The runner image ships postgresql-client, but a base image is a thing
+      # that changes under you. Installing only when it is missing costs a
+      # second and turns a confusing "psql: command not found" three steps
+      # later into nothing at all.
+      - name: Ensure psql
         run: |
-          echo "The suites in supabase/tests/*.test.sql are SKIPPED in CI."
-          echo "They need a live Postgres and a DATABASE_URL secret that is not set"
-          echo "on this repository. Run them locally before a release:"
-          echo
-          echo "  export DATABASE_URL='postgresql://postgres.<ref>:<password>@...pooler.supabase.com:5432/postgres'"
-          echo "  npm run test:sql"
-          echo
-          echo "See docs/testing.md."
+          if ! command -v psql >/dev/null; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          fi
+          psql --version
+
+      # THE SESSION POOLER, NOT THE TRANSACTION POOLER. Every suite is one
+      # transaction; the transaction pooler on 6543 hands out a different
+      # backend per statement, so `begin` and the `rollback` after it are not
+      # the same session and the suites fail in ways that look like the code.
+      # Checked without ever echoing the URL, which carries the password.
+      - name: Check the connection string is the session pooler
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          case "$DATABASE_URL" in
+            "") echo "No DATABASE_URL secret — the suites will skip." ;;
+            *:6543/*)
+              echo "::error::DATABASE_URL points at the TRANSACTION pooler (6543)."
+              echo "::error::Every SQL suite is one transaction, so it needs the SESSION"
+              echo "::error::pooler on 5432. Supabase dashboard > Project Settings >"
+              echo "::error::Database > Connection string > URI (session)."
+              exit 1 ;;
+          esac
+
+      # Skipped rather than failed when there is no secret — see the note above.
+      - name: SQL suites
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run test:sql -- --skip-without-db
 
   # ── SHIP THE JS TO TESTERS ───────────────────────────────────────────────
   #
-  # `needs: check` is the whole point: a push that fails typecheck, lint or the
-  # unit suites must not reach anyone's phone. Publishing is gated on green.
+  # `needs` is the whole point: a push that fails typecheck, lint, the unit
+  # suites or the SERVER suites must not reach anyone's phone. Publishing is
+  # gated on green.
   #
   # This only ships JAVASCRIPT. Native changes — a new module with native code,
   # icon/splash/permissions, an SDK bump, or a change to `expo.version` — still
@@ -89,7 +188,15 @@ jobs:
   # `ios.buildNumber` for new binaries and leave `version` alone.
   publish:
     name: publish OTA update
-    needs: check
+    # BOTH GATES. `check` is the client compiling; `sql` is the server rules
+    # still holding. An update that reaches testers' phones should have passed
+    # both, and the money loop of 2026-09-03 is the argument: it was invisible
+    # to typecheck, lint and every unit test, and it shipped.
+    #
+    # The cost, stated plainly: if the database is unreachable, nothing ships
+    # until it is. Re-run the job once it is back — the update is a push away
+    # and no state is lost.
+    needs: [check, sql]
     # Pushes to main only. A PR must not publish — it has not been merged, and
     # updates go to real testers' phones.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -151,8 +258,8 @@ jobs:
   # side reacts to a push. Without this job, a green push ships the OTA update
   # to phones while yapfantasy.com silently keeps serving the previous build.
   #
-  # `needs: check` for the same reason `publish` has it: the site and the app
-  # ship together, and only when the suite is green.
+  # It waits on the same two gates as `publish`, for the same reason: the site
+  # and the app ship together, and only when both suites are green.
   #
   # `.vercel/` is gitignored, so the runner has no project link. The CLI reads
   # VERCEL_ORG_ID / VERCEL_PROJECT_ID from the environment instead. These are
@@ -164,7 +271,8 @@ jobs:
   # only the first two builds fine here and ships a site with no Supabase client.
   deploy-web:
     name: deploy website
-    needs: check
+    # The site and the app ship together and on the same bar — see `publish`.
+    needs: [check, sql]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
