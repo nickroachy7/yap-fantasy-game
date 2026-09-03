@@ -78,7 +78,6 @@
 import { memo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { BADGE_WIDTH } from '@/components/lineup/LineupRow';
 import { PlayerAvatar, AVATAR_SIZE } from './PlayerAvatar';
 import { DASH } from '@/components/ui/DataTable';
 import { positionColors } from '@/constants/positions';
@@ -445,18 +444,22 @@ const styles = StyleSheet.create({
   /* Reserved at the portrait's size, so a licensed image drops in without the
      row being redesigned around it. See PlayerAvatar. */
   avatar: { width: AVATAR_SIZE, alignSelf: 'center' },
-  /* THE COMPETE BOARD'S BADGE COLUMN, to the point: same width, same centring,
-     same x for everything that follows it. `BADGE_WIDTH` is imported rather
-     than re-typed because two screens whose left columns agree by coincidence
-     are two screens that stop agreeing on the next change — the same argument
-     `InventoryRow` makes for borrowing it.
+  /* CENTRED LIKE THE COMPETE BADGE, BUT NOT AS WIDE AS ONE, and the difference
+     is the whole note.
  
-     CENTRED, NOT RIGHT-ALIGNED. Right-aligning squares 1 and 50 against each
-     other, which is the correct instinct for a column of figures and the wrong
-     one here: this is a LABEL on the portrait beside it, the way the slot badge
-     labels the row it opens, and a label sits in the middle of its own box. */
+     This was `BADGE_WIDTH` — the lineup's 40 — on the reasoning that one x for
+     the left column across both screens is worth having. It is, when the thing
+     in the column FILLS it: a slot badge is a 40pt block of colour, so centring
+     it puts ink at both edges. A single digit is eight points wide. Centred in
+     forty it leaves sixteen either side, and with the row's own gap that is
+     twenty-four points of nothing between the number and the portrait it is
+     labelling — the number stops reading as attached to the row and starts
+     reading as a gutter with a digit in it.
+ 
+     22 is what two digits need, and the board is fifty long so it is never
+     asked for three. The centring is kept, because that part was right. */
   boardRank: {
-    width: BADGE_WIDTH,
+    width: 22,
     textAlign: 'center',
     fontSize: 13,
     fontWeight: '700',
