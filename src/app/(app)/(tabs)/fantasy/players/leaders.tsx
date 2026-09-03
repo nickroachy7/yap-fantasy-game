@@ -35,6 +35,8 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { PlayerList, type ListedPlayer } from '@/components/cards/PlayerList';
 import { ROW_GUTTER } from '@/components/cards/PlayerRow';
 import {
+  fetchBasePrices,
+  invalidatePlayerDirectory,
   loadPlayerDirectory,
   peekPlayerDirectory,
   type DirectoryFetch,
@@ -59,6 +61,18 @@ export default function LeadersScreen() {
   const [result, setResult] = useState<DirectoryFetch | null>(() => peekPlayerDirectory());
   const [failed, setFailed] = useState(false);
   const [pos, setPos] = useState<PosFilter>('ALL');
+  const [refreshing, setRefreshing] = useState(false);
+  /**
+   * PRICES, READ LIVE, over the top of whatever the cached directory holds.
+   *
+   * The directory is cached for the app session and should be — it is a
+   * thousand rows of season stats that move once a week. The price on each row
+   * is the exception: `refresh-player-values` runs hourly, so a snapshot taken
+   * on the first visit of the day quotes a stale number for the rest of it, and
+   * the collection — which has its own read — disagrees with this board about
+   * what the same card is worth. That is exactly how this was found.
+   */
+  const [prices, setPrices] = useState<Map<string, number> | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -66,6 +80,10 @@ export default function LeadersScreen() {
       try {
         const next = await loadPlayerDirectory();
         if (live) setResult(next);
+        if (next.season !== null) {
+          const fresh = await fetchBasePrices(next.season);
+          if (live) setPrices(fresh);
+        }
       } catch {
         if (live) setFailed(true);
       }
@@ -73,6 +91,24 @@ export default function LeadersScreen() {
     return () => {
       live = false;
     };
+  }, []);
+
+  /* The board's own way out. `invalidatePlayerDirectory` has existed since the
+     cache did and had NO caller, so nothing in the app could ever get a fresher
+     directory than the one it happened to load first. */
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      invalidatePlayerDirectory();
+      const next = await loadPlayerDirectory();
+      setResult(next);
+      setFailed(false);
+      if (next.season !== null) setPrices(await fetchBasePrices(next.season));
+    } catch {
+      setFailed(true);
+    } finally {
+      setRefreshing(false);
+    }
   }, []);
 
   const fixtures = useUpcomingFixtures();
@@ -161,12 +197,13 @@ export default function LeadersScreen() {
           figure: {
             value: player.gamesPlayed > 0 ? player.fpPerGame.toFixed(1) : null,
             label: 'FP/G',
-            coins: player.baseCoins,
+            /* Live where we have it, the cached snapshot only until it lands. */
+            coins: prices?.get(player.playerId) ?? player.baseCoins,
           },
         })),
       pool: inPool.length,
     };
-  }, [result, pos]);
+  }, [result, pos, prices]);
 
   const openPlayer = useCallback(
     (player: DirectoryPlayer) =>
@@ -201,7 +238,15 @@ export default function LeadersScreen() {
         />
       );
     }
-    return <PlayerList players={board} fixtureFor={fixtureFor} onOpen={openPlayer} />;
+    return (
+      <PlayerList
+        players={board}
+        fixtureFor={fixtureFor}
+        onOpen={openPlayer}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+      />
+    );
   };
 
   /* The count names the POOL as well as the board. "Top 50 of 412" says both

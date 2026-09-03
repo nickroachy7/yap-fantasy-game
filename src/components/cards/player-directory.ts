@@ -257,11 +257,22 @@ async function fetchMarketRanks(season: number): Promise<Map<string, number>> {
 }
 
 /**
- * What a fresh copy of each player fetches. Soft-failing, like the ranks: a
- * board with no prices is last week's board, and a board that refuses to draw
- * because a price read failed is a blank screen.
+ * What a fresh copy of each player fetches.
+ *
+ * EXPORTED, AND READ AGAIN ON EVERY VISIT rather than taken from the cached
+ * directory. The rest of this file is cached for the life of the app session,
+ * which is right for what it mostly holds — season stats and bios move once a
+ * week. A PRICE does not: `refresh-player-values` runs hourly, so a directory
+ * snapshot taken at breakfast is quoting the wrong number by lunch, and a board
+ * that disagreed with the collection about what the same card is worth is how
+ * this was found. The read is one indexed pass over (uuid, int) for ~800 rows,
+ * which is cheap enough to do on mount and far cheaper than re-reading the
+ * whole directory to get it.
+ *
+ * Soft-failing, like the ranks: a board with last hour's prices is a board; a
+ * board that refuses to draw because a price read failed is a blank screen.
  */
-async function fetchBasePrices(season: number): Promise<Map<string, number>> {
+export async function fetchBasePrices(season: number): Promise<Map<string, number>> {
   const byId = new Map<string, number>();
   try {
     /* `player_id` is nullable on the row type because every column of a VIEW is
