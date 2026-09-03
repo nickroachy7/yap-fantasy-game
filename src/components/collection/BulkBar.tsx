@@ -80,7 +80,20 @@ export function BulkBar({
   onCancelStage,
   onClear,
   onDismissResult,
+  bottomInset = 0,
 }: {
+  /**
+   * ROOM FOR THE TAB PILL, which floats OVER the page rather than sitting under
+   * it — `useTabBarSpace` is the same number the lists pad their content by.
+   *
+   * The bar is pinned to the bottom of the screen and the pill is drawn on top
+   * of that exact spot, so without this the two actions this component exists
+   * for are underneath the navigation. The list above it had been padded since
+   * it was written; the bar had not, and nothing noticed while reaching it took
+   * a deliberate press of a Select button first. An always-live tick made it a
+   * one-tap path and the collision immediate.
+   */
+  bottomInset?: number;
   count: number;
   max: number;
   /** What selling the ticked copies pays, summed from their own prices. */
@@ -120,7 +133,11 @@ export function BulkBar({
 
   return (
     <>
-      <View style={[styles.bar, { backgroundColor: c.surfaceSheet, borderTopColor: c.border }]}>
+      <View
+        style={[
+          styles.bar,
+          { backgroundColor: c.surfaceSheet, borderTopColor: c.border, paddingBottom: bottomInset },
+        ]}>
         {/* WHAT IT DID, above what you can do next, and it survives the
             selection being cleared — the point of the line is to be read after
             the cards have gone. */}

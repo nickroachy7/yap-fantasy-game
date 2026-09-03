@@ -517,7 +517,15 @@ export default function InventoryScreen() {
               style={styles.fill}
               data={visible}
               keyExtractor={(card) => card.id}
-              contentContainerStyle={[styles.list, { paddingBottom: LIST_TAIL + tabSpace }]}
+              /* The list reserves room for the tab pill ONLY when nothing else
+                 is standing in front of it. While the bulk bar is up it is the
+                 thing the pill overlaps, and it holds that room itself — adding
+                 it here as well would leave a pill's height of dead scroll
+                 between the last row and the bar. */
+              contentContainerStyle={[
+                styles.list,
+                { paddingBottom: LIST_TAIL + (selecting ? 0 : tabSpace) },
+              ]}
               /* The roster line, drawn after one particular row. See `cut`. */
               ItemSeparatorComponent={cut}
               initialNumToRender={12}
@@ -597,6 +605,9 @@ export default function InventoryScreen() {
                 scrolls away from the action it describes. */}
             {selecting ? (
               <BulkBar
+                /* The pill floats over the page, so the bar has to hold its own
+                   room the way the list above it already does. Same number. */
+                bottomInset={tabSpace}
                 count={selected.size}
                 max={SELECTION_MAX}
                 sellCoins={selectedCoins}
