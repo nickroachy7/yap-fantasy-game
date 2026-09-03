@@ -190,11 +190,21 @@ jobs:
       # there — the same argument as the EXPO_TOKEN and VERCEL_TOKEN guards.
       # psql never prints the password in its own errors, so its message can be
       # shown as-is.
+      #
+      # The empty case is handled in the SHELL rather than in a step-level
+      # `if:`, and that is a rule rather than a preference: the `secrets`
+      # context is not available to `jobs.<id>.steps.<id>.if`, and a workflow
+      # that uses it there is rejected outright — the run fails before any job
+      # starts, with "this run likely failed because of a workflow file issue"
+      # and no log to read. Learned the expensive way on the commit before this.
       - name: Check the database answers
-        if: ${{ secrets.DATABASE_URL != '' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "No DATABASE_URL secret — nothing to connect to."
+            exit 0
+          fi
           if ! psql "$DATABASE_URL" -X -Atc 'select 1' >/dev/null; then
             echo "::error::Could not connect to the database with the DATABASE_URL secret."
             echo "::error::The suites cannot run. Check the password is current and that the"
