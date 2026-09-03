@@ -65,31 +65,6 @@ export function EmptyCollection({ onGetCards }: { onGetCards: () => void }) {
   );
 }
 
-/** Owns cards, but the current filters exclude all of them. */
-export function EmptyFilterResult({
-  onClear,
-  hasFilters,
-}: {
-  onClear: () => void;
-  hasFilters: boolean;
-}) {
-  const c = Colors[useScheme()];
-
-  return (
-    <View style={styles.inline}>
-      <Text style={[Type.section, { color: c.text }]}>Nothing matches</Text>
-      <Text style={[Type.body, styles.centred, { color: c.textSecondary }]}>
-        You own cards, just none that fit these filters.
-      </Text>
-      {hasFilters ? (
-        <View style={styles.actions}>
-          <Action label="Clear filters" onPress={onClear} />
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   panel: {
     borderWidth: StyleSheet.hairlineWidth,

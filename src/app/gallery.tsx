@@ -23,7 +23,6 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { InventoryRow } from '@/components/collection/InventoryRow';
-import { SelectButton } from '@/components/collection/CollectionFilters';
 import { DoorChip, Plus } from '@/components/ui/DoorChip';
 import { CollectionValue } from '@/components/collection/CollectionValue';
 import { RosterAlert } from '@/components/collection/RosterAlert';
@@ -459,7 +458,11 @@ function InventoryFixture() {
   const c = Colors[scheme];
   /* Live, because the row is only worth looking at in both its states: the mode
      off, and the mode on with ticks down the badge column. */
-  const [selecting, setSelecting] = useState(false);
+  /* The gallery ticks for real, because the circle IS the interaction now —
+     there is no mode switch left to fake it with, and a static screenshot of a
+     selected row would not show that the row still opens the card. */
+  const [picked, setPicked] = useState<Set<string>>(() => new Set());
+  const selecting = picked.size > 0;
 
   const starters = useMemo(() => new Set(['many-0', 'many-5', 'many-9']), []);
   const stats = useMemo(() => summarise(GALLERY_SPARES), []);
@@ -470,16 +473,16 @@ function InventoryFixture() {
           hence the negative margin, the same escape the board controls take
           above.
 
-          IT IS FOUR OBJECTS NOW, and it was seven. The filters went with the
-          grid: `InventoryControls` narrowed a mosaic of squares nobody could
-          read, and the rows say what the squares could not. What is left is two
-          readouts, the mode switch, and the two doors. */}
+          IT IS THREE OBJECTS NOW, and it was seven. The filters went with the
+          grid — they narrowed a mosaic of squares nobody could read, and the
+          rows say what the squares could not — and the mode switch went with
+          them, because the tick in every row is always live and there is no
+          mode left to enter. What is left is two readouts and the two doors. */}
       <View style={styles.inventoryControls}>
         <View style={styles.inventoryRow}>
           <CollectionValue sellValue={stats.sellValue} />
           <RosterCount roster={{ held: 31, cap: 30, warnAt: 24, overBy: 2, isOver: true, isNear: true, remaining: 0 }} />
           <View style={styles.inventorySpacer} />
-          <SelectButton on={selecting} onPress={() => setSelecting((v) => !v)} />
           <View style={styles.inventoryDoors}>
             <DoorChip
               label="Sets"
@@ -516,9 +519,17 @@ function InventoryFixture() {
             key={card.id}
             card={card}
             selecting={selecting}
-            selected={selecting && card.id.endsWith('4')}
-            blocked={selecting && starters.has(card.id)}
+            selected={picked.has(card.id)}
+            blocked={starters.has(card.id)}
             onPress={() => {}}
+            onToggle={() =>
+              setPicked((held) => {
+                const next = new Set(held);
+                if (next.has(card.id)) next.delete(card.id);
+                else next.add(card.id);
+                return next;
+              })
+            }
           />
         ))}
       </View>

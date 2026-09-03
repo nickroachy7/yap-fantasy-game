@@ -195,9 +195,15 @@ export default function InventoryScreen() {
   const starters = useStarters();
   /* THE OTHER TWO DECISION SETS ARE GONE WITH THE CHIPS THAT ASKED FOR THEM.
      `spareIds` and `useOffers` fed the spares/commitable/starting filter — one
-     pure pass over the ids, one RPC over the whole collection — and nothing on
-     this page asks either question now. `starters` stays: it is not a filter,
-     it is the refusal a tick has to honour. */
+     pure pass over the ids, one RPC over the whole collection — and both are
+     deleted. `starters` stays: it is not a filter, it is the refusal a tick has
+     to honour.
+
+     `spareIds` took its test suite with it. That suite was protecting agreement
+     between a CLIENT mirror and `commit_candidate`'s `order by career_fp asc,
+     acquired_at asc, id asc`; with the mirror gone there are no two things left
+     to disagree. The server's ordering is untouched and is still the only thing
+     that decides which copy a commit burns. */
   /**
    * Why the last blocked tap did nothing, shown on the selection bar.
    *
@@ -222,9 +228,15 @@ export default function InventoryScreen() {
    * state the player, his season, the tier, the total and the price is the
    * thing the filters were standing in for.
    *
-   * They are not deleted, only unused here: `InventoryControls` still exists
-   * and `/gallery` still draws it. If a roster cap ever stops being thirty this
-   * is the first thing that comes back.
+   * THEY ARE DELETED NOW, and that is deliberate rather than tidy-mindedness.
+   * They survived one pass as "unused but still there", which is the state that
+   * costs the most: `InventoryControls`, `ResultLine`, `EmptyFilterResult`,
+   * `useOffers`, `spareIds` and half of `types.ts` all read as working features
+   * to anyone opening the folder, and each one had to be traced to a caller
+   * that did not exist before it could be dismissed. Git remembers them. If the
+   * roster cap ever stops being thirty, bringing them back from history is an
+   * afternoon; leaving them lying here is an afternoon every time somebody new
+   * reads this directory.
    *
    * CAREER FP, DESCENDING — the sort's own default, now the only order. It puts
    * the copies worth keeping at the top, which makes the bottom of the list the

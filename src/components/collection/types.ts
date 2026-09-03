@@ -90,71 +90,22 @@ export type CollectionCard = {
   inSet: boolean;
 };
 
-/** Lineup-eligible positions, in the order the lineup screen lists them. */
-export const PositionOrder = ['QB', 'RB', 'WR', 'TE', 'PK'] as const;
-export type Position = (typeof PositionOrder)[number];
-
-export type PositionFilter = 'ALL' | Position;
-export type TierFilter = 'ALL' | CardTier;
-
 /**
- * WHAT YOU ARE TRYING TO DECIDE, as opposed to what the card happens to be.
+ * SORTING SURVIVED THE FILTERS, and only just: `sortCards` has one caller left,
+ * which asks for career FP descending and never changes its mind.
  *
- * Position and tier narrow by ATTRIBUTE, and between them they were the whole
- * of this screen's toolkit — which is the wrong toolkit for the job the screen
- * is actually for. Nobody opens their collection thinking "show me my wide
- * receivers". They open it holding twenty-nine cards and thirty slots, and the
- * two questions they have are "what can I get rid of" and "what finishes a
- * set". Neither was askable, so it was answered by scanning the grid by eye.
+ * The key and the direction stay parameters rather than being folded into the
+ * function, because the ORDER is the collection's one remaining editorial
+ * decision and a screen that wants a different one should be able to say so
+ * without reopening this file.
  *
- * These three are those questions. Each one is a fact the app already knows and
- * was keeping to itself until the moment of a confirmation dialog:
- *
- *   spare    — you hold more than one copy of this player, and this is not the
- *              one you would keep. Derived here, from the ids. See `spareIds`.
- *
- *   set      — at least one set would take this copy right now. That is
- *              `card_actions.can_commit`, which is the server's own conjunction
- *              and cannot be derived on the client. See `use-offers`.
- *
- *   starting — standing in a lineup you have not played. These are the cards
- *              that CANNOT be acted on, and being able to see them is what
- *              makes the rest safe to sweep. See `use-starters`.
- *
- * `ALL` is the absence of the filter and has no chip of its own: the three are
- * a single value, so pressing the active one releases it. A fourth "ALL" chip
- * beside the position row's own would have been two of them in one strip.
+ * What went with the chips is everything that LABELLED them — `SortLabels`,
+ * `SORT_OPTIONS`, `SortDefaultDir`, and the position, tier and job vocabularies
+ * beside them. A table of captions for controls nobody draws reads as a feature
+ * to the next person in here, and costs an afternoon to disprove.
  */
-export type JobFilter = 'ALL' | 'spare' | 'set' | 'starting';
 export type SortKey = 'fp' | 'tier' | 'starts' | 'name' | 'recent';
 export type SortDir = 'asc' | 'desc';
-
-export const SortLabels: Record<SortKey, string> = {
-  fp: 'Career FP',
-  tier: 'Tier',
-  starts: 'Starts',
-  name: 'Name',
-  recent: 'Acquired',
-};
-
-/** The same labels in reading order, as the shared sort strip wants them. */
-export const SORT_OPTIONS: { key: SortKey; label: string }[] = (
-  Object.keys(SortLabels) as SortKey[]
-).map((key) => ({ key, label: SortLabels[key] }));
-
-/**
- * The direction each key is worth reading FIRST. Pressing "Name" and getting
- * Z–A, or "Career FP" and getting your worst card, reads as a broken control
- * rather than a choice — so the direction follows the key and the toggle then
- * flips it from there.
- */
-export const SortDefaultDir: Record<SortKey, SortDir> = {
-  fp: 'desc',
-  tier: 'desc',
-  starts: 'desc',
-  name: 'asc',
-  recent: 'desc',
-};
 
 const isTier = (v: string | null): v is CardTier =>
   v !== null && (TierOrder as readonly string[]).includes(v);
@@ -225,67 +176,6 @@ export function toCardModel(c: CollectionCard): PlayerCardModel {
   };
 }
 
-/**
- * Takes the SHARED filter value, not this file's own.
- *
- * The inventory draws the Players boards' `PositionFilter` component now, whose
- * value is a `PosFilter` — the five positions, `ALL`, and `other`. `other` is
- * the key the palette gives a position it has no colour for; it is never in
- * `POS_FILTERS`, so it cannot be selected, and if it somehow were it would
- * match nothing, which is the honest answer for "positions we do not model".
- */
-export function matchesPosition(c: CollectionCard, filter: PositionFilter | 'other'): boolean {
-  return filter === 'ALL' || c.position === filter;
-}
-
-export function matchesTier(c: CollectionCard, filter: TierFilter): boolean {
-  return filter === 'ALL' || c.tier === filter;
-}
-
-/**
- * The sell pile, named — re-exported from `spares.ts`.
- *
- * IT LIVES IN A LEAF MODULE so the Deno unit runner can reach it, which this
- * file cannot offer: `types.ts` imports `theme.ts`, `theme.ts` imports
- * `global.css`, and the runner cannot follow a stylesheet. Same trade `bulk.ts`
- * made, for the same reason, and worth making twice — the ranking has to agree
- * with a SQL `ORDER BY` in `commit_candidate`, and nothing but a test keeps two
- * files in two languages saying the same thing. See `spares.ts`.
- */
-export { spareIds } from './spares';
-
-/** What the three decision chips are asked against. See `JobFilter`. */
-export type JobSets = {
-  spares: Set<string>;
-  /** Instance ids some set would take. Empty until the offers land. */
-  commitable: Set<string>;
-  starters: Set<string>;
-};
-
-export function matchesJob(c: CollectionCard, filter: JobFilter, sets: JobSets): boolean {
-  if (filter === 'ALL') return true;
-  if (filter === 'spare') return sets.spares.has(c.id);
-  if (filter === 'set') return sets.commitable.has(c.id);
-
-  return sets.starters.has(c.id);
-}
-
-/** How many cards each chip would leave. Zero is an answer, so all three keys. */
-export function countByJob(
-  cards: CollectionCard[],
-  sets: JobSets,
-): Record<Exclude<JobFilter, 'ALL'>, number> {
-  const counts = { spare: 0, set: 0, starting: 0 };
-  for (const c of cards) {
-    if (sets.spares.has(c.id)) counts.spare += 1;
-    if (sets.commitable.has(c.id)) counts.set += 1;
-    if (sets.starters.has(c.id)) counts.starting += 1;
-  }
-
-  return counts;
-}
-
-
 const byName = (a: CollectionCard, b: CollectionCard) =>
   a.playerName.localeCompare(b.playerName) || a.id.localeCompare(b.id);
 
@@ -314,21 +204,6 @@ export function sortCards(cards: CollectionCard[], key: SortKey, dir: SortDir): 
   return [...cards].sort((a, b) => sign * cmp(a, b) || byName(a, b));
 }
 
-export function countByTier(cards: CollectionCard[]): Record<CardTier, number> {
-  const counts = { bronze: 0, silver: 0, gold: 0, diamond: 0 };
-  for (const c of cards) counts[c.tier] += 1;
-
-  return counts;
-}
-
-export function countByPosition(cards: CollectionCard[]): Record<Position, number> {
-  const counts = { QB: 0, RB: 0, WR: 0, TE: 0, PK: 0 };
-  for (const c of cards) {
-    if (c.position && c.position in counts) counts[c.position as Position] += 1;
-  }
-
-  return counts;
-}
 
 export type CollectionStats = {
   cards: number;
