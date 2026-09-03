@@ -22,8 +22,6 @@ import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { quietScrollbar } from '@/components/ui/scroll-strip';
 import { Spacing } from '@/constants/theme';
 
-import type { ReactNode } from 'react';
-
 import { PLAYER_ROW_HEIGHT, PlayerRow, type RowFigure } from './PlayerRow';
 import type { DirectoryPlayer } from './player-directory';
 
@@ -33,16 +31,6 @@ export type ListedPlayer = {
   rank?: number;
   /** Overrides the row's right-hand number. Omit for season points. */
   figure?: RowFigure;
-  /**
-   * Replaces the tray under the row.
-   *
-   * Trend is the only caller. Its board is ORDERED BY the week-over-week move,
-   * and a board ranked by a number it does not show is the thing the figure
-   * column used to exist to prevent — so when the figure column was handed over
-   * to the shared format, the delta had to land somewhere it could still be
-   * read. The tray is the one band on the row with space for it.
-   */
-  strip?: ReactNode;
 };
 
 export function PlayerList({
@@ -71,7 +59,6 @@ export function PlayerList({
           player={item.player}
           rank={item.rank}
           figure={item.figure}
-          strip={item.strip}
           onPress={onOpen}
           fixture={fixtureFor?.(item.player.team)}
         />

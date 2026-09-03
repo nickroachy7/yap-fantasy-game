@@ -27,7 +27,7 @@
  */
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { PlayerList, type ListedPlayer } from '@/components/cards/PlayerList';
 import { figureFor, ROW_GUTTER } from '@/components/cards/PlayerRow';
@@ -36,7 +36,6 @@ import {
   type DirectoryPlayer,
 } from '@/components/cards/player-directory';
 import { fixtureLabel, useUpcomingFixtures } from '@/components/cards/use-fixtures';
-import { DASH } from '@/components/ui/DataTable';
 import { weekLabel } from '@/components/scores/scoreboard';
 import {
   loadCurrentSeason,
@@ -49,42 +48,11 @@ import { Screen } from '@/components/shell/Screen';
 import { SegmentedControl } from '@/components/shell/SegmentedControl';
 import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { computeMovers, deltaText } from '@/components/trend/movers';
+import { Spacing } from '@/constants/theme';
+import { computeMovers } from '@/components/trend/movers';
 
 const FALLBACK_SEASON = 2026;
 
-/**
- * The week's move, in the tray under the row.
- *
- * IT USED TO BE THE FIGURE COLUMN, and it lost that slot when all three boards
- * took one shared column. It could not simply go: this board is SORTED by it,
- * and a list ranked by a number it does not print is unreadable — you cannot
- * tell why the eleventh row is eleventh. The tray is the one band with room.
- *
- * Signed and coloured, which is the one place in this app a figure carries a
- * sign, and the sign is the whole content: `+12.4` and `-12.4` are opposite
- * news about the same size of movement.
- *
- * NULL IS A REAL STATE and reads as a dash. Below the movers sit every player
- * who cleared neither week's `MINIMUM_POINTS`, and they have no move to report
- * rather than a move of nought.
- */
-function MoveStrip({ delta }: { delta: number | null }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  const tone = delta === null ? c.textTertiary : delta > 0 ? c.positive : c.negative;
-
-  return (
-    <View style={styles.moveStrip}>
-      <Text style={[Type.micro, { color: c.textTertiary }]}>WEEK</Text>
-      <Text style={[Type.strong, NUMERIC, { color: tone }]}>
-        {delta === null ? DASH : deltaText(delta)}
-      </Text>
-    </View>
-  );
-}
 
 
 
@@ -245,26 +213,34 @@ export default function TrendScreen() {
       taken.add(player.playerId);
       rows.push({
         player,
-        /* THE SAME FIGURE COLUMN AS TOP AND SEARCH — how he scores over what a
-           card of him is worth. The delta this board is ordered by moves to the
-           tray rather than disappearing: a board ranked by a number it does not
-           show is still the thing to avoid, and `MoveStrip` is where it now
-           shows. */
+        /* THE SAME ROW AS TOP AND SEARCH, tray included. There is no longer
+           anything on it that only this board draws.
+ 
+           THE DELTA IS NOT SHOWN, and that is the cost, stated plainly. This
+           board is ORDERED by the week-over-week move and no longer prints it,
+           so the ordering has to be taken on trust — the old objection, that a
+           board ranked by a number it does not show cannot explain itself, is
+           still true and is being accepted rather than answered. What carries
+           it instead is the heading: the context line names the two weeks being
+           compared, and the up/down control says which direction is on top.
+ 
+           One row across three boards was worth more than one board's
+           explanation of itself. If the movement has to come back, `MoveStrip`
+           is in the history of this file and `ListedPlayer.strip` was the seam
+           it hung on. */
         figure: figureFor(player, prices?.get(player.playerId)),
-        strip: <MoveStrip delta={m.delta} />,
       });
     }
 
-    /* EVERYONE ELSE FOLLOWS THE MOVERS, best season first. They have no delta —
-       they did not clear `MINIMUM_POINTS` in either week — so the tray says so
-       rather than the row inventing a movement it cannot support. */
+    /* EVERYONE ELSE FOLLOWS THE MOVERS, best season first. They cleared
+       `MINIMUM_POINTS` in neither week, so they have no move to report — which
+       now costs the row nothing to say, since no row reports one. */
     const filler = [...directory.values()]
       .filter((p) => !taken.has(p.playerId) && inPosition(p.position))
       .sort((a, b) => b.seasonFp - a.seasonFp || a.name.localeCompare(b.name))
       .map<ListedPlayer>((player) => ({
         player,
         figure: figureFor(player, prices?.get(player.playerId)),
-        strip: <MoveStrip delta={null} />,
       }));
     rows.push(...filler);
 
@@ -397,10 +373,6 @@ export default function TrendScreen() {
 }
 
 const styles = StyleSheet.create({
-  /* The tray's own row: label then figure, left aligned, at the tray's height.
-     It replaces a five-column stat strip, so it deliberately does not try to
-     fill the width — one fact, stated once. */
-  moveStrip: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   pad: { paddingVertical: Spacing.four },
   controls: { paddingHorizontal: ROW_GUTTER, paddingBottom: Spacing.two, gap: Spacing.two },
   filters: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
