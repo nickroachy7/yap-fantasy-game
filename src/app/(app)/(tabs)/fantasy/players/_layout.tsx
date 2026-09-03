@@ -18,10 +18,17 @@ import { SectionFrame } from '@/components/shell/SectionFrame';
  * every card board. It was passed for the whole of the time this was a tab,
  * because a tab has no frame above it.
  *
- * The frame draws the section nav ONCE, above this navigator, so flipping
- * between Trend and Leaders replaces only the board underneath — see
- * `SectionFrame`. `Screen` supplies each page's remaining chrome and knows not
- * to draw the header a second time.
+ * THERE IS NO SECTION NAV LEFT FOR THE FRAME TO DRAW, and that is the newest
+ * thing about this file. Players had three views — Search, Trend and Top — and
+ * two of them turned out to be sort keys on the board they shared, so they are
+ * controls on it now; Search is a takeover reached from those controls. See the
+ * head of `index.tsx`. `SectionFrame` and `SectionNav` both test for children
+ * and draw nothing when a section has none, so this needed no change to stop
+ * drawing a bar — which is the whole reason the frame owns that test.
+ *
+ * THE FRAME STAYS ANYWAY, for the thing it does besides the bar: it provides
+ * the frame context `Screen` reads to know what chrome is already above it, and
+ * it is the seam a second view would hang off if one is ever wanted back.
  *
  * THE ROUTE AND THE LABEL AGREE AGAIN. It was called All Cards for one day —
  * the argument being that every row here is a card template rather than a

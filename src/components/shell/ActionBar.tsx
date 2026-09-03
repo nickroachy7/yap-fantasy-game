@@ -60,6 +60,7 @@ export type ActionIconName =
   | 'select'
   | 'trend'
   | 'sort'
+  | 'filters'
   | 'available'
   | 'tiers'
   | 'shop'
@@ -433,6 +434,53 @@ export function ActionIcon({
             <View style={bar(16)} />
             <View style={bar(11)} />
             <View style={bar(6)} />
+          </View>
+        </View>
+      );
+
+    case 'filters':
+      /* SLIDERS: three tracks with a handle each, at three different stops.
+ 
+         Added rather than borrowed, because the fourteen names above had no
+         honest one for "narrow this list". `sort` is descending bars and its
+         own comment insists that is the shape of an ORDER — which on the
+         players board is the control immediately beside this one, so reusing it
+         would put two different jobs behind one picture. `available` is a slot
+         with a plus meaning "you could add this", which is a statement about a
+         roster and not about a list. Drawing a fifth wrong meaning onto an
+         existing glyph is how an icon set stops meaning anything.
+ 
+         It is three rectangles and three circles on the same 24pt grid as
+         everything else here, so it costs no dependency and cannot drift in
+         weight from its neighbours. The handles sit at different stops on
+         purpose: three centred handles read as a stack of bars, which is `sort`
+         again. Off-centre, the picture is unmistakably "these are set to
+         something", which is exactly what the button holds.
+ 
+         THE HANDLES ARE SOLID IN BOTH STATES, which breaks this set's usual
+         outline-off / filled-on rule for the same reason `search`'s handle
+         does: a 4pt circle carrying a 1.6pt outline is a ring with a one-point
+         hole, which at 18pt reads as a smudge rather than as a handle. The lit
+         state is carried by `color`, which the button already swaps to the
+         accent. */
+      return (
+        <View style={box} accessibilityElementsHidden importantForAccessibility="no">
+          <View style={{ gap: 4 * u, alignItems: 'flex-start' }}>
+            {[15, 8, 12].map((stop) => (
+              <View key={stop} style={{ width: 18 * u, height: 4 * u, justifyContent: 'center' }}>
+                <View style={[bar(18, 1.5), { position: 'absolute' }]} />
+                <View
+                  style={{
+                    position: 'absolute',
+                    left: (stop - 2) * u,
+                    width: 4 * u,
+                    height: 4 * u,
+                    borderRadius: 2 * u,
+                    backgroundColor: color,
+                  }}
+                />
+              </View>
+            ))}
           </View>
         </View>
       );

@@ -47,7 +47,7 @@
  * stat strip under it. It used to draw its own compact table row, so opening a
  * swap re-rendered the same eight players in a second format at the exact
  * moment you were comparing them. One figure survives the loss of the columns,
- * and it follows the sort — see `figureFor`.
+ * and it follows the sort.
  *
  * AND IT IS DISMISSED THE WAY IT LOOKS DISMISSED
  *

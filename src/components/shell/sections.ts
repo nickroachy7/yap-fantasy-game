@@ -103,7 +103,8 @@ export type NavChild = {
    * page still there.
    *
    * Replacing was what made the way out wrong. With no entry left behind it,
-   * the screen had nothing to go back TO, so it hard-coded a return to Trend —
+   * the screen had nothing to go back TO, so it hard-coded a return to the
+   * players board —
    * and anyone who opened search from Leaders was quietly moved to a different
    * board on the way out.
    */
@@ -251,45 +252,40 @@ export const CONTESTS: NavChild = {
 };
 
 /**
- * The three ways into the card pool, which came back up to level 2 with it.
+ * SEARCH, which is the last of the three ways into the card pool still standing
+ * as a route of its own.
  *
- * THE SECTION LANDS ON THE SECOND, not the first, and it is the only nav item
- * in the app where that is true. The rule elsewhere — first child shares the
- * parent's href — exists so there is always a way back to the landing page, and
- * it is satisfied by ANY child pointing at it; being first was convention, not
- * mechanism, and `SectionNav` marks the active item by comparing paths rather
- * than by position. What the order carries instead is how the three read as a
- * set: find a card, see who moved, see who is best. Opening on Trend is a
- * separate decision from where Trend sits in that row, and forcing the two to
- * agree would mean landing on a search box — a page that shows you nothing
- * until you type.
+ * IT WAS A ROW IN A SECTION NAV — `PLAYER_VIEWS`, holding Search, Trend and
+ * Top. Trend and Top are gone from this file, and not because they were cut:
+ * they were one sort key each on a board all three shared, so they became
+ * controls on it. See the head of `players/index.tsx`. A strip of navigation
+ * over every visit to the board, offering two orderings of the page underneath
+ * it, was the whole cost of keeping them apart.
+ *
+ * SEARCH DID NOT GO WITH THEM. It is not an ordering — it is a tool you pick up
+ * with a name already in mind, use for four seconds and put down, and the case
+ * for handing it the entire screen (no chrome, no chips, keyboard up on
+ * arrival) is unaffected by what happened to its two neighbours. The board
+ * reaches it with a round button on its own controls.
+ *
+ * SO IT IS DECLARED HERE RATHER THAN IN A `children` ARRAY, which is exactly
+ * the shape `PACKS`, `CONTESTS` and `SETS` already have and for the same two
+ * reasons: `isOverlayPath` must know it is a takeover mounted above the tab
+ * navigator, and the wide rail names it in `also` — while nobody's nav bar
+ * draws it, because there is no longer a bar for it to sit in. `detached` says
+ * the second part.
+ *
+ * The path is root-level rather than `/fantasy/players/search`, because a
+ * takeover is a sibling of `(tabs)` in the Stack above them — see
+ * `app/(app)/search.tsx`.
  */
-const PLAYER_VIEWS: NavChild[] = [
-  /* Not `/fantasy/players/search`: it is a full-screen takeover living above
-     the tab navigator, so its path is a root one. See `app/(app)/search.tsx`. */
-  { href: '/search', label: 'Search', icon: 'search', takeover: true },
-  { href: '/fantasy/players', label: 'Trend', icon: 'trend' },
-  /* TOP, AND IT WAS LEADERS — renamed the same day the board above became
-     Leaders, because for one commit the two shared a word one row apart. The
-     strip said LEADERS and this bar, directly under it, said Leaders, pointing
-     at two genuinely different rankings: that board ranks MANAGERS, this page
-     ranks CARDS.
-
-     The strip's own header warns that those two rows can only coexist because
-     they do not look alike. Sharing a word is the other way for them to
-     converge and it is worse than sharing a treatment, because the reader
-     cannot see it at a glance — both look correct, and you only find out by
-     pressing one.
-
-     THE RENAME BELONGED ON THIS SIDE. "Leaders" is the right name for a table
-     of managers and a borrowed one for a table of cards; the board above is the
-     one people mean when they say the leaderboard. "Top" also sits better in
-     the row it is actually in — SEARCH / TREND / TOP are three one-word ways to
-     look at the same pool, and it was the only one of the three that needed two
-     syllables to say so. The ROUTE stays `/fantasy/players/leaders`, for the
-     same reason `/fantasy/players` kept its route through two label changes. */
-  { href: '/fantasy/players/leaders', label: 'Top', icon: 'standings' },
-];
+export const SEARCH: NavChild = {
+  href: '/search',
+  label: 'Search',
+  icon: 'search',
+  takeover: true,
+  detached: true,
+};
 
 /**
  * Sets, which is a SHEET over your collection rather than a view beside it.
@@ -381,9 +377,11 @@ export const FANTASY_SECTIONS: NavSection[] = [
    * the reader has not been given a reason to care about yet, and precision
    * bought at the cost of recognition is a bad trade in a bar.
    *
-   * It also settles a collision the strip had been working around. The board's
-   * own views are Search, Trend and Top — all three about players — under a
-   * heading that insisted they were about cards.
+   * It also settled a collision the strip had been working around. The board's
+   * own views were Search, Trend and Top — all three about players — under a
+   * heading that insisted they were about cards. Two of the three are
+   * orderings of one board now and the strip is gone, which retires the
+   * collision rather than settling it.
    *
    * ROUTE UNCHANGED, as it was through the last rename too: `/fantasy/players`
    * is what every deep link, both `dismissTo` fallbacks and the whole
@@ -398,7 +396,14 @@ export const FANTASY_SECTIONS: NavSection[] = [
     href: '/fantasy/players',
     label: 'Players',
     icon: 'players',
-    children: PLAYER_VIEWS,
+    /* NO CHILDREN, which makes it the third board with none — Compete and
+       Collect above it went the same way for the same reason. Its other two
+       views, Trend and Top, were one sort key each on the board they shared
+       and are controls on it now; Search is the takeover declared above. So
+       there is one page under this row and nothing for a bar to switch
+       between, and all three presentations answer correctly without being
+       told: `SectionNav` draws nothing, `webSectionOf` folds no tabs, and the
+       rail keeps the board as one row. */
   },
   /* LEADERS, which was Leaderboard-shortened-to-Board. One word in both bars
      now, so the `tabLabel` that existed to keep "Leaderboard" from truncating
@@ -408,7 +413,8 @@ export const FANTASY_SECTIONS: NavSection[] = [
      which put the same word in two bars one row apart pointing at two different
      rankings; that page is called Top now. This is the board that ranks
      MANAGERS, and it is the one people mean by "the leaderboard" — see the note
-     on `PLAYER_VIEWS` for why the rename went there rather than here.
+     on `SEARCH` for why the rename went there rather than here, and for what
+     became of the page that took it.
 
      It has no children, and it is the only section without any. It had two —
      STANDINGS and SCORING — and the strip they produced cost every phone screen
@@ -494,11 +500,15 @@ export function childrenOf(href: string): NavChild[] {
  * Every sub-page declared anywhere in the tree, plus the ones that hang off no
  * bar at all.
  *
- * `PACKS` is the reason for the last three terms, and `CONTESTS` and `SETS`
- * joined it: all three are destinations the rail lists and takeovers
- * `isOverlayPath` must know about, and all three are drawn by a page rather
+ * `PACKS` is the reason for the last four terms, and `CONTESTS`, `SETS` and
+ * `SEARCH` joined it: all four are destinations the rail lists and takeovers
+ * `isOverlayPath` must know about, and all four are drawn by a page rather
  * than by anybody's nav — so they appear in no `children` array and walking the
  * tree alone would miss them.
+ *
+ * `SEARCH` is the newest and arrived by a different road: it USED to be a
+ * child of Players, and stopped being one when that section's other two views
+ * became sort keys on the board and left no bar behind them.
  */
 function allChildren(): NavChild[] {
   return [
@@ -507,6 +517,7 @@ function allChildren(): NavChild[] {
     PACKS,
     CONTESTS,
     SETS,
+    SEARCH,
   ];
 }
 
@@ -519,8 +530,8 @@ function allChildren(): NavChild[] {
  * Top you read "Fantasy", then "Players", then "Leaders" — three words to name
  * one board, two of which are not places you can be. (Those were the labels at
  * the time; the board is Players and the view is Top now.) `/fantasy` is a
- * redirect and `/fantasy/players` opens on Trend, so two of the rail's ranks
- * were labels pretending to be destinations.
+ * redirect and `/fantasy/players` was itself a label rather than a page, so
+ * two of the rail's ranks were pretending to be destinations.
  *
  * WEB_NAV is the same app with the pretending removed: one flat list of the
  * places a reader can actually go, each one row, each one click. It is
@@ -539,7 +550,8 @@ function allChildren(): NavChild[] {
  * AND SECTIONS FOLD RATHER THAN SPLIT. Inventory/Sets and Search/Trend/
  * Leaders are not four and three destinations — they are two boards each with
  * a couple of views, and the phone only made them routes because a phone has
- * nowhere to put a view switcher. On web the row is the board and the views
+ * nowhere to put a view switcher. Players has since taken that argument all
+ * the way: its views are controls on one board, on every platform. On web the row is the board and the views
  * are tabs in the page's own heading; see `webSectionOf` and `WebPageTabs`.
  * The routes are untouched, so every URL, deep link and mobile path still
  * resolves exactly where it did.
@@ -654,18 +666,23 @@ const WEB_NAV_SPEC: WebNavSpec[] = [
      the alternative — a second, desktop-only packs PAGE — would be two
      implementations of one shop. */
   { href: '/packs' },
-  /* THREE FOLDED BOARDS now. This one came back from being a bottom TAB, and
-     nothing about the fold changed with the move — the rail never cared which
-     level a board lived at. Its place in the list is the phone strip's order
-     with Packs spliced in after the board that sells it. */
-  {
-    href: '/fantasy/players',
-    section: '/fantasy/players',
-    also: ['/search'],
-    /* Both views already ask for `table`; naming it here is what stops the
-       next one being added at a different width. */
-    measure: 'table',
-  },
+  /* NO LONGER FOLDED, and it is the one row that unfolded rather than the rail
+     changing its mind. Players had three views and now has one page: Trend and
+     Top became orderings on it, so there are no tabs left to hang in the
+     heading — `webSectionOf` returns null for a board with fewer than two, and
+     the page keeps its own heading and its own `measure`.
+ 
+     `section` IS GONE WITH THEM, deliberately, rather than left pointing at an
+     empty array. A fold declared for a board that cannot fold is a claim the
+     next reader has to disprove, and `measure` only ever applied through it.
+ 
+     `also` STAYS AND IS NOW THE WHOLE REASON THIS ROW KNOWS ABOUT SEARCH. The
+     takeover is mounted above the tab navigator at a root-level `/search`, so
+     nothing about the path says Players — without this line the rail would go
+     dark the moment a reader opened search from the board. Its place in the
+     list is the phone strip's order with Packs spliced in after the board that
+     sells it. */
+  { href: '/fantasy/players', also: ['/search'] },
   { href: '/fantasy/leaderboard' },
   /* THE OTHER PRODUCT, and the break above it is the one place the flat rail
      still says "different kind of thing". Everything above is a board of the
@@ -692,9 +709,11 @@ const WEB_NAV_SPEC: WebNavSpec[] = [
  * the lookup with no casts and nothing to declare beside the href. Packs is the
  * only row that resolves to a child, and the only row needing the verb set.
  *
- * PARENTS BEFORE CHILDREN, and the order is load-bearing: `/fantasy/players`
- * is both the Players SECTION and the href of its Trend child, and the rail
- * row must be captioned with the board's name rather than the view's.
+ * PARENTS BEFORE CHILDREN, and the order is load-bearing. It was Players that
+ * proved it: `/fantasy/players` was both the SECTION and the href of its Trend
+ * child, and the rail row had to be captioned with the board's name rather
+ * than the view's. That collision went with the child; the ordering stays,
+ * because it is the rule and the next folded board will need it.
  */
 function resolveRow(key: string): { label: string; icon: WebNavIcon } {
   const section = FANTASY_SECTIONS.find((s) => s.href === key);
@@ -792,9 +811,9 @@ export function webSectionOf(pathname: string): WebSection | null {
  * asking "which board am I on?" and being told "/packs".
  *
  * That was a visible defect the moment the wide heading started deriving from
- * the route: opening Packs from the Players board re-titled the page behind the
- * dialog from "Players" to "Trend" and dropped its tab row, then put both back
- * when you closed it. The rail is the opposite case and is correct as it is —
+ * the route: opening Packs from a folded board re-titled the page behind the
+ * dialog with the name of the view rather than the board, and dropped its tab
+ * row, then put both back when you closed it. The rail is the opposite case and is correct as it is —
  * Packs IS a rail row, and it should light while its sheet is open. The two
  * genuinely want different answers, which is why this is a separate question
  * rather than a fix to the matcher.

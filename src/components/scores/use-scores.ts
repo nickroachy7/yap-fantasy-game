@@ -167,8 +167,23 @@ const schedules = sessionCache<string, Schedule>(fetchSeasonSchedule);
 /** One object, so `useMemo` deps downstream do not churn while it is empty. */
 const NO_SCHEDULE: Schedule = { games: [], slates: [], teams: new Map() };
 
-export function useSeasonSchedule(season: number): SeasonSchedule {
-  const { value, loading, error, reload } = useSessionRead(schedules, String(season));
+/**
+ * `season` is NULLABLE, meaning "do not read one yet".
+ *
+ * For the Players board, which offers the trend ordering as one sort key among
+ * six and must not fund a season of fixtures plus two weeks of stat lines on
+ * every visit — most of which never ask for it. It passes null until the
+ * reader picks that order, and the cache hook simply idles on a null key, the
+ * same way `useWeekLeaders` already idles on a null slate.
+ *
+ * The three callers that always want a schedule pass a number and are
+ * unaffected.
+ */
+export function useSeasonSchedule(season: number | null): SeasonSchedule {
+  const { value, loading, error, reload } = useSessionRead(
+    schedules,
+    season === null ? null : String(season),
+  );
   const schedule = value ?? NO_SCHEDULE;
 
   return {

@@ -81,7 +81,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { PlayerAvatar, AVATAR_SIZE } from './PlayerAvatar';
 import { DASH } from '@/components/ui/DataTable';
 import { positionColors } from '@/constants/positions';
-import { Coin } from '@/components/shell/AppHeader';
 import { Colors, NUMERIC, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { injuryCode, injuryWeight } from '@/lib/injury';
@@ -162,46 +161,8 @@ export type RowFigure = {
   label: string;
   /** Overrides the figure's colour. For a signed delta, which reads as one. */
   color?: string;
-  /**
-   * COINS UNDER THE FIGURE, in place of the unit label.
-   *
-   * The second line is a unit on most surfaces and a second QUANTITY here, and
-   * the pair is deliberately the collection row's: a figure about the player
-   * over what a card of him is worth. Two boards drawing the same two numbers
-   * two different ways is the thing the shared `Identity` was built to stop,
-   * and the figure column had drifted into being the exception.
-   *
-   * The coin glyph is what makes the line legible without a caption — the
-   * collection makes the same argument in `InventoryRow.ValueFigure`, and it is
-   * why `label` is not merely set to `COINS`.
-   */
-  coins?: number | null;
 };
 
-/**
- * ONE FIGURE COLUMN FOR ALL THREE BOARDS — how he scores, over what a card of
- * him is worth.
- *
- * Trend, Top and Search were drawing three different things in the same box:
- * a week's movement, a season total, and a price. A reader moving between them
- * had to re-learn the right-hand column each time, on rows that were otherwise
- * identical. This is the shared answer; what makes each board different is its
- * ORDER, which is what a board is.
- *
- * A DASH RATHER THAN 0.0 where he has not played — see `RowFigure.value`, which
- * is nullable for exactly this. Before week one that is everybody, and printing
- * a nought for the whole league would be the board inventing a bad season for
- * the best players in football.
- */
-export function figureFor(player: DirectoryPlayer, coins?: number | null): RowFigure {
-  return {
-    value: player.gamesPlayed > 0 ? player.fpPerGame.toFixed(1) : null,
-    label: 'FP/G',
-    /* The caller's live price where it has landed, the cached snapshot until it
-       does — see `useDirectoryBoard` for why there are two of them. */
-    coins: coins ?? player.baseCoins,
-  };
-}
 
 export type PlayerRowProps = {
   player: DirectoryPlayer;
@@ -210,15 +171,33 @@ export type PlayerRowProps = {
   fixture?: string | null;
   figure?: RowFigure;
   /**
-   * His place on the board, drawn to the LEFT of the portrait.
+   * WHERE THE PLAYER RANKS, drawn to the LEFT of the portrait.
    *
-   * Optional, and the option is the point: only a list whose ORDER IS ITS
-   * SUBJECT may draw one. On the directory the order changes with every sort
-   * chip, so a number beside a name would mean a different thing from one press
-   * to the next — see the head of `leaders.tsx`, which makes the same argument
-   * from the other side.
+   * A PROPERTY OF THE PLAYER, NOT A POSITION IN THE LIST, and the distinction
+   * is the whole of this prop's history. It used to be the ordinal — row 1, row
+   * 2, row 3 — with a rule attached that said only a list whose ORDER IS ITS
+   * SUBJECT may draw one, "because on the directory the order changes with
+   * every sort chip, so a number beside a name would mean a different thing
+   * from one press to the next".
+   *
+   * The board then started passing an ordinal anyway, and the rule collected
+   * exactly the debt it predicted: the same player was 1st on the market board
+   * and 340th on the trend board and 12th on the points board, so a reader
+   * flipping between them saw the left column reshuffle every time and could
+   * not tell whether it was describing the player or the page.
+   *
+   * So the column holds the player's rank instead, and it holds the SAME one on
+   * every order. The list's own sequence is visible in the list; what a reader
+   * cannot see without being told is where this man stands, and now that number
+   * does not move when the sort does.
+   *
+   * `null` draws a dash and KEEPS THE COLUMN, which is what an unranked player
+   * needs: about a fifth of the directory has no market rank, and collapsing
+   * the box for them would step every name on those rows 30pt to the left.
+   * `undefined` is the separate case of a caller that wants no column at all —
+   * the card profile, where every row is the same player.
    */
-  rank?: number;
+  rank?: number | null;
   /**
    * Replaces the tray's contents.
    *
@@ -226,6 +205,15 @@ export type PlayerRowProps = {
    * at each tier, and what the best one has scored. That is the right answer on
    * the directory, where every row is a different player and the question is
    * which of them to chase.
+   *
+   * THE BOARD DOES NOT PASS ONE, and that is deliberate rather than an
+   * oversight. It briefly did — the tray followed whatever the board was
+   * ordered by, so it held a stat line under Season points and this histogram
+   * under Market rank — and the cost was that the grey band stopped meaning
+   * anything on its own. The two bands of this row are about two subjects, the
+   * footballer above and the CARD below, and the community's holdings are the
+   * one thing on the whole screen with no other home. So the tray is fixed and
+   * the order gets the figure and the detail line instead. See `BoardDetail`.
    *
    * On the card profile every row is the SAME player, so that strip would
    * repeat itself down the list while saying nothing about the thing that
@@ -235,9 +223,25 @@ export type PlayerRowProps = {
    * `getItemLayout` is promised that both bands sum to `PLAYER_ROW_HEIGHT`.
    */
   strip?: ReactNode;
+  /**
+   * Replaces the THIRD LINE of the identity block — by default `RK · PRK · MKT`.
+   *
+   * `undefined` keeps the three ranks. `null` is not offered: the line's height
+   * is part of `PLAYER_ROW_HEIGHT`, which `getItemLayout` is promised, so a
+   * caller may swap what is on this baseline but not whether there is one.
+   *
+   * WHY IT IS A SLOT. The trio is the right default — it is what a row on a
+   * board of strangers wants when nothing else has been said — and it is
+   * exactly wrong on a board that has been ordered by one thing. Sorted by
+   * points, `MKT #1457` is a number about a different question sitting where
+   * the answer should be; sorted by market rank, `RK —` and `PRK —` are two
+   * dashes where the reason for the ordering should be. The board fills this
+   * per order — see `BoardDetail`.
+   */
+  detail?: ReactNode;
 };
 
-function PlayerRowInner({ player, onPress, fixture, figure, strip, rank }: PlayerRowProps) {
+function PlayerRowInner({ player, onPress, fixture, figure, strip, detail, rank }: PlayerRowProps) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const accent = positionColors(player.position, scheme).accent;
@@ -252,7 +256,6 @@ function PlayerRowInner({ player, onPress, fixture, figure, strip, rank }: Playe
 
   const weight = injuryWeight(player.injuryStatus);
   const played = player.gamesPlayed > 0;
-  const gold = TierColors[scheme].gold.accent;
 
   return (
     <Pressable
@@ -264,18 +267,17 @@ function PlayerRowInner({ player, onPress, fixture, figure, strip, rank }: Playe
         { backgroundColor: pressed ? c.backgroundElement : c.background },
       ]}>
       <View style={styles.identity}>
-        {/* THE PLACE ON THE BOARD, OUTSIDE THE PORTRAIT AND BEFORE IT.
-            Only the Top board passes one — see `leaders.tsx`: a rank beside a
-            name means nothing on a list whose order changes with the sort key,
-            and everything on a list whose order IS the subject.
-            Right-aligned in a fixed box so 1 and 50 share a right edge and the
+        {/* WHERE HE RANKS, OUTSIDE THE PORTRAIT AND BEFORE IT — the same
+            number on every order, because it is about him and not about the
+            page. See `rank`.
+            Centred in a fixed box so 1 and 2,627 share a column and the
             portraits behind them start at one x. Tabular figures for the same
             reason. */}
         {rank === undefined ? null : (
           <Text
             numberOfLines={1}
             style={[styles.boardRank, NUMERIC, { color: c.textTertiary }]}>
-            {rank}
+            {rank === null ? DASH : rank}
           </Text>
         )}
         <View style={styles.avatar}>
@@ -332,23 +334,37 @@ function PlayerRowInner({ player, onPress, fixture, figure, strip, rank }: Playe
             ) : null}
           </View>
 
-          {/* WHERE HE PLACES, both ways round. The row already says what he
-              scored; this says what that was worth against everyone, and
-              against the only pool that decides a lineup — a receiver 40th
-              overall may be the 12th receiver, and those are two different
-              players to own.
+          {/* THE THIRD BASELINE, which belongs to the caller.
+
+              Its default is where he PLACES, three ways round: our overall
+              rank, our rank at his position, and the market's. The row already
+              says what he scored; these say what that was worth against
+              everyone, against the only pool that decides a lineup — a
+              receiver 40th overall may be the 12th receiver, and those are two
+              different players to own — and against what the market thought
+              before a snap was taken.
 
               Dashes for a man who has not played. `assignRanks` leaves him
               unranked rather than tied at the bottom: 380th for someone who
               has not taken a snap reads as information and is not, and in
-              preseason that is 354 of 968 rows. */}
+              preseason that is 354 of 968 rows. `MKT` is the one of the three
+              that survives that, which is why it is here at all.
+
+              A BOARD THAT HAS BEEN ORDERED OVERRIDES IT, because then two of
+              the three are about a question the reader did not ask. See
+              `detail`. */}
           <View style={styles.rankLine}>
-            <Rank label="RK" value={player.overallRank} />
-            {/* `PRK`, not the position. The heading names the KIND of rank, and
-                using `WR` for it made the pair read as two different subjects
-                rather than as one measure taken against two pools — which is
-                the entire reason both are here. */}
-            <Rank label="PRK" value={player.posRank} />
+            {detail ?? (
+              <>
+                <Rank label="RK" value={player.overallRank} />
+                {/* `PRK`, not the position. The heading names the KIND of rank,
+                    and using `WR` for it made the pair read as two different
+                    subjects rather than as one measure taken against two
+                    pools — which is the entire reason both are here. */}
+                <Rank label="PRK" value={player.posRank} />
+                <Rank label="MKT" value={player.marketRank} />
+              </>
+            )}
           </View>
         </View>
 
@@ -382,27 +398,22 @@ function PlayerRowInner({ player, onPress, fixture, figure, strip, rank }: Playe
               {DASH}
             </Text>
           )}
-          {/* A COIN AND A NUMBER, or the unit — never both. Where a caller has
-              a price the second line is what the card fetches; everywhere else
-              it is what the figure above is measured in. */}
-          {figure?.coins !== undefined && figure?.coins !== null ? (
-            <View style={styles.figureCoins}>
-              <Coin size={9} color={figure.coins > 0 ? gold : c.textTertiary} />
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.figureCoinValue,
-                  NUMERIC,
-                  { color: figure.coins > 0 ? c.textSecondary : c.textTertiary },
-                ]}>
-                {figure.coins.toLocaleString()}
-              </Text>
-            </View>
-          ) : (
-            <Text style={[Type.micro, styles.figureLabel, { color: c.textTertiary }]}>
-              {figure?.label ?? 'FP'}
-            </Text>
-          )}
+          {/* THE UNIT, ALWAYS, AND NOTHING ELSE.
+
+              This line could carry a coin glyph and a price instead, and did:
+              a fact about the player over what a card of him is worth, which is
+              the pair the collection row draws. It is the right pair THERE, on
+              a screen about copies you hold. On a board it meant every row
+              answered two questions when the reader had narrowed the board to
+              ask one — and where the figure above was itself a price, it said
+              the same number twice.
+
+              So the column is one number and its unit. A board ordered by the
+              market puts the price in the figure; the other orders do not carry
+              a price at all. See the head of `BoardDetail`. */}
+          <Text style={[Type.micro, styles.figureLabel, { color: c.textTertiary }]}>
+            {figure?.label ?? 'FP'}
+          </Text>
         </View>
       </View>
 
@@ -545,7 +556,11 @@ const styles = StyleSheet.create({
      competing with it. The centring is kept, because that part was right, and
      three digits fill 30 the way the original note wanted. */
   boardRank: {
-    width: 30,
+    /* Four digits, because a market rank runs past 2,600 and this used to hold
+       an ordinal that never reached four. At 12pt tabular the widest value is
+       about 28pt, so 34 leaves it a point of air on each side rather than
+       kerning against the portrait. */
+    width: 34,
     textAlign: 'center',
     fontSize: 12,
     fontWeight: '700',
@@ -587,8 +602,6 @@ const styles = StyleSheet.create({
   /* The collection row's coin line, at its numbers — see `InventoryRow`. Right
      aligned with the figure above it because the column is right aligned; the
      glyph leads the number the way it does everywhere else in the app. */
-  figureCoins: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one, height: 15 },
-  figureCoinValue: { fontSize: 12, lineHeight: 15, fontWeight: '600' },
   /* Two groups pushed apart, not an even grid. The histogram is one object and
      the best copy is another, and `space-between` is what says so — on a phone
      and on a 940pt table alike, where an even grid would have stranded four

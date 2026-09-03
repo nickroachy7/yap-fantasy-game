@@ -63,6 +63,25 @@ export type DirectoryPlayer = {
   baseCoins: number | null;
   /** Rank across EVERY position, by season points. Null until he has played. */
   overallRank: number | null;
+  /**
+   * HIS PLACE AT HIS POSITION ON THE MARKET'S BOARD — the 4 of "WR4" — and the
+   * size of the pool it is taken from.
+   *
+   * Derived here rather than read, because the provider's own `position_rank`
+   * is present for about a fifth of the board and a column that is null four
+   * times in five cannot be drawn. `marketRank` has complete coverage, so
+   * ranking each position by it gives the same answer with no holes — see
+   * `assignRanks`.
+   *
+   * THE POOL IS THE HALF THAT MAKES IT MEAN ANYTHING. "WR4" says nothing about
+   * whether that is fourth of thirty or fourth of ninety, and those are two
+   * different players to own.
+   *
+   * Null for anyone the market does not rank, which is the same fifth of the
+   * directory `marketRank` is null for.
+   */
+  marketPosRank: number | null;
+  marketPosPool: number | null;
   /* --- from `player_card_market()`, merged in by `fetchPlayerDirectory` --- */
   market: PlayerCardMarket | null;
 };
@@ -163,6 +182,8 @@ export function normalise(row: DirectoryRow, bio?: PlayerBio): DirectoryPlayer {
     experience: bio?.experience ?? null,
     posRank: null,
     marketRank: null,
+    marketPosRank: null,
+    marketPosPool: null,
     baseCoins: null,
     overallRank: null,
     market: null,
@@ -358,6 +379,27 @@ function assignRanks(players: DirectoryPlayer[]): void {
       p.posRank = n;
     });
   }
+
+  /* THE MARKET'S POSITION BOARD, over a different pool from everything above.
+     `played` is the right filter for OUR ranks, which are made of points
+     scored; it is the wrong one here, because the market ranks a man before he
+     has taken a snap and that is the entire reason this board can be ordered in
+     September. The filter is instead "does the market rank him at all". */
+  const ranked = new Map<string, DirectoryPlayer[]>();
+  for (const p of players) {
+    if (p.marketRank === null) continue;
+    const key = (p.position ?? '—').toUpperCase();
+    const list = ranked.get(key);
+    if (list) list.push(p);
+    else ranked.set(key, [p]);
+  }
+  for (const list of ranked.values()) {
+    list.sort((a, b) => (a.marketRank ?? 0) - (b.marketRank ?? 0));
+    list.forEach((p, i) => {
+      p.marketPosRank = i + 1;
+      p.marketPosPool = list.length;
+    });
+  }
 }
 
 /**
@@ -519,210 +561,55 @@ export async function fetchPlayerDirectory(): Promise<DirectoryFetch> {
   };
 }
 
-export type PositionFilter = 'ALL' | 'QB' | 'RB' | 'WR' | 'TE' | 'PK';
-export const POSITION_FILTERS: PositionFilter[] = ['ALL', 'QB', 'RB', 'WR', 'TE', 'PK'];
-
-/** Counts for the filter tabs, over the unfiltered set so they never move. */
-export function positionCounts(players: DirectoryPlayer[]): Record<PositionFilter, number> {
-  const counts = { ALL: players.length, QB: 0, RB: 0, WR: 0, TE: 0, PK: 0 };
-  for (const p of players) {
-    const pos = (p.position ?? '').toUpperCase() as PositionFilter;
-    if (pos !== 'ALL' && pos in counts) counts[pos] += 1;
-  }
-  return counts;
-}
-
 /**
- * Sortable fields.
+ * THE SORTING AND FILTERING THAT USED TO LIVE HERE HAS MOVED TO `board-view.ts`.
  *
- * `pos`, `team` and `college` were dropped along with the column headers that
- * used to carry them. Position is what the filter tabs above the list do, and
- * team and college are both matched by the search box — so all three were a
- * second way to do something the screen already does, and a sort bar has to
- * earn every chip it shows.
+ * `PositionFilter`, `POSITION_FILTERS`, `positionCounts`, `SortKey`,
+ * `SORT_OPTIONS`, `DEFAULT_SORT_DIR`, `SortState` and `filterAndSort` were all
+ * declared in this file and, by the end, six of the eight had NO CALLERS. They
+ * were the vocabulary of the nine-column directory table, which was replaced by
+ * the three boards, which have now been replaced by one — and each step left
+ * its predecessor's controls behind as exports nobody deleted.
+ *
+ * That is not a tidy-up. A table of captions and comparators for controls
+ * nothing draws reads as a feature to the next person in here and costs an
+ * afternoon to disprove; the collection made the same removal and its note on
+ * `SortKey` says the same thing. Anything genuinely still wanted came back
+ * across into the new model rather than being referenced from two places.
+ *
+ * WHAT STAYED IN THIS FILE is what a DIRECTORY is: the read, the shape of a
+ * row, the ranks derived over the whole pool, and the per-position stat line a
+ * row draws. Which slice of it is on screen, in what order, is the board's
+ * business and is stated there.
  */
-export type SortKey = 'name' | 'exp' | 'age' | 'games' | 'fp' | 'fpg';
-export type SortDir = 'asc' | 'desc';
-
-/** Chip order for the sort bar. Production first, identity last. */
-export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: 'fp', label: 'FP' },
-  { key: 'fpg', label: 'FP/G' },
-  { key: 'games', label: 'GP' },
-  { key: 'name', label: 'Name' },
-  { key: 'age', label: 'Age' },
-  { key: 'exp', label: 'Yrs' },
-];
-
-/**
- * The direction a column takes the first time you press it. Descending for a
- * stat — nobody opens a leaderboard to see who scored least — and ascending
- * for text, where A-Z is the only order anyone means.
- */
-export const DEFAULT_SORT_DIR: Record<SortKey, SortDir> = {
-  name: 'asc',
-  exp: 'asc',
-  age: 'asc',
-  games: 'desc',
-  fp: 'desc',
-  fpg: 'desc',
-};
-
-export type SortState = { key: SortKey; dir: SortDir };
-
-/** Diacritic-insensitive, case-insensitive contains. */
-function normaliseForSearch(s: string): string {
-  return s
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-}
-
-/**
- * Missing values sort last in BOTH directions rather than flipping to the top
- * when you reverse a column. A blank is not a small number, and a table that
- * opens with forty em dashes has buried the thing you pressed the header for.
- */
-function compareNullable(a: number | null, b: number | null, dir: SortDir): number {
-  if (a === null && b === null) return 0;
-  if (a === null) return 1;
-  if (b === null) return -1;
-  return dir === 'asc' ? a - b : b - a;
-}
-
-/** Same rule for text: an absent college is not a college that sorts before A. */
-function compareText(a: string | null, b: string | null, dir: SortDir): number {
-  const x = a?.trim() || null;
-  const y = b?.trim() || null;
-  if (x === null && y === null) return 0;
-  if (x === null) return 1;
-  if (y === null) return -1;
-  const r = x.localeCompare(y);
-  return dir === 'asc' ? r : -r;
-}
-
-export function filterAndSort(
-  players: DirectoryPlayer[],
-  {
-    position,
-    query,
-    sort,
-  }: { position: PositionFilter; query: string; sort: SortState },
-): DirectoryPlayer[] {
-  const q = normaliseForSearch(query.trim());
-  const filtered = players.filter((p) => {
-    if (position !== 'ALL' && (p.position ?? '').toUpperCase() !== position) return false;
-    if (!q) return true;
-    // College is searchable at every width, including the two where the column
-    // is not drawn: 'every Georgia receiver' is a real thing people look for,
-    // and on a phone typing it is the only way to ask.
-    return (
-      normaliseForSearch(p.name).includes(q) ||
-      normaliseForSearch(p.team ?? '').includes(q) ||
-      normaliseForSearch(p.college ?? '').includes(q)
-    );
-  });
-
-  const { key, dir } = sort;
-  return filtered.sort((a, b) => {
-    const r = compareBy(a, b, key, dir);
-    // Name is the tiebreak everywhere, because a preseason table has hundreds
-    // of players on exactly 0.0 and an arbitrary order among them makes the
-    // list appear to reshuffle whenever it re-renders.
-    return r !== 0 ? r : a.name.localeCompare(b.name);
-  });
-}
-
-function compareBy(a: DirectoryPlayer, b: DirectoryPlayer, key: SortKey, dir: SortDir): number {
-  switch (key) {
-    case 'name':
-      return compareText(a.name, b.name, dir);
-    case 'exp':
-      return compareNullable(a.experience, b.experience, dir);
-    case 'age':
-      return compareNullable(a.age, b.age, dir);
-    case 'games':
-      return compareNullable(a.gamesPlayed, b.gamesPlayed, dir);
-    case 'fp':
-      return compareNullable(a.seasonFp, b.seasonFp, dir);
-    case 'fpg':
-      // Per-game off zero games is 0/0, not 0. Ranking a player who has not
-      // played above one averaging 4.0 is the classic rate-stat bug.
-      return compareNullable(
-        a.gamesPlayed > 0 ? a.fpPerGame : null,
-        b.gamesPlayed > 0 ? b.fpPerGame : null,
-        dir,
-      );
-  }
-}
-
 
 /* -------------------------------------------------------------------------- *
- * The row's stat strip.
+ * The row's tray.
  * -------------------------------------------------------------------------- */
 
-export type StatCell = { label: string; value: number };
-
 /**
- * Five stats per position, chosen the way a manager reads a player.
+ * `statStrip` AND `formatStat` LIVED HERE AND ARE GONE, twice over.
  *
- * Five because that is what fits a phone row without the labels colliding, and
- * because the sixth stat for every position is already noise — a receiver's
- * rushing attempts, a quarterback's receptions.
+ * They built the five stats a row showed for a player's position — a
+ * quarterback's passing line, a kicker's attempts — and they were written for
+ * the nine-column directory table. When the row's tray became the ownership
+ * band they lost their caller and sat here exported and unused for weeks. They
+ * were briefly revived when the board's ordering could swap the tray, and lost
+ * it again when the tray became permanent.
  *
- * The last cell is always FP/G. The reference layout puts rostered-percentage
- * there, which this app cannot honestly show: ownership is RLS-scoped to its
- * owner, so a global figure needs a server-side aggregate, and with a
- * beta-sized user base it would read 0% or 100% for everyone. FP per game is
- * the number that actually decides a start, and it is real.
+ * That is twice the same answer, so it is worth writing down rather than
+ * leaving a third revival to be discovered: A ROW'S TRAY IS NOT WHERE A STAT
+ * LINE GOES. The row already carries the season in its figure and its detail
+ * line; five more numbers under it are a second telling of the same story in
+ * more detail than a row can use, and every one of them is on the player's own
+ * screen, one tap away, laid out with room to read. What is NOT anywhere else
+ * is the market — see `tierCounts` below.
+ *
+ * `DirectoryStats` and the columns behind it stay on the model. They are read
+ * in the same pass as everything else and cost nothing extra, and a surface
+ * that genuinely wants a season line should build it rather than inherit a
+ * shape designed for a 32pt band.
  */
-export function statStrip(player: DirectoryPlayer): StatCell[] {
-  const s = player.stats;
-  const perGame = player.gamesPlayed > 0 ? player.fpPerGame : 0;
-
-  switch ((player.position ?? '').toUpperCase()) {
-    case 'QB':
-      return [
-        { label: 'PASS YD', value: s.passingYards },
-        { label: 'PASS TD', value: s.passingTds },
-        { label: 'INT', value: s.interceptions },
-        { label: 'RUSH YD', value: s.rushingYards },
-        { label: 'FP/G', value: perGame },
-      ];
-    case 'RB':
-      return [
-        { label: 'ATT', value: s.rushingAttempts },
-        { label: 'RUSH YD', value: s.rushingYards },
-        { label: 'TD', value: s.rushingTds + s.receivingTds },
-        { label: 'REC', value: s.receptions },
-        { label: 'FP/G', value: perGame },
-      ];
-    case 'PK':
-      return [
-        { label: 'FG', value: s.fieldGoalsMade },
-        { label: 'FGA', value: s.fieldGoalAttempts },
-        { label: 'XP', value: s.extraPointsMade },
-        { label: 'GP', value: player.gamesPlayed },
-        { label: 'FP/G', value: perGame },
-      ];
-    // WR and TE read identically, and so does anything unexpected the feed
-    // sends: receiving is the safest default for a skill position.
-    default:
-      return [
-        { label: 'REC', value: s.receptions },
-        { label: 'REC YD', value: s.receivingYards },
-        { label: 'TD', value: s.receivingTds },
-        { label: 'TGT', value: s.targets },
-        { label: 'FP/G', value: perGame },
-      ];
-  }
-}
-
-/** FP/G wants a decimal; a touchdown count does not. */
-export function formatStat(cell: StatCell): string {
-  if (cell.label === 'FP/G') return cell.value.toFixed(1);
-  return Math.round(cell.value).toLocaleString();
-}
 
 /**
  * The ownership strip: how many copies of this player exist, split by tier.

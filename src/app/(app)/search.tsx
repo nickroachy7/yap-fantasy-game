@@ -1,13 +1,25 @@
 /**
  * Find a player. A takeover, not a page.
  *
- * WHY THIS ONE IS DIFFERENT FROM ITS TWO NEIGHBOURS
+ * WHY THIS SURVIVED THE MERGE
  *
- * Trend and Leaders are boards: you arrive, you read, you leave. Search is a
- * tool you pick up with a name already in mind, use for about four seconds, and
- * put down — and the whole time you are using it the rest of the section is
- * irrelevant. So it takes the screen: no section nav, no position chips, no
- * sort strip, nothing but a field and what matches it.
+ * It had two neighbours — Trend and Top — and they are gone, not because they
+ * were cut but because they turned out to be two orderings of the board they
+ * shared. See `players/index.tsx`. That could have swallowed this screen too:
+ * once a board has facets and a sort, a search field is arguably one more
+ * narrowing and belongs in the same row.
+ *
+ * It did not, and the reason is that search is not a way of looking at a list.
+ * It is a tool you pick up with a name already in mind, use for about four
+ * seconds, and put down — and the whole time you are using it, everything else
+ * on the board is in the way. So it still takes the screen: no chrome, no
+ * chips, no sort, nothing but a field and what matches it.
+ *
+ * THE COST, NAMED. A result here cannot inherit the board's facets or its order.
+ * Someone who has narrowed to unowned rookie receivers and then searches gets
+ * the whole pool back. That is the price of the focus, it was paid knowingly,
+ * and the fix if it ever bites is a field on the board rather than a filter row
+ * on this screen — which would be this file arguing itself out of existence.
  *
  * IT COVERS EVERYTHING, and that is why it does not live under `(tabs)`.
  *
@@ -26,17 +38,16 @@
  * That makes the X the only way out, which is the intended trade: there is no
  * tab bar to escape sideways through, so the dismissal has to be obvious and
  * has to be the biggest control on the row after the field itself. It returns
- * to Trend — the section's landing page — because there is nowhere else it
- * could sensibly go.
+ * to the players board, because there is nowhere else it could sensibly go.
  *
  * THE FIELD IS FOCUSED ON ARRIVAL. The entire content of this screen is a
  * response to typing, so a keyboard that has to be summoned first is a step
  * between the reader and the only thing here.
  *
- * NO SORT, AND NO POSITION FILTER. Both exist on the directory panel this
- * replaced, and both are answers to "show me a set", which is what the boards
- * next door are for. Here the query IS the filter, and a sort key would just be
- * a second control competing with it — the order that matters is points
+ * NO SORT, AND NO POSITION FILTER. Both live on the board next door, and both
+ * are answers to "show me a set" — which is a different errand from "find me
+ * this man". Here the query IS the filter, and a sort key would be a second
+ * control competing with the only one that matters. The order is points
  * descending, which is what you want when two players share a surname.
  */
 import { useRouter } from 'expo-router';
@@ -44,11 +55,12 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { PlayerList, type ListedPlayer } from '@/components/cards/PlayerList';
-import { figureFor, ROW_GUTTER } from '@/components/cards/PlayerRow';
+import { PlayerList } from '@/components/cards/PlayerList';
+import { BoardDetail, figureFor } from '@/components/cards/BoardDetail';
+import { ROW_GUTTER } from '@/components/cards/PlayerRow';
 import { useDirectoryBoard } from '@/components/cards/use-directory-board';
+import { NO_FILTERS, buildBoard } from '@/components/cards/board-view';
 import {
-  filterAndSort,
   type DirectoryFetch,
   type DirectoryPlayer,
 } from '@/components/cards/player-directory';
@@ -62,8 +74,23 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  * Points descending, fixed. See the header: the query is the only control here,
  * and this is the order that makes two players with the same surname resolve
  * into "the one you meant is first".
+ *
+ * IT GOES THROUGH `buildBoard`, the same function the board uses, with every
+ * facet left at its default and the query the only thing set. That is not
+ * ceremony: the matcher decides whether a man EXISTS, and two implementations
+ * of it is how a board and a search come to disagree about whether he does.
  */
-const SORT = { key: 'fp', dir: 'desc' } as const;
+const SORT = { key: 'points', dir: 'desc' } as const;
+
+/**
+ * The figure column follows the order, here as on the board — see `figureFor`.
+ *
+ * `points` descending puts a season total beside every name, over the price. In
+ * September that total is null for everybody and the row draws the quiet dash,
+ * which is correct and is what the whole app does with an unplayed player: the
+ * price underneath is the number that is real, and it is the fact most likely
+ * to be wanted by someone who arrived with a name in mind.
+ */
 
 export default function PlayersSearchScreen() {
   const router = useRouter();
@@ -80,8 +107,9 @@ export default function PlayersSearchScreen() {
   const fixtures = useUpcomingFixtures();
 
   /**
-   * THE SAME ROW AS TREND AND TOP: a number on the left, and how he scores over
-   * what a card of him is worth on the right.
+   * THE SAME ROW THE BOARD DRAWS: a number on the left, and what a card of him
+   * fetches on the right. The figure follows the order here exactly as it does
+   * on the board, and the order here is fixed — see `SORT`.
    *
    * THE NUMBER IS AN ORDINAL, NOT A RANK, and the distinction is worth keeping
    * straight because this file used to argue against drawing one at all. That
@@ -93,26 +121,72 @@ export default function PlayersSearchScreen() {
    * Every match is listed. There is no cap here and never was; the boards have
    * dropped theirs to match.
    */
-  const matches = useMemo<ListedPlayer[]>(() => {
+  const matches = useMemo<DirectoryPlayer[]>(() => {
     if (!result) return [];
-    return filterAndSort(result.players, { position: 'ALL', query, sort: SORT }).map(
-      (player, i) => ({
-        player,
-        rank: i + 1,
-        figure: figureFor(player, prices?.get(player.playerId)),
-      }),
-    );
-  }, [result, query, prices]);
+    return buildBoard(result.players, {
+      sort: SORT.key,
+      dir: SORT.dir,
+      filters: { ...NO_FILTERS, query },
+      /* No movement and no fixtures: the sort does not need a delta and no
+         facet here asks whether he plays this week. */
+      deltas: null,
+      playsThisWeek: () => false,
+    });
+  }, [result, query]);
+
+  /**
+   * THE SAME TWO SLOTS THE BOARD FILLS, from the same functions — a season
+   * total, with games played and the rate beside it. The takeover has no order
+   * control, so the answer is fixed; what it must not be is DIFFERENT. Two
+   * screens drawing one player two ways is how a reader learns to distrust
+   * both. The tray is left to the row, which is the community band it is
+   * everywhere else.
+   *
+   * CALLED PER VISIBLE ROW, like the board's — see `PlayerList`. It matters
+   * more here than there: this list is rebuilt on every KEYSTROKE, so building
+   * a figure and an element for every match would have put a thousand
+   * `toLocaleString` calls between a letter and its results.
+   */
+  const ctxFor = useCallback(
+    (player: DirectoryPlayer) => ({
+      sort: SORT.key,
+      dir: SORT.dir,
+      coins: prices?.get(player.playerId),
+      /* Unreachable for this order — a signed delta is what needs them — but
+         the context is required rather than partial, so a measure added later
+         cannot silently lose its colours on this screen. */
+      positive: c.positive,
+      negative: c.negative,
+    }),
+    [prices, c.positive, c.negative],
+  );
+
+  /* His market rank, as the board draws it: a fact about him rather than his
+     position in these results, which change on every keystroke. */
+  const rankFor = useCallback((player: DirectoryPlayer) => player.marketRank, []);
+  const figureOf = useCallback(
+    (player: DirectoryPlayer) => figureFor(player, ctxFor(player)),
+    [ctxFor],
+  );
+  const detailOf = useCallback(
+    (player: DirectoryPlayer) => <BoardDetail player={player} ctx={ctxFor(player)} />,
+    [ctxFor],
+  );
 
   /**
    * Close, not navigate.
    *
-   * This used to `replace('/fantasy/players')`, which was wrong twice over. It sent
-   * everyone to Trend regardless of where they opened search from, so anyone
-   * arriving from Leaders was moved to a different board on the way out. And a
-   * replace is a NAVIGATION: it tears this screen down and mounts a board from
-   * scratch, refetching the directory and flashing a spinner to arrive at a
-   * page that was already sitting there a moment ago.
+   * This used to `replace('/fantasy/players')`, which was wrong twice over. It
+   * sent everyone to one particular board regardless of where they had opened
+   * search from, so anyone arriving from a sibling view was moved on the way
+   * out. And a replace is a NAVIGATION: it tears this screen down and mounts a
+   * board from scratch, refetching the directory and flashing a spinner to
+   * arrive at a page that was already sitting there a moment ago.
+   *
+   * It matters more now, not less. The board carries the reader's order, their
+   * facets in local state, so a replace on the way out would
+   * silently reset every one of them — you would come back from a four-second
+   * errand to a board you had not configured.
    *
    * Going back dismisses instead. The page underneath was never unmounted, so
    * it reappears already scrolled where you left it, with no fetch and nothing
@@ -121,7 +195,7 @@ export default function PlayersSearchScreen() {
    * The fallback is for arriving here cold: a deep link or a refreshed browser
    * tab has no history to pop, and `back()` on an empty stack does nothing at
    * all, which would strand the reader on a screen whose only exit had stopped
-   * working. Trend is the section's landing page and the right place to land.
+   * working. The players board is where it belongs.
    */
   const close = useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -159,7 +233,16 @@ export default function PlayersSearchScreen() {
         />
       );
     }
-    return <PlayerList players={matches} fixtureFor={fixtureFor} onOpen={openPlayer} />;
+    return (
+      <PlayerList
+        players={matches}
+        rankFor={rankFor}
+        figureFor={figureOf}
+        renderDetail={detailOf}
+        fixtureFor={fixtureFor}
+        onOpen={openPlayer}
+      />
+    );
   };
 
   return (

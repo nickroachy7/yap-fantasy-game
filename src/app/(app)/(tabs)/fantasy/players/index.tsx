@@ -1,40 +1,68 @@
 /**
- * Who is heating up, and who has gone cold. The Players board lands here.
+ * PLAYERS: every card in the game, on one board.
  *
- * WHY THIS IS THE LANDING PAGE AND SEARCH IS NOT
+ * ===========================================================================
+ * THIS WAS THREE PAGES
+ * ===========================================================================
  *
- * Search shows you nothing until you type. It is the right page when you
- * already have a name in mind and the wrong one to open on, because opening on
- * it makes the section's first impression an empty box and a keyboard. Trend
- * has an answer before you do anything, and it is the answer that precedes
- * spending coins: who changed.
+ * Search, Trend and Top, under a permanent section nav. They were never three
+ * screens. All three read the same directory through `useDirectoryBoard`, all
+ * three drew the same `PlayerRow` through `PlayerList`, and by the end the only
+ * thing separating them was one sort key and one filter each — a fact this file
+ * used to admit in its own comments, where the trend board padded itself out
+ * with every non-mover in the directory sorted by season points because there
+ * were four qualifying movers in preseason.
  *
- * ONE COLUMN OF FIFTY, WITH A TOGGLE. This screen used to draw risers and
- * fallers side by side, twelve each, on the argument that hiding either behind
- * a toggle makes the page read as a hype feed. That argument was right about
- * the danger and wrong about the fix. Two columns of twelve is a shortlist you
- * cannot scan and cannot filter, and once the rows became full directory rows —
- * three lines of identity over a band of ownership counts — two of them abreast
- * does not fit a phone at all.
+ * The cost of the split was not the extra files. It was that a reader could not
+ * ask a question that crossed two of them: "the receivers who play on Sunday,
+ * cheapest first" had no page to be asked on, and picking a starting page was
+ * picking which two thirds of the controls to give up.
  *
- * The toggle is not a hype feed because DOWN is a peer of UP, not a footnote:
- * the same control, the same fifty, the same rows, one press away. What would
- * make it a hype feed is a "trending" list with no way to see the other half,
- * and that is precisely what is not being built here.
+ * So the ORDER became a control and the three collapsed into one. `board-view.ts`
+ * holds the model — the six orders and what each measures, and the five facets
+ * — and this
+ * file is the screen around it.
  *
- * See `trend/movers.ts` for why this measures production rather than the
- * add/drop volume the same screen shows on Sleeper.
+ * THE BOARD STILL ANSWERS BEFORE YOU TOUCH IT, which is the property the merge
+ * could most easily have destroyed. It opens on the market's rank with nothing
+ * filtered, which is exactly the page Top was; it is a board on arrival and a
+ * query surface only if you make it one. A merge that had opened on an empty
+ * form would have traded three answers for none.
+ *
+ * ===========================================================================
+ * WHAT IT COSTS, STATED PLAINLY
+ * ===========================================================================
+ *
+ * The delta the trend order sorts by is NOT DRAWN on the row. That was already
+ * true of the trend page — the note it inherited is worth keeping, because the
+ * objection has not been answered, only accepted: a board ordered by a number
+ * it does not print cannot explain itself, and what carries it instead is the
+ * order's own name in the bar and the context line naming the two weeks. One
+ * row across every ordering was worth more than one ordering's self-defence.
+ *
+ * SEARCH IS STILL A TAKEOVER and does not inherit these facets. It is a tool
+ * you pick up with a name in mind and put down four seconds later, and the case
+ * for giving it the whole screen — no chrome, keyboard up on arrival — did not
+ * weaken because its two neighbours became sort keys. The magnifier on the
+ * controls pushes it. See `app/(app)/search.tsx`.
  */
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 
-import { PlayerList, type ListedPlayer } from '@/components/cards/PlayerList';
-import { figureFor, ROW_GUTTER } from '@/components/cards/PlayerRow';
+import { PlayerList } from '@/components/cards/PlayerList';
+import { BoardDetail, figureFor } from '@/components/cards/BoardDetail';
+import { PlayerBoardControls } from '@/components/cards/PlayerBoardControls';
 import { useDirectoryBoard } from '@/components/cards/use-directory-board';
 import {
-  type DirectoryPlayer,
-} from '@/components/cards/player-directory';
+  NO_FILTERS,
+  buildBoard,
+  orderOf,
+  type BoardFilters,
+  type BoardSort,
+  type SortDir,
+} from '@/components/cards/board-view';
+import { type DirectoryPlayer } from '@/components/cards/player-directory';
 import { fixtureLabel, useUpcomingFixtures } from '@/components/cards/use-fixtures';
 import { weekLabel } from '@/components/scores/scoreboard';
 import {
@@ -45,79 +73,52 @@ import {
   type Slate,
 } from '@/components/scores/use-scores';
 import { Screen } from '@/components/shell/Screen';
-import { SegmentedControl } from '@/components/shell/SegmentedControl';
-import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Spacing } from '@/constants/theme';
-import { computeMovers } from '@/components/trend/movers';
+import { Colors, Spacing } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { computeMovers, type Mover } from '@/components/trend/movers';
 
 const FALLBACK_SEASON = 2026;
 
-
-
-
 /**
- * THE BOARD IS NOW THE WHOLE POOL, and the fifty-row cap is gone.
- *
- * Fifty was chosen as "a list you scroll" against twelve as "a teaser", and
- * both were answering the wrong question — the reader wanting the 63rd best
- * riser had no way to reach him and nothing on screen said he existed. The
- * directory is already read in full and held in memory, `PlayerRow` is a fixed
- * height, and `PlayerList` hands `getItemLayout` to the FlatList, so drawing a
- * thousand rows costs the same as drawing fifty: the ones off screen are never
- * mounted.
- *
- * `MINIMUM_POINTS` still cuts the tail, and that is a different cut — it is
- * about whether a move MEANS anything, not about how long a list may be.
- */
-
-/**
- * A player has to have been worth starting in at least one of the two weeks to
- * appear. Six points is roughly a replacement-level game — below it the list
- * fills with third-stringers whose "+3.1" is arithmetically true and tells you
- * nothing.
+ * A player has to have been worth starting in at least one of the two weeks
+ * before his change counts. Six points is roughly a replacement-level game —
+ * below it the ordering fills with third-stringers whose "+3.1" is
+ * arithmetically true and tells you nothing.
  */
 const MINIMUM_POINTS = 6;
 
-type Direction = 'up' | 'down';
-
-export default function TrendScreen() {
+export default function PlayersScreen() {
   const router = useRouter();
+  /* Resolved once here rather than inside the figure builder, which is a plain
+     function called a thousand times inside a memo. Only the trend order uses
+     them — a signed change reads as one — but a hook cannot be conditional and
+     reading two tokens costs nothing. */
+  const c = Colors[useColorScheme() === 'dark' ? 'dark' : 'light'];
+
+  const { result, prices, failed, refreshing, refresh } = useDirectoryBoard();
+
+  /**
+   * MARKET RANK, which is the page Top was.
+   *
+   * It is the only ordering that exists in September: `assignRanks` refuses to
+   * rank a man who has not played, so ours is null for everybody until week
+   * one, where the provider's consensus is published before a snap is taken.
+   * A board whose default order is empty for the first month of the season is
+   * not a default.
+   */
+  const [sort, setSort] = useState<BoardSort>('market');
+  const [dir, setDir] = useState<SortDir>('asc');
+  const [filters, setFilters] = useState<BoardFilters>(NO_FILTERS);
+
+  const fixtures = useUpcomingFixtures();
 
   /* Peeked, so a revisit starts on the season it ended on rather than on the
-     fallback — which would otherwise send `useSeasonSchedule` after the WRONG
-     season for one render and miss its cache. See `currentSeason`. */
+     fallback — which would send the schedule read after the WRONG season for
+     one render and miss its cache. See `currentSeason`. */
   const seededSeason = peekCurrentSeason();
   const [season, setSeason] = useState(seededSeason ?? FALLBACK_SEASON);
   const [seeded, setSeeded] = useState(seededSeason !== null);
-  const [pos, setPos] = useState<PosFilter>('ALL');
-  const [direction, setDirection] = useState<Direction>('up');
-
-  /**
-   * The directory, for the rows themselves.
-   *
-   * A `Mover` is a name, two week totals and a delta — it has no season line,
-   * no fixture and no ownership counts, which is three quarters of what a
-   * `PlayerRow` draws. Rather than widen the mover model to carry them, the
-   * rows come from the directory this section already loads and caches for the
-   * session: the trend board is a REORDERING of the directory, not a different
-   * set of players, and saying so in the code is what keeps the two screens
-   * from drifting into two ideas of what a player is.
-   */
-  /* One read for all three boards — the cached directory plus prices allowed to
-     be newer than it, and the way to drop both. See `useDirectoryBoard`. */
-  const {
-    result: fetched,
-    prices,
-    failed: directoryFailed,
-    refreshing,
-    refresh,
-  } = useDirectoryBoard();
-
-  const directory = useMemo<Map<string, DirectoryPlayer> | null>(
-    () => (fetched ? new Map(fetched.players.map((p) => [p.playerId, p])) : null),
-    [fetched],
-  );
 
   useEffect(() => {
     let live = true;
@@ -132,9 +133,34 @@ export default function TrendScreen() {
     };
   }, []);
 
+  /**
+   * THE TREND READS ARE NOT PAID FOR UNTIL THEY ARE ASKED FOR.
+   *
+   * Ordering by movement needs a season of fixtures and two weeks of stat
+   * lines — three reads that the old trend PAGE could fund honestly, because
+   * arriving there was the request. On a merged board it is one of six orders,
+   * so funding it on mount would charge every visit for something most visits
+   * never use.
+   *
+   * The latch never falls back to false. Flipping to another order and back
+   * would otherwise drop a schedule that is fixed months ahead and re-read it,
+   * and the cache behind these hooks is session-scoped anyway — so once the
+   * cost has been paid, paying attention to it again buys nothing.
+   *
+   * IT IS SET WHERE THE ORDER IS CHOSEN rather than in an effect watching the
+   * order. An effect would be a second render caused by the first, for a fact
+   * already known at the moment of the press — and the press is the request.
+   */
+  const [wantsMovement, setWantsMovement] = useState(false);
 
-  const fixtures = useUpcomingFixtures();
-  const { games, slates, teams, loading, error } = useSeasonSchedule(season);
+  const chooseSort = useCallback((key: BoardSort, next: SortDir) => {
+    if (orderOf(key).needsMovers) setWantsMovement(true);
+    setSort(key);
+    setDir(next);
+  }, []);
+
+  const armed = wantsMovement && seeded;
+  const { games, slates, teams, loading, error } = useSeasonSchedule(armed ? season : null);
 
   /**
    * The two most recently COMPLETED slates.
@@ -146,9 +172,7 @@ export default function TrendScreen() {
    */
   const [recentSlate, previousSlate] = useMemo(() => {
     const completed = slates.filter((s) =>
-      games.some(
-        (g) => g.seasonType === s.seasonType && g.week === s.week && g.status === 'final',
-      ),
+      games.some((g) => g.seasonType === s.seasonType && g.week === s.week && g.status === 'final'),
     );
     const tail = completed.slice(-2);
     return [tail[1] ?? tail[0] ?? null, tail.length > 1 ? tail[0] : null] as [
@@ -160,92 +184,116 @@ export default function TrendScreen() {
   const recent = useWeekLeaders(recentSlate, teams);
   const previous = useWeekLeaders(previousSlate, teams);
 
-  const movers = useMemo(
-    () => computeMovers(recent.leaders, previous.leaders, MINIMUM_POINTS),
-    [recent.leaders, previous.leaders],
+  /**
+   * Movement by player id — the WHOLE mover, not just its delta.
+   *
+   * It was a `Map<string, number>` of deltas, which was enough while the board
+   * only had to sort by them. The row now explains the ordering — the two
+   * weeks' points and the two ranks either side of the move — and all four
+   * facts are already on the `Mover` that produced the delta. Recomputing them
+   * beside it would be two derivations of one move.
+   *
+   * Null until BOTH weeks have landed, which keeps the trend order from briefly
+   * sorting everyone on nothing while the reads are in flight — `buildBoard`
+   * sinks a null delta to the bottom in both directions, so a half-loaded map
+   * would shuffle the board once and then again.
+   */
+  const movers = useMemo<Map<string, Mover> | null>(() => {
+    if (!armed || recent.loading || previous.loading) return null;
+    if (!recentSlate || !previousSlate) return null;
+    return new Map(
+      computeMovers(recent.leaders, previous.leaders, MINIMUM_POINTS).map((m) => [m.playerId, m]),
+    );
+  }, [armed, recent.loading, recent.leaders, previous.loading, previous.leaders, recentSlate, previousSlate]);
+
+  /** Just the deltas, which is all the ORDERING needs. */
+  const deltas = useMemo<Map<string, number> | null>(
+    () => (movers ? new Map([...movers].map(([id, m]) => [id, m.delta])) : null),
+    [movers],
+  );
+
+  const playsThisWeek = useCallback(
+    (team: string | null) => (team ? fixtures.get(team.toUpperCase()) != null : false),
+    [fixtures],
+  );
+
+  /** Every club with a player in the pool, for the facet menu. */
+  const clubs = useMemo(() => {
+    if (!result) return [];
+    const seen = new Set<string>();
+    for (const p of result.players) if (p.team) seen.add(p.team.toUpperCase());
+    return [...seen].sort();
+  }, [result]);
+
+  /**
+   * The board.
+   *
+   * THE NUMBER BESIDE EACH NAME IS HIS MARKET RANK, not this list's ordinal.
+   *
+   * It was the ordinal, and the old directory's own rule had already forbidden
+   * that: a rank column is honest on a list whose ORDER IS ITS SUBJECT and
+   * dishonest on one whose order is a control, because the same player is 1st
+   * on the market board and 340th on the trend board and the column looks like
+   * it is describing him. It is not. Holding his market rank there instead
+   * makes it describe him, on every order, and the sequence of the list is
+   * something a reader can already see by reading down it.
+   *
+   * WHICH ALSO SETTLES THE POSITION FILTER, and reverses what this note used to
+   * say. It argued that picking WR should re-rank the receivers 1..n, because a
+   * board reading 1, 4, 9, 14 "would be a filtered table". That was an argument
+   * about an ORDINAL and it does not survive the change: the left column is now
+   * an overall rank, so 1, 4, 9, 14 is simply true, and the receiver's place
+   * among receivers is on the detail line where it can carry its pool with it.
+   * The row says both, which neither version managed alone.
+   */
+  const board = useMemo<DirectoryPlayer[]>(
+    () => (result ? buildBoard(result.players, { sort, dir, filters, deltas, playsThisWeek }) : []),
+    [result, sort, dir, filters, deltas, playsThisWeek],
   );
 
   /**
-   * The board: fifty rows, movers first.
+   * What a row draws, as functions the list calls for the rows it decides to
+   * mount — not as a thousand pre-built objects.
    *
-   * A mover with no directory row is DROPPED rather than drawn half-empty. It
-   * means the player is not in this season's card pool — there is no card to
-   * own, so "he is up 12 points" is not a thing this section can act on.
+   * THIS IS WHY THE SORT MENU IS NOT LAGGY. The board used to build the figure,
+   * the detail line and a wrapper object for every player in the game inside
+   * the memo above, so picking an order did ~968 `figureFor` calls and ~968
+   * element creations — several thousand `toLocaleString`s among them, which
+   * Hermes is slow at — on the main thread, between the press and the menu
+   * closing, to render twelve visible rows.
    *
-   * THEN IT IS PADDED OUT TO FIFTY WITH PLAYERS WHO DID NOT MOVE, and the
-   * padding is drawn as an em dash rather than as "+0.0".
+   * Sorting is now a sort. Everything else follows the viewport, which is the
+   * point of handing `getItemLayout` to a virtualised list in the first place.
    *
-   * Two weeks into a preseason there are a handful of qualifying movers, so a
-   * board that showed only them was four rows of content under three rows of
-   * controls — a page that looked broken rather than early. As weeks accumulate
-   * the movers push the padding off the bottom on their own, and the list never
-   * changes shape while that happens.
-   *
-   * The dash is what keeps this honest. A padded row has no measured change —
-   * he did not play both weeks, or did not clear the six-point floor — and
-   * printing 0.0 there would claim we measured him and found no movement. It is
-   * the same distinction `market` draws on the directory row, for the same
-   * reason, and it means the boundary between the real board and the padding is
-   * visible without a divider: the signed green and red stop.
-   *
-   * Padding is ordered by season points, so if you are going to be shown
-   * players for whom there is no trend, they are at least the ones worth
-   * knowing about.
+   * The context is rebuilt per row, which sounds like the same mistake and is
+   * not: it happens twelve times instead of a thousand, and it is a five-field
+   * object literal rather than a formatted string and two React elements.
    */
-  const board = useMemo<ListedPlayer[]>(() => {
-    if (!directory) return [];
-    const inPosition = (position: string | null) =>
-      pos === 'ALL' ? true : (position ?? '').toUpperCase() === pos;
+  const ctxFor = useCallback(
+    (player: DirectoryPlayer) => ({
+      sort,
+      dir,
+      coins: prices?.get(player.playerId),
+      mover: movers?.get(player.playerId) ?? null,
+      positive: c.positive,
+      negative: c.negative,
+    }),
+    [sort, dir, prices, movers, c.positive, c.negative],
+  );
 
-    const wanted = movers
-      .filter((m) => inPosition(m.position))
-      .filter((m) => (direction === 'up' ? m.delta > 0 : m.delta < 0));
-    // computeMovers sorts by delta descending, so risers are already in order
-    // and fallers need reversing — the biggest DROP belongs at the top of its
-    // own board, not the smallest.
-    const ordered = direction === 'up' ? wanted : [...wanted].reverse();
-
-    const rows: ListedPlayer[] = [];
-    const taken = new Set<string>();
-    for (const m of ordered) {
-      const player = directory.get(m.playerId);
-      if (!player) continue;
-      taken.add(player.playerId);
-      rows.push({
-        player,
-        /* THE SAME ROW AS TOP AND SEARCH, tray included. There is no longer
-           anything on it that only this board draws.
- 
-           THE DELTA IS NOT SHOWN, and that is the cost, stated plainly. This
-           board is ORDERED by the week-over-week move and no longer prints it,
-           so the ordering has to be taken on trust — the old objection, that a
-           board ranked by a number it does not show cannot explain itself, is
-           still true and is being accepted rather than answered. What carries
-           it instead is the heading: the context line names the two weeks being
-           compared, and the up/down control says which direction is on top.
- 
-           One row across three boards was worth more than one board's
-           explanation of itself. If the movement has to come back, `MoveStrip`
-           is in the history of this file and `ListedPlayer.strip` was the seam
-           it hung on. */
-        figure: figureFor(player, prices?.get(player.playerId)),
-      });
-    }
-
-    /* EVERYONE ELSE FOLLOWS THE MOVERS, best season first. They cleared
-       `MINIMUM_POINTS` in neither week, so they have no move to report — which
-       now costs the row nothing to say, since no row reports one. */
-    const filler = [...directory.values()]
-      .filter((p) => !taken.has(p.playerId) && inPosition(p.position))
-      .sort((a, b) => b.seasonFp - a.seasonFp || a.name.localeCompare(b.name))
-      .map<ListedPlayer>((player) => ({
-        player,
-        figure: figureFor(player, prices?.get(player.playerId)),
-      }));
-    rows.push(...filler);
-
-    return rows.map((row, i) => ({ ...row, rank: i + 1 }));
-  }, [directory, movers, pos, direction, prices]);
+  /* HIS MARKET RANK, NOT HIS ROW NUMBER, and the same one under every order —
+     see `PlayerRow.rank`. An ordinal here reshuffled the left column every time
+     the sort changed, so the number appeared to be about the board rather than
+     about the man. */
+  const rankFor = useCallback((player: DirectoryPlayer) => player.marketRank, []);
+  const figureOf = useCallback(
+    (player: DirectoryPlayer) => figureFor(player, ctxFor(player)),
+    [ctxFor],
+  );
+  const detailOf = useCallback(
+    (player: DirectoryPlayer) => <BoardDetail player={player} ctx={ctxFor(player)} />,
+    [ctxFor],
+  );
 
   const openPlayer = useCallback(
     (player: DirectoryPlayer) =>
@@ -254,63 +302,72 @@ export default function TrendScreen() {
   );
 
   const fixtureFor = useCallback(
-    (team: string | null) =>
-      team ? fixtureLabel(fixtures.get(team.toUpperCase())) : undefined,
+    (team: string | null) => (team ? fixtureLabel(fixtures.get(team.toUpperCase())) : undefined),
     [fixtures],
   );
 
-  const busy = !seeded || loading || recent.loading || previous.loading || directory === null;
+  const openSearch = useCallback(() => router.push('/search'), [router]);
 
-  const comparison =
-    recentSlate && previousSlate
-      ? `${weekLabel(previousSlate.seasonType, previousSlate.week)} → ${weekLabel(recentSlate.seasonType, recentSlate.week)}`
-      : null;
+  /**
+   * What the board is of, in one line.
+   *
+   * The trend order names the two weeks it is comparing, because that is the
+   * part a reader needs in order to trust an ordering whose number is not on
+   * the rows. Every other order is self-describing from the bar above.
+   */
+  const context = (() => {
+    if (!result) return 'Every player in the game';
+    if (sort === 'trend' && recentSlate && previousSlate) {
+      return `${weekLabel(previousSlate.seasonType, previousSlate.week)} → ${weekLabel(recentSlate.seasonType, recentSlate.week)} · ${board.length} players`;
+    }
+    return `${result.season ?? ''} season · ${board.length} players`.trim();
+  })();
 
   const body = () => {
-    if (busy) return <ActivityIndicator style={styles.pad} />;
-    if (directoryFailed) {
+    if (failed) {
       return (
         <EmptyState
           title="Could not load the players"
-          body="The trend board is built from the directory, and that read failed. Open Search and pull to refresh, then come back."
+          body="The board is built from the card directory, and that read failed. Pull to refresh, or try again in a moment."
         />
       );
     }
-    if (error || recent.error || previous.error) {
+    if (!result) return <ActivityIndicator style={styles.pad} />;
+    /* The trend order is the one that can be asked for before it can be
+       answered. Everything else is served from a directory already in memory. */
+    if (sort === 'trend' && (loading || recent.loading || previous.loading)) {
+      return <ActivityIndicator style={styles.pad} />;
+    }
+    if (sort === 'trend' && (error || recent.error || previous.error)) {
       return (
         <EmptyState
-          title="Could not load the trend"
+          title="Could not measure the movement"
           body={error ?? recent.error ?? previous.error ?? ''}
         />
       );
     }
-    if (!recentSlate || !previousSlate) {
+    if (sort === 'trend' && (!recentSlate || !previousSlate)) {
       return (
         <EmptyState
           title="Not enough football yet"
-          body="Movement needs two completed weeks to compare. Check back once a second week has been played and swept."
+          body="Movement needs two completed weeks to compare. Pick another order, and come back once a second week has been played."
         />
       );
     }
-    /* Reachable only when the DIRECTORY has nobody at this position, since the
-       board pads itself out of the directory. "No movers" is no longer an empty
-       state — it is a board of dashes, which says the same thing while still
-       being a list of players worth looking at. */
     if (board.length === 0) {
       return (
         <EmptyState
-          title="No players here"
-          body={
-            pos === 'ALL'
-              ? 'The directory is empty for this season.'
-              : `There are no ${pos} cards in this season's pool.`
-          }
+          title="No players match"
+          body="Nothing in the pool fits every filter you have set. Clear one and try again."
         />
       );
     }
     return (
       <PlayerList
         players={board}
+        rankFor={rankFor}
+        figureFor={figureOf}
+        renderDetail={detailOf}
         fixtureFor={fixtureFor}
         onOpen={openPlayer}
         refreshing={refreshing}
@@ -320,52 +377,19 @@ export default function TrendScreen() {
   };
 
   return (
-    <Screen title="Trend" measure="table" context={comparison ?? `${season} season`} scroll={false}>
+    <Screen title="Players" measure="table" context={context} scroll={false}>
       {/* `scroll={false}` gives the page no horizontal gutter — the list owns
-          that, so it can run its rows edge to edge. The chrome above it has to
-          supply its own, at the same 16 the rows use, or the controls sit two
-          points inside every name below them. Same block as the directory's
-          toolbar, down to the numbers. */}
-      <View style={styles.controls}>
-
-        {/* ONE ROW OF FILTERS, position on the left and direction on the right.
-            
-            Both are filters over the same list, so stacking them made the page
-            three bands of chrome deep before the first player — and it put the
-            shared position chips at a different height here than on Leaders,
-            which is the exact jitter having one component was meant to remove.
-            Side by side, the chips sit directly under the nav on every board in
-            the section, and the direction switch reads as the page-specific
-            extra it is.
-
-            The chips take the room that is left and SCROLL: `ChipRow` is a
-            horizontal ScrollView, so six of them beside a toggle is a scroll
-            rather than a squeeze, and the toggle keeps its full label at every
-            width. Which is why it is the toggle that gets the fixed size and
-            the chips that flex, rather than the other way round — a toggle
-            reading `U…`/`D…` would be unusable, where chips you can push are
-            merely narrower.
-
-            The paragraph that used to sit under here — what the delta measures
-            and who is left out — is gone. It was three lines of methodology
-            above every visit, which is a footnote's job: the `context` line in
-            the header already names the two weeks being compared, and that is
-            the part a reader needs in order to trust the number. */}
-        <View style={styles.filters}>
-          <View style={styles.chips}>
-            <PositionFilter value={pos} onChange={setPos} />
-          </View>
-          <SegmentedControl<Direction>
-            compact
-            segments={[
-              { value: 'up', label: 'Up' },
-              { value: 'down', label: 'Down' },
-            ]}
-            value={direction}
-            onChange={setDirection}
-          />
-        </View>
-      </View>
+          that so its rows can run edge to edge — so the controls supply their
+          own, at the same 16 the names below them use. */}
+      <PlayerBoardControls
+        sort={sort}
+        dir={dir}
+        onSort={chooseSort}
+        filters={filters}
+        onFilters={setFilters}
+        onSearch={openSearch}
+        teams={clubs}
+      />
 
       {body()}
     </Screen>
@@ -374,10 +398,4 @@ export default function TrendScreen() {
 
 const styles = StyleSheet.create({
   pad: { paddingVertical: Spacing.four },
-  controls: { paddingHorizontal: ROW_GUTTER, paddingBottom: Spacing.two, gap: Spacing.two },
-  filters: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  /* `minWidth: 0` is load-bearing: without it the chips' ScrollView reports its
-     full content width as its minimum and pushes the toggle off the row instead
-     of scrolling inside what is left. */
-  chips: { flex: 1, minWidth: 0 },
 });
