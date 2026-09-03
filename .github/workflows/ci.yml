@@ -146,24 +146,62 @@ jobs:
           fi
           psql --version
 
-      # THE SESSION POOLER, NOT THE TRANSACTION POOLER. Every suite is one
-      # transaction; the transaction pooler on 6543 hands out a different
-      # backend per statement, so `begin` and the `rollback` after it are not
-      # the same session and the suites fail in ways that look like the code.
-      # Checked without ever echoing the URL, which carries the password.
-      - name: Check the connection string is the session pooler
+      # ONE BAD SECRET, TWENTY-THREE IDENTICAL ERRORS — which is what happened
+      # the first time this job ran for real, and the reason both checks below
+      # exist. The secret had the single quotes from `.env.local` around it, so
+      # psql did not recognise a URI, read the whole thing as a DATABASE NAME,
+      # and fell back to a local unix socket. Every suite then failed with
+      # `connection to server on socket "/var/run/postgresql/.s.PGSQL.5432"` —
+      # a message that says nothing whatever about the actual mistake.
+      #
+      # Neither check ever echoes the URL: it carries the password.
+      - name: Check the connection string
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           case "$DATABASE_URL" in
-            "") echo "No DATABASE_URL secret — the suites will skip." ;;
+            "")
+              echo "No DATABASE_URL secret — the suites will skip." ;;
+            postgres://*|postgresql://*)
+              : ;;
             *:6543/*)
               echo "::error::DATABASE_URL points at the TRANSACTION pooler (6543)."
               echo "::error::Every SQL suite is one transaction, so it needs the SESSION"
               echo "::error::pooler on 5432. Supabase dashboard > Project Settings >"
               echo "::error::Database > Connection string > URI (session)."
               exit 1 ;;
+            *)
+              # Deliberately NOT repaired here. Stripping quotes or a leading
+              # `DATABASE_URL=` for the caller would hide a misconfigured secret
+              # behind a job that mysteriously starts working.
+              echo "::error::The DATABASE_URL secret is not a connection URI — it does not"
+              echo "::error::start with postgresql:// or postgres://, so psql reads it as a"
+              echo "::error::database name and tries a local socket."
+              echo "::error::The usual cause is pasting the value out of .env.local WITH its"
+              echo "::error::surrounding quotes, or pasting the whole DATABASE_URL=... line."
+              echo "::error::Re-save it as the bare URI:"
+              echo "::error::  set -a; . ./.env.local; set +a"
+              echo "::error::  printf '%s' \"\$DATABASE_URL\" | gh secret set DATABASE_URL"
+              exit 1 ;;
           esac
+
+      # AND THAT IT ACTUALLY CONNECTS, before 23 suites each discover it
+      # separately. Two seconds here against a wall of identical failures
+      # there — the same argument as the EXPO_TOKEN and VERCEL_TOKEN guards.
+      # psql never prints the password in its own errors, so its message can be
+      # shown as-is.
+      - name: Check the database answers
+        if: ${{ secrets.DATABASE_URL != '' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if ! psql "$DATABASE_URL" -X -Atc 'select 1' >/dev/null; then
+            echo "::error::Could not connect to the database with the DATABASE_URL secret."
+            echo "::error::The suites cannot run. Check the password is current and that the"
+            echo "::error::host is the session pooler (port 5432)."
+            exit 1
+          fi
+          echo "connected"
 
       # Skipped rather than failed when there is no secret — see the note above.
       - name: SQL suites
