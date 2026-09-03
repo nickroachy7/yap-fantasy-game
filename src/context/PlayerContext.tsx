@@ -38,13 +38,24 @@
  * `applyCardDelta` is what makes it INSTANT rather than merely correct; see
  * there.
  */
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
-import { parseRoster, recountRoster, type RosterStatus } from '@/components/recap/recap';
-import { parseRun, type Run } from '@/components/runs/run';
-import { useAuth } from '@/context/AuthContext';
-import { useLoader, type Load } from '@/hooks/use-loader';
-import { supabase } from '@/lib/supabase';
+import {
+  parseRoster,
+  recountRoster,
+  type RosterStatus,
+} from "@/components/recap/recap";
+import { parseRun, type Run } from "@/components/runs/run";
+import { useAuth } from "@/context/AuthContext";
+import { useLoader, type Load } from "@/hooks/use-loader";
+import { supabase } from "@/lib/supabase";
 
 export type PlayerState = {
   coins: number;
@@ -64,6 +75,24 @@ export type PlayerState = {
    * first load — every signed-in player has one, because reading it makes one.
    */
   run: Run | null;
+  /**
+   * TODAY'S FREE PACK IS STILL THERE.
+   *
+   * The one piece of this state that is not a balance, and it is here for the
+   * same reason the balances are: the CHROME reads it. `FantasyTopNav` puts a
+   * dot on the board that owns the shop, so a free pack is news that finds the
+   * player from any Yap screen rather than a thing they have to go and look up.
+   *
+   * ASKED OF THE SERVER, never worked out from what has been opened.
+   * "Today" is a UTC day with a definition (`daily_pack_status`), and the
+   * client does not get to hold a second opinion about when it rolls over —
+   * the same rule the pack shelf follows for the same figure.
+   *
+   * FALSE ON FAILURE, not null. A badge is a promise that something is waiting;
+   * an unanswered question is not a promise, and a dot nobody can cash is worse
+   * than no dot. It also means every caller can treat this as a plain boolean.
+   */
+  dailyPack: boolean;
   loading: boolean;
   error: string | null;
   /** Call after anything that spends or earns coins, or moves a heart. */
@@ -104,9 +133,10 @@ export const PlayerContext = createContext<PlayerState | null>(null);
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
   const [coins, setCoins] = useState(0);
-  const [displayName, setDisplayName] = useState('player');
+  const [displayName, setDisplayName] = useState("player");
   const [roster, setRoster] = useState<RosterStatus | null>(null);
   const [run, setRun] = useState<Run | null>(null);
+  const [dailyPack, setDailyPack] = useState(false);
 
   const load = useCallback<Load>(
     async (live) => {
@@ -140,10 +170,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
        * fact, so a comment claiming it for a batch is a claim about tables it
        * has not checked.
        */
-      const [profile, balance, rosterRow, runRow] = await Promise.all([
-        supabase.from('profiles').select('display_name').eq('id', session.user.id).single(),
-        supabase.from('coin_balances').select('balance').single(),
-        /* THE COUNT AND THE CAP IN ONE CALL. This was a `count(*)` on
+      const [profile, balance, rosterRow, runRow, dailyRow] = await Promise.all(
+        [
+          supabase
+            .from("profiles")
+            .select("display_name")
+            .eq("id", session.user.id)
+            .single(),
+          supabase.from("coin_balances").select("balance").single(),
+          /* THE COUNT AND THE CAP IN ONE CALL. This was a `count(*)` on
            `card_instances where is_held` and the cap facts were a second read
            from a hook of their own — see the note at the top of this file for
            what having two of them cost.
@@ -154,16 +189,32 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
            somebody cleared a duplicate. The generated column is the same one
            `my_collection` filters on, so the grid and the header cannot
            disagree about how many cards you have. */
-        supabase.rpc('roster_status'),
-        supabase.rpc('my_run'),
-      ]);
+          supabase.rpc("roster_status"),
+          supabase.rpc("my_run"),
+          /* Whether today's free pack is unclaimed. See `dailyPack` on
+           `PlayerState`; the pack shelf asks the same question of the same
+           RPC, and neither of them counts openings to answer it. */
+          supabase.rpc("daily_pack_status"),
+        ],
+      );
       if (!live()) return;
-      const failure = profile.error ?? balance.error ?? rosterRow.error ?? runRow.error;
+      const failure =
+        profile.error ?? balance.error ?? rosterRow.error ?? runRow.error;
       if (failure) return failure.message;
-      setDisplayName(profile.data?.display_name ?? 'player');
+      setDisplayName(profile.data?.display_name ?? "player");
       setCoins(balance.data?.balance ?? 0);
       setRoster(parseRoster(rosterRow.data));
       setRun(parseRun(runRow.data));
+      /* NOT IN `failure` ABOVE, deliberately. The four reads before it are the
+         chrome — a header with no balance is broken and should say so. This one
+         decorates a nav item, so a failure costs an absent dot and must not
+         blank the masthead behind it. */
+      setDailyPack(
+        dailyRow.error
+          ? false
+          : (dailyRow.data as { available?: boolean } | null)?.available ===
+              true,
+      );
     },
     [session],
   );
@@ -189,19 +240,33 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       cardCount: roster?.held ?? 0,
       roster,
       run,
+      dailyPack,
       loading: loading || !session,
       error,
       refresh,
       applyCardDelta,
     }),
-    [coins, displayName, roster, run, loading, error, refresh, applyCardDelta, session],
+    [
+      coins,
+      displayName,
+      roster,
+      run,
+      dailyPack,
+      loading,
+      error,
+      refresh,
+      applyCardDelta,
+      session,
+    ],
   );
 
-  return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
+  return (
+    <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>
+  );
 }
 
 export function usePlayer(): PlayerState {
   const ctx = useContext(PlayerContext);
-  if (!ctx) throw new Error('usePlayer must be used inside <PlayerProvider>');
+  if (!ctx) throw new Error("usePlayer must be used inside <PlayerProvider>");
   return ctx;
 }

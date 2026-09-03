@@ -89,14 +89,15 @@
  * WIDE WEB RENDERS NOTHING. The rail lists all four as rows already, the same
  * rule `SectionNav` follows for the same reason.
  */
-import { usePathname, useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { usePathname, useRouter } from "expo-router";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { FANTASY_SECTIONS, isOverlayPath } from '@/components/shell/sections';
-import { useSteadyPathname } from '@/components/shell/use-steady-pathname';
-import { useIsWide } from '@/components/shell/useResponsive';
-import { Colors, selectionAccent } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { FANTASY_SECTIONS, isOverlayPath } from "@/components/shell/sections";
+import { useSteadyPathname } from "@/components/shell/use-steady-pathname";
+import { useIsWide } from "@/components/shell/useResponsive";
+import { Colors, TierColors, selectionAccent } from "@/constants/theme";
+import { usePlayer } from "@/context/PlayerContext";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 
 /**
  * How wide the row of four is allowed to get before it stops spreading.
@@ -108,6 +109,30 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  * browser window between that and the 900 where the rail takes over.
  */
 const STRIP_MEASURE = 440;
+
+/**
+ * The news dot: how big, and how far off the word's top-right corner.
+ *
+ * IT IS DRAWN OVER THE LABEL, NOT BESIDE IT, and that is the whole of the
+ * layout decision. Every measurement in this file is downstream of the four
+ * labels' total width — `space-evenly` divides what is left, and the 6pt touch
+ * slop is derived from the gap that produces at 320pt, where it is already
+ * down to a point of clearance. A dot in the flow would take width from the
+ * gaps, close them, and put two neighbouring slops on top of each other; a tap
+ * in the space between two words would then go to whichever rendered last.
+ *
+ * Absolute, so it costs nothing. It hangs off the word's top-right corner —
+ * four points out and two up — which overlaps the last letter's shoulder
+ * rather than sitting clear of it. Clear of it was tried first at seven out:
+ * the dot then lands entirely INSIDE the gap to the next word, and at 320pt
+ * that gap is 13, so a third of the rhythm the strip is built on goes to a
+ * dot. Overlapping the corner is the version that costs the row nothing at any
+ * width.
+ *
+ * The item's own 12pt of top padding is above this, so two points up stays
+ * well inside the strip and never reaches the masthead's baseline.
+ */
+const DOT = { size: 6, top: -2, right: -4 } as const;
 
 export function FantasyTopNav({
   /**
@@ -132,12 +157,32 @@ export function FantasyTopNav({
    * time. `Screen` has held its heading steady like this for the same reason;
    * this strip had been left behind. See `useSteadyPathname`.
    */
-  const pathname = useSteadyPathname(pathnameOverride ?? realPathname, isOverlayPath);
+  const pathname = useSteadyPathname(
+    pathnameOverride ?? realPathname,
+    isOverlayPath,
+  );
   const wide = useIsWide();
 
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = useColorScheme() === "dark" ? "dark" : "light";
   const c = Colors[scheme];
   const accent = selectionAccent(scheme);
+  /**
+   * GOLD, WHICH IS NOT THE ACCENT THIS STRIP ALREADY SPEAKS.
+   *
+   * `selectionAccent` is "this is the one you are looking at" and it is
+   * deliberately not gold (see `theme`); it is what the active rule under a
+   * word is drawn in. A dot in that same colour would put "you are here" and
+   * "something is waiting in here" in one hue an inch apart, on a row where
+   * the two are frequently true of different items.
+   *
+   * Gold is the app's own — the coin, the packs sheet's tone, the mark on the
+   * one control that spends. A gold dot over COLLECT is the same colour as the
+   * thing it is announcing, and it can never be confused with the rule.
+   */
+  const news = TierColors[scheme].gold.accent;
+  /* The chrome's own state. See `dailyPack` on `PlayerState` for why a failed
+     read shows no dot rather than an uncertain one. */
+  const player = usePlayer();
 
   if (wide) return null;
 
@@ -152,7 +197,8 @@ export function FantasyTopNav({
           // moment you moved off a board's landing view — press Leaders and
           // PLAYERS would stop being underlined.
           const active =
-            pathname === section.href || pathname.startsWith(`${section.href}/`);
+            pathname === section.href ||
+            pathname.startsWith(`${section.href}/`);
           return (
             <Pressable
               key={section.href}
@@ -186,16 +232,38 @@ export function FantasyTopNav({
                  what makes the strip behave like the tab bar it is standing in
                  for rather than like a trail. */
               onPress={() => router.replace(section.href as never)}
-              style={({ pressed }) => [styles.item, pressed && styles.pressed]}>
-              <Text
-                numberOfLines={1}
-                style={[styles.label, { color: active ? c.text : c.textSecondary }]}>
-                {(section.tabLabel ?? section.label).toUpperCase()}
-              </Text>
+              style={({ pressed }) => [styles.item, pressed && styles.pressed]}
+            >
+              <View>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.label,
+                    { color: active ? c.text : c.textSecondary },
+                  ]}
+                >
+                  {(section.tabLabel ?? section.label).toUpperCase()}
+                </Text>
+                {/* NEWS, NOT A COUNT — see `badge` on `NavSection`. The label
+                    already carries the board's name for a screen reader, so
+                    this adds the one fact it does not: that there is something
+                    in there. */}
+                {section.badge && player[section.badge] ? (
+                  <View
+                    accessible
+                    accessibilityRole="text"
+                    accessibilityLabel="Free pack ready"
+                    style={[styles.dot, { backgroundColor: news }]}
+                  />
+                ) : null}
+              </View>
               {/* `alignSelf: 'stretch'` on an item sized by its label is what
                   makes the rule exactly as wide as the word. */}
               <View
-                style={[styles.rule, { backgroundColor: active ? accent : 'transparent' }]}
+                style={[
+                  styles.rule,
+                  { backgroundColor: active ? accent : "transparent" },
+                ]}
               />
             </Pressable>
           );
@@ -212,24 +280,34 @@ const styles = StyleSheet.create({
      why the gutter lives on the row inside rather than here. */
   bar: { borderBottomWidth: StyleSheet.hairlineWidth },
   inner: {
-    flexDirection: 'row',
+    flexDirection: "row",
     /* No horizontal padding: `space-evenly` is already putting a margin before
        the first item and after the last, and padding on top of it would make
        those two gaps larger than the three between — the same imbalance this
        layout exists to remove, mirrored. */
-    justifyContent: 'space-evenly',
-    width: '100%',
+    justifyContent: "space-evenly",
+    width: "100%",
     maxWidth: STRIP_MEASURE,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
   /* 12 above the word and 8 below it, which with the 4 the masthead leaves puts
      16 between the wordmark and these labels. It was 27 while both rows padded
      the same joint. */
-  item: { alignItems: 'center', paddingTop: 12, gap: 8 },
+  item: { alignItems: "center", paddingTop: 12, gap: 8 },
   /* 11.5, not 12: at 12 the four words plus their minimum gaps no longer fit a
      320pt viewport. Uppercase with letter-spacing is what lets it go this small
      and stay a label rather than a caption. */
-  label: { fontSize: 11.5, fontWeight: '700', letterSpacing: 0.7 },
-  rule: { height: 2, alignSelf: 'stretch', borderRadius: 1 },
+  label: { fontSize: 11.5, fontWeight: "700", letterSpacing: 0.7 },
+  rule: { height: 2, alignSelf: "stretch", borderRadius: 1 },
+  /* Out of the flow entirely — see `DOT` for why that is load-bearing rather
+     than merely tidy. */
+  dot: {
+    position: "absolute",
+    top: DOT.top,
+    right: DOT.right,
+    width: DOT.size,
+    height: DOT.size,
+    borderRadius: DOT.size / 2,
+  },
   pressed: { opacity: 0.6 },
 });

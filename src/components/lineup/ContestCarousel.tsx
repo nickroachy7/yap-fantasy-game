@@ -71,34 +71,46 @@
  * `goTo` exists because none of that fires for a PROGRAMMATIC scroll: a tap on a
  * heart has to move the list and the state itself.
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   FlatList,
   Platform,
+  Pressable,
   StyleSheet,
-  Text,
   View,
   useWindowDimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
-} from 'react-native';
+} from "react-native";
 import Animated, {
   runOnJS,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
   type SharedValue,
-} from 'react-native-reanimated';
+} from "react-native-reanimated";
 
-import { ContestCard } from '@/components/contests/ContestCard';
-import { settlementOf } from '@/components/contests/contest-model';
-import { termsOfEntry, type MyContest } from '@/components/contests/use-my-contests';
-import { ContestHearts, Heart, type HeartResult, type HeartSpan } from '@/components/runs/Hearts';
-import { useIsWide } from '@/components/shell/useResponsive';
-import { DoorChip, Plus } from '@/components/ui/DoorChip';
-import { Colors, NUMERIC, Spacing, selectionAccent } from '@/constants/theme';
-import type { PlayerState } from '@/context/PlayerContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ContestCard } from "@/components/contests/ContestCard";
+import { settlementOf } from "@/components/contests/contest-model";
+import {
+  termsOfEntry,
+  type MyContest,
+} from "@/components/contests/use-my-contests";
+import {
+  ContestHearts,
+  type HeartResult,
+  type HeartSpan,
+} from "@/components/runs/Hearts";
+import { DOOR_HEIGHT, DoorChip, Plus } from "@/components/ui/DoorChip";
+import { Colors, Spacing, selectionAccent } from "@/constants/theme";
+import type { PlayerState } from "@/context/PlayerContext";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 
 /**
  * The air between one card and the next.
@@ -188,7 +200,7 @@ const PAGE_FADE = 0.5;
 const PAGE_HOME = 0.05;
 
 /** Captured once, because a worklet cannot read a getter off a module. */
-const WEB = Platform.OS === 'web';
+const WEB = Platform.OS === "web";
 
 /**
  * One pip on the rail's pager.
@@ -219,7 +231,6 @@ export function ContestCarousel({
   now,
   run,
   onEnter,
-  onPacks,
   width,
 }: {
   contests: MyContest[];
@@ -243,7 +254,7 @@ export function ContestCarousel({
    * while the run has hearts to draw — a dead one awaiting its carry shows
    * nothing here, exactly as the masthead used to decide. See the foot.
    */
-  run: PlayerState['run'];
+  run: PlayerState["run"];
   /**
    * Open the contests screen, on one of its shelves.
    *
@@ -254,17 +265,7 @@ export function ContestCarousel({
    * the same screen by the same param. Narrowing this to a bare callback would
    * hide that the destination has shelves at all.
    */
-  onEnter: (view: 'open' | 'history') => void;
-  /**
-   * The pack shop, over this board — the same `/packs` sheet `PacksButton`
-   * pushes from the collection.
-   *
-   * A CALLBACK RATHER THAN A ROUTER, like `onEnter` and `onOpen` beside it:
-   * this file draws a rail and knows nothing about where the app keeps its
-   * sheets, and the one page that mounts the carousel already owns every other
-   * push on the screen.
-   */
-  onPacks: () => void;
+  onEnter: (view: "open" | "history") => void;
   /**
    * The measured width of the column this sits in.
    *
@@ -607,7 +608,9 @@ export function ContestCarousel({
    * and a contest you have not entered has not taken one yet.
    */
   const committed = contests.reduce(
-    (n, ct) => n + (!ct.recap && ct.lineupId !== null ? Math.max(0, ct.heartsAtRisk) : 0),
+    (n, ct) =>
+      n +
+      (!ct.recap && ct.lineupId !== null ? Math.max(0, ct.heartsAtRisk) : 0),
     0,
   );
 
@@ -633,7 +636,6 @@ export function ContestCarousel({
         focus={null}
         onGo={goTo}
         onEnter={onEnter}
-        onPacks={onPacks}
       />
     ) : null;
   }
@@ -656,7 +658,11 @@ export function ContestCarousel({
           onScroll={onScroll}
           scrollEventThrottle={16}
           keyExtractor={(item: MyContest) => item.id}
-          getItemLayout={(_: unknown, i: number) => ({ length: step, offset: step * i, index: i })}
+          getItemLayout={(_: unknown, i: number) => ({
+            length: step,
+            offset: step * i,
+            index: i,
+          })}
           /* OPENS ON THE LINKED CARD, not on the first one. Arriving from the
              contest sheet means the reader has just chosen a contest, and a
              carousel that marked it active while showing the free contest's card
@@ -664,9 +670,19 @@ export function ContestCarousel({
              down. Safe with `getItemLayout` supplied; without it the list cannot
              measure ahead and silently ignores this. */
           initialScrollIndex={index}
-          renderItem={({ item, index: i }: { item: MyContest; index: number }) => (
+          renderItem={({
+            item,
+            index: i,
+          }: {
+            item: MyContest;
+            index: number;
+          }) => (
             <Page i={i} step={step} offset={offset}>
-              <Card contest={item} onOpen={onOpen} {...{ lockAt, locked, now }} />
+              <Card
+                contest={item}
+                onOpen={onOpen}
+                {...{ lockAt, locked, now }}
+              />
             </Page>
           )}
         />
@@ -679,7 +695,6 @@ export function ContestCarousel({
           focus={spanFor(page)}
           onGo={goTo}
           onEnter={onEnter}
-          onPacks={onPacks}
         />
       ) : null}
     </View>
@@ -734,7 +749,11 @@ function Page({
     return { opacity: 1 - PAGE_FADE * Math.min(1, away) };
   });
 
-  return <Animated.View style={[styles.page, { width: step }, fade]}>{children}</Animated.View>;
+  return (
+    <Animated.View style={[styles.page, { width: step }, fade]}>
+      {children}
+    </Animated.View>
+  );
 }
 
 /**
@@ -813,9 +832,8 @@ function RunRail({
   focus,
   onGo,
   onEnter,
-  onPacks,
 }: {
-  run: NonNullable<PlayerState['run']>;
+  run: NonNullable<PlayerState["run"]>;
   /**
    * Hearts held by a live entry, counted off the same walk that placed the
    * highlights — NOT `run.wagered`.
@@ -831,15 +849,11 @@ function RunRail({
   focus: HeartSpan | null;
   onGo: (page: number) => void;
   /** The contests screen. See the carousel's prop. */
-  onEnter: (view: 'open' | 'history') => void;
-  /** The pack shop. See the carousel's prop. */
-  onPacks: () => void;
+  onEnter: (view: "open" | "history") => void;
 }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = useColorScheme() === "dark" ? "dark" : "light";
   const c = Colors[scheme];
   const accent = selectionAccent(scheme);
-  /* The rail draws Packs as a row of its own on wide. See the doors. */
-  const wide = useIsWide();
 
   const held = Math.max(0, run.hearts);
   const staked = Math.min(Math.max(0, committed), held);
@@ -945,48 +959,75 @@ function RunRail({
   return (
     <View style={styles.rail}>
       {/**
-       * THE RUN, AT THE HEAD OF THE ROW: what you hold, then what is riding.
+       * THE RUN, AT THE HEAD OF THE ROW: a way in, then what is riding.
        *
        * ---------------------------------------------------------------------
-       * THE COUNT CAME DOWN FROM THE MASTHEAD
+       * THE COUNT WENT BACK UP TO THE MASTHEAD
        * ---------------------------------------------------------------------
        *
-       * `AppHeader` carried it as a pill beside the coins, and the argument was
-       * that a balance belongs to the chrome. It holds for coins, which are
-       * spent from every screen in the app. It never held for hearts: a heart
-       * is risked by exactly ONE object, that object is the card above this
-       * row, and up in the masthead the figure sat on Collection and Players —
-       * screens where a heart cannot move — with nothing linking it to anything.
+       * A pill here said how many hearts you HOLD, one glance from the pips
+       * saying which of them this week has committed, and that pairing was the
+       * reason to draw it. It has gone back to `AppHeader` — see the note
+       * there: a heart is now stakeable from a contest sheet presented over any
+       * page, so a count that exists on one board is a count you have to go and
+       * look up.
        *
-       * Here it is one glance from the pips, and that pairing is the reason to
-       * draw it at all: the pill is what you HOLD, the rack is which of them
-       * this week has already committed. Neither number says the other.
+       * The rack did NOT go with it. A rack is one pip per card, each carrying
+       * free, wagered or killed, each a link to the contest it rides on, and
+       * none of that survives at masthead size. Held travels; riding stays.
        *
-       * IT IS THE MASTHEAD'S PILL, not a new object — same fill, same glyph,
-       * same shape — because a reader who has been looking at it up there for
-       * weeks should recognise it, not learn it again. The type steps down to
-       * this row's 13/700: a 14/800 figure among 12pt labels and 16pt pips
-       * would make the balance the loudest thing on a band whose subject is the
-       * card above it.
+       * ---------------------------------------------------------------------
+       * WHAT TOOK THE SLOT IS A DOOR, WHICH IS A REVERSAL
+       * ---------------------------------------------------------------------
        *
-       * NOT A RACK. `Hearts` would draw five pips here, next to a rack of pips
-       * that means something else entirely, and the two would read as one run
-       * of ten. A glyph and a number cannot be confused with a page indicator.
+       * The pill's own note ended "IT IS A READOUT AND NOT A DOOR — nothing on
+       * the run's own state is pressable". That rule stands for readouts; what
+       * is here now is not one. The count left, and rather than let the pips
+       * slide to the rail's edge the slot carries a second way into the lobby,
+       * under the left thumb, at the end of the row a right-handed player never
+       * reaches without moving their grip.
        *
-       * IT IS A READOUT AND NOT A DOOR. Nothing on the run's own state is
-       * pressable — pressing a balance implies somewhere to go, and the place
-       * hearts come from is a contest, which is what the far end of this row is
-       * for.
+       * IT IS THE SAME ROOM AS THE CHIP AT THE FAR END, deliberately. Two doors
+       * to one place on one row is normally the duplication this file argues
+       * against — see the packs door it just lost — and the defence is reach
+       * rather than discovery: the chip is the labelled door that TEACHES the
+       * lobby exists, this is the shortcut for somebody who has already learned
+       * it. If the chip is ever unlabelled or moved, this stops being a
+       * shortcut and starts being the ambiguity below.
+       *
+       * A BARE `+` IS AMBIGUOUS AND THAT IS NOT SOLVED, only bounded. The
+       * chip's own note retired a bare `+` from this row once, because a glyph
+       * alone among hearts could add a heart, a card or a slot. What contains
+       * it now: the accessible label names the room, and the mark is in the
+       * QUIET ink — gold still appears exactly once on this row, on the chip
+       * that is the real call to action. A second accent here would make the
+       * row choose between two doors to the same place.
        */}
       <View style={styles.run}>
-        <View
-          accessible
-          accessibilityRole="text"
-          accessibilityLabel={held === 1 ? '1 heart' : `${held} hearts`}
-          style={[styles.held, { backgroundColor: c.surface }]}>
-          <Heart size={12} state="free" />
-          <Text style={[styles.heldFigure, NUMERIC, { color: c.text }]}>{String(held)}</Text>
-        </View>
+        {/* IT GOES WHEN NOTHING IS FREE, on the same rule as the chip's own
+            mark at the far end of this row — and here it is the whole control
+            rather than a mark on one, because there is no word underneath it to
+            stay true. A bare `+` offered to a run with nothing to stake is the
+            ambiguity above at its worst: a glyph that can only mean "add",
+            beside a rack of hearts, when nothing can be added. The labelled
+            door is still there for the recaps. */}
+        {live ? (
+          <Pressable
+            onPress={() => onEnter("open")}
+            accessibilityRole="button"
+            accessibilityLabel="Contest lobby"
+            /* Reaches past 44 from a 28pt mark, the same trick `DoorChip` uses —
+             see `DOOR_HEIGHT`. */
+            hitSlop={9}
+            style={({ pressed }) => [
+              styles.enter,
+              { backgroundColor: c.surface },
+              pressed && styles.pressed,
+            ]}
+          >
+            <Plus color={c.textSecondary} />
+          </Pressable>
+        ) : null}
 
         {/**
          * THE PAGER, BESIDE THE COUNT RATHER THAN ON THE COLUMN'S CENTRE.
@@ -1023,30 +1064,39 @@ function RunRail({
       </View>
 
       {/**
-       * THE TWO DOORS, TOGETHER AT THE END OF THE ROW.
+       * ONE DOOR AT THE END OF THE ROW, AND IT IS BIGGER FOR BEING ALONE.
        *
-       * They were at opposite ends — Contests here, previous weeks facing it —
-       * and the week door is gone: the contests screen lists its own archive,
-       * so the rail was carrying a shortcut to a shelf one tap inside the room
-       * it already opens. What is left is a pair of things you GO to, and a pair
-       * belongs side by side rather than either side of a readout.
+       * ---------------------------------------------------------------------
+       * PACKS LEFT
+       * ---------------------------------------------------------------------
        *
-       * PACKS IS HERE BECAUSE THE HEARTS ARE. This band is now the whole answer
-       * to "what can I spend, and where" — a heart and the contest that takes
-       * it, coins and the shop that takes them — on the screen where a player is
-       * already deciding. The collection board has carried `PacksButton` for as
-       * long as packs have existed; this is the same door, not a second one,
-       * which is why it is the same route and the same word.
+       * `+ Packs` sat beside this, on the argument that the band was the whole
+       * answer to "what can I spend, and where" — a heart and the contest that
+       * takes it, coins and the shop that takes them.
        *
-       * ORDER IS BY STAKE. Contests risks a heart and is the app's main call to
-       * action, so it is read first; packs are the shop, and a shop is what you
-       * visit after you know what you need. Swapping them would put a purchase
-       * ahead of the play.
+       * The band no longer holds that half. The coin balance is in the masthead
+       * and the heart count has gone up to join it, so the row is not the
+       * wallet any more; it is the run and the way into a contest. A shop door
+       * on it was the one object serving a currency the row had stopped
+       * mentioning. Packs is reached from the collection, which is the board
+       * where "I need more cards" is the actual next thought.
        *
-       * NOTHING ON WIDE FOR PACKS. The rail carries Packs as a row of its own
-       * there, and a second door two inches from the first is the duplication
-       * `PacksButton` already refuses to make. Contests has no such row, so it
-       * is drawn at every width.
+       * ---------------------------------------------------------------------
+       * WHICH IS WHY THE CHIP CAN GROW
+       * ---------------------------------------------------------------------
+       *
+       * This was tried at 32 with a 13/600 two-word label and backed out: a
+       * PAIR of chips that size was plainly the biggest object on the row, and
+       * a door has to rank below the card it serves.
+       *
+       * The objection was about the pair. One chip at 32 is a single call to
+       * action under a card, which is what this screen's main button is
+       * supposed to be — and the two words are what buy the growth: "Contests"
+       * named a room in a way that could be read as a filter on the board above
+       * it. "Contest Lobby" cannot be anything but somewhere to go.
+       *
+       * `large` on `DoorChip` is that size, declared once so the collection's
+       * quiet pair cannot drift into it.
        */}
       <View style={styles.doors}>
         {/**
@@ -1081,21 +1131,25 @@ function RunRail({
          * screen's actual subject.
          *
          * So the pill stays and the fill goes quiet. It has to stay a pill:
-         * this is the app's main call to action and the one door to the
-         * contests screen. What carries the state is the `+` — struck in the
-         * accent when a heart is free, absent when none is. Gold appears once
-         * on this screen, at nine points, on the one mark whose whole job is to
-         * say the act is voluntary. The packs door beside it takes coins, which
-         * are gold everywhere else in the app, so its own `+` is deliberately
-         * NOT the accent: two gold marks four points apart would make the row
+         * this is the app's main call to action, and it is the LABELLED door to
+         * the contests screen — the shortcut at the head of the row is the same
+         * room, but only this one says so. What carries the state is the `+` —
+         * struck in the accent when a heart is free, absent when none is. Gold
+         * appears once on this screen, at nine points, on the one mark whose
+         * whole job is to say the act is voluntary. The shortcut's `+` is
+         * deliberately NOT the accent for that reason: two gold marks at
+         * opposite ends of a row, opening the same door, would make the row
          * choose between them.
          */}
         <DoorChip
-          label="Contests"
+          large
+          label="Contest Lobby"
           accessibilityLabel={
-            live ? `Contests. ${free === 1 ? '1 heart' : `${free} hearts`} free` : 'Contests'
+            live
+              ? `Contest lobby. ${free === 1 ? "1 heart" : `${free} hearts`} free`
+              : "Contest lobby"
           }
-          onPress={() => onEnter('open')}
+          onPress={() => onEnter("open")}
           fill={c.backgroundElement}
           ink={c.text}
           /**
@@ -1124,22 +1178,6 @@ function RunRail({
            */
           lead={live ? <Plus color={accent} /> : null}
         />
-        {wide ? null : (
-          <DoorChip
-            label="Packs"
-            accessibilityLabel="Packs"
-            onPress={onPacks}
-            fill={c.backgroundElement}
-            ink={c.text}
-            /* ALWAYS DRAWN, unlike the contests mark. Packs are bought with
-               coins and there is always something on the shelf to look at, so
-               there is no state in which this door offers something the player
-               cannot reach — the shop's own rows say what is affordable. In the
-               quiet ink, because the accent is spoken by the button beside it;
-               see the note on the doors. */
-            lead={<Plus color={c.textSecondary} />}
-          />
-        )}
       </View>
     </View>
   );
@@ -1263,8 +1301,8 @@ const styles = StyleSheet.create({
    * row, where it is what stops the last pip touching the first `+`.
    */
   rail: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingTop: Spacing.two + 2,
     gap: Spacing.three,
   },
@@ -1277,43 +1315,47 @@ const styles = StyleSheet.create({
    * a balance.
    */
   run: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.two,
     flexGrow: 1,
     flexShrink: 1,
     minWidth: 0,
   },
   /**
-   * The masthead's pill, one step quieter. See the note where it is drawn.
+   * The shortcut into the lobby, in the slot the heart pill vacated.
    *
-   * The geometry is `AppHeader.pill` unchanged — same gap, same padding, same
-   * radius — because it IS that object, moved. Only the figure steps down.
+   * SQUARE, AT THE SMALL DOOR'S HEIGHT. `DOOR_HEIGHT` rather than the chip at
+   * the far end, because this is the quiet half of the pair — a 32pt circle at
+   * the head of the row would compete with the labelled door for the same act.
+   * A full round rather than the pill's `999`: with no word in it the shape has
+   * nothing to be long for, and a circle is what the eye reads as "a mark you
+   * press" beside a rack of drawn hearts.
    */
-  held: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-    borderRadius: 999,
+  enter: {
+    width: DOOR_HEIGHT,
+    height: DOOR_HEIGHT,
+    borderRadius: DOOR_HEIGHT / 2,
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
   },
-  /* 13/700 against the masthead's 14/800: this row's loudest thing is the card
-     above it, and a balance is not allowed to outweigh a page indicator by
-     much. Tabular, so a run that drops from 10 to 9 does not shift the pips. */
-  heldFigure: { fontSize: 13, fontWeight: '700', letterSpacing: -0.2 },
   /* The doors, and neither of them ever gives. See the note where they are
      drawn, and `DoorChip` for the chip itself — the collection's toolbar draws
      the same pair, which is why the geometry no longer lives in this file. The
      gap is the chip's own internal one, so the two read as one cluster rather
      than as two buttons that happen to be near each other. */
-  doors: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two - 2, flexShrink: 0 },
+  doors: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two - 2,
+    flexShrink: 0,
+  },
   /* The rack. `overflow: hidden` is the interim answer to a week with more
      cards than the row can hold — a clipped pager is recoverable by swiping,
      and the alternative is pushing a door off the screen. The real answer is to
      let it scroll, which is worth doing the week a board can hold eight. */
-  pager: { flexShrink: 1, minWidth: 0, overflow: 'hidden' },
+  pager: { flexShrink: 1, minWidth: 0, overflow: "hidden" },
   /**
    * THE PAGER, SPREAD BACK OVER `Screen`'s PADDING.
    *
@@ -1322,7 +1364,7 @@ const styles = StyleSheet.create({
    * between them without the card paying for it. The card is unmoved — the 16
    * points come back immediately as each page's own padding. See `PAGE_GUTTER`.
    */
-  stage: { position: 'relative', marginHorizontal: -PAGE_GUTTER },
+  stage: { position: "relative", marginHorizontal: -PAGE_GUTTER },
   /* One page. The card sits in the middle of it with a gutter either side, and
      the gutters are what you see between two cards mid-drag. */
   page: { paddingHorizontal: PAGE_GUTTER },

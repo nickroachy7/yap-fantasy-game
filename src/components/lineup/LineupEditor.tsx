@@ -1435,10 +1435,6 @@ export function LineupEditor({
             view === 'history' ? { pathname: '/contests', params: { view } } : '/contests',
           )
         }
-        /* The shop, over this board, exactly as `PacksButton` opens it from the
-           collection — `/packs` is a sheet, so this pushes and closing puts the
-           reader back on the lineup they were filling. */
-        onPacks={() => router.push('/packs')}
         width={cardWidth}
         onOpen={(ct) => router.push({ pathname: '/contest/[code]', params: { code: ct.code } })}
       />

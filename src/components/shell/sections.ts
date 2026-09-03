@@ -71,9 +71,9 @@
  * Collect both land on their first; Players lands on its second, and the note
  * there explains why being first was convention rather than mechanism.
  */
-import type { ActionIconName } from '@/components/shell/ActionBar';
-import type { TabIconName } from '@/components/shell/TabIcon';
-import type { Measure } from '@/constants/theme';
+import type { ActionIconName } from "@/components/shell/ActionBar";
+import type { TabIconName } from "@/components/shell/TabIcon";
+import type { Measure } from "@/constants/theme";
 
 export type NavChild = {
   href: string;
@@ -155,6 +155,20 @@ export type NavSection = {
    * by walking this array — see `iconOf`. The narrow top nav is text-only.
    */
   icon: TabIconName;
+  /**
+   * A field of `PlayerState` that, when true, puts a dot on this item.
+   *
+   * DECLARED HERE RATHER THAN IN THE STRIP, on the same rule as everything else
+   * in this file: a component that hardcoded "Collect is the one with the
+   * daily-pack dot" would be the parallel copy of the navigation this file's
+   * header warns about, one badge at a time. The strip draws whatever is
+   * declared; which board owns which news is a navigation fact.
+   *
+   * IT NAMES NEWS, NOT A COUNT. A dot says "there is something in here for
+   * you"; it never says how much, and nothing that needs a number should use
+   * it. The board itself is where a figure belongs.
+   */
+  badge?: "dailyPack";
   children?: NavChild[];
 };
 
@@ -186,19 +200,31 @@ export type NavTab = {
 };
 
 /**
- * Where you go to get more cards, declared once and used by BOTH boards that
- * make you want them.
+ * Where you go to get more cards, declared once.
  *
  * It is not a peer of anything and it is not a page: a sheet presented over the
  * app, so pressing it pushes `/packs` over whatever you were reading and
  * closing it puts you back on THAT page. See `app/(app)/packs.tsx`.
  *
- * IT APPEARS TWICE ON PURPOSE. It used to have one home because Collection was
- * a folder and the tray under it was the only place a round button could sit.
- * With Collection and Sets separated, "I need more cards" is the next thought
- * on both of them — a shop reachable from your cards but not from the set you
- * are two cards short of would be missing from exactly the screen that sells
- * hardest. One object, two doors, and the same sheet behind both.
+ * IT APPEARED TWICE AND NOW APPEARS ONCE, which is worth stating plainly
+ * because the second door was argued for at length here and then removed.
+ *
+ * It sat at the end of the lineup's rail as well as the collection's toolbar,
+ * on the argument that "I need more cards" is the next thought on both boards.
+ * The rail's own reason was narrower than that: it carried the shop because it
+ * carried the WALLET — a heart and the contest that takes it, coins and the
+ * shop that takes them, on the screen where a player is already deciding.
+ *
+ * The wallet has moved. The coin balance was always in the masthead and the
+ * heart count has gone up to join it, so the rail is the run and the way into a
+ * contest, and a shop door on it served a currency the row no longer mentions.
+ *
+ * ON A PHONE THAT LEAVES EXACTLY ONE DELIBERATE DOOR — this chip, on Collect.
+ * The empty-collection state and the one-time auto-open are doors too, and
+ * both are for a player who owns nothing; an established player has one. That
+ * is a known and deliberately thin position, not an oversight, and if packs is
+ * ever to be reachable from everywhere the place for it is the masthead's
+ * trailing slot, beside the balances it spends. See `AppHeader`.
  *
  * IT IS NOT A CHILD OF ANY SECTION, and that is the difference between where it
  * sits and where it USED to. As a `detached` child it was drawn by
@@ -206,17 +232,17 @@ export type NavTab = {
  * circle and nothing else — the tray beside it had gone empty when Collection
  * stopped being a folder. It became a round button each page drew for itself
  * (`PacksButton`), and it is a `DoorChip` now: `+ Packs`, at the end of the
- * collection's toolbar and the lineup's rail, beside the other door on each.
- * One object, two rows, and the same sheet behind both.
+ * collection's toolbar beside `+ Sets`. The wide rail still draws it as a row
+ * of its own, which is why the chip is drawn on narrow only.
  *
  * It stays declared HERE because everything else about it is still navigation:
  * the rail resolves `/packs` to this label and glyph, and `isOverlayPath` reads
  * `takeover` off it to know the sheet is mounted above the tabs.
  */
 export const PACKS: NavChild = {
-  href: '/packs',
-  label: 'Packs',
-  icon: 'shop',
+  href: "/packs",
+  label: "Packs",
+  icon: "shop",
   takeover: true,
   detached: true,
 };
@@ -244,9 +270,9 @@ export const PACKS: NavChild = {
  * is not a bar item.
  */
 export const CONTESTS: NavChild = {
-  href: '/contests',
-  label: 'Contests',
-  icon: 'contests',
+  href: "/contests",
+  label: "Contests",
+  icon: "contests",
   takeover: true,
   detached: true,
 };
@@ -280,9 +306,9 @@ export const CONTESTS: NavChild = {
  * `app/(app)/search.tsx`.
  */
 export const SEARCH: NavChild = {
-  href: '/search',
-  label: 'Search',
-  icon: 'search',
+  href: "/search",
+  label: "Search",
+  icon: "search",
   takeover: true,
   detached: true,
 };
@@ -313,9 +339,9 @@ export const SEARCH: NavChild = {
  * the tabs. Nothing draws it as a nav item — `detached` says so.
  */
 export const SETS: NavChild = {
-  href: '/sets',
-  label: 'Sets',
-  icon: 'sets',
+  href: "/sets",
+  label: "Sets",
+  icon: "sets",
   takeover: true,
   detached: true,
 };
@@ -325,9 +351,9 @@ export const FANTASY_SECTIONS: NavSection[] = [
      there is no longer *a* lineup to name the board after. The section is
      where your entries live, and the free contest's lineup is its index. */
   {
-    href: '/fantasy/compete',
-    label: 'Compete',
-    icon: 'lineup',
+    href: "/fantasy/compete",
+    label: "Compete",
+    icon: "lineup",
     /* NO CHILDREN, and it is the only board with none. Its second view became a
        sheet reached from the carousel — see `CONTESTS` — which leaves one page
        under this row and nothing for a bar to switch between. `SectionNav`
@@ -342,9 +368,21 @@ export const FANTASY_SECTIONS: NavSection[] = [
      draws nothing, `webSectionOf` folds no tabs, and the rail keeps the board
      as one row. */
   {
-    href: '/fantasy/collect',
-    label: 'Collect',
-    icon: 'collection',
+    href: "/fantasy/collect",
+    label: "Collect",
+    icon: "collection",
+    /* COLLECT CARRIES THE DAILY-PACK DOT, because Collect carries the shop —
+       see `PACKS`, which is a chip on this board's toolbar and, on a phone,
+       the only deliberate door to it.
+       
+       That thinness is exactly what the dot is for. The free daily comes back
+       every UTC day and NOTHING said so: a player had to open a board they had
+       no other reason to visit, on the chance that something was waiting. The
+       door stays where the intent forms; the NEWS travels, which is the half
+       that was missing. The dot is the cheapest thing that can travel — six
+       points, drawn over the label rather than beside it, so the strip's
+       spacing and its touch slop are untouched. */
+    badge: "dailyPack",
   },
   /* PLAYERS, which was a bottom TAB for three days and is a board again.
    *
@@ -393,9 +431,9 @@ export const FANTASY_SECTIONS: NavSection[] = [
    * there was no room for more. ALL CARDS to PLAYERS gives two back — 30 down
    * to 28, exactly the width the layout was measured against. */
   {
-    href: '/fantasy/players',
-    label: 'Players',
-    icon: 'players',
+    href: "/fantasy/players",
+    label: "Players",
+    icon: "players",
     /* NO CHILDREN, which makes it the third board with none — Compete and
        Collect above it went the same way for the same reason. Its other two
        views, Trend and Top, were one sort key each on the board they shared
@@ -427,9 +465,9 @@ export const FANTASY_SECTIONS: NavSection[] = [
      team, sort out what you own, see what else is out there, then see where all
      of that put you. */
   {
-    href: '/fantasy/leaderboard',
-    label: 'Leaders',
-    icon: 'leaderboard',
+    href: "/fantasy/leaderboard",
+    label: "Leaders",
+    icon: "leaderboard",
   },
 ];
 
@@ -448,7 +486,12 @@ export const NAV_TABS: NavTab[] = [
    * THE ROUTE IS STILL `/fantasy`. A label is a word and a route is an address
    * with deep links, `dismissTo` targets and a directory on disk behind it;
    * renaming the second to agree with the first buys the reader nothing. */
-  { href: '/fantasy', label: 'Yap', icon: 'fantasy', sections: FANTASY_SECTIONS },
+  {
+    href: "/fantasy",
+    label: "Yap",
+    icon: "fantasy",
+    sections: FANTASY_SECTIONS,
+  },
   /* LEAGUES: private leagues, and a placeholder until they exist.
    *
    * It ships empty on purpose rather than waiting to ship full. The bar is the
@@ -459,12 +502,12 @@ export const NAV_TABS: NavTab[] = [
    * Second, not last: it is the only other PRODUCT here. Scores and Profile are
    * a reference page and an account, so the two games sit together at the front
    * and the furniture follows them. */
-  { href: '/leagues', label: 'Leagues', icon: 'leagues' },
+  { href: "/leagues", label: "Leagues", icon: "leagues" },
   /* The league's own week, rather than yours. It was a band across the top of
      the lineup until it had somewhere better to be; a page can hold the week
      picker and the per-game leaders that the band had no room for. */
-  { href: '/scores', label: 'Scores', icon: 'scores' },
-  { href: '/profile', label: 'Profile', icon: 'profile' },
+  { href: "/scores", label: "Scores", icon: "scores" },
+  { href: "/profile", label: "Profile", icon: "profile" },
 ];
 
 /**
@@ -477,7 +520,7 @@ export const NAV_TABS: NavTab[] = [
  * own array of five sections and had already started to drift from this one.
  */
 export function routeNameOf(tab: NavTab): string {
-  return tab.href.replace(/^\//, '');
+  return tab.href.replace(/^\//, "");
 }
 
 /**
@@ -573,8 +616,7 @@ function allChildren(): NavChild[] {
  * copy of the other's shape.
  */
 export type WebNavIcon =
-  | { set: 'tab'; name: TabIconName }
-  | { set: 'action'; name: ActionIconName };
+  { set: "tab"; name: TabIconName } | { set: "action"; name: ActionIconName };
 
 /**
  * One rail row, as DECLARED. Label and icon are absent because they are looked
@@ -643,29 +685,29 @@ const WEB_NAV_SPEC: WebNavSpec[] = [
      — the same fold Collection/Sets had before they were split apart, restored
      because they are genuinely one board again, and now matched by Compete.
      The rail was never the thing that wanted them separate; a phone was. */
-  { href: '/fantasy/compete', section: '/fantasy/compete', measure: 'form' },
+  { href: "/fantasy/compete", section: "/fantasy/compete", measure: "form" },
   /* The lobby, as its own row rather than as a tab under Compete — the same
      treatment `/packs` gets below and for the same reason: it is a sheet, not a
      view of the board. On a phone the carousel's last card is the way in; a
      rail has room to name it outright. */
-  { href: '/contests' },
+  { href: "/contests" },
   /* NO TABS LEFT TO FOLD — Sets was the second view and is the sheet below.
      `section` stays so the row still lights for anything under
      `/fantasy/collect`, and `measure` stays because it is the width the board
      asks for whether or not there is a heading to hang tabs in. */
-  { href: '/fantasy/collect', section: '/fantasy/collect', measure: 'table' },
+  { href: "/fantasy/collect", section: "/fantasy/collect", measure: "table" },
   /* Sets, as its own row rather than as a tab under Collect — the same
      treatment `/contests` gets above and for the same reason: it is a sheet,
      not a view of the board. On a phone the board's toolbar carries the door; a
      rail has room to name it outright. */
-  { href: '/sets' },
+  { href: "/sets" },
   /* Directly under the board that makes you want more cards, which is the
      question it answers. It is still the sheet it is on a phone (see
      `(app)/_layout`), opened over the app rather than navigated to; a rail row
      that opens a sheet is the same bargain as a toolbar button that does, and
      the alternative — a second, desktop-only packs PAGE — would be two
      implementations of one shop. */
-  { href: '/packs' },
+  { href: "/packs" },
   /* NO LONGER FOLDED, and it is the one row that unfolded rather than the rail
      changing its mind. Players had three views and now has one page: Trend and
      Top became orderings on it, so there are no tabs left to hang in the
@@ -682,16 +724,16 @@ const WEB_NAV_SPEC: WebNavSpec[] = [
      dark the moment a reader opened search from the board. Its place in the
      list is the phone strip's order with Packs spliced in after the board that
      sells it. */
-  { href: '/fantasy/players', also: ['/search'] },
-  { href: '/fantasy/leaderboard' },
+  { href: "/fantasy/players", also: ["/search"] },
+  { href: "/fantasy/leaderboard" },
   /* THE OTHER PRODUCT, and the break above it is the one place the flat rail
      still says "different kind of thing". Everything above is a board of the
      card game; these two are not. */
-  { href: '/leagues', spacedAbove: true },
+  { href: "/leagues", spacedAbove: true },
   /* Last, because it is the only row that is not about you: the others are your
      lineup, your cards, your packs, your rank and your leagues, and this is the
      league's own week. */
-  { href: '/scores' },
+  { href: "/scores" },
 ];
 
 /**
@@ -717,13 +759,15 @@ const WEB_NAV_SPEC: WebNavSpec[] = [
  */
 function resolveRow(key: string): { label: string; icon: WebNavIcon } {
   const section = FANTASY_SECTIONS.find((s) => s.href === key);
-  if (section) return { label: section.label, icon: { set: 'tab', name: section.icon } };
+  if (section)
+    return { label: section.label, icon: { set: "tab", name: section.icon } };
 
   const tab = NAV_TABS.find((t) => t.href === key);
-  if (tab) return { label: tab.label, icon: { set: 'tab', name: tab.icon } };
+  if (tab) return { label: tab.label, icon: { set: "tab", name: tab.icon } };
 
   const child = allChildren().find((c) => c.href === key);
-  if (child) return { label: child.label, icon: { set: 'action', name: child.icon } };
+  if (child)
+    return { label: child.label, icon: { set: "action", name: child.icon } };
 
   /* Thrown at module load rather than papered over with a fallback. This is
      static data declared in this same file, so a miss is a typo that is wrong
@@ -824,7 +868,7 @@ export function webSectionOf(pathname: string): WebSection | null {
  * declared as `Stack.Screen`s in `(app)/_layout.tsx` and appear nowhere in this
  * file's tree. If a fourth sheet is added there, add it here.
  */
-const SHEET_PREFIXES = ['/player/', '/card/', '/set/', '/contest/'] as const;
+const SHEET_PREFIXES = ["/player/", "/card/", "/set/", "/contest/"] as const;
 
 /**
  * The SHEETS ONLY — the half of `isOverlayPath` that every surface agrees on.

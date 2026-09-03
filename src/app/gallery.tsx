@@ -18,16 +18,22 @@
  * Like `/preview` this sits outside the auth gate and is inert outside
  * development — `expo export` emits every route it finds.
  */
-import { Redirect } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Redirect } from "expo-router";
+import { useMemo, useState } from "react";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 
-import { InventoryRow } from '@/components/collection/InventoryRow';
-import { DoorChip, Plus } from '@/components/ui/DoorChip';
-import { CollectionValue } from '@/components/collection/CollectionValue';
-import { RosterAlert } from '@/components/collection/RosterAlert';
-import { RosterCount } from '@/components/collection/RosterCount';
-import { summarise } from '@/components/collection/types';
+import { InventoryRow } from "@/components/collection/InventoryRow";
+import { DoorChip, Plus } from "@/components/ui/DoorChip";
+import { CollectionValue } from "@/components/collection/CollectionValue";
+import { RosterAlert } from "@/components/collection/RosterAlert";
+import { RosterCount } from "@/components/collection/RosterCount";
+import { summarise } from "@/components/collection/types";
 import {
   CARD_PROFILE_NEVER_STARTED,
   CARD_PROFILE_SAMPLE,
@@ -36,95 +42,117 @@ import {
   MCCAFFREY_GAME_LOG,
   MCCAFFREY_PROFILE,
   USAGE_SAMPLE,
-} from '@/components/dev/profile-fixture';
-import { OWNED_MANY, SETS_FIXTURE, SET_MEMBERS_FIXTURE } from '@/components/dev/fixtures';
-import { SetActions,
-  SetChecklist, type SetFilter } from '@/components/collection/SetChecklist';
+} from "@/components/dev/profile-fixture";
+import {
+  OWNED_MANY,
+  SETS_FIXTURE,
+  SET_MEMBERS_FIXTURE,
+} from "@/components/dev/fixtures";
+import {
+  SetActions,
+  SetChecklist,
+  type SetFilter,
+} from "@/components/collection/SetChecklist";
 import {
   ClaimAllBar,
   SetsFilters,
   SetsList,
   SetsStrip,
-} from '@/components/collection/SetsList';
+} from "@/components/collection/SetsList";
 import {
   autofillSelection,
   filterSets,
   remainingOf,
   summariseSets,
   type SetListFilter,
-} from '@/components/collection/sets';
-import { PlayerHero, type HeroFigure } from '@/components/players/PlayerHero';
-import { RecentForm, recentFormCount, recentFormHint } from '@/components/players/RecentForm';
-import { Section, SectionStack } from '@/components/players/Section';
-import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
-import { GameLogTab } from '@/components/players/GameLogTab';
-import { startKey } from '@/components/players/GameLog';
-import { CommunityPanel } from '@/components/players/CommunityPanel';
-import { StartLog } from '@/components/players/StartLog';
-import { parseCardProfile } from '@/components/players/card-profile';
-import { parseMarket } from '@/components/players/market';
-import { parseGameLog } from '@/components/players/game-log';
-import { TeamContext } from '@/components/players/TeamContext';
-import { UsagePanel } from '@/components/players/UsagePanel';
-import { parseProfile } from '@/components/players/profile';
-import { ScoreStrip } from '@/components/scores/ScoreStrip';
-import type { ScoreGame, ScoreTeam } from '@/components/scores/scoreboard';
-import { BoardRow } from '@/components/leaderboard/BoardRow';
-import { BoardColumns } from '@/components/leaderboard/BoardColumns';
-import { BoardTop } from '@/components/leaderboard/BoardTop';
-import { standingRows } from '@/components/leaderboard/PointsBoard';
-import type { Standing } from '@/components/leaderboard/board';
+} from "@/components/collection/sets";
+import { PlayerHero, type HeroFigure } from "@/components/players/PlayerHero";
+import {
+  RecentForm,
+  recentFormCount,
+  recentFormHint,
+} from "@/components/players/RecentForm";
+import { Section, SectionStack } from "@/components/players/Section";
+import { PlayerSheetFrame } from "@/components/players/PlayerSheetFrame";
+import { GameLogTab } from "@/components/players/GameLogTab";
+import { startKey } from "@/components/players/GameLog";
+import { CommunityPanel } from "@/components/players/CommunityPanel";
+import { StartLog } from "@/components/players/StartLog";
+import { parseCardProfile } from "@/components/players/card-profile";
+import { parseMarket } from "@/components/players/market";
+import { parseGameLog } from "@/components/players/game-log";
+import { TeamContext } from "@/components/players/TeamContext";
+import { UsagePanel } from "@/components/players/UsagePanel";
+import { parseProfile } from "@/components/players/profile";
+import { ScoreStrip } from "@/components/scores/ScoreStrip";
+import type { ScoreGame, ScoreTeam } from "@/components/scores/scoreboard";
+import { BoardRow } from "@/components/leaderboard/BoardRow";
+import { BoardColumns } from "@/components/leaderboard/BoardColumns";
+import { BoardTop } from "@/components/leaderboard/BoardTop";
+import { standingRows } from "@/components/leaderboard/PointsBoard";
+import type { Standing } from "@/components/leaderboard/board";
 import {
   BOARD_META,
   buildBoard,
   type BoardId,
   type CommunityBoardId,
   type CommunityData,
-} from '@/components/leaderboard/community';
-import { Panel } from '@/components/ui/Panel';
-import { BoardControls } from '@/components/leaderboard/BoardControls';
-import { MenuButton, MenuHeading, MenuItem } from '@/components/ui/MenuButton';
-import { Tabs } from '@/components/ui/Tabs';
-import { Screen } from '@/components/shell/Screen';
-import { SegmentedControl, type Segment } from '@/components/shell/SegmentedControl';
-import { AppHeader } from '@/components/shell/AppHeader';
-import { FantasyTopNav } from '@/components/shell/FantasyTopNav';
-import { ContestCarousel } from '@/components/lineup/ContestCarousel';
-import type { MyContest } from '@/components/contests/use-my-contests';
-import { FrameProvider } from '@/components/shell/frame';
-import { RecapBody } from '@/components/recap/RecapBody';
-import type { Recap } from '@/components/recap/recap';
-import { Sidebar } from '@/components/shell/Sidebar';
-import { WIDE_BREAKPOINT, useIsWide } from '@/components/shell/useResponsive';
-import { Colors, Spacing, Type, type Measure } from '@/constants/theme';
-import { PlayerContext, type PlayerState } from '@/context/PlayerContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+} from "@/components/leaderboard/community";
+import { Panel } from "@/components/ui/Panel";
+import { BoardControls } from "@/components/leaderboard/BoardControls";
+import { MenuButton, MenuHeading, MenuItem } from "@/components/ui/MenuButton";
+import { Tabs } from "@/components/ui/Tabs";
+import { Screen } from "@/components/shell/Screen";
+import {
+  SegmentedControl,
+  type Segment,
+} from "@/components/shell/SegmentedControl";
+import { AppHeader } from "@/components/shell/AppHeader";
+import { FantasyTopNav } from "@/components/shell/FantasyTopNav";
+import { ContestCarousel } from "@/components/lineup/ContestCarousel";
+import type { MyContest } from "@/components/contests/use-my-contests";
+import { FrameProvider } from "@/components/shell/frame";
+import { RecapBody } from "@/components/recap/RecapBody";
+import type { Recap } from "@/components/recap/recap";
+import { Sidebar } from "@/components/shell/Sidebar";
+import { WIDE_BREAKPOINT, useIsWide } from "@/components/shell/useResponsive";
+import { Colors, Spacing, Type, type Measure } from "@/constants/theme";
+import { PlayerContext, type PlayerState } from "@/context/PlayerContext";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 
 /** Parsed once: three components in this file read the same fixture. */
 const MCCAFFREY_SECTIONS = parseGameLog(MCCAFFREY_GAME_LOG);
 
 /** What the directory profile puts in the header strip. See `PlayerHero`. */
 const HERO_FIGURES: HeroFigure[] = [
-  { label: 'SEASON FP', value: '73.9' },
-  { label: 'FP / GAME', value: '14.8' },
-  { label: 'RANK', value: 'RB4', hint: 'of 84' },
+  { label: "SEASON FP", value: "73.9" },
+  { label: "FP / GAME", value: "14.8" },
+  { label: "RANK", value: "RB4", hint: "of 84" },
 ];
 
 const FIXTURE_PLAYER: PlayerState = {
   coins: 1240,
-  displayName: 'nickroachy',
+  displayName: "nickroachy",
   cardCount: 14,
   /* Under the warning line, so the chrome draws its calm state. `RosterBar`'s
      own three volumes are exercised in the kit, where a fixture can be set to
      each of them without the rest of the shell moving with it. */
-  roster: { held: 14, cap: 30, warnAt: 24, overBy: 0, isOver: false, isNear: false, remaining: 16 },
+  roster: {
+    held: 14,
+    cap: 30,
+    warnAt: 24,
+    overBy: 0,
+    isOver: false,
+    isNear: false,
+    remaining: 16,
+  },
   /* Two hearts held against a rack of three, one of the two already riding on
      this week's slate, and one win off the next carry rung. Picked to exercise
      ALL THREE heart states at once — safe, wagered and broken — because a full
      rack with nothing wagered draws the same as a fresh account and would show
      only one of them. */
   run: {
-    id: 'fixture-run',
+    id: "fixture-run",
     hearts: 2,
     maxHearts: 5,
     rack: 3,
@@ -139,6 +167,9 @@ const FIXTURE_PLAYER: PlayerState = {
     heldCards: 14,
     lostCards: 0,
   },
+  /* A free pack waiting, so the strip's news dot is visible for design work.
+     See `dailyPack` on `PlayerState`. */
+  dailyPack: true,
   loading: false,
   error: null,
   refresh: async () => {},
@@ -151,19 +182,29 @@ const FIXTURE_PLAYER: PlayerState = {
  * web build's paging arrows have something to page.
  */
 const GALLERY_TEAMS: Record<string, ScoreTeam> = Object.fromEntries(
-  ['BUF', 'MIA', 'KC', 'LV', 'SF', 'SEA', 'DAL', 'PHI', 'GB', 'CHI', 'CIN', 'BAL'].map((a) => [
-    a,
-    { id: a, abbreviation: a, name: a },
-  ]),
+  [
+    "BUF",
+    "MIA",
+    "KC",
+    "LV",
+    "SF",
+    "SEA",
+    "DAL",
+    "PHI",
+    "GB",
+    "CHI",
+    "CIN",
+    "BAL",
+  ].map((a) => [a, { id: a, abbreviation: a, name: a }]),
 );
 
 const GALLERY_GAMES: ScoreGame[] = [
-  ['MIA', 'BUF', 17, 24, 'final'],
-  ['LV', 'KC', 10, 31, 'final'],
-  ['SEA', 'SF', 14, 13, 'live'],
-  ['PHI', 'DAL', null, null, 'scheduled'],
-  ['CHI', 'GB', null, null, 'scheduled'],
-  ['BAL', 'CIN', null, null, 'scheduled'],
+  ["MIA", "BUF", 17, 24, "final"],
+  ["LV", "KC", 10, 31, "final"],
+  ["SEA", "SF", 14, 13, "live"],
+  ["PHI", "DAL", null, null, "scheduled"],
+  ["CHI", "GB", null, null, "scheduled"],
+  ["BAL", "CIN", null, null, "scheduled"],
 ].map(([away, home, awayScore, homeScore, status], i) => ({
   id: `g${i}`,
   season: 2026,
@@ -174,56 +215,63 @@ const GALLERY_GAMES: ScoreGame[] = [
   homeScore: homeScore as number | null,
   awayScore: awayScore as number | null,
   startsAt: `2026-08-2${1 + Math.floor(i / 3)}T17:0${i}:00Z`,
-  status: status as ScoreGame['status'],
-  statusText: status === 'final' ? 'Final' : null,
+  status: status as ScoreGame["status"],
+  statusText: status === "final" ? "Final" : null,
 }));
 
 /** Two of yours in the opener, one in the live game — the band's own mark. */
 const GALLERY_STARTERS_BY_TEAM = new Map([
-  ['BUF', 2],
-  ['SF', 1],
+  ["BUF", 2],
+  ["SF", 1],
 ]);
 
-type View_ = 'inventory' | 'sets' | 'checklist' | 'leaderboard' | 'lineup' | 'recap' | 'profile';
+type View_ =
+  | "inventory"
+  | "sets"
+  | "checklist"
+  | "leaderboard"
+  | "lineup"
+  | "recap"
+  | "profile";
 const VIEWS: Segment<View_>[] = [
-  { value: 'inventory', label: 'Inventory' },
-  { value: 'sets', label: 'Sets' },
-  { value: 'checklist', label: 'Set' },
-  { value: 'leaderboard', label: 'Board' },
-  { value: 'lineup', label: 'Lineup' },
-  { value: 'recap', label: 'Recap' },
-  { value: 'profile', label: 'Profile' },
+  { value: "inventory", label: "Inventory" },
+  { value: "sets", label: "Sets" },
+  { value: "checklist", label: "Set" },
+  { value: "leaderboard", label: "Board" },
+  { value: "lineup", label: "Lineup" },
+  { value: "recap", label: "Recap" },
+  { value: "profile", label: "Profile" },
 ];
 
 /** Each view previews the measure its real screen asks for, not a single one. */
 const VIEW_MEASURE: Record<View_, Measure> = {
-  inventory: 'grid',
-  sets: 'table',
-  checklist: 'form',
-  leaderboard: 'table',
-  lineup: 'form',
-  recap: 'form',
-  profile: 'table',
+  inventory: "grid",
+  sets: "table",
+  checklist: "form",
+  leaderboard: "table",
+  lineup: "form",
+  recap: "form",
+  profile: "table",
 };
 const VIEW_TITLE: Record<View_, string> = {
-  inventory: 'Inventory',
-  sets: 'Sets',
-  checklist: 'Jacksonville Jaguars',
-  leaderboard: 'Leaders',
-  lineup: 'Lineup',
-  recap: 'Week 3 recap',
-  profile: 'Christian McCaffrey',
+  inventory: "Inventory",
+  sets: "Sets",
+  checklist: "Jacksonville Jaguars",
+  leaderboard: "Leaders",
+  lineup: "Lineup",
+  recap: "Week 3 recap",
+  profile: "Christian McCaffrey",
 };
 
 /** Drives the rail's active/nested state, which is otherwise unreachable here. */
 const VIEW_PATH: Record<View_, string> = {
-  inventory: '/fantasy/collect',
-  sets: '/sets',
-  checklist: '/sets',
-  leaderboard: '/fantasy/leaderboard',
-  lineup: '/fantasy/compete',
-  recap: '/fantasy/compete',
-  profile: '/fantasy/players',
+  inventory: "/fantasy/collect",
+  sets: "/sets",
+  checklist: "/sets",
+  leaderboard: "/fantasy/leaderboard",
+  lineup: "/fantasy/compete",
+  recap: "/fantasy/compete",
+  profile: "/fantasy/players",
 };
 
 /**
@@ -251,65 +299,203 @@ const RECAP_FIXTURE: Recap = {
   coinsBonus: 305,
   cards: [
     {
-      slot: 'QB', cardInstanceId: 'r1', playerId: 'p1', playerName: 'Patrick Mahomes',
-      position: 'QB', team: 'KC', points: 31.2, awarded: true, tierAtAward: 'gold',
-      coinMultiplier: 1.25, coins: 58, positionRank: 1, bonusCoins: 250, wasWeekMvp: true,
-      tierNow: 'gold', promoted: false, careerFp: 412.6,
+      slot: "QB",
+      cardInstanceId: "r1",
+      playerId: "p1",
+      playerName: "Patrick Mahomes",
+      position: "QB",
+      team: "KC",
+      points: 31.2,
+      awarded: true,
+      tierAtAward: "gold",
+      coinMultiplier: 1.25,
+      coins: 58,
+      positionRank: 1,
+      bonusCoins: 250,
+      wasWeekMvp: true,
+      tierNow: "gold",
+      promoted: false,
+      careerFp: 412.6,
     },
     {
-      slot: 'RB1', cardInstanceId: 'r2', playerId: 'p2', playerName: 'Bijan Robinson',
-      position: 'RB', team: 'ATL', points: 22.8, awarded: true, tierAtAward: 'silver',
-      coinMultiplier: 1.1, coins: 37, positionRank: 3, bonusCoins: 40, wasWeekMvp: false,
-      tierNow: 'silver', promoted: false, careerFp: 188.1,
+      slot: "RB1",
+      cardInstanceId: "r2",
+      playerId: "p2",
+      playerName: "Bijan Robinson",
+      position: "RB",
+      team: "ATL",
+      points: 22.8,
+      awarded: true,
+      tierAtAward: "silver",
+      coinMultiplier: 1.1,
+      coins: 37,
+      positionRank: 3,
+      bonusCoins: 40,
+      wasWeekMvp: false,
+      tierNow: "silver",
+      promoted: false,
+      careerFp: 188.1,
     },
     {
-      slot: 'RB2', cardInstanceId: 'r3', playerId: 'p3', playerName: 'Bhayshul Tuten',
-      position: 'RB', team: 'JAX', points: 14.1, awarded: true, tierAtAward: 'bronze',
-      coinMultiplier: 1, coins: 21, positionRank: 14, bonusCoins: 0, wasWeekMvp: false,
-      tierNow: 'silver', promoted: true, careerFp: 52.4,
+      slot: "RB2",
+      cardInstanceId: "r3",
+      playerId: "p3",
+      playerName: "Bhayshul Tuten",
+      position: "RB",
+      team: "JAX",
+      points: 14.1,
+      awarded: true,
+      tierAtAward: "bronze",
+      coinMultiplier: 1,
+      coins: 21,
+      positionRank: 14,
+      bonusCoins: 0,
+      wasWeekMvp: false,
+      tierNow: "silver",
+      promoted: true,
+      careerFp: 52.4,
     },
     {
-      slot: 'WR1', cardInstanceId: 'r4', playerId: 'p4', playerName: "Ja'Marr Chase",
-      position: 'WR', team: 'CIN', points: 19.6, awarded: true, tierAtAward: 'diamond',
-      coinMultiplier: 1.4, coins: 41, positionRank: 8, bonusCoins: 15, wasWeekMvp: false,
-      tierNow: 'diamond', promoted: false, careerFp: 921.3,
+      slot: "WR1",
+      cardInstanceId: "r4",
+      playerId: "p4",
+      playerName: "Ja'Marr Chase",
+      position: "WR",
+      team: "CIN",
+      points: 19.6,
+      awarded: true,
+      tierAtAward: "diamond",
+      coinMultiplier: 1.4,
+      coins: 41,
+      positionRank: 8,
+      bonusCoins: 15,
+      wasWeekMvp: false,
+      tierNow: "diamond",
+      promoted: false,
+      careerFp: 921.3,
     },
     {
-      slot: 'WR2', cardInstanceId: 'r5', playerId: 'p5', playerName: 'Matthew Golden',
-      position: 'WR', team: 'GB', points: 8.4, awarded: true, tierAtAward: 'bronze',
-      coinMultiplier: 1, coins: 12, positionRank: 31, bonusCoins: 0, wasWeekMvp: false,
-      tierNow: 'bronze', promoted: false, careerFp: 31.2,
+      slot: "WR2",
+      cardInstanceId: "r5",
+      playerId: "p5",
+      playerName: "Matthew Golden",
+      position: "WR",
+      team: "GB",
+      points: 8.4,
+      awarded: true,
+      tierAtAward: "bronze",
+      coinMultiplier: 1,
+      coins: 12,
+      positionRank: 31,
+      bonusCoins: 0,
+      wasWeekMvp: false,
+      tierNow: "bronze",
+      promoted: false,
+      careerFp: 31.2,
     },
     {
-      slot: 'TE', cardInstanceId: 'r6', playerId: 'p6', playerName: 'Travis Kelce',
-      position: 'TE', team: 'KC', points: 0, awarded: true, tierAtAward: 'gold',
-      coinMultiplier: 1.25, coins: 0, positionRank: null, bonusCoins: 0, wasWeekMvp: false,
-      tierNow: 'gold', promoted: false, careerFp: 259.8,
+      slot: "TE",
+      cardInstanceId: "r6",
+      playerId: "p6",
+      playerName: "Travis Kelce",
+      position: "TE",
+      team: "KC",
+      points: 0,
+      awarded: true,
+      tierAtAward: "gold",
+      coinMultiplier: 1.25,
+      coins: 0,
+      positionRank: null,
+      bonusCoins: 0,
+      wasWeekMvp: false,
+      tierNow: "gold",
+      promoted: false,
+      careerFp: 259.8,
     },
     {
-      slot: 'FLEX', cardInstanceId: 'r7', playerId: 'p7', playerName: 'Rome Odunze',
-      position: 'WR', team: 'CHI', points: 13.9, awarded: true, tierAtAward: 'bronze',
-      coinMultiplier: 1, coins: 20, positionRank: 19, bonusCoins: 0, wasWeekMvp: false,
-      tierNow: 'bronze', promoted: false, careerFp: 44.7,
+      slot: "FLEX",
+      cardInstanceId: "r7",
+      playerId: "p7",
+      playerName: "Rome Odunze",
+      position: "WR",
+      team: "CHI",
+      points: 13.9,
+      awarded: true,
+      tierAtAward: "bronze",
+      coinMultiplier: 1,
+      coins: 20,
+      positionRank: 19,
+      bonusCoins: 0,
+      wasWeekMvp: false,
+      tierNow: "bronze",
+      promoted: false,
+      careerFp: 44.7,
     },
     {
-      slot: 'K', cardInstanceId: 'r8', playerId: 'p8', playerName: 'Harrison Butker',
-      position: 'PK', team: 'KC', points: 8.4, awarded: true, tierAtAward: 'silver',
-      coinMultiplier: 1.1, coins: 13, positionRank: 6, bonusCoins: 15, wasWeekMvp: false,
-      tierNow: 'silver', promoted: false, careerFp: 96.5,
+      slot: "K",
+      cardInstanceId: "r8",
+      playerId: "p8",
+      playerName: "Harrison Butker",
+      position: "PK",
+      team: "KC",
+      points: 8.4,
+      awarded: true,
+      tierAtAward: "silver",
+      coinMultiplier: 1.1,
+      coins: 13,
+      positionRank: 6,
+      bonusCoins: 15,
+      wasWeekMvp: false,
+      tierNow: "silver",
+      promoted: false,
+      careerFp: 96.5,
     },
   ],
   closestSets: [
-    { code: 'team-kc-2026', name: 'Kansas City Chiefs', family: 'team', committed: 6, nextAt: 8, nextReward: 400, stillNeeded: 2, readyNow: 2 },
-    { code: 'team-cin-2026', name: 'Cincinnati Bengals', family: 'team', committed: 5, nextAt: 8, nextReward: 400, stillNeeded: 3, readyNow: 1 },
-    { code: 'team-chi-2026', name: 'Chicago Bears', family: 'team', committed: 2, nextAt: 8, nextReward: 400, stillNeeded: 6, readyNow: 4 },
+    {
+      code: "team-kc-2026",
+      name: "Kansas City Chiefs",
+      family: "team",
+      committed: 6,
+      nextAt: 8,
+      nextReward: 400,
+      stillNeeded: 2,
+      readyNow: 2,
+    },
+    {
+      code: "team-cin-2026",
+      name: "Cincinnati Bengals",
+      family: "team",
+      committed: 5,
+      nextAt: 8,
+      nextReward: 400,
+      stillNeeded: 3,
+      readyNow: 1,
+    },
+    {
+      code: "team-chi-2026",
+      name: "Chicago Bears",
+      family: "team",
+      committed: 2,
+      nextAt: 8,
+      nextReward: 400,
+      stillNeeded: 6,
+      readyNow: 4,
+    },
   ],
   // Over the cap, which is the state the footer exists for.
-  roster: { held: 34, cap: 30, warnAt: 24, overBy: 4, isOver: true, isNear: false, remaining: 0 },
+  roster: {
+    held: 34,
+    cap: 30,
+    warnAt: 24,
+    overBy: 4,
+    isOver: true,
+    isNear: false,
+    remaining: 0,
+  },
 };
 
 /* ---- fixture content ---------------------------------------------------- */
-
 
 const GAP = Spacing.two + 4;
 
@@ -329,7 +515,7 @@ const GAP = Spacing.two + 4;
  */
 function SetsFixture() {
   const [claiming, setClaiming] = useState<string | null>(null);
-  const [filter, setFilter] = useState<SetListFilter>('ALL');
+  const [filter, setFilter] = useState<SetListFilter>("ALL");
   const shown = filterSets(SETS_FIXTURE, filter);
 
   return (
@@ -357,7 +543,9 @@ function SetsFixture() {
         sets={shown}
         claimingCode={claiming}
         onOpenSet={() => undefined}
-        onClaim={(set) => setClaiming((held) => (held === set.code ? null : set.code))}
+        onClaim={(set) =>
+          setClaiming((held) => (held === set.code ? null : set.code))
+        }
       />
     </View>
   );
@@ -378,10 +566,10 @@ function ChecklistFixture() {
   const [selected, setSelected] = useState<string[]>([]);
   /* The route holds this so the sheet's bar and the row in the list can be the
      same control; on the page there is no bar, and it is simply state. */
-  const [filter, setFilter] = useState<SetFilter>('ALL');
-  const set = SETS_FIXTURE.find((s) => s.code === 'team-jax-2026') ?? null;
+  const [filter, setFilter] = useState<SetFilter>("ALL");
+  const set = SETS_FIXTURE.find((s) => s.code === "team-jax-2026") ?? null;
 
-    /* CLIPPED, which the sheet does for free and a page does not. The tone
+  /* CLIPPED, which the sheet does for free and a page does not. The tone
        band reaches well above its own top so a bounce at the top of the sheet
        reveals more band rather than the fill behind it; the sheet's scroll view
        clips that away at rest, and on a page it would paint straight up over
@@ -423,7 +611,13 @@ function ChecklistFixture() {
         selected={selected}
         submitting={false}
         onAutofill={() =>
-          setSelected(autofillSelection(SET_MEMBERS_FIXTURE, set ? remainingOf(set) : 0, set?.minTier ?? null))
+          setSelected(
+            autofillSelection(
+              SET_MEMBERS_FIXTURE,
+              set ? remainingOf(set) : 0,
+              set?.minTier ?? null,
+            ),
+          )
         }
         onClear={() => setSelected([])}
         // Inert: there is no session behind this page, and the confirmation it
@@ -454,7 +648,7 @@ const GALLERY_SPARES = OWNED_MANY.map((card, i) => ({
 }));
 
 function InventoryFixture() {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = useColorScheme() === "dark" ? "dark" : "light";
   const c = Colors[scheme];
   /* Live, because the row is only worth looking at in both its states: the mode
      off, and the mode on with ticks down the badge column. */
@@ -464,7 +658,7 @@ function InventoryFixture() {
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const selecting = picked.size > 0;
 
-  const starters = useMemo(() => new Set(['many-0', 'many-5', 'many-9']), []);
+  const starters = useMemo(() => new Set(["many-0", "many-5", "many-9"]), []);
   const stats = useMemo(() => summarise(GALLERY_SPARES), []);
 
   return (
@@ -481,7 +675,17 @@ function InventoryFixture() {
       <View style={styles.inventoryControls}>
         <View style={styles.inventoryRow}>
           <CollectionValue sellValue={stats.sellValue} />
-          <RosterCount roster={{ held: 31, cap: 30, warnAt: 24, overBy: 2, isOver: true, isNear: true, remaining: 0 }} />
+          <RosterCount
+            roster={{
+              held: 31,
+              cap: 30,
+              warnAt: 24,
+              overBy: 2,
+              isOver: true,
+              isNear: true,
+              remaining: 0,
+            }}
+          />
           <View style={styles.inventorySpacer} />
           <View style={styles.inventoryDoors}>
             <DoorChip
@@ -505,11 +709,31 @@ function InventoryFixture() {
         {/* The one state that draws a band. Under the cap it is null, and it is
             layout-neutral, so the gutter comes from here. */}
         <View style={{ paddingHorizontal: Spacing.three }}>
-          <RosterAlert roster={{ held: 32, cap: 30, warnAt: 24, overBy: 2, isOver: true, isNear: true, remaining: 0 }} />
+          <RosterAlert
+            roster={{
+              held: 32,
+              cap: 30,
+              warnAt: 24,
+              overBy: 2,
+              isOver: true,
+              isNear: true,
+              remaining: 0,
+            }}
+          />
         </View>
         <View style={styles.inventoryRow}>
           <CollectionValue sellValue={232} />
-          <RosterCount roster={{ held: 14, cap: 30, warnAt: 24, overBy: 0, isOver: false, isNear: false, remaining: 16 }} />
+          <RosterCount
+            roster={{
+              held: 14,
+              cap: 30,
+              warnAt: 24,
+              overBy: 0,
+              isOver: false,
+              isNear: false,
+              remaining: 16,
+            }}
+          />
           <View style={styles.inventorySpacer} />
         </View>
         {/* Full-bleed, like the list they are in — each row carries its own
@@ -552,58 +776,288 @@ function InventoryFixture() {
  * `MEID` is nickroachy's row on every board, so the "you" tint and the YOU word
  * are visible here rather than only for whoever is signed in.
  */
-const MEID = 'fixture-me';
+const MEID = "fixture-me";
 
 /* The mark each manager's row wears — their best held card. Real boards read it
    from `board_top_tiers`; here it is fixed so all four tiers are on screen. */
 const SCOPE_FIXTURE = [
-  { value: 'season', label: 'Season' },
-  { value: '3', label: 'Pre 3' },
-  { value: '2', label: 'Pre 2' },
-  { value: '1', label: 'Pre 1' },
+  { value: "season", label: "Season" },
+  { value: "3", label: "Pre 3" },
+  { value: "2", label: "Pre 2" },
+  { value: "1", label: "Pre 1" },
 ];
 
 const BOARD_FIXTURES: Record<CommunityBoardId, CommunityData> = {
   record: {
-    id: 'record',
+    id: "record",
     rows: [
-      { rank: 1, user_id: 'u2', display_name: 'dmb', wins: 3, losses: 0, ties: 0, weeks: 3, win_pct: 1, points: 298.1 },
-      { rank: 2, user_id: MEID, display_name: 'nickroachy', wins: 2, losses: 0, ties: 1, weeks: 3, win_pct: 0.833, points: 312.4 },
-      { rank: 3, user_id: 'u5', display_name: 'sarah', wins: 1, losses: 1, ties: 1, weeks: 3, win_pct: 0.5, points: 233.9 },
-      { rank: 4, user_id: 'u3', display_name: 'a_very_long_display_name', wins: 1, losses: 2, ties: 0, weeks: 3, win_pct: 0.333, points: 271.8 },
-      { rank: 5, user_id: 'u4', display_name: 'kp', wins: 0, losses: 2, ties: 0, weeks: 2, win_pct: 0, points: 245 },
+      {
+        rank: 1,
+        user_id: "u2",
+        display_name: "dmb",
+        wins: 3,
+        losses: 0,
+        ties: 0,
+        weeks: 3,
+        win_pct: 1,
+        points: 298.1,
+      },
+      {
+        rank: 2,
+        user_id: MEID,
+        display_name: "nickroachy",
+        wins: 2,
+        losses: 0,
+        ties: 1,
+        weeks: 3,
+        win_pct: 0.833,
+        points: 312.4,
+      },
+      {
+        rank: 3,
+        user_id: "u5",
+        display_name: "sarah",
+        wins: 1,
+        losses: 1,
+        ties: 1,
+        weeks: 3,
+        win_pct: 0.5,
+        points: 233.9,
+      },
+      {
+        rank: 4,
+        user_id: "u3",
+        display_name: "a_very_long_display_name",
+        wins: 1,
+        losses: 2,
+        ties: 0,
+        weeks: 3,
+        win_pct: 0.333,
+        points: 271.8,
+      },
+      {
+        rank: 5,
+        user_id: "u4",
+        display_name: "kp",
+        wins: 0,
+        losses: 2,
+        ties: 0,
+        weeks: 2,
+        win_pct: 0,
+        points: 245,
+      },
     ],
   },
   collection: {
-    id: 'collection',
+    id: "collection",
     rows: [
-      { rank: 1, user_id: 'u2', display_name: 'dmb', value_coins: 1864, held: 61, in_sets: 22, players: 54, bronze: 38, silver: 13, gold: 9, diamond: 1, career_fp: 1240.5 },
-      { rank: 2, user_id: MEID, display_name: 'nickroachy', value_coins: 1208, held: 74, in_sets: 0, players: 66, bronze: 55, silver: 14, gold: 5, diamond: 0, career_fp: 980.2 },
-      { rank: 3, user_id: 'u3', display_name: 'a_very_long_display_name', value_coins: 742, held: 38, in_sets: 9, players: 35, bronze: 30, silver: 5, gold: 3, diamond: 0, career_fp: 610 },
-      { rank: 4, user_id: 'u5', display_name: 'sarah', value_coins: 416, held: 29, in_sets: 0, players: 27, bronze: 0, silver: 0, gold: 1, diamond: 0, career_fp: 305.4 },
+      {
+        rank: 1,
+        user_id: "u2",
+        display_name: "dmb",
+        value_coins: 1864,
+        held: 61,
+        in_sets: 22,
+        players: 54,
+        bronze: 38,
+        silver: 13,
+        gold: 9,
+        diamond: 1,
+        career_fp: 1240.5,
+      },
+      {
+        rank: 2,
+        user_id: MEID,
+        display_name: "nickroachy",
+        value_coins: 1208,
+        held: 74,
+        in_sets: 0,
+        players: 66,
+        bronze: 55,
+        silver: 14,
+        gold: 5,
+        diamond: 0,
+        career_fp: 980.2,
+      },
+      {
+        rank: 3,
+        user_id: "u3",
+        display_name: "a_very_long_display_name",
+        value_coins: 742,
+        held: 38,
+        in_sets: 9,
+        players: 35,
+        bronze: 30,
+        silver: 5,
+        gold: 3,
+        diamond: 0,
+        career_fp: 610,
+      },
+      {
+        rank: 4,
+        user_id: "u5",
+        display_name: "sarah",
+        value_coins: 416,
+        held: 29,
+        in_sets: 0,
+        players: 27,
+        bronze: 0,
+        silver: 0,
+        gold: 1,
+        diamond: 0,
+        career_fp: 305.4,
+      },
       // A shelf that has never been started: FP is an em dash, not a zero.
-      { rank: 5, user_id: 'u4', display_name: 'kp', value_coins: 96, held: 12, in_sets: 3, players: 12, bronze: 12, silver: 2, gold: 0, diamond: 0, career_fp: 0 },
+      {
+        rank: 5,
+        user_id: "u4",
+        display_name: "kp",
+        value_coins: 96,
+        held: 12,
+        in_sets: 3,
+        players: 12,
+        bronze: 12,
+        silver: 2,
+        gold: 0,
+        diamond: 0,
+        career_fp: 0,
+      },
     ],
   },
   cards: {
-    id: 'cards',
+    id: "cards",
     rows: [
-      { rank: 1, card_instance_id: 'c1', user_id: 'u2', display_name: 'dmb', player_id: 'p1', player_name: 'Josh Allen', position_abbreviation: 'QB', team_abbreviation: 'BUF', tier: 'diamond', career_fp: 2612.4, lineup_starts: 31, fp_per_start: 84.3 },
-      { rank: 2, card_instance_id: 'c2', user_id: MEID, display_name: 'nickroachy', player_id: 'p2', player_name: 'Christian McCaffrey', position_abbreviation: 'RB', team_abbreviation: 'SF', tier: 'gold', career_fp: 1188, lineup_starts: 14, fp_per_start: 84.9 },
-      { rank: 3, card_instance_id: 'c3', user_id: 'u5', display_name: 'sarah', player_id: 'p3', player_name: "Ja'Marr Chase", position_abbreviation: 'WR', team_abbreviation: 'CIN', tier: 'gold', career_fp: 902.5, lineup_starts: 12, fp_per_start: 75.2 },
-      { rank: 4, card_instance_id: 'c4', user_id: MEID, display_name: 'nickroachy', player_id: 'p4', player_name: 'Travis Kelce', position_abbreviation: 'TE', team_abbreviation: 'KC', tier: 'silver', career_fp: 411.8, lineup_starts: 9, fp_per_start: 45.8 },
-      { rank: 5, card_instance_id: 'c5', user_id: 'u4', display_name: 'kp', player_id: 'p5', player_name: 'Harrison Butker', position_abbreviation: 'PK', team_abbreviation: 'KC', tier: 'bronze', career_fp: 96, lineup_starts: 8, fp_per_start: 12 },
+      {
+        rank: 1,
+        card_instance_id: "c1",
+        user_id: "u2",
+        display_name: "dmb",
+        player_id: "p1",
+        player_name: "Josh Allen",
+        position_abbreviation: "QB",
+        team_abbreviation: "BUF",
+        tier: "diamond",
+        career_fp: 2612.4,
+        lineup_starts: 31,
+        fp_per_start: 84.3,
+      },
+      {
+        rank: 2,
+        card_instance_id: "c2",
+        user_id: MEID,
+        display_name: "nickroachy",
+        player_id: "p2",
+        player_name: "Christian McCaffrey",
+        position_abbreviation: "RB",
+        team_abbreviation: "SF",
+        tier: "gold",
+        career_fp: 1188,
+        lineup_starts: 14,
+        fp_per_start: 84.9,
+      },
+      {
+        rank: 3,
+        card_instance_id: "c3",
+        user_id: "u5",
+        display_name: "sarah",
+        player_id: "p3",
+        player_name: "Ja'Marr Chase",
+        position_abbreviation: "WR",
+        team_abbreviation: "CIN",
+        tier: "gold",
+        career_fp: 902.5,
+        lineup_starts: 12,
+        fp_per_start: 75.2,
+      },
+      {
+        rank: 4,
+        card_instance_id: "c4",
+        user_id: MEID,
+        display_name: "nickroachy",
+        player_id: "p4",
+        player_name: "Travis Kelce",
+        position_abbreviation: "TE",
+        team_abbreviation: "KC",
+        tier: "silver",
+        career_fp: 411.8,
+        lineup_starts: 9,
+        fp_per_start: 45.8,
+      },
+      {
+        rank: 5,
+        card_instance_id: "c5",
+        user_id: "u4",
+        display_name: "kp",
+        player_id: "p5",
+        player_name: "Harrison Butker",
+        position_abbreviation: "PK",
+        team_abbreviation: "KC",
+        tier: "bronze",
+        career_fp: 96,
+        lineup_starts: 8,
+        fp_per_start: 12,
+      },
     ],
   },
   sets: {
-    id: 'sets',
+    id: "sets",
     rows: [
-      { rank: 1, user_id: MEID, display_name: 'nickroachy', rungs: 13, sets: 4, completed: 3, dailies: 11, burned: 42, coins: 790 },
-      { rank: 2, user_id: 'u2', display_name: 'dmb', rungs: 9, sets: 3, completed: 1, dailies: 24, burned: 31, coins: 1240 },
-      { rank: 3, user_id: 'u5', display_name: 'sarah', rungs: 4, sets: 2, completed: 0, dailies: 6, burned: 14, coins: 300 },
-      { rank: 4, user_id: 'u3', display_name: 'a_very_long_display_name', rungs: 2, sets: 1, completed: 0, dailies: 3, burned: 8, coins: 150 },
+      {
+        rank: 1,
+        user_id: MEID,
+        display_name: "nickroachy",
+        rungs: 13,
+        sets: 4,
+        completed: 3,
+        dailies: 11,
+        burned: 42,
+        coins: 790,
+      },
+      {
+        rank: 2,
+        user_id: "u2",
+        display_name: "dmb",
+        rungs: 9,
+        sets: 3,
+        completed: 1,
+        dailies: 24,
+        burned: 31,
+        coins: 1240,
+      },
+      {
+        rank: 3,
+        user_id: "u5",
+        display_name: "sarah",
+        rungs: 4,
+        sets: 2,
+        completed: 0,
+        dailies: 6,
+        burned: 14,
+        coins: 300,
+      },
+      {
+        rank: 4,
+        user_id: "u3",
+        display_name: "a_very_long_display_name",
+        rungs: 2,
+        sets: 1,
+        completed: 0,
+        dailies: 3,
+        burned: 8,
+        coins: 150,
+      },
       // Cards burnt, no rung reached yet — the row the union in board_sets exists for.
-      { rank: 5, user_id: 'u4', display_name: 'kp', rungs: 0, sets: 0, completed: 0, dailies: 1, burned: 3, coins: 40 },
+      {
+        rank: 5,
+        user_id: "u4",
+        display_name: "kp",
+        rungs: 0,
+        sets: 0,
+        completed: 0,
+        dailies: 1,
+        burned: 3,
+        coins: 40,
+      },
     ],
   },
 };
@@ -618,25 +1072,80 @@ const BOARD_FIXTURES: Record<CommunityBoardId, CommunityData> = {
  * get wrong is `NEW`, which must not read as a rise of zero.
  */
 const POINTS_FIXTURE: Standing[] = [
-  { userId: 'u2', name: 'dmb', rank: 1, points: 312.4, weeksPlayed: 3, seasonRank: 1, avg: 104.1, best: { week: 2, points: 148.2, rank: 1 }, movement: 2, weekly: [] },
-  { userId: MEID, name: 'nickroachy', rank: 2, points: 298.1, weeksPlayed: 3, seasonRank: 2, avg: 99.4, best: { week: 3, points: 141.7, rank: 2 }, movement: -1, weekly: [] },
-  { userId: 'u3', name: 'a_very_long_display_name', rank: 3, points: 271.8, weeksPlayed: 3, seasonRank: 3, avg: 90.6, best: { week: 1, points: 139, rank: 3 }, movement: 0, weekly: [] },
-  { userId: 'u4', name: 'kp', rank: 4, points: 245, weeksPlayed: 2, seasonRank: 4, avg: 122.5, best: { week: 3, points: 122.4, rank: 4 }, movement: null, weekly: [] },
+  {
+    userId: "u2",
+    name: "dmb",
+    rank: 1,
+    points: 312.4,
+    weeksPlayed: 3,
+    seasonRank: 1,
+    avg: 104.1,
+    best: { week: 2, points: 148.2, rank: 1 },
+    movement: 2,
+    weekly: [],
+  },
+  {
+    userId: MEID,
+    name: "nickroachy",
+    rank: 2,
+    points: 298.1,
+    weeksPlayed: 3,
+    seasonRank: 2,
+    avg: 99.4,
+    best: { week: 3, points: 141.7, rank: 2 },
+    movement: -1,
+    weekly: [],
+  },
+  {
+    userId: "u3",
+    name: "a_very_long_display_name",
+    rank: 3,
+    points: 271.8,
+    weeksPlayed: 3,
+    seasonRank: 3,
+    avg: 90.6,
+    best: { week: 1, points: 139, rank: 3 },
+    movement: 0,
+    weekly: [],
+  },
+  {
+    userId: "u4",
+    name: "kp",
+    rank: 4,
+    points: 245,
+    weeksPlayed: 2,
+    seasonRank: 4,
+    avg: 122.5,
+    best: { week: 3, points: 122.4, rank: 4 },
+    movement: null,
+    weekly: [],
+  },
   // Nothing scored yet: the derived columns are dashes, not zeroes.
-  { userId: 'u5', name: 'sarah', rank: 5, points: 0, weeksPlayed: 0, seasonRank: 5, avg: null, best: null, movement: null, weekly: [] },
+  {
+    userId: "u5",
+    name: "sarah",
+    rank: 5,
+    points: 0,
+    weeksPlayed: 0,
+    seasonRank: 5,
+    avg: null,
+    best: null,
+    movement: null,
+    weekly: [],
+  },
 ];
 
 function LeaderboardFixture() {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const [id, setId] = useState<BoardId>('cards');
+  const scheme = useColorScheme() === "dark" ? "dark" : "light";
+  const [id, setId] = useState<BoardId>("cards");
 
-  const points = id === 'points';
-  const [scope, setScope] = useState('season');
+  const points = id === "points";
+  const [scope, setScope] = useState("season");
   // One metadata table for all six boards now — no fixture copy to drift.
   const meta = BOARD_META[id];
   // Preseason, so the week board reads "Pre 3" rather than "Wk 3".
   const built = points
-    ? standingRows(POINTS_FIXTURE, 'season', 1, true)
+    ? standingRows(POINTS_FIXTURE, "season", 1, true)
     : buildBoard(BOARD_FIXTURES[id], 1, { scheme });
 
   return (
@@ -648,12 +1157,14 @@ function LeaderboardFixture() {
         <BoardControls
           board={id}
           onBoardChange={setId}
-          context={`Preseason 2026 · ${built.length} ranked`}>
+          context={`Preseason 2026 · ${built.length} ranked`}
+        >
           {points ? (
             <MenuButton
-              text={scope === 'season' ? 'SZN' : `P${scope}`}
+              text={scope === "season" ? "SZN" : `P${scope}`}
               label="Week"
-              active={scope !== 'season'}>
+              active={scope !== "season"}
+            >
               {(close) => (
                 <>
                   <MenuHeading>Week</MenuHeading>
@@ -687,21 +1198,29 @@ function LeaderboardFixture() {
 
       {/* Pinned above the rows on every real board. The fixture names the same
           columns the rows below it draw — see `BoardColumns`. */}
-      <BoardColumns section="Rankings" figureLabel={built[0]?.figureLabel ?? ''} />
+      <BoardColumns
+        section="Rankings"
+        figureLabel={built[0]?.figureLabel ?? ""}
+      />
 
       {/* Bled past the gallery Screen's own 16pt padding, because the real
           boards bleed past the list's — otherwise this fixture would show a
           narrower row than the product draws. */}
       <View style={styles.boardRows}>
         {built.map((row) => (
-          <BoardRow key={row.key} row={row} isMe={row.userId === MEID} unit={meta.unit} />
+          <BoardRow
+            key={row.key}
+            row={row}
+            isMe={row.userId === MEID}
+            unit={meta.unit}
+          />
         ))}
       </View>
     </View>
   );
 }
 
-const SLOTS = ['QB', 'RB', 'RB', 'WR', 'WR', 'WR', 'TE', 'PK'];
+const SLOTS = ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "PK"];
 
 /**
  * Two contests, so the carousel has something to swipe BETWEEN.
@@ -726,15 +1245,15 @@ const SLOTS = ['QB', 'RB', 'RB', 'WR', 'WR', 'WR', 'TE', 'PK'];
  */
 const CONTEST_FIXTURES: MyContest[] = [
   {
-    id: 'fx-free',
-    code: 'free:2026:1:4',
-    kind: 'free',
-    name: 'Preseason Week 4',
-    formatCode: 'main',
-    formatName: 'Full Roster',
+    id: "fx-free",
+    code: "free:2026:1:4",
+    kind: "free",
+    name: "Preseason Week 4",
+    formatCode: "main",
+    formatName: "Full Roster",
     slotCount: 8,
     entryFeeCoins: 0,
-    lineupId: 'fx-lineup-free',
+    lineupId: "fx-lineup-free",
     filled: 8,
     field: {
       week: 4,
@@ -751,11 +1270,11 @@ const CONTEST_FIXTURES: MyContest[] = [
     },
     heartsAtRisk: 1,
     heartsOnWin: 0,
-    winCondition: 'median',
+    winCondition: "median",
     winRank: null,
     winPct: null,
     targetPoints: null,
-    payoutCurve: 'flat',
+    payoutCurve: "flat",
     scoreRate: 1.5,
     cut: null,
     prizePool: 0,
@@ -767,19 +1286,19 @@ const CONTEST_FIXTURES: MyContest[] = [
     myProjected: 131.7,
     projField: { low: 62.8, median: 118.2, high: 187.4, cut: null, myRank: 5 },
     recap: false,
-    weekLabel: 'PRE 4',
-    weekTitle: 'Preseason 4',
+    weekLabel: "PRE 4",
+    weekTitle: "Preseason 4",
   },
   {
-    id: 'fx-wr',
-    code: 'wr_room:2026:1:4',
-    kind: 'lobby',
-    name: 'WR Room',
-    formatCode: 'wr_room',
-    formatName: 'WR Room',
+    id: "fx-wr",
+    code: "wr_room:2026:1:4",
+    kind: "lobby",
+    name: "WR Room",
+    formatCode: "wr_room",
+    formatName: "WR Room",
     slotCount: 3,
     entryFeeCoins: 40,
-    lineupId: 'fx-lineup-wr',
+    lineupId: "fx-lineup-wr",
     filled: 3,
     field: {
       week: 4,
@@ -796,14 +1315,14 @@ const CONTEST_FIXTURES: MyContest[] = [
     },
     heartsAtRisk: 1,
     heartsOnWin: 1,
-    winCondition: 'top_n',
+    winCondition: "top_n",
     winRank: 3,
     winPct: null,
     targetPoints: null,
     /* STEEP, so the fixture exercises a curve that is not the default. Under
        `flat` every top-three finisher takes 80 of a 240 pool; under this one
        first takes 130, which is the whole reason the column exists. */
-    payoutCurve: 'steep',
+    payoutCurve: "steep",
     scoreRate: 1.5,
     /* Above the median (31.5) and BELOW the cut — the exact state the old card
        could not draw. 27.1 reads as comfortably mid-field against a median and
@@ -819,8 +1338,8 @@ const CONTEST_FIXTURES: MyContest[] = [
     myProjected: 44.8,
     projField: { low: 21.6, median: 48.0, high: 79.3, cut: 52.2, myRank: 4 },
     recap: false,
-    weekLabel: 'PRE 4',
-    weekTitle: 'Preseason 4',
+    weekLabel: "PRE 4",
+    weekTitle: "Preseason 4",
   },
   /* THE THIRD BRANCH, and it is here for the reason stated above the array: a
      fixture set where every row takes the same path tests the path, not the
@@ -833,15 +1352,15 @@ const CONTEST_FIXTURES: MyContest[] = [
      less than one good catch, against a number that will not move. Every other
      contest's line drifts all afternoon. */
   {
-    id: 'fx-warmup',
-    code: 'warmup:2026:1:4',
-    kind: 'lobby',
-    name: 'The Warm-Up',
-    formatCode: 'flex3',
-    formatName: 'Flex Three',
+    id: "fx-warmup",
+    code: "warmup:2026:1:4",
+    kind: "lobby",
+    name: "The Warm-Up",
+    formatCode: "flex3",
+    formatName: "Flex Three",
     slotCount: 3,
     entryFeeCoins: 0,
-    lineupId: 'fx-lineup-warmup',
+    lineupId: "fx-lineup-warmup",
     filled: 3,
     field: {
       week: 4,
@@ -858,11 +1377,11 @@ const CONTEST_FIXTURES: MyContest[] = [
     },
     heartsAtRisk: 0,
     heartsOnWin: 1,
-    winCondition: 'target',
+    winCondition: "target",
     winRank: null,
     winPct: null,
     targetPoints: 30.0,
-    payoutCurve: 'flat',
+    payoutCurve: "flat",
     scoreRate: 1.5,
     cut: 30.0,
     prizePool: 0,
@@ -875,13 +1394,13 @@ const CONTEST_FIXTURES: MyContest[] = [
     myProjected: 34.5,
     projField: { low: 34.5, median: 34.5, high: 34.5, cut: 30.0, myRank: 1 },
     recap: false,
-    weekLabel: 'PRE 4',
-    weekTitle: 'Preseason 4',
+    weekLabel: "PRE 4",
+    weekTitle: "Preseason 4",
   },
 ];
 
 function LineupFixture() {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = useColorScheme() === "dark" ? "dark" : "light";
   const c = Colors[scheme];
   const [contestIndex, setContestIndex] = useState(0);
   const [carouselWidth, setCarouselWidth] = useState(0);
@@ -900,13 +1419,12 @@ function LineupFixture() {
           onIndexChange={setContestIndex}
           lockAt={null}
           locked={false}
-          now={Date.parse('2026-08-25T12:00:00Z')}
+          now={Date.parse("2026-08-25T12:00:00Z")}
           /* The fixture run, so the rack under the card draws all three heart
              states and the focused pip can be seen moving as you swipe — see
              `Foot` in the carousel. */
           run={FIXTURE_PLAYER.run}
           onEnter={() => {}}
-          onPacks={() => {}}
           width={carouselWidth}
         />
       </View>
@@ -919,19 +1437,22 @@ function LineupFixture() {
 }
 
 function LineupRows({ slotCount }: { slotCount: number }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = useColorScheme() === "dark" ? "dark" : "light";
   const c = Colors[scheme];
 
   return (
     <View style={styles.rows}>
       {SLOTS.slice(0, slotCount).map((slot, i) => (
-        <View key={`${slot}-${i}`} style={[styles.row, { borderColor: c.backgroundElement }]}>
+        <View
+          key={`${slot}-${i}`}
+          style={[styles.row, { borderColor: c.backgroundElement }]}
+        >
           <Text style={[styles.slot, { color: c.textSecondary }]}>{slot}</Text>
           <Text numberOfLines={1} style={[styles.rowName, { color: c.text }]}>
-            {OWNED_MANY[i]?.playerName ?? 'Empty'}
+            {OWNED_MANY[i]?.playerName ?? "Empty"}
           </Text>
           <Text style={[styles.rowMeta, { color: c.textSecondary }]}>
-            {OWNED_MANY[i]?.team ?? '—'}
+            {OWNED_MANY[i]?.team ?? "—"}
           </Text>
         </View>
       ))}
@@ -946,9 +1467,9 @@ function LineupRows({ slotCount }: { slotCount: number }) {
  * starter looks like until the regular season begins.
  */
 function ProfileFixture() {
-  const [pt, setPt] = useState<'overview' | 'card' | 'log'>('overview');
+  const [pt, setPt] = useState<"overview" | "card" | "log">("overview");
   const [sheet, setSheet] = useState(false);
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = useColorScheme() === "dark" ? "dark" : "light";
   const c = Colors[scheme];
   const profile = parseProfile(MCCAFFREY_PROFILE);
   if (!profile) return null;
@@ -971,15 +1492,19 @@ function ProfileFixture() {
         style={({ pressed }: { pressed: boolean }) => [
           styles.sheetButton,
           pressed && styles.pressed,
-        ]}>
-        <Text style={[Type.strong, { color: c.text }]}>Open the profile sheet →</Text>
+        ]}
+      >
+        <Text style={[Type.strong, { color: c.text }]}>
+          Open the profile sheet →
+        </Text>
       </Pressable>
 
       {sheet ? (
         <PlayerSheetFrame
           title={profile.player.name}
           subtitle="SF · RB · LEGENDARY"
-          onClose={() => setSheet(false)}>
+          onClose={() => setSheet(false)}
+        >
           <PlayerHero
             name={profile.player.name}
             bio={profile.player}
@@ -988,7 +1513,10 @@ function ProfileFixture() {
             injuryStatus={profile.player.injuryStatus}
             figures={HERO_FIGURES}
           />
-          <GameLogTab profile={profile} sections={parseGameLog(MCCAFFREY_GAME_LOG)} />
+          <GameLogTab
+            profile={profile}
+            sections={parseGameLog(MCCAFFREY_GAME_LOG)}
+          />
         </PlayerSheetFrame>
       ) : null}
 
@@ -1010,9 +1538,9 @@ function ProfileFixture() {
           so the primitive is seen in the arrangement it actually ships in. */}
       <Tabs
         tabs={[
-          { value: 'overview', label: 'Overview' },
-          { value: 'card', label: 'Card', hint: '2' },
-          { value: 'log', label: 'Game log', hint: '3' },
+          { value: "overview", label: "Overview" },
+          { value: "card", label: "Card", hint: "2" },
+          { value: "log", label: "Game log", hint: "3" },
         ]}
         value={pt}
         onChange={setPt}
@@ -1028,7 +1556,8 @@ function ProfileFixture() {
       <SectionStack>
         <Section
           label={`Last ${recentFormCount(MCCAFFREY_SECTIONS)} weeks`}
-          hint={recentFormHint(MCCAFFREY_SECTIONS)}>
+          hint={recentFormHint(MCCAFFREY_SECTIONS)}
+        >
           <RecentForm sections={MCCAFFREY_SECTIONS} />
         </Section>
       </SectionStack>
@@ -1048,7 +1577,10 @@ function ProfileFixture() {
       <TeamContext bio={profile.player} standings={profile.standings} />
 
       {/* ---- Game log: career folded in, season summary above per-game ---- */}
-      <GameLogTab profile={profile} sections={parseGameLog(MCCAFFREY_GAME_LOG)} />
+      <GameLogTab
+        profile={profile}
+        sections={parseGameLog(MCCAFFREY_GAME_LOG)}
+      />
 
       {/* The CARD profile's variant of the same tab: every week marked with
           whether this copy was started. The player profile passes nothing and
@@ -1108,22 +1640,28 @@ export default function GalleryScreen() {
 }
 
 function GalleryBody() {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = useColorScheme() === "dark" ? "dark" : "light";
   const c = Colors[scheme];
   const { width } = useWindowDimensions();
   const isWide = useIsWide();
-  const [view, setView] = useState<View_>('inventory');
+  const [view, setView] = useState<View_>("inventory");
 
   const banner = useMemo(
     () =>
-      `${Math.round(width)}px · ${isWide ? 'wide' : 'narrow'} (breakpoint ${WIDE_BREAKPOINT}) · rail ${
-        isWide ? 'on' : 'off'
+      `${Math.round(width)}px · ${isWide ? "wide" : "narrow"} (breakpoint ${WIDE_BREAKPOINT}) · rail ${
+        isWide ? "on" : "off"
       } · measure ${VIEW_MEASURE[view]}`,
     [width, isWide, view],
   );
 
   return (
-    <View style={[styles.shell, isWide && styles.shellWide, { backgroundColor: c.background }]}>
+    <View
+      style={[
+        styles.shell,
+        isWide && styles.shellWide,
+        { backgroundColor: c.background },
+      ]}
+    >
       {isWide ? <Sidebar pathnameOverride={VIEW_PATH[view]} /> : null}
       <View style={styles.content}>
         {/* The wide chrome, in the arrangement `(tabs)/_layout` builds it: the
@@ -1159,49 +1697,56 @@ function GalleryBody() {
           </>
         )}
         <FrameProvider value={{ header: !isWide }}>
-        <Screen
-          title={VIEW_TITLE[view]}
-          measure={VIEW_MEASURE[view]}
-          context="Preseason · Week 3"
-          /* What makes the FOLDED heading inspectable: on a real route the
+          <Screen
+            title={VIEW_TITLE[view]}
+            measure={VIEW_MEASURE[view]}
+            context="Preseason · Week 3"
+            /* What makes the FOLDED heading inspectable: on a real route the
              collection views draw as tabs under the word "Collection", and a
              gallery route matches no nav href. Same escape hatch the rail and
              the top nav already take. */
-          pathnameOverride={VIEW_PATH[view]}
-          /* The score band, in the slot the lineup screen puts it in. This is
+            pathnameOverride={VIEW_PATH[view]}
+            /* The score band, in the slot the lineup screen puts it in. This is
              the whole reason it is a slot on the frame: it renders flush under
              the header on a phone and across the top of the page on the web,
              and neither placement is reachable from inside the content box.
              Only on the lineup view, which is the only screen that has one. */
-          banner={
-            /* The slot is narrow-only now — `Screen` simply does not render it
+            banner={
+              /* The slot is narrow-only now — `Screen` simply does not render it
                on wide, since the window grew a permanent score band of its own
                (see above). No `isWide` guard here: this gallery exists to
                exercise the real component, and a caller working around a rule
                the component already enforces hides whether it still does. */
-            view === 'lineup' ? (
-              <ScoreStrip
-                games={GALLERY_GAMES}
-                week="Pre Wk 3"
-                startersByTeam={GALLERY_STARTERS_BY_TEAM}
-                loading={false}
-              />
-            ) : null
-          }>
-          {/* A live read-out of what the layout thinks it is. The single most
+              view === "lineup" ? (
+                <ScoreStrip
+                  games={GALLERY_GAMES}
+                  week="Pre Wk 3"
+                  startersByTeam={GALLERY_STARTERS_BY_TEAM}
+                  loading={false}
+                />
+              ) : null
+            }
+          >
+            {/* A live read-out of what the layout thinks it is. The single most
               useful thing to see while resizing: which branch is rendering. */}
-          <Text style={[styles.banner, { color: c.textSecondary }]}>{banner}</Text>
+            <Text style={[styles.banner, { color: c.textSecondary }]}>
+              {banner}
+            </Text>
 
-          <SegmentedControl segments={VIEWS} value={view} onChange={setView} />
+            <SegmentedControl
+              segments={VIEWS}
+              value={view}
+              onChange={setView}
+            />
 
-          {view === 'inventory' ? <InventoryFixture /> : null}
-          {view === 'sets' ? <SetsFixture /> : null}
-          {view === 'checklist' ? <ChecklistFixture /> : null}
-          {view === 'leaderboard' ? <LeaderboardFixture /> : null}
-          {view === 'lineup' ? <LineupFixture /> : null}
-          {view === 'recap' ? <RecapBody recap={RECAP_FIXTURE} /> : null}
-          {view === 'profile' ? <ProfileFixture /> : null}
-        </Screen>
+            {view === "inventory" ? <InventoryFixture /> : null}
+            {view === "sets" ? <SetsFixture /> : null}
+            {view === "checklist" ? <ChecklistFixture /> : null}
+            {view === "leaderboard" ? <LeaderboardFixture /> : null}
+            {view === "lineup" ? <LineupFixture /> : null}
+            {view === "recap" ? <RecapBody recap={RECAP_FIXTURE} /> : null}
+            {view === "profile" ? <ProfileFixture /> : null}
+          </Screen>
         </FrameProvider>
       </View>
     </View>
@@ -1210,19 +1755,24 @@ function GalleryBody() {
 
 const styles = StyleSheet.create({
   shell: { flex: 1 },
-  shellWide: { flexDirection: 'row' },
+  shellWide: { flexDirection: "row" },
   content: { flex: 1 },
-  banner: { fontSize: 11, letterSpacing: 0.3, fontVariant: ['tabular-nums'] },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, alignItems: 'flex-start' },
+  banner: { fontSize: 11, letterSpacing: 0.3, fontVariant: ["tabular-nums"] },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: GAP,
+    alignItems: "flex-start",
+  },
   profile: { gap: Spacing.three },
   /** See the note where it is used. */
   checklist: {
     gap: Spacing.three,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginHorizontal: -Spacing.three,
     paddingHorizontal: Spacing.three,
   },
-  sheetButton: { alignSelf: 'flex-start' },
+  sheetButton: { alignSelf: "flex-start" },
   pressed: { opacity: 0.6 },
   board: { gap: 14 },
   boardIntro: { gap: 2 },
@@ -1232,26 +1782,42 @@ const styles = StyleSheet.create({
   /* Same escape for the inventory's row, which carries its own gutter. */
   inventoryControls: { marginHorizontal: -Spacing.three },
   inventoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.one + 2,
     paddingHorizontal: Spacing.three,
     paddingBottom: Spacing.one + 2,
   },
   inventorySpacer: { flex: 1, minWidth: 0 },
   /* The doors, as one cluster — the product's own gap. */
-  inventoryDoors: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two - 2, flexShrink: 0 },
+  inventoryDoors: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.two - 2,
+    flexShrink: 0,
+  },
   rows: { gap: 1 },
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.three,
     paddingVertical: Spacing.two + 2,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  rank: { width: 22, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  slot: { width: 34, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
-  rowName: { flex: 1, fontSize: 14, fontWeight: '600' },
+  rank: {
+    width: 22,
+    fontSize: 13,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
+  slot: { width: 34, fontSize: 11, fontWeight: "800", letterSpacing: 0.8 },
+  rowName: { flex: 1, fontSize: 14, fontWeight: "600" },
   rowMeta: { fontSize: 12 },
-  rowPoints: { fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'], width: 60, textAlign: 'right' },
+  rowPoints: {
+    fontSize: 14,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+    width: 60,
+    textAlign: "right",
+  },
 });
