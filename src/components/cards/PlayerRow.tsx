@@ -527,12 +527,27 @@ const styles = StyleSheet.create({
      labelling — the number stops reading as attached to the row and starts
      reading as a gutter with a digit in it.
  
-     22 is what two digits need, and the board is fifty long so it is never
-     asked for three. The centring is kept, because that part was right. */
+     22 WAS WHAT TWO DIGITS NEED, on the note that "the board is fifty long so
+     it is never asked for three". That was true when it was written and false
+     the moment the fifty-row cap came off: the directory is 968 players, so
+     every rank past 99 rendered as `1…` — the column truncating the one thing
+     it exists to say.
+ 
+     30 at 12pt holds THREE figures, which is what the pool actually needs: the
+     directory is 968 players and a position board is a fraction of that. Four
+     was tried and does not fit — `1000` renders as `10…` at this width, which
+     the kit's rank row exercises so the next person finds out from a screen
+     rather than from a report. Widening further is available and costs the name
+     four more points; a pool past 999 is the trigger.
+ 
+     The point steps down from 13 so the extra room costs the name eight points
+     instead of twelve — a rank is a marker beside a name, not a figure
+     competing with it. The centring is kept, because that part was right, and
+     three digits fill 30 the way the original note wanted. */
   boardRank: {
-    width: 22,
+    width: 30,
     textAlign: 'center',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },

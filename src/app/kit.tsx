@@ -1388,7 +1388,12 @@ function Kit() {
                 <PlayerRow
                   key={`ranked-${r.player.cardId}`}
                   player={r.player}
-                  rank={i + 1}
+                  /* 1, 99, 100, 968, 999 — every width the column has to hold
+                     now the boards are uncapped. 100 and up are what broke it at
+                     22pt, where they rendered as `1…`. 999 is the ceiling: a
+                     four-figure rank does NOT fit and truncates, which is why
+                     this row stops here rather than at 1000. */
+                  rank={[1, 99, 100, 968, 999][i] ?? i + 1}
                   onPress={() => {}}
                   fixture={r.fixture}
                   /* As the Top board draws it: the price of a fresh copy where
