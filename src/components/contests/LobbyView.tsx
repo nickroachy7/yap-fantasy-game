@@ -403,8 +403,13 @@ export function LobbyView({
           draw a nought. */}
       <View style={styles.doors}>
         <Door
-          label="Build a contest"
-          hint="Your terms, your guest list"
+          label="Build a friendly contest"
+          /* SHORT ENOUGH FOR A PHONE. The label wraps to two lines at 375pt and
+             the hint gets what is left of one; "Your terms, your guest list"
+             truncated to "Your terms, your gues…", which is worse than saying
+             less. The label already carries the noun, so the hint only has to
+             carry the promise. */
+          hint="On your terms"
           glyph="+"
           onPress={onCreate}
         />
@@ -463,6 +468,8 @@ export function LobbyView({
           which described its STATE rather than its kind — and once Friendly
           sits under it on the same scroll, "open" stops distinguishing the two
           (a friendly contest is open too). */}
+      {invites.error ? <ErrorLine message={invites.error} /> : null}
+
       <Section
         label="Community"
         count={open.length}
@@ -488,56 +495,48 @@ export function LobbyView({
           sentence for somebody looking at a list of contests to enter. */}
       <Footnote />
 
-      {/* FRIENDLY, WHICH IS NO LONGER A PROMISE.
-          The shelf named this feature before it existed — deliberately, as the
-          cheapest possible statement that the lobby had a second kind of
-          contest coming. It has one now, and the shelf keeps its place at the
-          bottom of the scroll for the reason the order was chosen: the week is
-          lived downward, and a contest you have to BUILD is the last thing you
-          reach for, after everything already on offer has been read.
+      {/* FRIENDLY — AND IT IS NOT A SHELF ANY MORE, IT IS AN OVERFLOW.
+          ---------------------------------------------------------------------
+          It renders only when it has something in it, and in the ordinary week
+          it has nothing, so the section simply is not there. That is the whole
+          intent: a heading with an empty state under it, permanently, is dead
+          space on the one screen a player opens most.
 
-          IT IS NOW ONE LIST AND NOT THREE. Invitations moved OUT of it and onto
-          the header's Invites door, and the reason is that they were never the
-          same kind of object as the rows beside them. A contest on a shelf is
-          an offer standing there indefinitely; an invitation is a QUESTION with
-          your name on it, and a question at the bottom of a scroll, in the same
-          shape as the offers around it, is a question nobody answers. The badge
-          is what makes it a to-do; this shelf is what is left once it has been
-          answered.
+          WHY IT EXISTS AT ALL, then. Three lists can hold a friendly — Entered,
+          Recent, and this — and the first two both key on having FILED A
+          LINEUP. Building one does not file anything: `create_friendly_contest`
+          deliberately does not enter its creator, because entering costs coins
+          and needs a team picked, and a build button that quietly charged would
+          be the ambush the lobby's stake marks exist to prevent. Accepting an
+          invitation does not file anything either, for the same reason.
 
-          SO WHAT IS HERE IS EVERYTHING FRIENDLY YOU HAVE NOT ENTERED: the ones
-          you built, and the ones you said yes to. Entering one moves it up to
-          Entered with every other contest you are in — see that section. */}
-      <Section
-        label="Friendly"
-        count={friendlies.length}
-        hint="Yours to enter — the ones you built, and the ones you accepted."
-        action={<ArchiveLink onPress={onCreate} label="Build one" />}>
-        <View style={styles.stack}>
-          {invites.error ? <ErrorLine message={invites.error} /> : null}
+          So there is a real state between "this contest exists and is mine" and
+          "I am in it", and a contest in that state has NO other row anywhere:
+          the board's carousel is `my_contest_cards`, which is entries. Without
+          this, a host who built a contest, invited five friends and closed the
+          sheet before picking a team could not find it again — and the invites
+          would still be going out.
 
-          {friendlies.map((c) => (
-            <ContestEntry
-              key={c.id}
-              contest={c}
-              coins={coins}
-              onPress={() => onOpenContest(c.code)}
-            />
-          ))}
-
-          {friendlies.length === 0 && !loading ? (
-            <SectionEmpty
-              text={
-                invites.count > 0
-                  ? `Nothing here yet — you have ${invites.count} invitation${
-                      invites.count === 1 ? '' : 's'
-                    } waiting at the top of the page.`
-                  : 'Nothing yet. Build a contest on your own terms and invite whoever you like.'
-              }
-            />
-          ) : null}
-        </View>
-      </Section>
+          It is therefore the smallest possible safety net rather than a
+          section: no heading when empty, no empty state, no door (the header
+          has one). If it is showing, something needs a lineup. */}
+      {friendlies.length > 0 ? (
+        <Section
+          label="Friendly"
+          count={friendlies.length}
+          hint="Yours, waiting on a lineup. Filing one moves it up to Entered.">
+          <View style={styles.stack}>
+            {friendlies.map((c) => (
+              <ContestEntry
+                key={c.id}
+                contest={c}
+                coins={coins}
+                onPress={() => onOpenContest(c.code)}
+              />
+            ))}
+          </View>
+        </Section>
+      ) : null}
 
         </>
       )}
@@ -908,7 +907,19 @@ function Door({
           </View>
         ) : null}
       </View>
-      <Text numberOfLines={1} style={[Type.strong, { color: c.text }]}>
+      {/* A FLAT STACK, AND IT HAS TO BE.
+          This was briefly a `flex: 1` block that pushed the hint to the floor
+          of the door, so that a label wrapping to two lines could not knock the
+          two hints onto different baselines. It rendered with NO HINT AT ALL:
+          `flex: 1` pins `flexBasis` to 0%, and a zero-basis child of a parent
+          whose own height is its content resolves to zero height. The text was
+          in the tree and one pixel tall. See the note this project already
+          keeps on that shorthand — it has now cost two bugs.
+
+          Both doors sit in a row that stretches them to a common height
+          anyway, so the alignment this was buying was worth nothing against
+          the alignment it broke. */}
+      <Text numberOfLines={2} style={[Type.strong, { color: c.text }]}>
         {label}
       </Text>
       <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>

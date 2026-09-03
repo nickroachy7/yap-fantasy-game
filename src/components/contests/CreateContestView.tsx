@@ -1,5 +1,11 @@
 /**
- * The contest builder: eight decisions, one preview, one button.
+ * The friendly-contest builder: eight decisions, one preview, one button.
+ *
+ * NAMED IN FULL EVERYWHERE IT IS OFFERED — "Build a friendly contest", not
+ * "Build a contest". The lobby already holds eight contests nobody built, so a
+ * door labelled with the general word reads as a way of adding to that shelf.
+ * What this makes is a different object with different rules: it costs coins,
+ * it risks no hearts, and only the people you ask can see it.
  *
  * ---------------------------------------------------------------------------
  * WHY IT IS ONE SCROLL AND NOT A WIZARD
@@ -248,10 +254,10 @@ export function CreateContestView({
 
   return (
     <PlayerSheetFrame
-      title="Build a contest"
+      title="Build a friendly contest"
       subtitle="Your own terms, your own guest list"
       onClose={onClose}
-      closeLabel="Close the contest builder"
+      closeLabel="Close the friendly contest builder"
       dismissible={dismissible}>
       <View style={styles.page}>
         {/* The way back, as a CHILD rather than a frame prop — every view on
