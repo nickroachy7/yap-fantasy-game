@@ -209,7 +209,7 @@ do $$
 declare
   v_bronze constant uuid := '54444444-0000-0000-0000-00000000000b';
   v_gold   constant uuid := '54444444-0000-0000-0000-00000000000f';
-  ok boolean := false; r jsonb; v record; v_bal integer;
+  ok boolean := false; r jsonb; v record; v_bal integer; v_quote integer;
 begin
   -- The tiers the trigger derived, so the payout below is not asserted against
   -- a number this file made up.
@@ -233,6 +233,27 @@ begin
   end;
   if not ok then raise exception 'FAIL: a card outside the set was committed to it'; end if;
 
+  /* WHAT THE BUTTON QUOTED, read before the press.
+   *
+   * This block used to assert the commit paid `4`, with a comment saying
+   * "bronze sells for 8, the set pays 50% of it" — and it broke on 2026-09-03
+   * when `20260903050345` raised the price floor from 8 to 12 and a commit
+   * started paying 6. Nothing was wrong: a constant copied out of the price
+   * ladder had gone stale, which is what constants copied out of another
+   * table do.
+   *
+   * The invariant that does not go stale is the one a player actually cares
+   * about — THE COMMIT PAYS WHAT THE CHECKLIST QUOTED IT AT. That is the
+   * number on the screen they pressed, and it is worth more as an assertion
+   * than any figure, because it fails when the quote and the payment part
+   * company rather than when somebody re-tunes a price. */
+  v_quote := (select commit_value from public.set_checklist('test-set-2026')
+               where card_id = (select id from set_test_cards where n = 1));
+  if coalesce(v_quote, 0) <= 0 then
+    raise exception 'FAIL: the checklist quoted % to commit a card the player holds', v_quote;
+  end if;
+  v_bal := (select balance from public.coin_balances where user_id = auth.uid());
+
   -- The commit itself.
   r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 1));
 
@@ -245,13 +266,14 @@ begin
   if (select is_held from public.card_instances where id = v_gold) is not true then
     raise exception 'FAIL: the gold copy was destroyed';
   end if;
-  -- bronze sells for 8, the set pays 50% of it.
-  if (r ->> 'paid')::integer <> 4 then
-    raise exception 'FAIL: the commit paid % coins, expected 4', r ->> 'paid';
+  -- The quote is the payment, and the payment is the whole of the movement.
+  if (r ->> 'paid')::integer <> v_quote then
+    raise exception 'FAIL: the checklist quoted % and the commit paid %',
+      v_quote, r ->> 'paid';
   end if;
-  if (select balance from public.coin_balances where user_id = auth.uid()) <> 104 then
-    raise exception 'FAIL: balance is % after a 4 coin commit on 100',
-      (select balance from public.coin_balances where user_id = auth.uid());
+  if (select balance from public.coin_balances where user_id = auth.uid()) <> v_bal + v_quote then
+    raise exception 'FAIL: balance is % after a % coin commit on %',
+      (select balance from public.coin_balances where user_id = auth.uid()), v_quote, v_bal;
   end if;
   if (select count(*) from public.coins_ledger where reason = 'set_commit') <> 1 then
     raise exception 'FAIL: the commit did not write exactly one ledger row';
@@ -318,14 +340,20 @@ begin
   end if;
 
   -- ---- the first rung ----------------------------------------------------
+  /* The rung AMOUNTS stay hardcoded, and that is the distinction worth keeping:
+   * 10 / 20 / 30 / 100 are this set's own ladder, seeded by this file at the
+   * top, so they are facts the suite owns. What it does not own is the price of
+   * a card — so balances are asserted as MOVEMENTS from wherever the last step
+   * left them. */
+  v_bal := (select balance from public.coin_balances where user_id = auth.uid());
   r := public.claim_set_reward('test-set-2026');
   if (r ->> 'reward_coins')::integer <> 10 or (r ->> 'rungs')::integer <> 1 then
     raise exception 'FAIL: the first claim paid % over % rungs, expected 10 over 1',
       r ->> 'reward_coins', r ->> 'rungs';
   end if;
-  if (select balance from public.coin_balances where user_id = auth.uid()) <> 114 then
-    raise exception 'FAIL: balance is % after a 10 coin rung on 104',
-      (select balance from public.coin_balances where user_id = auth.uid());
+  if (select balance from public.coin_balances where user_id = auth.uid()) <> v_bal + 10 then
+    raise exception 'FAIL: balance is % after a 10 coin rung on %',
+      (select balance from public.coin_balances where user_id = auth.uid()), v_bal;
   end if;
 
   -- NOTHING NEW SINCE. A second press must not pay the same rung again.
@@ -337,7 +365,7 @@ begin
     if not ok then raise exception 'FAIL: a repeat claim was blocked by the wrong rule: %', sqlerrm; end if;
   end;
   if not ok then raise exception 'FAIL: the same rung was claimed twice'; end if;
-  if (select balance from public.coin_balances where user_id = auth.uid()) <> 114 then
+  if (select balance from public.coin_balances where user_id = auth.uid()) <> v_bal + 10 then
     raise exception 'FAIL: a refused claim still moved the balance';
   end if;
   -- The paid rung reports what actually landed, not what it is priced at.
@@ -406,13 +434,17 @@ values ('51111111-1111-1111-1111-111111111111', (select id from set_test_cards w
 set local role authenticated;
 
 do $$
-declare ok boolean := false; r jsonb; v record;
+declare ok boolean := false; r jsonb; v record; v_bal integer; v_paid integer;
 begin
   -- Card 2 went in above, as a starter whose slot was freed by the commit. It
   -- used to be committed here instead, because the block above expected the
   -- attempt to be refused. Three are committed either way — 1, 2 and 3 — which
   -- is what the two rungs below are counted against.
+  /* Movements, not constants, for the same reason as the block above: what a
+     commit pays is the price ladder's business and it has moved once already. */
+  v_bal := (select balance from public.coin_balances where user_id = auth.uid());
   r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 3));
+  v_paid := (r ->> 'paid')::integer;
 
   -- ---- TWO RUNGS AT ONCE -------------------------------------------------
   -- Three committed crosses both the 50% and the 75% bars, and one press must
@@ -427,10 +459,13 @@ begin
     raise exception 'FAIL: the sweep paid % over % rungs, expected 50 over 2',
       r ->> 'reward_coins', r ->> 'rungs';
   end if;
-  -- 114 + 4 + 4 commits + 50.
-  if (select balance from public.coin_balances where user_id = auth.uid()) <> 172 then
-    raise exception 'FAIL: balance is %, expected 172',
-      (select balance from public.coin_balances where user_id = auth.uid());
+  -- The two commits this block has made, plus the 50 the sweep just paid. (The
+  -- second commit is card 2's, made by the lineup block above; both are already
+  -- in `v_bal`'s successor by the time this reads.)
+  if (select balance from public.coin_balances where user_id = auth.uid()) <> v_bal + v_paid + 50 then
+    raise exception 'FAIL: balance is %, expected % (% + % commit + 50 swept)',
+      (select balance from public.coin_balances where user_id = auth.uid()),
+      v_bal + v_paid + 50, v_bal, v_paid;
   end if;
   -- ONE LEDGER ROW PER RUNG, not one for the sweep: a 25% tranche and a 100%
   -- tranche have to stay distinguishable in the audit trail.
@@ -440,7 +475,9 @@ begin
   end if;
 
   -- ---- the top rung ------------------------------------------------------
+  v_bal := (select balance from public.coin_balances where user_id = auth.uid());
   r := public.commit_card_to_set('test-set-2026', (select id from set_test_cards where n = 4));
+  v_paid := (r ->> 'paid')::integer;
 
   select committed, complete, next_at into v from public.my_sets where code = 'test-set-2026';
   if v.committed <> 4 or not v.complete then
@@ -467,10 +504,11 @@ begin
     raise exception 'FAIL: the top rung paid % over % rungs, expected 100 over 1',
       r ->> 'reward_coins', r ->> 'rungs';
   end if;
-  -- 172 + 4 commit + 100.
-  if (select balance from public.coin_balances where user_id = auth.uid()) <> 276 then
-    raise exception 'FAIL: balance is %, expected 276',
-      (select balance from public.coin_balances where user_id = auth.uid());
+  -- The commit above, plus the 100 the top rung pays.
+  if (select balance from public.coin_balances where user_id = auth.uid()) <> v_bal + v_paid + 100 then
+    raise exception 'FAIL: balance is %, expected % (% + % commit + 100 rung)',
+      (select balance from public.coin_balances where user_id = auth.uid()),
+      v_bal + v_paid + 100, v_bal, v_paid;
   end if;
   -- The whole ladder, and no more.
   select claimed_coins, claimable_coins, total_reward into v
@@ -661,7 +699,7 @@ set local request.jwt.claims = '{"sub":"61111111-1111-1111-1111-111111111111","r
 do $$
 declare
   v_ids uuid[];
-  r jsonb; ok boolean := false; v record;
+  r jsonb; ok boolean := false; v record; v_fill integer; v_hi integer;
 begin
   select array_agg(c.id order by p.external_id) into v_ids
     from public.cards c join public.players p on p.id = c.player_id
@@ -675,6 +713,24 @@ begin
         || array[(select id from set_test_cards where n = 6)]
         || v_ids[2:5];
 
+  /* WHAT ONE CARD IS QUOTED AT, read while they are all still uncommitted.
+   *
+   * Not the SUM of the quotes: this set requires three of its five members, so
+   * the fill stops at the bar and two of the quotable cards are never taken.
+   * Summing them would assert a payment for cards that correctly did not go in.
+   *
+   * Every member here is a zero-signal fixture copy, so the checklist quotes
+   * them all the same number — which the guard below states rather than
+   * assumes, because a fixture that quietly stopped being uniform would make
+   * the arithmetic underneath it meaningless. */
+  select min(commit_value), max(commit_value) into v_fill, v_hi
+    from public.set_checklist('bulk-set-2026')
+   where not committed and commit_value is not null;
+  if v_fill is null or v_fill <= 0 or v_fill <> v_hi then
+    raise exception 'FAIL: the fixture quotes % to % per card — the fill arithmetic below needs one price',
+      v_fill, v_hi;
+  end if;
+
   r := public.commit_cards_to_set('bulk-set-2026', v_ids);
 
   -- Three in, three refused: the non-member, and two that arrived after the bar.
@@ -684,13 +740,36 @@ begin
   if (r ->> 'skipped')::integer <> 3 then
     raise exception 'FAIL: the fill skipped %, expected 3', r ->> 'skipped';
   end if;
-  -- Five bronze copies at 8 coins, half of it each.
-  if (r ->> 'paid')::integer <> 12 then
-    raise exception 'FAIL: the fill paid %, expected 12', r ->> 'paid';
+  /* WHAT THE FILL PAID, against what it was quoted.
+   *
+   * This was `12`, with a comment reading "five bronze copies at 8 coins, half
+   * of it each" — a price copied out of the ladder, which went stale the day
+   * the floor moved from 8 to 12. The checklist is asked instead, so the
+   * assertion is about the batch honouring its own quote rather than about the
+   * price of a card in September.
+   *
+   * Balance rather than a delta here: this account starts the block at zero and
+   * the fill is the only thing that has paid it. */
+  if (r ->> 'paid')::integer <> (r ->> 'added')::integer * v_fill then
+    raise exception 'FAIL: the fill paid % for % cards quoted at % each',
+      r ->> 'paid', r ->> 'added', v_fill;
   end if;
-  if (select balance from public.coin_balances where user_id = auth.uid()) <> 12 then
-    raise exception 'FAIL: balance is %, expected 12',
-      (select balance from public.coin_balances where user_id = auth.uid());
+  /* AND THE TOTAL IS THE SUM OF ITS PARTS. The batch reports one figure and
+     also reports every card it took; a total that drifted from the cards
+     behind it would be invisible to every other assertion here, and it is the
+     figure that reaches a balance. */
+  if (r ->> 'paid')::integer <> (
+       select coalesce(sum((x ->> 'paid')::integer), 0)
+         from jsonb_array_elements(r -> 'cards') x
+     ) then
+    raise exception 'FAIL: the fill reported % against % across the cards it names',
+      r ->> 'paid',
+      (select coalesce(sum((x ->> 'paid')::integer), 0) from jsonb_array_elements(r -> 'cards') x);
+  end if;
+  if (select balance from public.coin_balances where user_id = auth.uid())
+       <> (r ->> 'paid')::integer then
+    raise exception 'FAIL: balance is %, expected the % the fill paid',
+      (select balance from public.coin_balances where user_id = auth.uid()), r ->> 'paid';
   end if;
 
   -- EACH REFUSAL SAYS WHY. A bulk action that dropped cards silently would be

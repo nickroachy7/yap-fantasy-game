@@ -19,7 +19,7 @@ set local request.jwt.claims = '{"sub":"eeeeeeee-0000-0000-0000-000000000009","r
 
 do $$
 declare
-  v_start int; v_after int; n int; v_status jsonb;
+  v_start int; v_after int; v_cost int; n int; v_status jsonb;
   v_pack uuid;
   blocked int := 0;
 begin
@@ -89,9 +89,17 @@ begin
   --    claimed the free one.
   select count(*) into n from public.open_pack('standard');
   if n <> 5 then raise exception 'FAIL: standard returned % cards after a daily claim', n; end if;
+  /* CHARGED WHAT THE SHELF SAYS, read from the row rather than from a constant.
+     This was `100` until 20260903124500 doubled it to close a buy-to-dump loop,
+     and a price copied into a test is a test that breaks on the day the price
+     is deliberately changed. What matters here is that a paid pack still
+     charges after a free one was claimed — the amount is the packs table's
+     business. */
+  select coin_cost into v_cost from public.packs where code = 'standard';
   select balance into v_after from public.coin_balances where user_id = auth.uid();
-  if v_after <> v_start - 100 then
-    raise exception 'FAIL: standard cost % coins, expected 100', v_start - v_after;
+  if v_after <> v_start - v_cost then
+    raise exception 'FAIL: standard cost % coins, expected the shelf price of %',
+      v_start - v_after, v_cost;
   end if;
 
   if blocked <> 1 then raise exception 'FAIL: the second same-day claim was not blocked'; end if;

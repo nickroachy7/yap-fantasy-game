@@ -27,6 +27,11 @@
 -- Every timestamp is set relative to now(), so this does not rot after Aug 21.
 -- now() is fixed for the transaction, so "time" advances by moving the games.
 --
+-- THE FIXTURE OWNS THE WHOLE `games` TABLE, not just the four weeks it walks.
+-- `current_slate()`, `upcoming_slate()` and `lineup_slate()` take no arguments
+-- — they answer about the league, so any football outside this arc is inside
+-- their answer. See the pin below.
+--
 -- Runs inside a transaction that is rolled back, so it is safe anywhere.
 -- Run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/slate_transition.test.sql
 
@@ -47,7 +52,21 @@ begin
    * statement, so a raise anywhere in it unwinds all of it. The test cannot
    * leave a shifted kickoff behind even if it is run outside a transaction. */
 
-  -- Pin the surrounding weeks so the assertions describe week 3's arc alone.
+  /* Pin the surrounding weeks so the assertions describe week 3's arc alone.
+   *
+   * AND PIN EVERY OTHER SEASON TYPE OUT OF THE WAY, which this suite did not
+   * have to do when it was written and does now. It walks PRESEASON week 3,
+   * and it was written in August when the preseason was the only football
+   * ingested — so "the next slate" could only ever be another preseason week.
+   * The regular season landed on 2026-09-03 and phase 2 started failing with
+   * `lineups should have moved to week 4, got 1`: `upcoming_slate()` had
+   * correctly moved to REGULAR week 1, which kicks off before the preseason
+   * week 4 this arc pins seven days out. Nothing was broken; the fixture had
+   * stopped describing the whole board.
+   *
+   * A month is chosen rather than a year so the rows stay plausible football
+   * — this is a rolled-back transaction, but a game in 2027 in a table
+   * somebody might dump mid-run is a confusing thing to leave lying around. */
   update public.games set starts_at = now() - interval '7 days', status_state = 'final'
    where season = 2026 and season_type = 1 and week = 2;
   update public.games set starts_at = now() + interval '7 days', status_state = 'scheduled'
@@ -55,6 +74,11 @@ begin
   -- Week 1 is a single game and sits behind week 2 throughout.
   update public.games set starts_at = now() - interval '14 days', status_state = 'final'
    where season = 2026 and season_type = 1 and week = 1;
+  -- Everything that is not this preseason: a month out, and out of the arc.
+  update public.games
+     set starts_at = now() + interval '30 days' + (week * interval '1 day'),
+         status_state = 'scheduled'
+   where not (season = 2026 and season_type = 1);
 
   -- Week 3's opener, which is the game that flips the slate.
   select id into v_first
@@ -117,8 +141,9 @@ begin
    where id = v_first;
 
   select * into s from public.current_slate();
-  if s.week is distinct from 3 then
-    raise exception 'FAIL phase 2: slate should be week 3, got %', s.week;
+  if s.week is distinct from 3 or s.season_type is distinct from 1::smallint then
+    raise exception 'FAIL phase 2: slate should be preseason week 3, got type % week %',
+      s.season_type, s.week;
   end if;
   checks := checks + 1;
 
@@ -130,9 +155,15 @@ begin
 
   -- Lineups must move on the moment the week starts; this is the bug that made
   -- the lineup screen permanently locked when both questions shared a function.
+  /* THE SEASON TYPE IS PART OF THE ANSWER, and leaving it out is what made
+   * this assertion's failure unreadable: it reported "got 1" for a function
+   * that had correctly returned REGULAR week 1, and a bare 1 next to an
+   * expected 4 reads as the arc going backwards rather than as a different
+   * season entirely. Every slate check below names both. */
   select * into s from public.upcoming_slate();
-  if s.week is distinct from 4 then
-    raise exception 'FAIL phase 2: lineups should have moved to week 4, got %', s.week;
+  if s.week is distinct from 4 or s.season_type is distinct from 1::smallint then
+    raise exception 'FAIL phase 2: lineups should have moved to preseason week 4, got type % week %',
+      s.season_type, s.week;
   end if;
   checks := checks + 1;
 
@@ -209,8 +240,9 @@ begin
 
   -- The finished week stays the scoring slate until the next one approaches.
   select * into s from public.current_slate();
-  if s.week is distinct from 3 then
-    raise exception 'FAIL phase 4: scoring slate drifted off week 3, got %', s.week;
+  if s.week is distinct from 3 or s.season_type is distinct from 1::smallint then
+    raise exception 'FAIL phase 4: scoring slate drifted off preseason week 3, got type % week %',
+      s.season_type, s.week;
   end if;
   checks := checks + 1;
 

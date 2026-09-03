@@ -13,8 +13,11 @@
 --      that sells cheap.
 --   2. STARTING A CARD NEVER MAKES IT CHEAPER. The whole game is "play the card
 --      to grow it"; a price that falls as a copy climbs inverts that.
---   3. A CARD WITH NO SIGNAL IS PRICED EXACTLY AS IT WAS BEFORE. 40% of the pool
+--   3. A CARD WITH NO SIGNAL IS NEVER PRICED BELOW WHAT IT WAS. 40% of the pool
 --      has no 2025 production and this migration promised them nothing lost.
+--      NOTHING LOST, not nothing changed: the floor has since been raised from
+--      8 to 12 (20260903050345), and a promise that forbids a gift is a promise
+--      nobody keeps. See property 4 below, which is the one-way version.
 --   4. THE SCALE MEANS THE SAME THING AT EVERY POSITION. Asserted the way it
 --      actually failed the first time: the median kicker must not out-price a
 --      top-twenty receiver.
@@ -80,10 +83,37 @@ begin
     v_prev := v_here;
   end loop;
 
-  -- 4. THE NO-CLAW-BACK PROMISE. A bronze copy of a player with no value score
-  --    and no points sells for exactly what it sold for before this migration.
-  if public.sale_value('bronze', 0, 0) <> (select sell_value from public.tier_thresholds where tier = 'bronze') then
-    raise exception 'FAIL: the bronze floor moved — that is a claw-back';
+  -- 4. THE NO-CLAW-BACK PROMISE, WHICH IS A FLOOR AND NOT AN EQUALITY.
+  --
+  --    This was written as `sale_value('bronze', 0, 0) = tier_thresholds.sell_value`
+  --    on the day the formula replaced the flat ladder, when the two were the
+  --    same number by construction. It failed on 2026-09-03 — and it failed
+  --    because the floor went UP: `20260903050345` raised it from 8 to 12 so
+  --    976 players had more than 57 integer prices to fit into. An assertion
+  --    that fires when nobody lost anything is an assertion that will be
+  --    deleted the third time it cries wolf.
+  --
+  --    So it is two checks now, and each says something the other cannot:
+  --
+  --      the CONTRACT   a card with no player value and no points prices at
+  --                     the configured floor exactly. That is what the floor
+  --                     IS, and it is the assertion that catches the formula
+  --                     drifting off its own bottom rung.
+  --      the PROMISE    and that floor is never below the old flat ladder's
+  --                     bronze rung. One-way, because raising it is a gift and
+  --                     lowering it is a claw-back out of everybody's shelf.
+  --
+  --    `tier_thresholds.sell_value` is a museum piece — `20260902060000`
+  --    marked it superseded and said not to join it for price — and this is
+  --    deliberately the one place it is still read: as the historical number
+  --    the promise was made against, never as today's answer.
+  if public.sale_value('bronze', 0, 0) <> v_floor then
+    raise exception 'FAIL: a card with no value and no points prices at % against a floor of %',
+      public.sale_value('bronze', 0, 0), v_floor;
+  end if;
+  if v_floor < (select sell_value from public.tier_thresholds where tier = 'bronze') then
+    raise exception 'FAIL: the floor is % against the old flat ladder''s % — that is a claw-back',
+      v_floor, (select sell_value from public.tier_thresholds where tier = 'bronze');
   end if;
 
   -- 5. THE KICKER TEST, written from the failure rather than the fix: the first
@@ -144,8 +174,10 @@ $$;
 -- --------------------------------------------- the curve, on the real league
 --
 -- Not an assertion on particular players — they change every season — but on the
--- SHAPE the feature exists to produce: within one position, adjacent players
--- separate, and they separate by less when their production is closer.
+-- SHAPE the feature exists to produce: within one position, players separate
+-- into distinct prices, and the ranking still reaches the price even though it
+-- is no longer the only thing in it. See the note on the group check below for
+-- why "the ranking reaches price" is not the same as "price falls with rank".
 do $$
 declare
   v_pos       text := 'WR';
@@ -153,6 +185,8 @@ declare
   v_distinct  integer;
   v_top_gap   integer;
   v_next_gap  integer;
+  v_top_worst integer;
+  v_rest_best integer;
 begin
   -- The BASE at diamond: the widest the player component ever gets. Asked of
   -- sale_value with no points, so this measures the curve alone rather than
@@ -173,20 +207,52 @@ begin
       v_pos, v_distinct;
   end if;
 
-  -- Descending, strictly enough that rank order survives into price order.
-  if exists (
-    select 1 from (
-      select x, lag(x) over (order by o) prev from unnest(v_prices) with ordinality t(x, o)
-    ) y where prev is not null and x > prev
-  ) then
-    raise exception 'FAIL: price does not fall with position rank';
+  /* RANK CARRIES INTO PRICE — as a GROUP, not player by player.
+   *
+   * This used to require the top ten to price in descending rank order, and it
+   * was right to when `value_score` was a map onto the ranking and nothing
+   * else. It is now wrong by design. `20260903050345` blended production into
+   * the score and said so in as many words:
+   *
+   *   "The order is still not monotonic in rank and still should not be —
+   *    Jefferson is 11th on the board and 140 coins on 11.9 FP/G last season,
+   *    against 380 for the man ranked behind him. That is the production
+   *    weight, and it is the only thing on the row the ranking does not
+   *    already say."
+   *
+   * On 2026-09-03 the WR ten read 653 624 669 596 403 385 473 411 259 569:
+   * Chase outprices Nacua from a rank below him, and Lamb at ten outprices
+   * five men above him. A test demanding descent would force the blend back
+   * out — it would be pinning the absence of the feature.
+   *
+   * What must still be true is that the ranking has not stopped mattering, and
+   * the honest form of that is a separation between groups: every one of the
+   * position's top ten prices above everyone outside its top THIRD. Measured
+   * the day this was written, the worst of the ten was 259 against a best of
+   * 175 below the line — comfortable, and it fails exactly when rank has
+   * stopped reaching price at all. */
+  select min(public.sale_value('diamond', pv.value_score, 0)) into v_top_worst
+    from public.player_values pv
+   where pv.season = 2026 and pv.position_abbreviation = v_pos and pv.pos_rank <= 10;
+  select max(public.sale_value('diamond', pv.value_score, 0)) into v_rest_best
+    from public.player_values pv
+   where pv.season = 2026 and pv.position_abbreviation = v_pos
+     and pv.pos_rank > pv.pos_pool / 3;
+
+  if v_top_worst is null or v_rest_best is null then
+    raise exception 'FAIL: % has no top ten or no field below it to compare', v_pos;
+  end if;
+  if v_top_worst <= v_rest_best then
+    raise exception
+      'FAIL: the cheapest top-ten % prices at % against % outside the top third — rank has stopped reaching price',
+      v_pos, v_top_worst, v_rest_best;
   end if;
 
   v_top_gap  := v_prices[1] - v_prices[2];
   v_next_gap := v_prices[2] - v_prices[3];
   raise notice
-    'card_prices: top ten % at diamond = % — % distinct, #1-#2 gap %, #2-#3 gap %',
-    v_pos, v_prices, v_distinct, v_top_gap, v_next_gap;
+    'card_prices: top ten % at diamond = % — % distinct, #1-#2 gap %, #2-#3 gap %, worst of ten % vs % below the top third',
+    v_pos, v_prices, v_distinct, v_top_gap, v_next_gap, v_top_worst, v_rest_best;
 end;
 $$;
 

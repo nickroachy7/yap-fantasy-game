@@ -14,28 +14,46 @@ set local request.jwt.claims = '{"sub":"eeeeeeee-0000-0000-0000-000000000005","r
 
 do $$
 declare
-  v_start int; v_after int; v_cards int; v_net int;
+  v_start int; v_after int; v_cards int; v_net int; v_cost int;
   blocked int := 0; n int;
 begin
   select balance into v_start from public.coin_balances where user_id = auth.uid();
   if v_start <> 500 then raise exception 'FAIL: signup grant was %, expected 500', v_start; end if;
 
+  /* THE SHELF PRICE, not a constant. This block used to buy five packs at 100
+     to land a 500 grant on exactly 0, and `20260903124500` doubled the price
+     to 200 to close a buy-to-dump loop — at which point five packs was three
+     more than the grant could pay for and the drain below stopped draining.
+     The grant no longer divides evenly by the price and there is no reason it
+     ever should, so the wallet is emptied by asking rather than by counting. */
+  select coin_cost into v_cost from public.packs where code = 'standard';
+  if coalesce(v_cost, 0) <= 0 then
+    raise exception 'FAIL: the standard pack costs %, so none of this measures anything', v_cost;
+  end if;
+
   select count(*) into n from public.open_pack('standard');
   if n <> 5 then raise exception 'FAIL: pack returned % cards, expected 5', n; end if;
 
   select balance into v_after from public.coin_balances where user_id = auth.uid();
-  if v_after <> 400 then raise exception 'FAIL: balance % after one pack, expected 400', v_after; end if;
+  if v_after <> v_start - v_cost then
+    raise exception 'FAIL: balance % after one pack, expected % — the shelf says %',
+      v_after, v_start - v_cost, v_cost;
+  end if;
 
-  -- drain the wallet
-  perform public.open_pack('standard');
-  perform public.open_pack('standard');
-  perform public.open_pack('standard');
-  perform public.open_pack('standard');
+  -- Drain the wallet down to what will not buy another pack.
+  loop
+    select balance into v_after from public.coin_balances where user_id = auth.uid();
+    exit when v_after < v_cost;
+    perform public.open_pack('standard');
+  end loop;
 
   select balance into v_after from public.coin_balances where user_id = auth.uid();
-  if v_after <> 0 then raise exception 'FAIL: balance % after 5 packs, expected 0', v_after; end if;
+  if v_after >= v_cost then
+    raise exception 'FAIL: % coins left against a % pack — the wallet is not drained', v_after, v_cost;
+  end if;
 
-  -- 1. buy a pack you cannot afford
+  -- 1. buy a pack you cannot afford. `v_after` is short of the price rather
+  --    than necessarily zero — the grant need not divide by it.
   begin
     perform public.open_pack('standard');
     raise exception 'FAIL: opened a pack with 0 coins';
@@ -57,7 +75,7 @@ begin
   -- 4. rewrite your own balance. An UPDATE with no matching policy affects zero
   --    rows rather than raising, so assert the value instead of catching.
   update public.coin_balances set balance = 999999 where user_id = auth.uid();
-  if (select balance from public.coin_balances where user_id = auth.uid()) <> 0 then
+  if (select balance from public.coin_balances where user_id = auth.uid()) <> v_after then
     raise exception 'FAIL: rewrote own coin balance';
   end if;
   blocked := blocked + 1;
@@ -83,7 +101,8 @@ begin
    where user_id = auth.uid() and pack_opening_id is null;
   if v_cards <> 0 then raise exception 'FAIL: % cards with no pack opening', v_cards; end if;
 
-  raise notice 'PASS: 5/5 attacks blocked, ledger reconciles, 25 cards all traceable';
+  raise notice 'PASS: 5/5 attacks blocked, ledger reconciles, % cards all traceable',
+    (select count(*) from public.card_instances where user_id = auth.uid());
 end $$;
 
 reset role;
