@@ -30,9 +30,16 @@ export function MovementMark({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
-  if (!known) return <Text style={[Type.micro, { color: c.textTertiary }, style]}>{DASH}</Text>;
-  if (movement === null) return <Text style={[Type.micro, { color: c.textTertiary }, style]}>NEW</Text>;
-  if (movement === 0) return <Text style={[Type.micro, { color: c.textTertiary }, style]}>–</Text>;
+  /* Unknown, new, and held are all an em dash: three different reasons there is
+     no movement to state, and none of them is movement. `NEW` was a word in a
+     column of two-character marks — the widest thing in it, on the rows that
+     had the least to say — and on a board where most managers are new it was
+     the loudest repeated element on the screen. The distinction survives where
+     it can be read properly: `movementLabel` still says which of the three a
+     screen reader is looking at. */
+  if (!known || movement === null || movement === 0) {
+    return <Text style={[Type.micro, { color: c.textTertiary }, style]}>{DASH}</Text>;
+  }
 
   const up = movement > 0;
   return (

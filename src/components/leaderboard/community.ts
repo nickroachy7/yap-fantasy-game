@@ -34,16 +34,14 @@
  * column is that computation's own answer — not a position in an array that
  * happens to agree with it today.
  */
-import { DASH } from '@/components/ui/DataTable';
 import { positionColors } from '@/constants/positions';
 import { Colors, getTierTheme, selectionAccent, type CardTier } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
-import { weekTabLabel } from './board';
 
 /** Same ceiling and same reason as the points board. */
 export const BOARD_LIMIT = 500;
 
-export type CommunityBoardId = 'week' | 'record' | 'collection' | 'cards' | 'sets';
+export type CommunityBoardId = 'record' | 'collection' | 'cards' | 'sets';
 
 /**
  * Every board on the screen, points included.
@@ -59,7 +57,6 @@ export type BoardId = 'points' | CommunityBoardId;
 
 /** The board ids in tab order, points excluded — it is not one of these. */
 export const COMMUNITY_BOARD_IDS: CommunityBoardId[] = [
-  'week',
   'record',
   'collection',
   'cards',
@@ -70,15 +67,6 @@ export const COMMUNITY_BOARD_IDS: CommunityBoardId[] = [
 export const BOARD_IDS: BoardId[] = ['points', ...COMMUNITY_BOARD_IDS];
 
 /* ------------------------------------------------------------------ rows */
-
-export type BestWeekEntry = {
-  rank: number;
-  user_id: string;
-  display_name: string;
-  week: number;
-  points: number;
-  weeks_played: number;
-};
 
 export type RecordEntry = {
   rank: number;
@@ -101,7 +89,10 @@ export type CollectionEntry = {
   /** Copies committed to sets: still counted, frozen at the tier they went in at. */
   in_sets: number;
   players: number;
-  gold_plus: number;
+  /** One count per tier. They sum to `held` — see the migration. */
+  bronze: number;
+  silver: number;
+  gold: number;
   diamond: number;
   career_fp: number;
 };
@@ -144,7 +135,6 @@ export type SetsEntry = {
  * identity, not on a guess about their shape.
  */
 export type CommunityData =
-  | { id: 'week'; rows: BestWeekEntry[] }
   | { id: 'record'; rows: RecordEntry[] }
   | { id: 'collection'; rows: CollectionEntry[] }
   | { id: 'cards'; rows: CardEntry[] }
@@ -203,14 +193,14 @@ export type BoardRowModel = {
   accentToken?: { text: string; color: string };
   /** Line 1, last and quietest. The cards board's club. */
   mutedToken?: string;
-  /** Line 2: the one sentence that qualifies the figure on the right. */
-  secondary: string;
+
   /**
    * Line 3, leading it — the slot the lineup row gives its tier letter.
    *
-   * The cards board puts the copy's own tier here. The collection board puts
-   * the BEST tier on the shelf, which is the one fact that says what kind of
-   * collection it is at a glance.
+   * The CARDS board puts the copy's own tier here, and it is the only board
+   * that does. Four manager boards used to lead this line with the best tier
+   * their owner held, and it read as the same letter in front of every row of
+   * every board — see `buildBoard`.
    */
   tier?: CardTier;
   /** Leads line 3 with the coin glyph, where the line is about currency. */
@@ -227,6 +217,14 @@ export type BoardRowModel = {
   /** The right column: the one number this board ranks by, and its unit. */
   figure: string;
   figureLabel: string;
+  /**
+   * The figure as a NUMBER, which is the only form a gap can be computed from.
+   *
+   * `figure` is already formatted — thousands-separated, or a win rate written
+   * `.625` with the leading zero dropped — and parsing it back would be reading
+   * a presentation to recover the fact it was made from.
+   */
+  value: number;
 };
 
 /**
@@ -242,8 +240,6 @@ export type BoardRowModel = {
  */
 type BuildOptions = {
   scheme: 'light' | 'dark';
-  /** The tier mark per manager. Empty until `fetchTopTiers` lands. */
-  topTiers: Map<string, CardTier>;
 };
 
 /* ------------------------------------------------------------- formatting */
@@ -281,8 +277,6 @@ export type BoardMeta = {
   label: string;
   /** Panel title, where there is room to be plainer. */
   title: string;
-  /** One line under the title: what this board ranks, and on what. */
-  blurb: string;
   /** Shown instead of the table when nobody qualifies yet. */
   emptyTitle: string;
   emptyBody: string;
@@ -290,15 +284,49 @@ export type BoardMeta = {
   absent: string;
   /** Screen-reader phrasing for the headline value, e.g. "42.5 points". */
   unit: string;
+  /**
+   * Which heading this board sits under in the picker.
+   *
+   * Five boards rank MANAGERS and one ranks CARDS, and a flat list of six gave
+   * no sign of that — so `Cards` read as a sixth way of ranking people rather
+   * than as a board whose rows are a different kind of object entirely.
+   */
+  group: BoardGroup;
+  /**
+   * One sentence saying what the board ranks, read in TWO places.
+   *
+   * Under the board's name in the picker, where it is what a reader is
+   * actually asking while the menu is open; and under the closed bar, where it
+   * says what the numbers below it are numbers of.
+   *
+   * ONE STRING FOR BOTH, deliberately. It began as a scrolling blurb inside the
+   * list, then became a two-word tag on the right of the menu row — and a tag
+   * that short cannot explain a board while a sentence that long cannot sit at
+   * the end of a menu row. Under the label in both places it can be the same
+   * sentence, so the description a reader chose by is the description they
+   * arrive at. See `BoardControls`.
+   *
+   * Sentence case, no full stop: it is a caption, and it is joined to the slate
+   * with a middot below the bar.
+   */
+  description: string;
 };
+
+/** The picker's two headings, in the order they appear. */
+export type BoardGroup = 'Managers' | 'Cards';
+
+export const BOARD_GROUPS: BoardGroup[] = ['Managers', 'Cards'];
 
 export const BOARD_META: Record<BoardId, BoardMeta> = {
   points: {
-    label: 'Points',
-    title: 'Points',
-    // No "pick a week to…": the week chip now sits immediately beside the board
-    // chip, and a line explaining a control the reader is looking at is chrome.
-    blurb: 'Every fantasy point a scored lineup has earned, season to date or week by week.',
+    /* TOTAL FANTASY POINTS, not "Points", and the first word is the whole
+       difference. The board sums every point a scored lineup has earned across
+       the season and every contest in it — a career total, not a standing in
+       something — and `Points` next to `Record` and `Roster value` read as one
+       more thing you could be leading. `TFP` is the abbreviation the rest of
+       the game already uses for it, on the lineup row and the card profile. */
+    label: 'Total fantasy points',
+    title: 'Total fantasy points',
     emptyTitle: 'Nothing scored yet',
     emptyBody:
       'Scores land after a week’s games finish, so the board fills in as soon as one is scored.',
@@ -306,66 +334,64 @@ export const BOARD_META: Record<BoardId, BoardMeta> = {
     // be setting a lineup for — see `PointsBoard`. It is here so the record of
     // what every board says is complete in one place.
     absent: 'You have no scored lineup yet.',
-    unit: 'points',
-  },
-  week: {
-    label: 'Best week',
-    title: 'Best week',
-    blurb: 'The single highest week anybody has posted, and when they posted it.',
-    emptyTitle: 'No week has been scored yet',
-    emptyBody:
-      'A best week needs a scored week. The first one lands after a slate’s games finish.',
-    absent: 'You have no scored week yet, so you have no best one.',
-    unit: 'points',
+    unit: 'fantasy points',
+    group: 'Managers',
+    description: 'every fantasy point your lineups have scored this season',
   },
   record: {
     label: 'Record',
     title: 'Record against the median',
-    blurb:
-      'Everybody plays the field’s median score every week. Beat it and it is a win — so half of everyone wins.',
     emptyTitle: 'No week has been graded yet',
     emptyBody:
       'A week is graded once every fixture in it is final and at least two managers entered it. Until then there is a live median but no result.',
     absent: 'You have no graded week yet. Set a lineup and it is scored against the median.',
     unit: 'win rate',
+    group: 'Managers',
+    description: 'your weekly score against the field median',
   },
   collection: {
-    /* COLLECTION VALUE, not "Collection". The board ranks what a shelf would
-       SELL for, and the bare noun named the thing rather than the measure —
-       next to boards called Points and Record it read as "biggest collection",
-       which is the one reading it is not: thirty bronze duplicates lose to
-       sixteen played cards. It also collided with the Collection TAB in the
-       nav, two words apart in the same chrome, meaning different things. */
-    label: 'Collection Value',
-    title: 'Collection value',
-    blurb:
-      'What a shelf would sell for. Tier is earned by starting a card, so a played collection outgrows a hoarded one.',
+    /* ROSTER VALUE, and the word is load-bearing twice over.
+   
+       It names the MEASURE rather than the thing — the bare noun "Collection"
+       read as "biggest collection", which is the one reading it is not: thirty
+       bronze duplicates lose to sixteen played cards.
+   
+       And it says WHICH CARDS. This board counts the cards on your roster and
+       nothing else; copies committed to a set are not on it. Called "collection
+       value" it competed with the Collect tab for one phrase while counting a
+       different pile, which is how the same player could read 4,156 on one
+       screen and 11,688 on the other with nothing anywhere saying why. Roster
+       is the word the game already uses for the thirty slots this measures. */
+    label: 'Roster value',
+    title: 'Roster value',
     emptyTitle: 'Nobody holds a card yet',
     emptyBody: 'Every card enters the game through a pack. The first one is still out there.',
     absent: 'You hold no cards yet. Open a pack and you will appear here.',
     unit: 'coins',
+    group: 'Managers',
+    description: 'what the cards on your roster would sell for',
   },
   cards: {
     label: 'Cards',
     title: 'Best cards in the game',
-    blurb:
-      'The highest-scoring single COPY, and who holds it. Two managers with the same player have two different cards.',
     emptyTitle: 'No card has scored yet',
     emptyBody:
       'A copy only earns while it is in a lineup, so this board fills in from the first scored week.',
     absent: 'None of your cards has scored yet. A card earns from the week you start it.',
     unit: 'career points',
+    group: 'Cards',
+    description: 'the highest-scoring single copy, and who holds it',
   },
   sets: {
     label: 'Sets',
     title: 'Set progress',
-    blurb:
-      'Set rewards claimed, dailies cleared, and the cards burnt getting there.',
     emptyTitle: 'Nobody has claimed a set reward yet',
     emptyBody:
       'A team set pays six times as you fill it, starting at a tenth of the roster. Commit cards to start collecting.',
     absent: 'You have not claimed a set reward yet.',
     unit: 'rewards',
+    group: 'Managers',
+    description: 'set rewards claimed and dailies cleared',
   },
 };
 
@@ -377,24 +403,6 @@ export type FetchOptions = {
   /** Cards board only. Null is every position. */
   position: string | null;
 };
-
-/**
- * The best card each manager still holds, keyed by user.
- *
- * Fetched apart from the boards because it is one row per MANAGER rather than
- * per board row — the same answer serves all of them — and because the points
- * board reads `leaderboard()`, which could not carry the column without being
- * dropped and recreated. See the migration.
- *
- * A failure here is swallowed to an empty map on purpose: the mark is the row's
- * colour, not its content, and losing it must never take a rendered board down
- * with it. The same posture the points board takes on its week enrichment.
- */
-export async function fetchTopTiers(): Promise<Map<string, CardTier>> {
-  const { data, error } = await supabase.rpc('board_top_tiers');
-  if (error) return new Map();
-  return new Map((data ?? []).map((r) => [r.user_id, r.tier] as const));
-}
 
 /**
  * One board's rows.
@@ -409,25 +417,6 @@ export async function fetchCommunityBoard(
   { season, seasonType, position }: FetchOptions,
 ): Promise<CommunityData> {
   switch (id) {
-    case 'week': {
-      const { data, error } = await supabase.rpc('board_best_week', {
-        p_season: season,
-        p_season_type: seasonType,
-        p_limit: BOARD_LIMIT,
-      });
-      if (error) throw new Error(error.message);
-      return {
-        id,
-        rows: (data ?? []).map((r) => ({
-          rank: num(r.rank),
-          user_id: r.user_id,
-          display_name: r.display_name,
-          week: num(r.week),
-          points: num(r.points),
-          weeks_played: num(r.weeks_played),
-        })),
-      };
-    }
     case 'record': {
       const { data, error } = await supabase.rpc('board_record', {
         p_season: season,
@@ -466,7 +455,9 @@ export async function fetchCommunityBoard(
           held: num(r.held),
           in_sets: num(r.in_sets),
           players: num(r.players),
-          gold_plus: num(r.gold_plus),
+          bronze: num(r.bronze),
+          silver: num(r.silver),
+          gold: num(r.gold),
           diamond: num(r.diamond),
           career_fp: num(r.career_fp),
         })),
@@ -530,44 +521,6 @@ const part = (key: string, value: string, unit?: string, accent?: string): Detai
   accent,
 });
 
-/** The best tier on a shelf — what the collection IS, in one letter. */
-function topTier(row: CollectionEntry): CardTier | undefined {
-  if (row.diamond > 0) return 'diamond';
-  if (row.gold_plus > 0) return 'gold';
-  // Below gold the counts are not returned separately, and guessing between
-  // silver and bronze from a valuation would be a number pretending to be a
-  // fact. No mark is better than a wrong one.
-  return undefined;
-}
-
-/** "3 weeks" / "1 week". Every board counts something that can be singular. */
-const plural = (n: number, one: string, many = `${one}s`) => `${whole(n)} ${n === 1 ? one : many}`;
-
-function weekRows(rows: BestWeekEntry[], seasonType: number): BoardRowModel[] {
-  const best = rows[0]?.points ?? 0;
-  return rows.map((r) => ({
-    key: r.user_id,
-    rank: r.rank,
-    userId: r.user_id,
-    name: r.display_name,
-    // WHICH week is the whole context for a best week — the figure alone is a
-    // number with no occasion attached to it.
-    secondary: `Posted in ${weekTabLabel(seasonType, r.week)}`,
-    detail: [part('weeks', whole(r.weeks_played), 'weeks played')],
-    // The lineup row ends its third line with the distance still to run; so
-    // does this. A board of scores with no gaps on it is a list, not a race.
-    note:
-      rows.length < 2
-        ? undefined
-        : r.rank === 1
-          ? 'Best in the game'
-          : best - r.points > 0
-            ? `${oneDp(best - r.points)} off the best`
-            : undefined,
-    figure: oneDp(r.points),
-    figureLabel: 'PTS',
-  }));
-}
 
 function recordRows(rows: RecordEntry[], scheme: 'light' | 'dark'): BoardRowModel[] {
   const c = Colors[scheme];
@@ -576,62 +529,68 @@ function recordRows(rows: RecordEntry[], scheme: 'light' | 'dark'): BoardRowMode
     rank: r.rank,
     userId: r.user_id,
     name: r.display_name,
-    // What the record MEANS, in the contest's own terms, rather than the
-    // W-L-T repeated as a word. The three counts are on the line below.
-    secondary: `Beat the median in ${r.wins} of ${plural(r.weeks, 'graded week')}`,
+    /* `Beat the median in 0 of 2 graded weeks` used to lead this row and it was
+       the W-L-T below it written out longhand — the wins are the first figure
+       and the three counts sum to the weeks. One statement of a fact per row. */
     // A win and a loss are the app's clearest positive and negative facts, and
     // this is the one board whose numbers ARE those facts. The letter beside
     // each is what carries it; the colour only makes the record scannable.
+    // W-L-T is one fact in three tokens, so it survives whole. The points total
+    // does not: it is the POINTS board's figure, restated on a board that ranks
+    // by win rate, where it can only be read as a second ranking.
     detail: [
       part('w', String(r.wins), 'w', r.wins > 0 ? c.positive : undefined),
       part('l', String(r.losses), 'l', r.losses > 0 ? c.negative : undefined),
       part('t', String(r.ties), 't'),
-      part('pts', oneDp(r.points), 'pts'),
     ],
     figure: rate(r.win_pct),
     figureLabel: 'PCT',
+    value: r.win_pct,
   }));
 }
 
-function collectionRows(
-  rows: CollectionEntry[],
-  scheme: 'light' | 'dark',
-  topTiers: Map<string, CardTier>,
-): BoardRowModel[] {
+/**
+ * The tiers a roster is made of, in ladder order.
+ *
+ * ONE ENTRY PER TIER rather than a loop over `TierOrder`, because the RPC
+ * returns four named columns and this is the seam where a column becomes a
+ * letter. If a fifth tier is ever added, the compiler finds this list through
+ * `CollectionEntry` rather than leaving a tier silently uncounted.
+ */
+const ROSTER_TIERS: { key: CardTier; letter: string; of: (r: CollectionEntry) => number }[] = [
+  { key: 'bronze', letter: 'b', of: (r) => r.bronze },
+  { key: 'silver', letter: 's', of: (r) => r.silver },
+  { key: 'gold', letter: 'g', of: (r) => r.gold },
+  { key: 'diamond', letter: 'd', of: (r) => r.diamond },
+];
+
+function collectionRows(rows: CollectionEntry[], scheme: 'light' | 'dark'): BoardRowModel[] {
   return rows.map((r) => ({
     key: r.user_id,
     rank: r.rank,
     userId: r.user_id,
     name: r.display_name,
-    // The quality of the shelf in one phrase; its size is on the line below.
-    secondary:
-      r.gold_plus > 0
-        ? `${whole(r.gold_plus)} gold or better${r.diamond > 0 ? `, ${whole(r.diamond)} diamond` : ''}`
-        : 'No card above silver yet',
-    // The shelf's best tier leads the line, exactly where a card's own tier
-    // leads a lineup row — it is the same question asked of a whole collection.
-    // The exact tier where it is known; the board's own columns can only see
-    // as far down as gold, so they are the fallback rather than the source.
-    tier: topTiers.get(r.user_id) ?? topTier(r),
-    detail: [
-      part('held', whole(r.held), 'cards'),
-      // DISTINCT cards. The gap between this and CARDS is the duplicates.
-      part('players', whole(r.players), 'unique'),
-      // Committed copies count on this board and can never grow again, so a
-      // large figure here says a shelf is banked rather than still climbing.
-      // Dropped entirely at zero: an empty cell on most rows would be noise.
-      ...(r.in_sets > 0 ? [part('sets', whole(r.in_sets), 'in sets')] : []),
-      part(
-        'fp',
-        r.career_fp > 0 ? oneDp(r.career_fp) : DASH,
-        'tfp',
-        r.career_fp > 0
-          ? getTierTheme(topTiers.get(r.user_id) ?? topTier(r) ?? 'bronze', scheme).colors.accent
-          : undefined,
-      ),
-    ],
+    /* THE TIER SPREAD, which is the story `30 CARDS` could not tell. A roster
+       of thirty bronze duplicates and a roster of thirty cards played up to
+       gold are the same count and a different game — tier is earned by
+       STARTING a card, so the spread is the one line that says whether a shelf
+       has been played or hoarded. The counts sum to `held`, so the total is
+       still on the row, spelled out.
+   
+       ZERO TIERS ARE OMITTED rather than printed. Nothing has tiered up yet, so
+       every row would otherwise end in `0 S · 0 G · 0 D` — three quarters of
+       the line reserved for a number that is not there. A tier appears the week
+       someone earns it, which is also the week it becomes worth reading.
+   
+       The count carries its tier's colour and its tier's letter, so the line
+       survives greyscale and a reader who cannot separate bronze from gold
+       still has the initial. */
+    detail: ROSTER_TIERS.filter((t) => t.of(r) > 0).map((t) =>
+      part(t.key, whole(t.of(r)), t.letter, getTierTheme(t.key, scheme).colors.accent),
+    ),
     figure: whole(r.value_coins),
     figureLabel: 'COINS',
+    value: r.value_coins,
   }));
 }
 
@@ -653,8 +612,6 @@ function cardRows(rows: CardEntry[], scheme: 'light' | 'dark'): BoardRowModel[] 
           }
         : undefined,
       mutedToken: r.team_abbreviation ? `— ${r.team_abbreviation.toUpperCase()}` : undefined,
-      // WHOSE copy it is. On a board of cards that is the leaderboard part.
-      secondary: `Held by ${r.display_name}`,
       tier: r.tier,
       // The tier mark leads this line, so the tier's NAME is not repeated here
       // — what is left is what the copy has actually done.
@@ -662,8 +619,14 @@ function cardRows(rows: CardEntry[], scheme: 'light' | 'dark'): BoardRowModel[] 
         part('starts', whole(r.lineup_starts), 'gs'),
         ...(r.fp_per_start === null ? [] : [part('avg', oneDp(r.fp_per_start), 'per start')]),
       ],
+      /* WHOSE copy it is — on a board of cards that is the leaderboard part,
+         and it is the row's door to a manager. It sat on its own line and now
+         ends this one, in the tail slot a phrase belongs in. `profileOn` moved
+         with it; see `BoardRow`. */
+      note: `Held by ${r.display_name}`,
       figure: oneDp(r.career_fp),
       figureLabel: 'FP',
+      value: r.career_fp,
     };
   });
 }
@@ -675,59 +638,119 @@ function setRows(rows: SetsEntry[], scheme: 'light' | 'dark'): BoardRowModel[] {
     rank: r.rank,
     userId: r.user_id,
     name: r.display_name,
-    secondary:
-      r.sets > 0
-        ? `${whole(r.completed)} of ${plural(r.sets, 'team set')} completed`
-        : 'No team set started yet',
     // Dailies are counted apart from rungs everywhere, including here — see
     // the note on board_sets.
     // Coins are the app's one currency and they are gold wherever they appear —
     // the masthead balance, the profile's coin flow, and now here.
     coin: true,
+    // Dailies and what they paid. `BURNT` was the third and is the one to lose:
+    // it is a cost already implied by the rungs this board ranks by.
     detail: [
+      // `3 of 36 team sets completed` as a figure. A manager with no set yet
+      // reads `0/0 SETS`, which is the same shape as everybody else's row
+      // rather than a sentence only they get.
+      part('done', `${whole(r.completed)}/${whole(r.sets)}`, 'sets'),
       part('daily', whole(r.dailies), 'dailies'),
-      part('burned', whole(r.burned), 'burnt'),
       part('coins', whole(r.coins), 'coins', r.coins > 0 ? coinAccent : undefined),
     ],
     figure: whole(r.rungs),
     figureLabel: 'RUNGS',
+    value: r.rungs,
   }));
 }
 
 export function buildBoard(
   data: CommunityData,
   seasonType: number,
-  { scheme, topTiers }: BuildOptions,
+  { scheme }: BuildOptions,
 ): BoardRowModel[] {
   switch (data.id) {
-    case 'week':
-      return withTopTier(weekRows(data.rows, seasonType), topTiers);
+    /* NO TIER MARK ON A MANAGER BOARD. Four of these rows used to open their
+       detail line with the best tier their owner held, via `withTopTier`. It
+       read as a `B` in front of every row in the game — the same letter on
+       every line of every board, because almost nothing has been tiered up yet
+       — which is a mark that cannot distinguish anything spending the first
+       slot on every row. It is the CARDS board's own column now, where the
+       tier belongs to the thing being ranked. */
     case 'record':
-      return withTopTier(recordRows(data.rows, scheme), topTiers);
+      return recordRows(data.rows, scheme);
     case 'collection':
-      // Already leads with the shelf's own best tier, from its own columns.
-      return collectionRows(data.rows, scheme, topTiers);
+      return collectionRows(data.rows, scheme);
     case 'cards':
-      // The COPY's tier, not its owner's best — this board ranks the card.
+      // The COPY's tier: this board ranks the card, so the tier is its own.
       return cardRows(data.rows, scheme);
     case 'sets':
-      return withTopTier(setRows(data.rows, scheme), topTiers);
+      return setRows(data.rows, scheme);
   }
 }
 
 /**
- * Marks manager rows with the best card their owner holds.
+ * How each board writes a quantity of its own figure.
  *
- * Applied after the fact rather than inside each builder, because it is the
- * same operation on four boards and the alternative is the same three lines
- * copied into each of them.
+ * The single source for it. Each board's caption states a gap — `380 to 11th`
+ * — and it has to be in the same units and to the same precision as the two
+ * figures the gap is between, which is only true while one table decides both.
+ * The alternative is a formatter per caller, and coins with a comma in one
+ * place and without it in another is one number that looks like two.
  */
-export function withTopTier(
-  rows: BoardRowModel[],
-  topTiers: Map<string, CardTier>,
-): BoardRowModel[] {
-  if (topTiers.size === 0) return rows;
-  return rows.map((r) => (r.tier ? r : { ...r, tier: topTiers.get(r.userId) }));
+export const BOARD_FORMAT: Record<BoardId, (n: number) => string> = {
+  points: oneDp,
+  record: rate,
+  collection: whole,
+  cards: oneDp,
+  sets: whole,
+};
+
+/** "1st", "12th", "23rd" — the caption's own leading word. */
+export function ordinal(n: number): string {
+  const rest = n % 100;
+  if (rest >= 11 && rest <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+}
+
+/**
+ * The tail of your own row's detail line: what it would take to move one place.
+ *
+ * IT WAS A CAPTION UNDER THE ROW and it is a phrase inside it, because most of
+ * what the caption said was already on the screen twice. `12th of 48 ranked ·
+ * top 25% · 380 to 11th` sat under a row whose rank column already read 12,
+ * beneath a context line that already read `48 ranked`. What survived the
+ * overlap is the last clause, and it goes in the slot `BoardRow` keeps for
+ * exactly this — the one the lineup row fills with `0/200 to Silver Tier`.
+ *
+ * THE LAST CLAUSE IS THE ONLY ACTIONABLE ONE, which is why it is the one that
+ * survived. `−9,424` against the leader is a fact about somebody you will not
+ * catch; `380 to 11th` is the next thing that can actually happen, and on a
+ * board of five hundred it is the only number on the screen a reader can do
+ * anything about. On the leader's own row the honest version is the lead they
+ * are holding.
+ *
+ * THE PERCENTILE IS GONE with the caption. It was worth a line of its own and
+ * is not worth a third clause here; the field size is still on the context line
+ * above, so `12` against `48 ranked` says the same thing one division later.
+ */
+export function standingNote({
+  rank,
+  toNext,
+  leadingBy,
+}: {
+  rank: number;
+  /** Formatted gap to the rank directly above, or null at the top. */
+  toNext: string | null;
+  /** Formatted lead over second place — the leader's version of `toNext`. */
+  leadingBy: string | null;
+}): string | undefined {
+  if (rank === 1) return leadingBy ? `Leading by ${leadingBy}` : undefined;
+  return toNext ? `${toNext} to ${ordinal(rank - 1)}` : undefined;
 }
 
 /**

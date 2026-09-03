@@ -397,10 +397,25 @@ export function MenuBar({
 /**
  * One row in a menu panel.
  *
- * The current choice is marked by a filled dot in the accent AND by its label
- * going to full `text` weight — never by colour alone, which is the rule the
- * tier chips and the action bar both keep. `detail` is the quiet figure on the
- * right: a count, or the direction of the sort you are already on.
+ * THE SELECTION IS A CHECK AND A BAND, and it used to be an 8pt dot: filled in
+ * the accent when chosen, drawn as a hairline circle when not. The outline was
+ * the problem. Every unchosen row carried a faint empty ring, so a menu of six
+ * boards drew five pieces of furniture whose only job was to be ignored, and
+ * the one that mattered was an 8pt dot competing with all of them. A menu
+ * should be a list of words.
+ *
+ * What replaced it says the same thing three ways and adds no ink to the rows
+ * that are not chosen: a check in the leading slot, the label at full `text`
+ * weight, and the row on `backgroundElement`. Colour is never the only signal
+ * and is not one here — the check and the weight both survive greyscale, which
+ * is the rule the tier chips and the action bar keep.
+ *
+ * THE LEADING SLOT IS FIXED WIDTH whether or not it holds a check, because a
+ * label that steps sideways as the selection moves down the list is the thing
+ * the dot got right and is worth keeping.
+ *
+ * `detail` is the quiet figure on the right: a count, the unit a board ranks
+ * by, or the direction of the sort you are already on.
  *
  * `label` and `glyph` are alternatives, not a pair. A glyph that already spells
  * its own name — the tier badge does, in letters, which is the whole reason
@@ -411,6 +426,7 @@ export function MenuItem({
   label,
   selected,
   detail,
+  description,
   glyph,
   onPress,
   accessibilityLabel,
@@ -419,6 +435,18 @@ export function MenuItem({
   label?: string;
   selected: boolean;
   detail?: string;
+  /**
+   * A sentence under the label, for a menu whose options need explaining
+   * rather than counting.
+   *
+   * IT IS AN ALTERNATIVE TO `detail`, not a companion. A right-aligned figure
+   * works while it is a figure — a count, a unit, a sort direction — and stops
+   * working the moment it is a phrase: the label and the phrase end up on one
+   * line at opposite edges with a gulf between them, and the eye has to travel
+   * the width of the panel to pair two halves of one thought. Under the label
+   * there is no gulf, and the sentence has room to be a sentence.
+   */
+  description?: string;
   /** Drawn in the label's place — the tier menu puts its badge here. */
   glyph?: ReactNode;
   onPress: () => void;
@@ -434,25 +462,30 @@ export function MenuItem({
       accessibilityRole="menuitem"
       accessibilityState={{ selected }}
       accessibilityLabel={accessibilityLabel ?? label}
-      style={({ pressed }) => [styles.item, pressed && { backgroundColor: c.backgroundElement }]}>
-      <View
-        style={[
-          styles.dot,
-          selected ? { backgroundColor: accent } : { borderColor: c.border, borderWidth: 1 },
-        ]}
-      />
+      style={({ pressed }) => [
+        styles.item,
+        selected && { backgroundColor: c.backgroundElement },
+        pressed && { backgroundColor: c.backgroundElement },
+      ]}>
+      <Text style={[styles.check, { color: accent }]}>{selected ? '✓' : ''}</Text>
       {glyph ? (
         <View style={styles.itemLabel}>{glyph}</View>
       ) : (
-        <Text
-          numberOfLines={1}
-          style={[
-            Type.body,
-            styles.itemLabel,
-            { color: selected ? c.text : c.textSecondary, fontWeight: selected ? '700' : '500' },
-          ]}>
-          {label}
-        </Text>
+        <View style={styles.itemLabel}>
+          <Text
+            numberOfLines={1}
+            style={[
+              Type.body,
+              { color: selected ? c.text : c.textSecondary, fontWeight: selected ? '700' : '500' },
+            ]}>
+            {label}
+          </Text>
+          {description ? (
+            <Text numberOfLines={2} style={[Type.fine, styles.itemDesc, { color: c.textTertiary }]}>
+              {description}
+            </Text>
+          ) : null}
+        </View>
       )}
       {detail ? (
         <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
@@ -474,17 +507,22 @@ export function MenuHeading({ children }: { children: string }) {
 }
 
 const styles = StyleSheet.create({
-  /* `Spacing.two` either side matches `MenuItem`'s own horizontal padding, so a
-     chip line and a row line start on the same left edge. */
+  /* Matches `MenuItem`'s own horizontal padding exactly, so a chip line and a
+     row line start on the same left edge. It was `Spacing.two` against the
+     item's `Spacing.three` and the two were quietly out of step. */
   chips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.one + 2,
-    paddingHorizontal: Spacing.two,
+    paddingHorizontal: Spacing.two + 2,
     paddingTop: Spacing.one,
     paddingBottom: Spacing.two,
   },
-  menuDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: Spacing.two, marginVertical: Spacing.one },
+  menuDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: Spacing.two + 2,
+    marginVertical: Spacing.one,
+  },
   button: {
     width: SIZE,
     height: SIZE,
@@ -515,16 +553,29 @@ const styles = StyleSheet.create({
   },
   item: {
     flexDirection: 'row',
-    alignItems: 'center',
+    /* Top, not centre: a row carrying a description is two lines tall and the
+       check belongs beside the LABEL rather than floating between the two. The
+       nudge below puts it on the label's own optical line. */
+    alignItems: 'flex-start',
     gap: Spacing.two,
-    paddingHorizontal: Spacing.three,
+    /* One step tighter than the panel's old 16, so the leading slot sits under
+       the heading's own left edge rather than inside it. */
+    paddingHorizontal: Spacing.two + 2,
     paddingVertical: Spacing.two + 2,
     minHeight: 40,
   },
-  /* Fixed width whether it is filled or outlined, so labels do not step
-     sideways as the selection moves down the list. */
-  dot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  /* Fixed width whether or not it holds a check — see the note above. */
+  check: { width: 12, fontSize: 12, lineHeight: 22, fontWeight: '700', flexShrink: 0 },
   itemLabel: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
-  heading: { paddingHorizontal: Spacing.three, paddingTop: Spacing.two, paddingBottom: Spacing.one },
+  itemDesc: { marginTop: 2 },
+  /* Aligned with the item rows below it, and given more air above than below:
+     a heading belongs to what follows it, and the gap either side being equal
+     is what made the groups read as one long list. */
+  heading: {
+    paddingHorizontal: Spacing.two + 2,
+    paddingTop: Spacing.two + 2,
+    paddingBottom: Spacing.one,
+    letterSpacing: 0.4,
+  },
   pressed: { opacity: 0.6 },
 });

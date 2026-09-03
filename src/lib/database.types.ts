@@ -2248,15 +2248,17 @@ export type Database = {
       board_collection: {
         Args: { p_limit?: number; p_season?: number }
         Returns: {
+          bronze: number
           career_fp: number
           diamond: number
           display_name: string
-          gold_plus: number
+          gold: number
           held: number
           in_sets: number
           in_sets_coins: number
           players: number
           rank: number
+          silver: number
           user_id: string
           value_coins: number
         }[]

@@ -7,19 +7,24 @@
  * round trips to render one table, and four of them would be thrown away by the
  * first tab press.
  *
- * The four parts, top to bottom, are the same on every board. The first three
- * are PINNED and the last one scrolls:
+ * The five parts, top to bottom. The first four are PINNED and only the rows
+ * scroll — the list has no header component at all now:
  *
- *   1. The board strip, and this board's own filter beside it.
+ *   1. The board bar, and this board's own filter beside it.
  *   2. A line saying what slate the rows are counted over and how many there
  *      are — see `BoardControls`, which also explains why the field size moved
  *      here from the panel that used to carry it.
- *   3. `BoardTop`: the leading three and your own row, in one frame. Always
- *      visible, so the answer to the only question the reader actually came
- *      with cannot scroll away — which is what it used to do.
- *   4. The table, under one line saying what this board ranks. Without that
- *      line "COINS" and "RUNGS" are column headers with no referent and the
- *      reader has to infer the game's rules from four letters.
+ *   3. `BoardTop`: your own row in a frame. Always visible, so the answer to
+ *      the only question the reader actually came with cannot scroll away.
+ *   4. Its caption — where you stand, and what it would take to move up one.
+ *   5. `BoardColumns`, then the rows.
+ *
+ * WHAT USED TO BE HERE AND IS NOT. A sentence per board explaining what it
+ * ranked, inside the list, scrolling away after four rows. It was the only
+ * reason the list had a header at all, and it answered a question the reader
+ * has stopped asking by the time they can read it. The measure now sits against
+ * each board's name in the PICKER — `BOARD_META.ranks` — and the columns are
+ * labelled where they are drawn.
  *
  * Every board's empty state says WHICH empty it is. "No rows" is
  * indistinguishable from a broken query, and this screen has shipped looking
@@ -41,20 +46,18 @@ import { useOpenManager } from '@/components/friends/use-open-manager';
 import { BOARD_ROW_HEIGHT, BoardRow } from './BoardRow';
 import { BoardTop, hasBoardTop } from './BoardTop';
 import {
+  BOARD_FORMAT,
   BOARD_META,
   buildBoard,
   fetchCommunityBoard,
-  fetchTopTiers,
   findMine,
+  standingNote,
   type BoardId,
   type CommunityBoardId,
   type BoardRowModel,
   type CommunityData,
 } from './community';
-import type { CardTier } from '@/constants/theme';
-
-/** Stable identity so the memo below does not recompute on every render. */
-const NO_TIERS = new Map<string, CardTier>();
+import { BoardColumns } from './BoardColumns';
 
 export function CommunityBoard({
   id,
@@ -87,26 +90,22 @@ export function CommunityBoard({
 
   const [position, setPosition] = useState<PosFilter>('ALL');
   const [data, setData] = useState<CommunityData | null>(null);
-  const [topTiers, setTopTiers] = useState<Map<string, CardTier>>(NO_TIERS);
 
+  /* ONE CALL PER BOARD. It was two: the board, and `board_top_tiers` for the
+     best tier each manager held, which led every row's detail line with a
+     letter. That mark is gone — see `buildBoard` — and the round trip that fed
+     it went with it. */
   const load = useCallback<Load>(
     async (live) => {
-      // In parallel: the board, and the tier mark each manager's row wears.
-      // The marks never fail the load — `fetchTopTiers` swallows its own error
-      // — so a board still renders if only the decoration is missing.
-      const [next, tiers] = await Promise.all([
-        fetchCommunityBoard(id, {
-          season,
-          seasonType,
-          // Only the cards board has a position, and passing one anywhere else
-          // would be an argument the RPC does not take.
-          position: id === 'cards' && position !== 'ALL' ? position : null,
-        }),
-        fetchTopTiers(),
-      ]);
+      const next = await fetchCommunityBoard(id, {
+        season,
+        seasonType,
+        // Only the cards board has a position, and passing one anywhere else
+        // would be an argument the RPC does not take.
+        position: id === 'cards' && position !== 'ALL' ? position : null,
+      });
       if (!live()) return;
       setData(next);
-      setTopTiers(tiers);
     },
     [id, season, seasonType, position],
   );
@@ -121,26 +120,39 @@ export function CommunityBoard({
   const fresh = data?.id === id ? data : null;
 
   const rows = useMemo(
-    () => (fresh ? buildBoard(fresh, seasonType, { scheme, topTiers }) : null),
-    [fresh, seasonType, scheme, topTiers],
+    () => (fresh ? buildBoard(fresh, seasonType, { scheme }) : null),
+    [fresh, seasonType, scheme],
   );
   const mine = useMemo(() => (rows ? findMine(rows, meId) : null), [rows, meId]);
 
   /**
-   * What the list holds, above the rows and nothing else.
+   * Your own row, with what it would take to move one place written onto the
+   * end of its detail line — see `standingNote`.
    *
-   * Everything that used to be in here — the podium, "Where you stand", the
-   * "Standings" heading — is now pinned outside the list, so the ONE thing
-   * left is the one thing that should scroll away: a sentence you read once
-   * per board. It sits directly over the rows it describes, which is where a
-   * caption belongs; without it "COINS" and "RUNGS" are four letters with no
-   * referent and the reader has to infer the game's rules from a column.
+   * A COPY of the row rather than an edit to it: the same object is also in the
+   * list below, where the note would be a second sentence nobody asked for. The
+   * only row that carries a target is the one that is yours.
+   *
+   * The gaps are read out of the ROWS by rank rather than by array index, for
+   * the reason the whole module keeps repeating: rank is the database's answer
+   * and a position in an array is a guess that currently agrees with it.
    */
-  const header = (
-    <View style={styles.head}>
-      <Text style={[Type.bodyRelaxed, styles.blurb, { color: c.textSecondary }]}>{meta.blurb}</Text>
-    </View>
-  );
+  const mineWithNote = useMemo(() => {
+    if (!mine || !rows) return mine;
+    const format = BOARD_FORMAT[id];
+    const gapTo = (rank: number): string | null => {
+      const target = rows.find((r) => r.rank === rank);
+      if (!target) return null;
+      const gap = Math.abs(target.value - mine.value);
+      return gap > 0 ? format(gap) : null;
+    };
+    const note = standingNote({
+      rank: mine.rank,
+      toNext: gapTo(mine.rank - 1),
+      leadingBy: gapTo(2),
+    });
+    return note ? { ...mine, note } : mine;
+  }, [mine, rows, id]);
 
   /* The pinned band scrolls the list to the reader's real row — see `BoardTop`.
      `getItemLayout` below is what lets it reach a row that has never been
@@ -173,10 +185,12 @@ export function CommunityBoard({
     <BoardControls
       board={board}
       onBoardChange={onBoardChange}
-      /* The slate, then how many rows are under it. The old "Where you stand"
-         panel carried the field size as its hint; it is a fact about the BOARD
-         rather than about the reader, so it belongs on the board's own line. */
-      context={rows ? `${slateContext} · ${fieldHint(id, rows.length)}` : slateContext}>
+      /* The slate, what this board ranks, and how many rows are under it — the
+         same sentence the picker showed against this board's name, so choosing
+         and arriving say the same thing. See `BOARD_META.description`. */
+      context={[slateContext, meta.description, rows ? fieldHint(id, rows.length) : null]
+        .filter(Boolean)
+        .join(' · ')}>
       {/* This board's own control, where the points board puts its week button.
 
           A round menu rather than a second row of chips: the board strip beside
@@ -217,19 +231,28 @@ export function CommunityBoard({
       {hasBoardTop(meId) ? (
         <View style={styles.top}>
           <BoardTop
-            mine={mine}
+            mine={mineWithNote}
             meId={meId}
             unit={meta.unit}
             absent={meta.absent}
             onJumpToMine={jumpToMine}
+            /* On the cards board this row is your best COPY, not you. */
+            label={id === 'cards' ? 'Your best card' : 'Your team'}
           />
         </View>
       ) : null}
+      {/* Pinned with everything above it: a heading that scrolls away is a
+          decoration on the first screenful. See `BoardColumns`. */}
+      <BoardColumns section="Rankings" figureLabel={rows?.[0]?.figureLabel ?? ''} />
       <FlatList
         {...quietScrollbar}
         ref={list}
         data={rows ?? []}
         style={styles.fill}
+        /* One height on every board now — see `BOARD_ROW_HEIGHT`. These boards
+           have no expansion, so the arithmetic is exact rather than an
+           estimate, which is what lets the pinned row jump to row four
+           hundred. */
         getItemLayout={(_, index) => ({
           length: BOARD_ROW_HEIGHT,
           offset: BOARD_ROW_HEIGHT * index,
@@ -248,7 +271,6 @@ export function CommunityBoard({
             }}
           />
         }
-        ListHeaderComponent={header}
         ListEmptyComponent={
           <View style={[styles.empty, { borderColor: c.border, backgroundColor: c.surface }]}>
             <Text style={[Type.section, { color: c.text }]}>{meta.emptyTitle}</Text>
@@ -263,9 +285,9 @@ export function CommunityBoard({
             isMe={item.userId === meId}
             unit={meta.unit}
             onOpenProfile={() => openManager(item.userId, item.name)}
-            /* On the cards board line 1 is the footballer and the manager is
+            /* On the cards board line 1 is the footballer and the manager ends
                line 2 — "Held by dmb" — so the link goes there. See `profileOn`. */
-            profileOn={id === 'cards' ? 'secondary' : 'name'}
+            profileOn={id === 'cards' ? 'note' : 'name'}
           />
         )}
       />
@@ -284,14 +306,11 @@ function fieldHint(id: CommunityBoardId, rows: number): string {
 }
 
 const styles = StyleSheet.create({
-  head: {
-    paddingBottom: Spacing.two,
-    paddingHorizontal: Spacing.three,
-  },
-  /* The pinned frame's own gutter, matching the chips above it and the rows'
-     content below it. */
-  top: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
-  blurb: { maxWidth: 560 },
+  /* No horizontal padding: the row inside bleeds to the page edges exactly as
+     the list's rows do, which is the property that lines their columns up. The
+     heading and caption around it take the gutter back for themselves — see
+     `BoardTop`. */
+  top: { paddingBottom: Spacing.two },
   fill: { flex: 1 },
   /* VERTICAL ONLY. The rows are bled to the edges of the page, exactly as the
      lineup board bleeds its cards, so the horizontal inset belongs to whatever

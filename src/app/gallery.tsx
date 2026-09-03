@@ -70,13 +70,13 @@ import { parseProfile } from '@/components/players/profile';
 import { ScoreStrip } from '@/components/scores/ScoreStrip';
 import type { ScoreGame, ScoreTeam } from '@/components/scores/scoreboard';
 import { BoardRow } from '@/components/leaderboard/BoardRow';
+import { BoardColumns } from '@/components/leaderboard/BoardColumns';
 import { BoardTop } from '@/components/leaderboard/BoardTop';
 import { standingRows } from '@/components/leaderboard/PointsBoard';
 import type { Standing } from '@/components/leaderboard/board';
 import {
   BOARD_META,
   buildBoard,
-  withTopTier,
   type BoardId,
   type CommunityBoardId,
   type CommunityData,
@@ -96,7 +96,7 @@ import { RecapBody } from '@/components/recap/RecapBody';
 import type { Recap } from '@/components/recap/recap';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { WIDE_BREAKPOINT, useIsWide } from '@/components/shell/useResponsive';
-import { Colors, Spacing, Type, type CardTier, type Measure } from '@/constants/theme';
+import { Colors, Spacing, Type, type Measure } from '@/constants/theme';
 import { PlayerContext, type PlayerState } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -563,25 +563,7 @@ const SCOPE_FIXTURE = [
   { value: '1', label: 'Pre 1' },
 ];
 
-const FIXTURE_TIERS = new Map<string, CardTier>([
-  ['u2', 'diamond'],
-  [MEID, 'gold'],
-  ['u3', 'silver'],
-  ['u4', 'bronze'],
-  ['u5', 'bronze'],
-]);
-
 const BOARD_FIXTURES: Record<CommunityBoardId, CommunityData> = {
-  week: {
-    id: 'week',
-    rows: [
-      { rank: 1, user_id: 'u2', display_name: 'dmb', week: 2, points: 148.2, weeks_played: 3 },
-      { rank: 2, user_id: MEID, display_name: 'nickroachy', week: 3, points: 141.7, weeks_played: 3 },
-      { rank: 3, user_id: 'u3', display_name: 'a_very_long_display_name', week: 1, points: 139.0, weeks_played: 3 },
-      { rank: 4, user_id: 'u4', display_name: 'kp', week: 3, points: 122.4, weeks_played: 2 },
-      { rank: 5, user_id: 'u5', display_name: 'sarah', week: 2, points: 96.5, weeks_played: 3 },
-    ],
-  },
   record: {
     id: 'record',
     rows: [
@@ -595,12 +577,12 @@ const BOARD_FIXTURES: Record<CommunityBoardId, CommunityData> = {
   collection: {
     id: 'collection',
     rows: [
-      { rank: 1, user_id: 'u2', display_name: 'dmb', value_coins: 1864, held: 61, in_sets: 22, players: 54, gold_plus: 9, diamond: 1, career_fp: 1240.5 },
-      { rank: 2, user_id: MEID, display_name: 'nickroachy', value_coins: 1208, held: 74, in_sets: 0, players: 66, gold_plus: 5, diamond: 0, career_fp: 980.2 },
-      { rank: 3, user_id: 'u3', display_name: 'a_very_long_display_name', value_coins: 742, held: 38, in_sets: 9, players: 35, gold_plus: 3, diamond: 0, career_fp: 610 },
-      { rank: 4, user_id: 'u5', display_name: 'sarah', value_coins: 416, held: 29, in_sets: 0, players: 27, gold_plus: 1, diamond: 0, career_fp: 305.4 },
+      { rank: 1, user_id: 'u2', display_name: 'dmb', value_coins: 1864, held: 61, in_sets: 22, players: 54, bronze: 38, silver: 13, gold: 9, diamond: 1, career_fp: 1240.5 },
+      { rank: 2, user_id: MEID, display_name: 'nickroachy', value_coins: 1208, held: 74, in_sets: 0, players: 66, bronze: 55, silver: 14, gold: 5, diamond: 0, career_fp: 980.2 },
+      { rank: 3, user_id: 'u3', display_name: 'a_very_long_display_name', value_coins: 742, held: 38, in_sets: 9, players: 35, bronze: 30, silver: 5, gold: 3, diamond: 0, career_fp: 610 },
+      { rank: 4, user_id: 'u5', display_name: 'sarah', value_coins: 416, held: 29, in_sets: 0, players: 27, bronze: 0, silver: 0, gold: 1, diamond: 0, career_fp: 305.4 },
       // A shelf that has never been started: FP is an em dash, not a zero.
-      { rank: 5, user_id: 'u4', display_name: 'kp', value_coins: 96, held: 12, in_sets: 3, players: 12, gold_plus: 0, diamond: 0, career_fp: 0 },
+      { rank: 5, user_id: 'u4', display_name: 'kp', value_coins: 96, held: 12, in_sets: 3, players: 12, bronze: 12, silver: 2, gold: 0, diamond: 0, career_fp: 0 },
     ],
   },
   cards: {
@@ -646,7 +628,6 @@ const POINTS_FIXTURE: Standing[] = [
 
 function LeaderboardFixture() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
   const [id, setId] = useState<BoardId>('cards');
 
   const points = id === 'points';
@@ -655,8 +636,8 @@ function LeaderboardFixture() {
   const meta = BOARD_META[id];
   // Preseason, so the week board reads "Pre 3" rather than "Wk 3".
   const built = points
-    ? withTopTier(standingRows(POINTS_FIXTURE, 'season', 1, true), FIXTURE_TIERS)
-    : buildBoard(BOARD_FIXTURES[id], 1, { scheme, topTiers: FIXTURE_TIERS });
+    ? standingRows(POINTS_FIXTURE, 'season', 1, true)
+    : buildBoard(BOARD_FIXTURES[id], 1, { scheme });
 
   return (
     <View style={styles.board}>
@@ -701,11 +682,12 @@ function LeaderboardFixture() {
         meId={MEID}
         unit={meta.unit}
         absent="You are not on this board yet."
+        label="Your team"
       />
 
-      {/* The one thing still inside the real boards' list header, and the only
-          thing above the rows. */}
-      <Text style={[Type.bodyRelaxed, { color: c.textSecondary }]}>{meta.blurb}</Text>
+      {/* Pinned above the rows on every real board. The fixture names the same
+          columns the rows below it draw — see `BoardColumns`. */}
+      <BoardColumns section="Rankings" figureLabel={built[0]?.figureLabel ?? ''} />
 
       {/* Bled past the gallery Screen's own 16pt padding, because the real
           boards bleed past the list's — otherwise this fixture would show a

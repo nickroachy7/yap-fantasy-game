@@ -51,12 +51,17 @@
  *
  *   1. WHO. Rank, name, and — on the cards board — the position and club.
  *   2. THE HEADLINE'S CONTEXT. The one sentence that qualifies the figure on
- *      the right: which week a best week was, what a record was over, who holds
- *      a card.
+ *      the right: which week a best week was, who holds a card.
  *   3. THE REST OF THE NUMBERS. What used to be the dropped columns.
  *
- * A board that had nothing for a line leaves it empty rather than inventing
- * something; the box does not change height, so the rows stay a column.
+ * LINE 2 IS DROPPED ENTIRELY BY A BOARD THAT PASSES `''`, and the row gets
+ * shorter rather than keeping an empty line. It was kept — the box held its
+ * height so the rows stayed a column — and the collection board showed what
+ * that costs: `No card above silver yet` on every row in the game, a sentence
+ * whose only content was that it had none. A board with nothing to say on line
+ * 2 should say nothing and take up no room saying it. The rows still form a
+ * column, because a board's rows are all the same shape as each other; it is
+ * only ACROSS boards that the height now varies, and no screen shows two.
  */
 import type { ReactNode } from 'react';
 import { Fragment, useState } from 'react';
@@ -74,10 +79,25 @@ import type { BoardRowModel } from './community';
  * 2pt gaps, in a box with 4pt of air top and bottom. `LINEUP_ROW_HEIGHT`'s
  * arithmetic exactly, because it is the same row.
  */
-export const BOARD_ROW_HEIGHT = 62;
+/**
+ * 20 for the name, 15 for the detail line, one 2pt gap, 4pt of air top and
+ * bottom.
+ *
+ * ONE HEIGHT, ON EVERY BOARD. It was two — three-line rows on four boards and
+ * two-line rows on the roster board — and the difference was the sentence that
+ * used to sit between the name and the numbers. Six boards each wrote that
+ * sentence differently: `Beat the median in 0 of 2 graded weeks` restated the
+ * W-L-T under it, `No card above silver yet` said nothing at all, and switching
+ * boards changed the row's height and rhythm for no reason a reader could name.
+ *
+ * A constant rather than an intrinsic height because the lists measure rows
+ * without rendering them — `getItemLayout` is what lets the pinned row jump to
+ * row four hundred — and a row that sizes itself cannot be measured in advance.
+ */
+export const BOARD_ROW_HEIGHT = 45;
 
 /** The page's own heading inset, as on the lineup board. */
-const GUTTER = Spacing.three;
+export const GUTTER = Spacing.three;
 
 /**
  * The lead column, at the lineup row's `BADGE_WIDTH` exactly.
@@ -86,10 +106,12 @@ const GUTTER = Spacing.three;
  * and a name that starts at a different x on each would be the sort of drift
  * that is invisible in one screenshot and obvious in the app.
  */
-const RANK_COL = 40;
+export const RANK_COL = 40;
 
 /** Set by the widest label the column holds, as on the lineup row. */
-const RIGHT_WIDTH = 64;
+export const RIGHT_WIDTH = 64;
+
+export const COL_GAP = Spacing.two;
 
 export function BoardRow({
   row,
@@ -142,15 +164,19 @@ export function BoardRow({
    */
   onOpenProfile?: () => void;
   /**
-   * WHICH LINE CARRIES THE LINK, because the manager is not always the name.
+   * WHICH TEXT CARRIES THE LINK, because the manager is not always the name.
    *
    * On five boards line 1 IS the manager. On the cards board line 1 is the
-   * footballer and the manager is line 2 — "Held by dmb" — so the link belongs
-   * there instead. Linking the name on that board would take a reader who
-   * tapped a player's name to somebody's account, which is the wrong page for
-   * the word they pressed.
+   * footballer and the manager is the phrase that ends line 2 — "Held by dmb" —
+   * so the link belongs there instead. Linking the name on that board would
+   * take a reader who tapped a player's name to somebody's account, which is
+   * the wrong page for the word they pressed.
+   *
+   * It used to be `'secondary'`, naming the sentence line that every board has
+   * now dropped. The phrase moved to the `note` slot at the end of the detail
+   * line and the link moved with it.
    */
-  profileOn?: 'name' | 'secondary';
+  profileOn?: 'name' | 'note';
   /**
    * False for a row that is the last thing inside a frame. The rule is the
    * divider between this row and the next one, and against the bottom edge of
@@ -170,7 +196,6 @@ export function BoardRow({
     `Rank ${row.rank}`,
     row.name,
     row.accentToken?.text,
-    row.secondary,
     `${row.figure} ${unit}`,
     row.detail.map((p) => [p.value, p.unit?.toLowerCase()].filter(Boolean).join(' ')).join(', '),
     row.note,
@@ -222,42 +247,28 @@ export function BoardRow({
           {isMe ? <Text style={[Type.micro, styles.you, { color: c.textSecondary }]}>YOU</Text> : null}
         </View>
 
-        {onOpenProfile && profileOn === 'secondary' ? (
-          <Pressable
-            onPress={onOpenProfile}
-            accessibilityRole="link"
-            accessibilityLabel={row.secondary}
-            accessibilityHint="Opens this manager's profile"
-            hitSlop={6}
-            style={({ pressed }) => [styles.secondaryLink, pressed && styles.linkPressed]}>
-            <Text numberOfLines={1} style={[styles.secondary, { color: c.textTertiary }]}>
-              {row.secondary}
-            </Text>
-          </Pressable>
-        ) : (
-          <Text numberOfLines={1} style={[styles.secondary, { color: c.textTertiary }]}>
-            {row.secondary}
-          </Text>
-        )}
-
         {/* The value/unit strip. Each figure reads at body weight in the
-            secondary ink with its unit in 9pt caps beneath the eye — the
-            lineup row's `0.0 TFP` exactly. Groups are set apart by a wider gap
-            than the one inside a group, which is what makes them read as
-            groups without a separator character doing the work. */}
+            secondary ink with its unit in 9pt caps beside it — the lineup row's
+            `0.0 TFP` exactly.
+   
+            THE GROUPS ARE SEPARATED BY A MIDDOT, and they were separated by a
+            wider gap: 4pt inside a pair against 8pt between them, on the
+            argument that spacing alone would make them read as groups "without
+            a separator character doing the work". Four points of difference is
+            not enough at 11pt, and `0.0 AVG 2 WEEKS` ran together into one
+            string of five tokens with no structure in it. The dot is tertiary
+            and is what makes the line scan as `0.0 AVG · 2 WEEKS`. */}
         <View style={styles.detailLine}>
           {row.tier ? <TierMark tier={row.tier} /> : null}
           {row.coin ? <Coin size={9} color={selectionAccent(scheme)} /> : null}
           {row.detail.map((p, i) => (
             <Fragment key={p.key}>
+              {i > 0 ? (
+                <Text style={[styles.value, styles.sep, { color: c.textTertiary }]}>·</Text>
+              ) : null}
               <Text
                 numberOfLines={1}
-                style={[
-                  styles.value,
-                  NUMERIC,
-                  i > 0 && styles.group,
-                  { color: p.accent ?? c.textSecondary },
-                ]}>
+                style={[styles.value, NUMERIC, { color: p.accent ?? c.textSecondary }]}>
                 {p.value}
               </Text>
               {p.unit ? (
@@ -267,10 +278,35 @@ export function BoardRow({
               ) : null}
             </Fragment>
           ))}
+          {/* The tail phrase gets the same separator, so the line has one
+              rhythm rather than a dot between figures and a bare gap before a
+              word. */}
+          {row.note && row.detail.length > 0 ? (
+            <Text style={[styles.value, styles.sep, { color: c.textTertiary }]}>·</Text>
+          ) : null}
           {row.note ? (
-            <Text numberOfLines={1} style={[styles.value, styles.note, { color: c.textTertiary }]}>
-              {row.note}
-            </Text>
+            onOpenProfile && profileOn === 'note' ? (
+              /* `link`, not `button`: react-native-web renders a button role as
+                 a real <button>, and this one sits inside the row's own
+                 pressable. See the note on `onOpenProfile`. */
+              <Pressable
+                onPress={onOpenProfile}
+                accessibilityRole="link"
+                accessibilityLabel={row.note}
+                accessibilityHint="Opens this manager's profile"
+                hitSlop={6}
+                style={({ pressed }) => [styles.noteLink, pressed && styles.linkPressed]}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.value, styles.note, { color: c.textTertiary }]}>
+                  {row.note}
+                </Text>
+              </Pressable>
+            ) : (
+              <Text numberOfLines={1} style={[styles.value, styles.note, { color: c.textTertiary }]}>
+                {row.note}
+              </Text>
+            )
           ) : null}
         </View>
       </View>
@@ -327,7 +363,7 @@ const styles = StyleSheet.create({
   content: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: Spacing.two,
+    gap: COL_GAP,
     paddingHorizontal: GUTTER,
   },
   lines: { flex: 1, minWidth: 0, gap: 2 },
@@ -356,18 +392,30 @@ const styles = StyleSheet.create({
   /* The link is a wrapper around the name, so it inherits the name's own right
      to give way and adds nothing to the line's height. */
   nameLink: { flexShrink: 1, minWidth: 0 },
-  secondaryLink: { flexShrink: 1, minWidth: 0, alignSelf: 'flex-start' },
   linkPressed: { opacity: 0.6 },
-  secondary: { fontSize: 11, lineHeight: 15, fontWeight: '500', flexShrink: 1, minWidth: 0 },
+  /* Wraps the note so the link adds nothing to the line's height, exactly as
+     `nameLink` wraps the name. */
+  noteLink: { flexShrink: 1, minWidth: 0 },
   detailLine: {
     flexDirection: 'row',
     alignItems: 'baseline',
+    /* One gap everywhere on the line: 4pt between a figure and its unit, and
+       4pt either side of the separator. The rhythm is carried by the dot now,
+       not by two different gaps — see the note above. */
     gap: Spacing.one,
     minWidth: 0,
     height: 15,
-    /* Out from under the right column and across the full row. Nothing is
-       drawn opposite this line, so nothing is overlapped — see RIGHT_WIDTH. */
-    marginRight: -(RIGHT_WIDTH + Spacing.two),
+    /* IT STOPS AT THE FIGURE COLUMN, and that is a fix rather than a
+       restriction. This line used to bleed out under the right column on a
+       negative margin, justified as "nothing is drawn opposite this line" —
+       true while the row was three lines tall and the figure and its unit sat
+       opposite lines 1 and 2. The row is two lines now, so the detail line is
+       level with the unit label, and the bleed put `Leading by 33` straight
+       through `RUNGS`.
+   
+       What it costs is width: the line gives up about 72pt and its tail phrase
+       ellipsises earlier. `note` is the only thing on it allowed to shrink, so
+       the figures are never the part that goes. */
   },
   /* A figure on the detail line. Body weight, so it carries; the unit beside
      it is 9pt caps and does not. */
@@ -375,12 +423,12 @@ const styles = StyleSheet.create({
   /* Never shrinks and never wider than the word: it is the unit on the figure
      before it, not a column of its own. */
   unit: { flexShrink: 0, lineHeight: 15 },
-  /* 4pt inside a value/unit group, 8 between groups. The extra half is what
-     separates `31 GS` from `84.3 PER START` without a middot. */
-  group: { marginLeft: Spacing.one },
+  /* Never shrinks: a separator that gave way would let two groups collide back
+     into the string the dot exists to break up. */
+  sep: { flexShrink: 0, fontWeight: '400' },
   /* The tail phrase, and the only thing on the line allowed to give way — the
      figures before it are fixed-length and this is not. */
-  note: { flexShrink: 1, minWidth: 0, marginLeft: Spacing.one, fontWeight: '500' },
+  note: { flexShrink: 1, minWidth: 0, fontWeight: '500' },
   /* Centred against the whole row rather than pinned to its top: the figure and
      its label are a pair, not two rows of a table. */
   right: { width: RIGHT_WIDTH, alignSelf: 'center', alignItems: 'flex-end', gap: 2 },

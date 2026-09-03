@@ -29,7 +29,7 @@ import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { MenuButton, MenuHeading, MenuItem } from '@/components/ui/MenuButton';
 import { DASH } from '@/components/ui/DataTable';
 import { quietScrollbar } from '@/components/ui/scroll-strip';
-import { Colors, Spacing, Type, type CardTier } from '@/constants/theme';
+import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
@@ -38,12 +38,13 @@ import { useOpenManager } from '@/components/friends/use-open-manager';
 import { BoardRow } from './BoardRow';
 import { BoardTop, hasBoardTop } from './BoardTop';
 import {
+  BOARD_FORMAT,
   BOARD_META,
-  fetchTopTiers,
-  withTopTier,
+  standingNote,
   type BoardId,
   type BoardRowModel,
 } from './community';
+import { BoardColumns } from './BoardColumns';
 import { WeekBreakdown } from './WeekBreakdown';
 import {
   BOARD_LIMIT,
@@ -60,9 +61,8 @@ import {
   type WeekBoards,
 } from './board';
 
-/** Stable identities so the memos below do not recompute on every render. */
+/** A stable identity so the memos below do not recompute on every render. */
 const NO_WEEKS: WeekBoards = [];
-const NO_TIERS = new Map<string, CardTier>();
 
 export function PointsBoard({
   slate,
@@ -95,8 +95,6 @@ export function PointsBoard({
   const [weeks, setWeeks] = useState<WeekBoards | null>(null);
   const [scope, setScope] = useState('season');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  /** The tier mark each row wears — see `board_top_tiers`. */
-  const [topTiers, setTopTiers] = useState<Map<string, CardTier>>(NO_TIERS);
 
   const loadedSlate = useRef<string | null>(null);
   const list = useRef<FlatList<BoardRowModel>>(null);
@@ -125,16 +123,11 @@ export function PointsBoard({
         setWeeks(null);
       }
 
-      // Phase two, in parallel: the week boards that fill in the derived
-      // columns, and the tier marks. Both are enrichment — neither can fail
-      // the board, and `fetchTopTiers` swallows its own error to an empty map.
-      const [boards, tiers] = await Promise.all([
-        fetchWeekBoards(season, seasonType, slate?.week ?? 0),
-        fetchTopTiers(),
-      ]);
+      // Phase two: the week boards that fill in the derived columns. Pure
+      // enrichment — it cannot fail the board, which has already rendered.
+      const boards = await fetchWeekBoards(season, seasonType, slate?.week ?? 0);
       if (!live()) return;
       setWeeks(boards);
-      setTopTiers(tiers);
     },
     [season, seasonType, slate?.week],
   );
@@ -158,8 +151,8 @@ export function PointsBoard({
     [activeScope, entries, boards],
   );
   const boardRows = useMemo(
-    () => withTopTier(standingRows(rows, activeScope, seasonType, detailKnown), topTiers),
-    [rows, activeScope, seasonType, detailKnown, topTiers],
+    () => standingRows(rows, activeScope, seasonType, detailKnown),
+    [rows, activeScope, seasonType, detailKnown],
   );
   /* The expansion needs the week lines, which are a property of the STANDING
      rather than of the row drawn from it. A map rather than a find, so opening
@@ -201,22 +194,33 @@ export function PointsBoard({
   // Everything that changes a row's appearance without changing `boardRows`.
   const listExtra = useMemo(() => ({ expandedId, meId }), [expandedId, meId]);
 
-  const meta = BOARD_META.points;
-
-  /* THE SAME SKELETON AS EVERY OTHER BOARD, in the same order: the board strip
+  /* THE SAME SKELETON AS EVERY OTHER BOARD, in the same order: the board bar
      and this board's own control, a line saying what the rows are counted over,
-     the top three with your row under them, then the list under one sentence
-     saying what it ranks. Only the last of those is inside the list — see
-     `BoardTop` for why the rest is pinned.
+     your own row with its caption, the column header, then the rows. ALL of it
+     is pinned now — see `BoardColumns` for why the one thing that used to
+     scroll, the blurb, is gone rather than moved. */
 
-     This board used to open on its week tabs with no heading at all — the only
-     board that never said what it ranked — because its tabs and the other
-     five's headings were built from two different lists. See `BOARD_IDS`. */
-  const listHeader = (
-    <View style={styles.head}>
-      <Text style={[Type.bodyRelaxed, styles.blurb, { color: c.textSecondary }]}>{meta.blurb}</Text>
-    </View>
-  );
+  /**
+   * Your own row, with what it would take to move one place written onto the
+   * end of its detail line — see `standingNote`.
+   *
+   * A COPY of the row rather than an edit to it: the same object is also in the
+   * list below, where the note would be a second sentence nobody asked for.
+   *
+   * Guarded on `detailKnown` for the same reason every other derived number on
+   * this board is: until the week boards land the ranks around yours are not
+   * settled, and a target computed against them would be a wrong statement
+   * where a missing one costs nothing.
+   */
+  const mineWithNote = (() => {
+    if (!mine || !detailKnown) return mine;
+    const note = standingNote({
+      rank: mine.rank,
+      toNext: gapTo(boardRows, mine.rank - 1, mine.value),
+      leadingBy: gapTo(boardRows, 2, mine.value),
+    });
+    return note ? { ...mine, note } : mine;
+  })();
 
   /**
    * The scope, spelled out for the line under the chips.
@@ -251,12 +255,17 @@ export function PointsBoard({
     <BoardControls
       board={board}
       onBoardChange={onBoardChange}
-      /* The slate, the slice of it on screen, and how many rows that slice
-         holds. "Loading week detail…" while phase two is in flight, because
-         the count is the one part of the line that changes when it lands. */
-      context={`${slateContext} · ${scopeContext} · ${
-        detailKnown ? `${rows.length} ranked` : 'loading week detail…'
-      }`}>
+      /* The slate, the slice of it on screen, what the board ranks, and how
+         many rows that slice holds. The description is the same sentence the
+         picker showed against this board's name — see `BOARD_META.description`.
+         "Loading week detail…" while phase two is in flight, because the count
+         is the one part of the line that changes when it lands. */
+      context={[
+        slateContext,
+        scopeContext,
+        BOARD_META.points.description,
+        detailKnown ? `${rows.length} ranked` : 'loading week detail…',
+      ].join(' · ')}>
       {/* A lone "Season" option is chrome, not a choice.
 
           The circle carries the VALUE — `SZN`, `W3` — rather than a glyph for
@@ -300,14 +309,21 @@ export function PointsBoard({
       {hasBoardTop(meId) ? (
         <View style={styles.top}>
           <BoardTop
-            mine={mine}
+            mine={mineWithNote}
             meId={meId}
-            unit="points"
+            unit="fantasy points"
             absent={absentReason}
             onJumpToMine={jumpToMine}
+            label="Your team"
           />
         </View>
       ) : null}
+      {/* Pinned with everything above it: a heading that scrolls away is a
+          decoration on the first screenful. See `BoardColumns`. */}
+      <BoardColumns
+        section="Rankings"
+        figureLabel={activeScope === 'season' ? 'TFP' : 'PTS'}
+      />
       <FlatList
         {...quietScrollbar}
         ref={list}
@@ -332,13 +348,12 @@ export function PointsBoard({
             }}
           />
         }
-        ListHeaderComponent={listHeader}
         ListEmptyComponent={<EmptyBoard slate={slate} />}
         renderItem={({ item }) => (
           <BoardRow
             row={item}
             isMe={item.userId === meId}
-            unit="points"
+            unit="fantasy points"
             /* The row's own press is the week-by-week breakdown, so the profile
                is a link on the name — see `onOpenProfile`. */
             onOpenProfile={() => openManager(item.userId, item.name)}
@@ -359,12 +374,20 @@ export function PointsBoard({
   );
 }
 
-/** The distance to the top, or null when there is no meaningful gap to state. */
-function gapNote(s: Standing, rows: Standing[], leader: number): string | undefined {
-  if (rows.length < 2) return undefined;
-  const gap = s.rank === 1 ? s.points - rows[1].points : leader - s.points;
-  if (!(gap > 0)) return undefined;
-  return s.rank === 1 ? `Leading by ${gap.toFixed(1)}` : `${gap.toFixed(1)} behind`;
+/**
+ * The distance from one row to the figure at a given rank, formatted.
+ *
+ * Reads the rank off the ROWS rather than trusting an index: `rank` is the
+ * database's own answer and an array position is only ever a guess that agrees
+ * with it — which is the same distinction `community.ts` makes about never
+ * sorting on the client. Null when there is no such rank, which is the normal
+ * case for `leadingBy` on a board of one.
+ */
+function gapTo(rows: BoardRowModel[], rank: number, mine: number): string | null {
+  const target = rows.find((r) => r.rank === rank);
+  if (!target) return null;
+  const gap = Math.abs(target.value - mine);
+  return gap > 0 ? BOARD_FORMAT.points(gap) : null;
 }
 
 /**
@@ -375,11 +398,8 @@ function gapNote(s: Standing, rows: Standing[], leader: number): string | undefi
  * pressable row and a per-row expansion. Only the last two are still special,
  * and `BoardRow` takes both as props, so what is left is a mapping.
  *
- * WHAT GOES ON EACH LINE, AND WHY IT CHANGES WITH THE SCOPE. On the season
- * board the question behind a row is "how good are they" — an average and a
- * best week answer it. On a WEEK board the row is one Sunday, and the useful
- * context is the opposite: where that Sunday's performer sits over the season,
- * which is the column the table used to call SZN.
+ * WHAT GOES ON THE DETAIL LINE, AND WHY IT CHANGES WITH THE SCOPE — see the
+ * note in the mapping below.
  *
  * Em dashes, not zeroes, until the week boards land: `detailKnown` is false for
  * a round trip after the season board renders, and an average of 0.0 is a claim
@@ -392,32 +412,24 @@ export function standingRows(
   detailKnown: boolean,
 ): BoardRowModel[] {
   const oneDp = (n: number) => n.toFixed(1);
-  /* The gap to the top, which is the leaderboard's version of the distance the
-     lineup row prints at the end of its third line — `0/200 to Silver Tier`.
-     A column of totals with no gaps marked on it is a list, not a race. */
-  const leader = rows[0]?.points ?? 0;
 
   return rows.map((s) => {
     const avg = s.avg === null ? DASH : oneDp(s.avg);
-    const best =
-      s.best === null
-        ? null
-        : `${oneDp(s.best.points)} in ${weekTabLabel(seasonType, s.best.week)}`;
-
     return {
       key: s.userId,
       rank: s.rank,
       userId: s.userId,
       name: s.name,
       movement: { places: s.movement, known: detailKnown },
-      // The occasion behind the total: on the season board the best week they
-      // have posted, on a week board where that week's performer stands overall.
-      secondary:
-        scope === 'season'
-          ? best
-            ? `Best week ${best}`
-            : 'No scored week yet'
-          : `Season rank ${s.seasonRank ?? DASH}`,
+      /* ONE LINE, and what is on it still changes with the scope — that part of
+         the old sentence was right. On the season board the question behind a
+         row is "how good are they", which an average and a count of weeks
+         answer. On a WEEK board the row is one Sunday, and the useful context
+         is where that Sunday's performer sits over the season — the column the
+         table used to call SZN.
+   
+         What went is `Best week 0.0 in Pre 3`. It is the BEST WEEK board's
+         whole subject, restated on a board that ranks by season total. */
       detail: [
         { key: 'avg', value: avg, unit: 'AVG' },
         {
@@ -425,13 +437,20 @@ export function standingRows(
           value: String(s.weeksPlayed),
           unit: s.weeksPlayed === 1 ? 'WEEK' : 'WEEKS',
         },
+        ...(scope === 'season'
+          ? []
+          : [{ key: 'szn', value: String(s.seasonRank ?? DASH), unit: 'SZN RANK' }]),
       ],
-      // Guarded rather than trusted. `leaderboard()` ranks by points descending
-      // so the gap is always positive — but a board whose rank and points ever
-      // disagreed would print "Leading by -14.3", which is worse than silence.
-      note: gapNote(s, rows, leader),
+      // The `14.3 behind` that used to end this line is the BEHIND column now,
+      // stated the same way it is on the other five boards — see `withBehind`.
       figure: oneDp(s.points),
-      figureLabel: 'PTS',
+      /* `TFP` on the season board because that is what the figure IS — every
+         point scored, which is the abbreviation the lineup row and the card
+         profile already use. On a WEEK board the same column holds one week's
+         score, and calling that a career total would be wrong rather than
+         short. */
+      figureLabel: scope === 'season' ? 'TFP' : 'PTS',
+      value: s.points,
     };
   });
 }
@@ -462,14 +481,11 @@ function EmptyBoard({ slate }: { slate: Slate | null }) {
 }
 
 const styles = StyleSheet.create({
-  head: {
-    paddingBottom: Spacing.two,
-    paddingHorizontal: Spacing.three,
-  },
-  /* The pinned frame's own gutter, matching the chips above it and the rows'
-     content below it. */
-  top: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
-  blurb: { maxWidth: 560 },
+  /* No horizontal padding: the row inside bleeds to the page edges exactly as
+     the list's rows do, which is the property that lines their columns up. The
+     heading and caption around it take the gutter back for themselves — see
+     `BoardTop`. */
+  top: { paddingBottom: Spacing.two },
   fill: { flex: 1 },
   /* VERTICAL ONLY. The rows are bled to the edges of the page, exactly as the
      lineup board bleeds its cards, so the horizontal inset belongs to whatever
