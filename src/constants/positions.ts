@@ -154,11 +154,23 @@ export const POSITION_NAMES: Record<PositionKey, string> = {
  */
 export const SLOT_POSITIONS: Record<string, Position[]> = {
   QB: ['QB'],
+  /* The BARE codes as well as the numbered ones. `positionsForSlot` strips a
+     trailing digit before its second lookup, so `RB3` — which the eight-slot
+     board never had but a manager-built contest can — needs somewhere to land.
+     Without these it degrades to a solid badge coloured from its label, which
+     is right for RB and WR and wrong for the two combination slots below. */
+  RB: ['RB'],
   RB1: ['RB'],
   RB2: ['RB'],
+  WR: ['WR'],
   WR1: ['WR'],
   WR2: ['WR'],
   TE: ['TE'],
   FLEX: ['RB', 'WR', 'TE'],
+  /* SUPERFLEX WAS MISSING, and it is not new: the seeded `superflex` format has
+     had an SFLEX slot since `20260901050000`, and with nothing here it drew as
+     a grey "other" badge — the one slot in the game whose whole point is that
+     it takes a quarterback OR a skill player, saying neither. */
+  SFLEX: ['QB', 'RB', 'WR', 'TE'],
   K: ['PK'],
 };

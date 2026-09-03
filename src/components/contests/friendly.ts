@@ -47,10 +47,23 @@ export type SlotPosition = 'QB' | 'RB' | 'WR' | 'TE' | 'PK';
 
 export const POSITIONS: SlotPosition[] = ['QB', 'RB', 'WR', 'TE', 'PK'];
 
-/** One slot of a format being built. `positions` is never empty. */
+/**
+ * One slot of a format being built.
+ *
+ * IT HAS NO NAME, AND THAT IS THE SIMPLIFICATION. The builder used to ask for
+ * one — a six-character text field per slot, next to the position toggles — and
+ * it was the single worst control on the screen: a required, validated, freely
+ * typed field whose only job was to label a thing the player had already
+ * described by tapping RB, WR and TE. Two of the eight refusals the server can
+ * give were about it.
+ *
+ * The label is DERIVED instead (`slotLabels`), and derived so that the standard
+ * shapes come out with the standard names — three flex slots are FLEX1, FLEX2,
+ * FLEX3, which is exactly what the seeded `flex3` format calls them. That is
+ * what keeps the server's format deduplication working now that nobody types
+ * the names: build Flex Three by hand and you get `flex3` itself.
+ */
 export type DraftSlot = {
-  /** 1–6 characters, A–Z and 0–9. Upper-cased on the way to the server. */
-  slot: string;
   positions: SlotPosition[];
 };
 
@@ -146,6 +159,59 @@ export const feeRange = (slots: number): { min: number; max: number } => ({
   max: slots * FEE_CEILING_PER_SLOT - 1,
 });
 
+/**
+ * What a set of positions is CALLED.
+ *
+ * The five singles keep their own name, and the two combinations the game has
+ * words for get them. Anything else is either a two-position pair written out
+ * (`WRTE`) or, past that, just `SLOT` — a five-character ceiling, because a
+ * repeated label takes a digit and the column allows six.
+ */
+function baseLabel(positions: SlotPosition[]): string {
+  const sig = [...new Set(positions)]
+    .sort((a, b) => POSITIONS.indexOf(a) - POSITIONS.indexOf(b))
+    .join('/');
+
+  if (sig === 'RB/WR/TE') return 'FLEX';
+  if (sig === 'QB/RB/WR/TE') return 'SFLEX';
+  /* `PK` is the position on a player and `K` is what a lineup slot has always
+     been called — `main` names its kicker slot K. The label follows the board,
+     not the data. */
+  if (sig === 'PK') return 'K';
+  if (!sig.includes('/')) return sig;
+
+  const flat = sig.replace(/\//g, '');
+  return flat.length <= 5 ? flat : 'SLOT';
+}
+
+/**
+ * Every slot's label, numbered where a label repeats.
+ *
+ * One of a kind keeps the bare word — a single tight end slot is `TE`, not
+ * `TE1` — and repeats count from one. That is not a style choice: it is what
+ * reproduces the seeded formats EXACTLY, which is what lets the server
+ * recognise a hand-built standard shape as the real thing rather than as the
+ * hundredth copy of it.
+ *
+ *   three flex     FLEX1 FLEX2 FLEX3          = flex3
+ *   three WR       WR1 WR2 WR3                = wr_room
+ *   QB/flex/sflex  QB FLEX SFLEX              = superflex
+ *   the full one   QB RB1 RB2 WR1 WR2 TE FLEX = roster7
+ */
+export function slotLabels(slots: DraftSlot[]): string[] {
+  const base = slots.map((s) => baseLabel(s.positions));
+  const total = new Map<string, number>();
+  for (const b of base) total.set(b, (total.get(b) ?? 0) + 1);
+
+  const seen = new Map<string, number>();
+  return base.map((b) => {
+    if ((total.get(b) ?? 0) === 1) return b;
+    const n = (seen.get(b) ?? 0) + 1;
+    seen.set(b, n);
+    return `${b}${n}`;
+  });
+}
+
 /** The middle of the band, which is what a fresh draft opens on. */
 export const suggestedFee = (slots: number): number => {
   const { min, max } = feeRange(slots);
@@ -186,13 +252,9 @@ export function draftProblems(d: ContestDraft): string[] {
     p.push(`A contest has between 1 and ${MAX_SLOTS} slots.`);
   }
 
-  const names = d.slots.map((s) => s.slot.trim().toUpperCase());
-  if (names.some((n) => !/^[A-Z0-9]{1,6}$/.test(n))) {
-    p.push('A slot name is 1 to 6 letters or digits, like QB or FLEX1.');
-  }
-  if (new Set(names).size !== names.length) {
-    p.push('Two slots cannot share a name.');
-  }
+  /* NO NAME CHECKS. `slotLabels` generates them, and generates them unique —
+     the two refusals that used to live here were about a text field that no
+     longer exists. */
   if (d.slots.some((s) => s.positions.length === 0)) {
     p.push('Every slot needs at least one position it accepts.');
   }
@@ -287,11 +349,14 @@ export function shapeName(slots: DraftSlot[]): string {
 export async function createFriendly(d: ContestDraft): Promise<BuiltContest> {
   const { data, error } = await supabase.rpc('create_friendly_contest', {
     p_name: d.name.trim(),
-    p_slots: d.slots.map((s, i) => ({
-      slot: s.slot.trim().toUpperCase(),
-      positions: s.positions,
-      ord: i + 1,
-    })),
+    p_slots: (() => {
+      const labels = slotLabels(d.slots);
+      return d.slots.map((s, i) => ({
+        slot: labels[i],
+        positions: s.positions,
+        ord: i + 1,
+      }));
+    })(),
     p_entry_fee: d.entryFee,
     p_max_entrants: d.maxEntrants,
     p_win_condition: d.winCondition,
