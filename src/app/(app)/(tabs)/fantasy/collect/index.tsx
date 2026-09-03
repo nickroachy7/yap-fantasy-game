@@ -52,7 +52,7 @@
  * `RosterCut` for what it is claiming.
  */
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -64,7 +64,6 @@ import {
   View,
 } from 'react-native';
 
-import { SelectButton } from '@/components/collection/CollectionFilters';
 import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { CollectionValue } from '@/components/collection/CollectionValue';
 import { RosterAlert } from '@/components/collection/RosterAlert';
@@ -170,8 +169,12 @@ export default function InventoryScreen() {
    * copy of a card that no longer exists. Ids survive that, and anything the
    * selection needs is looked up against the current rows. See `selectedCards`.
    */
-  const [selecting, setSelecting] = useState(false);
+  /* DERIVED, NOT A MODE. The circle in every row is always live, so "are we
+     selecting" is simply "has anything been picked" — there is no state to
+     enter and none to leave. What it still gates is the row's explanation of
+     itself (the STARTING and IN SET marks) and the bar at the bottom. */
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const selecting = selected.size > 0;
 
   /* ---- list geometry --------------------------------------------------- *
    * THERE ISN'T ANY, AND THAT IS THE POINT. This screen used to measure itself
@@ -317,18 +320,11 @@ export default function InventoryScreen() {
   const bulk = useBulk(clearSelection);
 
   /**
-   * HOW THE MODE WAS OPENED, because it decides how it closes.
-   *
-   * A mode opened by HOLDING a card was opened *about that card*: untick it and
-   * the mode has nothing left to be about, so emptying the selection closes it
-   * and one tap undoes the hold. A mode opened by the BUTTON starts empty by
-   * definition — closing it at zero would make the button unpressable.
-   *
-   * A ref rather than state: nothing renders differently for it, and it is read
-   * inside the tick handler that sets the selection.
+   * TICK OR UNTICK ONE CARD. Called by the circle in the row and by nothing
+   * else — there is no mode to open first, so there is no longer any question
+   * of how the mode was opened or when it should close. It closes when the last
+   * tick comes off, because `selecting` is just "is anything picked".
    */
-  const heldOpen = useRef(false);
-
   const toggleCard = useCallback(
     (id: string) => {
       /* A CARD YOU ARE STARTING CANNOT BE PICKED. Selling one is refused by the
@@ -341,11 +337,6 @@ export default function InventoryScreen() {
       }
       setBlockedNote(null);
 
-      /* THE LAST TICK TAKES THE MODE WITH IT — see `heldOpen`. Decided out here
-         from the CURRENT selection rather than inside the updater below: an
-         updater has to be pure, and React may run it more than once. */
-      const emptying = selected.size === 1 && selected.has(id);
-
       setSelected((held) => {
         const next = new Set(held);
         if (next.has(id)) next.delete(id);
@@ -355,67 +346,10 @@ export default function InventoryScreen() {
         else if (next.size < SELECTION_MAX) next.add(id);
         return next;
       });
-
-      if (emptying && heldOpen.current) {
-        heldOpen.current = false;
-        setSelecting(false);
-      }
     },
-    [selected, starters, all],
+    [starters, all],
   );
 
-  /* Leaving the mode drops the selection with it. A set of ticks you cannot see
-     is a set of ticks that will surprise somebody the next time the mode opens.
-     Blocked mid-run: the ids are what the call in flight is about. */
-  const toggleSelecting = useCallback(() => {
-    if (bulk.busy) return;
-    /* Pressed the button, so the mode is the button's however it was opened —
-       an empty selection is a state it is allowed to sit in. See `heldOpen`. */
-    heldOpen.current = false;
-    setBlockedNote(null);
-    setSelecting((on) => {
-      if (on) setSelected(new Set());
-      return !on;
-    });
-  }, [bulk.busy]);
-
-  /**
-   * HOLDING A CARD OPENS THE MODE, with that card already ticked.
-   *
-   * The button on the toolbar opens an EMPTY mode, which is the right thing
-   * when you know you are about to pick several and have not decided which.
-   * It is the wrong thing in the far more common case: you are looking at a
-   * card, you want it and three others gone, and the button makes you leave
-   * the card, press, come back and find it again. The hold is the same
-   * gesture every phone photo library uses for exactly this, and it arrives
-   * where the intent already is.
-   *
-   * NOT A TOGGLE. Holding a card while the mode is already open does nothing
-   * here — the cell's ordinary press is the toggle by then, and a hold that
-   * also toggled would fire on the way to a tap that had already fired.
-   *
-   * The bulk guard is `toggleSelecting`'s, for its reason: the ids are what a
-   * call in flight is about, so the mode cannot be opened out from under one.
-   *
-   * A STARTER OPENS THE MODE WITH NOTHING TICKED rather than refusing to open
-   * it. The hold is a request for the mode, and the card it was made on is
-   * merely the obvious first pick; denying the whole gesture over one
-   * ineligible card would leave the reader holding a cell that does nothing at
-   * all. The mode opens, the cell is drawn blocked, and the bar says why.
-   */
-  const holdCard = useCallback(
-    (id: string) => () => {
-      if (selecting || bulk.busy) return;
-      const blocked = starters.has(id);
-      heldOpen.current = !blocked;
-      setSelecting(true);
-      setSelected(blocked ? new Set() : new Set([id]));
-      setBlockedNote(
-        blocked ? cannotSelect(all.find((card) => card.id === id)?.playerName) : null,
-      );
-    },
-    [selecting, bulk.busy, starters, all],
-  );
 
   /* `addable` LIVED HERE, and it went with the arming it fed. It was the list a
      press of Select would tick — the visible cards minus the starters, minus
@@ -427,35 +361,6 @@ export default function InventoryScreen() {
      The two subtractions it made are not lost: `toggleCard` still refuses a
      starter, and `BulkBar` still counts what is actually ticked. */
 
-  /**
-   * Pressing Select, which does one of two things depending on the row.
-   *
-   * NOTHING FILTERED: opens an empty mode, exactly as the old square did.
-   * A PILE FILTERED: opens the mode with that whole pile already ticked, which
-   * is the move `SelectButton`'s count is promising. Twenty taps become one,
-   * and a player who came to the row only to narrow the grid is handed bulk
-   * selection rather than having to go looking for it.
-   *
-   * `heldOpen` is cleared for `toggleSelecting`'s reason: a mode opened this
-   * way is not about one card, so emptying the selection must not close it out
-   * from under someone who is re-picking.
-   */
-  const startSelecting = useCallback(() => {
-    if (bulk.busy) return;
-    heldOpen.current = false;
-    setBlockedNote(null);
-    setSelecting(true);
-    /* IT ALWAYS OPENS EMPTY NOW, and the arming that used to happen here went
-       with the filters.
-
-       The rule was: a press from a NARROWED list ticks what the filter left, a
-       press from the whole collection ticks nothing. Unfiltered, `addable` is
-       the whole roster — including the cards you are playing on Sunday — and
-       arming that is one press from a confirmation to sell them; a selection
-       you have not narrowed is one you have not thought about. With no filters
-       on the page every press is the second kind, so the branch is not a branch
-       any more. */
-  }, [bulk.busy]);
 
   /**
    * A player who owns nothing gets the packs sheet opened FOR them, once.
@@ -579,11 +484,6 @@ export default function InventoryScreen() {
                   load-bearing. */}
               <RosterCount roster={roster} />
               <View style={styles.spacer} />
-              <SelectButton
-                on={selecting}
-                disabled={bulk.busy}
-                onPress={selecting ? toggleSelecting : startSelecting}
-              />
               <View style={styles.doors}>
                 <DoorChip
                   label={SETS.label}
@@ -678,11 +578,14 @@ export default function InventoryScreen() {
                   card={item}
                   selecting={selecting}
                   selected={selected.has(item.id)}
-                  /* Only inside the mode. Outside it a starter is an ordinary
-                     row that opens its own profile. */
-                  blocked={selecting && starters.has(item.id)}
-                  onPress={selecting ? () => toggleCard(item.id) : openCard(item)}
-                  onLongPress={holdCard(item.id)}
+                  /* Only once something is picked. A resting collection does not
+                     need every starter labelled — see `InventoryRow.selecting`. */
+                  blocked={starters.has(item.id)}
+                  /* The row opens the card, ALWAYS. The circle is the only thing
+                     that ticks, so the tap people already know never changes
+                     meaning under them. */
+                  onPress={openCard(item)}
+                  onToggle={() => toggleCard(item.id)}
                 />
               )}
             />

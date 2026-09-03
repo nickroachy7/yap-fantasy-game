@@ -131,27 +131,38 @@ export default function LeadersScreen() {
            for the top fifty; on a position board they must not — a receiver
            board that reads 1, 4, 9, 14 is the filtered table this page exists
            not to be. */
-        /* WHAT A CARD OF HIM FETCHES, in place of the season's points.
+        /* THE COLLECTION ROW'S PAIR, on a board of players rather than of
+           copies: how he SCORES over what a card of him is worth.
  
-           The figure column holds one number and this is the one that belongs
-           beside a rank: the board is ordered by what the market thinks of a
-           player, and the price is that opinion in coins. Season points are the
-           right figure on Search, where you arrive with a name and want to know
-           how he has done — and they are a dash for everybody here until a week
-           has been played, which is most of the reason this board had nothing
-           to say in September.
+           Both halves were already here and neither was readable — the price
+           had taken the figure column outright, which put the season's
+           production nowhere, and before that the production was there and the
+           price was nowhere. They are two answers to one question and the
+           collection has drawn them stacked all along. Two boards drawing the
+           same pair two different ways is the drift `Identity` exists to stop.
  
-           It is the BASE — bronze, nothing earned — so two players are compared
-           on the part of the price that is about them. A copy in hand is worth
-           this times its tier, plus what it has banked. See
-           `player_base_price`. */
+           AVERAGE, NOT TOTAL. A season total rewards availability — sixteen
+           quiet games out-scores nine good ones — and this board is ordered by
+           what the market expects NEXT, which is a rate. It is also the only
+           form of the number that means anything in September, when the totals
+           are all zero.
+ 
+           A DASH WHERE HE HAS NOT PLAYED, never 0.0. Every row on this board is
+           unplayed until week one, and printing a nought for all fifty would be
+           the board inventing a bad season for the best players in football.
+ 
+           The price is the BASE — bronze, nothing earned — so two players are
+           compared on the part of it that is about them. A copy in hand is
+           worth this times its tier plus what it has banked, which is still
+           `card_prices`. */
         .map((player, i) => ({
           player,
           rank: i + 1,
-          figure:
-            player.baseCoins === null
-              ? undefined
-              : { value: player.baseCoins.toLocaleString(), label: 'COINS' },
+          figure: {
+            value: player.gamesPlayed > 0 ? player.fpPerGame.toFixed(1) : null,
+            label: 'FP/G',
+            coins: player.baseCoins,
+          },
         })),
       pool: inPool.length,
     };

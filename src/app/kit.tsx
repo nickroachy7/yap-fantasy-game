@@ -1395,11 +1395,11 @@ function Kit() {
                      the directory shows the season's points. The last row has
                      no value row at all and falls back to FP, which is the
                      state a player the market has no opinion about lands in. */
-                  figure={
-                    r.player.baseCoins === null
-                      ? undefined
-                      : { value: r.player.baseCoins.toLocaleString(), label: 'COINS' }
-                  }
+                  figure={{
+                    value: r.player.gamesPlayed > 0 ? r.player.fpPerGame.toFixed(1) : null,
+                    label: 'FP/G',
+                    coins: r.player.baseCoins,
+                  }}
                 />
               ))}
             </Panel>

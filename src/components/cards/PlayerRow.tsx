@@ -81,6 +81,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { PlayerAvatar, AVATAR_SIZE } from './PlayerAvatar';
 import { DASH } from '@/components/ui/DataTable';
 import { positionColors } from '@/constants/positions';
+import { Coin } from '@/components/shell/AppHeader';
 import { Colors, NUMERIC, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { injuryCode, injuryWeight } from '@/lib/injury';
@@ -148,11 +149,33 @@ const EMPTY_MARKET = { copies: 0, bronze: 0, silver: 0, gold: 0, diamond: 0, bes
  * `played` above.
  */
 export type RowFigure = {
-  value: string;
+  /**
+   * Null means the caller HAS the slot but has no number for it — an unplayed
+   * player on a board that still wants his price underneath. It draws the same
+   * quiet dash an unplayed row draws for itself, rather than the em dash at
+   * figure weight, which reads as a redaction rather than an absence. Passing
+   * `DASH` as a string would get the loud one; that is why this is nullable
+   * instead.
+   */
+  value: string | null;
   /** The unit under it — `FP`, `WK`. Kept short; it sits in a 52pt column. */
   label: string;
   /** Overrides the figure's colour. For a signed delta, which reads as one. */
   color?: string;
+  /**
+   * COINS UNDER THE FIGURE, in place of the unit label.
+   *
+   * The second line is a unit on most surfaces and a second QUANTITY here, and
+   * the pair is deliberately the collection row's: a figure about the player
+   * over what a card of him is worth. Two boards drawing the same two numbers
+   * two different ways is the thing the shared `Identity` was built to stop,
+   * and the figure column had drifted into being the exception.
+   *
+   * The coin glyph is what makes the line legible without a caption — the
+   * collection makes the same argument in `InventoryRow.ValueFigure`, and it is
+   * why `label` is not merely set to `COINS`.
+   */
+  coins?: number | null;
 };
 
 export type PlayerRowProps = {
@@ -204,6 +227,7 @@ function PlayerRowInner({ player, onPress, fixture, figure, strip, rank }: Playe
 
   const weight = injuryWeight(player.injuryStatus);
   const played = player.gamesPlayed > 0;
+  const gold = TierColors[scheme].gold.accent;
 
   return (
     <Pressable
@@ -314,11 +338,15 @@ function PlayerRowInner({ player, onPress, fixture, figure, strip, rank }: Playe
               A supplied figure is never dashed: the caller has already decided
               it is worth printing, and a screen that ranks by it cannot then
               claim not to have it. */}
-          {figure ? (
+          {figure && figure.value !== null ? (
             <Text
               numberOfLines={1}
               style={[styles.figureValue, NUMERIC, { color: figure.color ?? c.text }]}>
               {figure.value}
+            </Text>
+          ) : figure ? (
+            <Text numberOfLines={1} style={[styles.figureEmpty, NUMERIC, { color: c.textTertiary }]}>
+              {DASH}
             </Text>
           ) : played ? (
             <Text numberOfLines={1} style={[styles.figureValue, NUMERIC, { color: c.text }]}>
@@ -329,9 +357,27 @@ function PlayerRowInner({ player, onPress, fixture, figure, strip, rank }: Playe
               {DASH}
             </Text>
           )}
-          <Text style={[Type.micro, styles.figureLabel, { color: c.textTertiary }]}>
-            {figure?.label ?? 'FP'}
-          </Text>
+          {/* A COIN AND A NUMBER, or the unit — never both. Where a caller has
+              a price the second line is what the card fetches; everywhere else
+              it is what the figure above is measured in. */}
+          {figure?.coins !== undefined && figure?.coins !== null ? (
+            <View style={styles.figureCoins}>
+              <Coin size={9} color={figure.coins > 0 ? gold : c.textTertiary} />
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.figureCoinValue,
+                  NUMERIC,
+                  { color: figure.coins > 0 ? c.textSecondary : c.textTertiary },
+                ]}>
+                {figure.coins.toLocaleString()}
+              </Text>
+            </View>
+          ) : (
+            <Text style={[Type.micro, styles.figureLabel, { color: c.textTertiary }]}>
+              {figure?.label ?? 'FP'}
+            </Text>
+          )}
         </View>
       </View>
 
@@ -498,6 +544,11 @@ const styles = StyleSheet.create({
      has played and one who has not — only the ink changes. */
   figureEmpty: { fontSize: 12, lineHeight: 20, fontWeight: '500' },
   figureLabel: { lineHeight: 15 },
+  /* The collection row's coin line, at its numbers — see `InventoryRow`. Right
+     aligned with the figure above it because the column is right aligned; the
+     glyph leads the number the way it does everywhere else in the app. */
+  figureCoins: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one, height: 15 },
+  figureCoinValue: { fontSize: 12, lineHeight: 15, fontWeight: '600' },
   /* Two groups pushed apart, not an even grid. The histogram is one object and
      the best copy is another, and `space-between` is what says so — on a phone
      and on a 940pt table alike, where an even grid would have stranded four

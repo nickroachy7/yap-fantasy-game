@@ -79,10 +79,10 @@
  * contradicting itself. It is dimmed and it says STARTING; the bar at the
  * bottom of the screen says why.
  */
+import { useState } from 'react';
 import { StyleSheet, Pressable, Text, View } from 'react-native';
 
 import {
-  BADGE_SIZE,
   BADGE_WIDTH,
   Identity,
   LINEUP_ROW_HEIGHT,
@@ -91,8 +91,15 @@ import {
 } from '@/components/lineup/LineupRow';
 import { tierProgressLabel } from '@/components/lineup/model';
 import { Coin } from '@/components/shell/AppHeader';
-import { PositionBadge } from '@/components/ui/PositionBadge';
-import { Colors, NUMERIC, Spacing, TierColors, Type } from '@/constants/theme';
+import {
+  Colors,
+  NUMERIC,
+  Spacing,
+  TierColors,
+  Type,
+  selectionAccent,
+  selectionInk,
+} from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import type { CollectionCard } from './types';
 
@@ -189,37 +196,56 @@ export function InventoryRow({
   selected,
   blocked,
   onPress,
-  onLongPress,
+  onToggle,
 }: {
   card: CollectionCard;
-  /** The list is in multi-select: the badge column becomes the tick. */
+  /**
+   * SOMETHING IN THE LIST IS SELECTED — not "the list is in a mode".
+   *
+   * There is no mode any more. The circle is always drawn and always live, so
+   * this no longer decides whether a card CAN be picked; it decides only
+   * whether the row explains itself, which is the STARTING and IN SET marks on
+   * line 2. Those are answers to "why can I not tick this one" and a question
+   * nobody has asked yet does not need answering — a badge on a third of a
+   * resting collection is chrome over the thing you came to look at.
+   */
   selecting?: boolean;
   selected?: boolean;
   /** Standing in a lineup you have not played — cannot be sold or committed. */
   blocked?: boolean;
+  /** Opens the card. The whole row except the circle. */
   onPress?: () => void;
-  onLongPress?: () => void;
+  /** Ticks it. The circle, and nothing else. */
+  onToggle?: () => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
+  /* THE APP'S SELECTION ACCENT, not the positive green.
+     `positive` means "good news" — a win, a promotion, a set completed — and a
+     tick is not good news, it is a state. Every other live selection in the app
+     already reads from here (the segmented control, the action bar, the tab
+     underline), so a ticked circle now matches the thing it is a selection in.
+     It is also a quieter colour than #4CC38A, which at 30 circles down a page
+     was the loudest thing on a screen whose subject is the cards. */
+  const accent = selectionAccent(scheme);
+  const ink = selectionInk(scheme);
+
   const progress = tierProgressLabel(card);
-  const marked = Boolean(selecting && selected);
+  const marked = Boolean(selected);
+  const [pressed, setPressed] = useState(false);
 
   return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
-      disabled={!onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: marked, disabled: Boolean(selecting && blocked) }}
-      accessibilityLabel={describe(card, selecting, blocked)}
-      accessibilityHint={
-        selecting && blocked
-          ? 'In your lineup — cannot be sold or added to a set'
-          : undefined
-      }
-      style={({ pressed }) => [
+    /* TWO TARGETS, AS SIBLINGS, AND THEY CANNOT BE NESTED. The circle picks the
+       card and the rest of the row opens it — the lineup row's split exactly,
+       and it carries the lineup row's constraint with it: react-native-web
+       renders `accessibilityRole="button"` as a real <button>, and a button
+       inside a button is invalid HTML that React rejects at runtime. So the row
+       is a plain View with two Pressables in it, and the pressed highlight is
+       lifted to the row, or pressing a name would light half an object that
+       reads as one row. */
+    <View
+      style={[
         styles.row,
         { backgroundColor: marked ? c.backgroundSelected : c.background },
         pressed && { backgroundColor: c.backgroundElement },
@@ -228,45 +254,77 @@ export function InventoryRow({
           the hairline along with the text breaks the rhythm of the list at
           exactly the rows the eye is trying to skim past. Verbatim from the
           lineup row, and for the same reason. */}
-      <View style={[styles.content, selecting && blocked && styles.dimmed]}>
+      <View style={[styles.content, blocked && selecting && styles.dimmed]}>
+        {/* THE CIRCLE IS THE MULTI-SELECT, AND IT REPLACED A POSITION BADGE.
+ 
+            The badge was saying something the row already said: the position is
+            four characters along line 1, in the same accent, next to the name.
+            A fixed 40pt column repeating it down thirty rows bought nothing and
+            cost the only left-hand slot the row has.
+ 
+            What that slot is worth is an always-live tick. Selecting used to be
+            a MODE — press Select, then the badges become circles, then pick —
+            which is three actions to sell one spare, and a mode with nothing on
+            screen to announce it until you are already in it. The circle is
+            here from the first frame, so picking a card is picking a card.
+ 
+            IT IS ITS OWN TARGET, so the row keeps its own press: tapping a card
+            opens the card, which is what it has always done and what a
+            collection is mostly for. Only the circle ticks.
+ 
+            A BLOCKED COPY GETS A CIRCLE THAT REFUSES rather than no circle at
+            all. An empty column beside one row in eight reads as a rendering
+            fault; a struck circle reads as an answer, and the row says which
+            answer on line 2. */}
         <View style={styles.badgeCol}>
-          {selecting ? (
-            blocked ? null : (
-              <View
-                style={[
-                  styles.tick,
-                  selected
-                    ? { backgroundColor: c.positive, borderColor: c.positive }
+          <Pressable
+            onPress={blocked ? undefined : onToggle}
+            disabled={!onToggle || blocked}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: marked, disabled: Boolean(blocked) }}
+            accessibilityLabel={`Select ${card.playerName}`}
+            accessibilityHint={
+              blocked ? 'In your lineup — cannot be sold or added to a set' : undefined
+            }
+            /* The circle is 22pt, well under the 44pt minimum on its own. The
+               slop takes it to the row's full height and out into the gutter
+               beside it, which is dead space no other target wants. */
+            hitSlop={{ top: 20, bottom: 20, left: GUTTER, right: Spacing.two }}
+            style={({ pressed: p }) => [styles.tickHit, p && styles.tickPressed]}>
+            <View
+              style={[
+                styles.tick,
+                blocked
+                  ? { backgroundColor: 'transparent', borderColor: c.border }
+                  : selected
+                    ? { backgroundColor: accent, borderColor: accent }
                     : { backgroundColor: c.surfaceSunken, borderColor: c.borderStrong },
-                ]}>
-                {/* A tick drawn as type rather than as an icon: a hand-built
-                    check of two Views is a smudge at this size. */}
-                {selected ? (
-                  <Text style={[Type.label, styles.mark, { color: c.background }]}>✓</Text>
-                ) : null}
-              </View>
-            )
-          ) : (
-            /* OUTLINED, WITH THE POSITION'S INK. The bench badge's box — see
-               `PositionBadge`'s `tone` — because thirty solid accent blocks
-               running down a page of cards out-shout the tier marks on line 3,
-               which are the thing this screen is actually sorted by. The
-               letters keep the accent, so the column is still scannable by
-               position at a glance; it is the FILL that was doing the
-               shouting, not the colour. */
-            <PositionBadge
-              label={card.position ?? '--'}
-              size={BADGE_SIZE}
-              width={BADGE_WIDTH}
-              tone="outline"
-            />
-          )}
+              ]}>
+              {/* Drawn as type rather than as an icon: a hand-built check of two
+                  Views is a smudge at this size. */}
+              {blocked ? (
+                <Text style={[Type.label, styles.mark, { color: c.textTertiary }]}>—</Text>
+              ) : selected ? (
+                <Text style={[Type.label, styles.mark, { color: ink }]}>✓</Text>
+              ) : null}
+            </View>
+          </Pressable>
         </View>
 
-        <Identity
-          card={toRowCard(card)}
-          right={<ValueFigure points={card.careerFp} coins={card.sellValue} />}
-          secondary={
+        {/* Everything except the circle, as one target — and the flex row that
+            squares the left column off against the right. */}
+        <Pressable
+          onPress={onPress}
+          disabled={!onPress}
+          accessibilityRole="button"
+          accessibilityLabel={describe(card, selecting, blocked)}
+          style={styles.body}
+          onPressIn={() => setPressed(true)}
+          onPressOut={() => setPressed(false)}>
+          <Identity
+            card={toRowCard(card)}
+            right={<ValueFigure points={card.careerFp} coins={card.sellValue} />}
+            secondary={
             <>
               {/* STARTING, in the warning tone rather than the negative one:
                   nothing is wrong and nothing has been refused yet — the card
@@ -299,15 +357,16 @@ export function InventoryRow({
               </Text>
             </>
           }
-          progress={progress ? { text: progress } : { text: 'Top tier' }}
-        />
+            progress={progress ? { text: progress } : { text: 'Top tier' }}
+          />
+        </Pressable>
       </View>
 
       {/* Inset to the gutter so it reads as the gap between two rows rather than
           as a rule ruled across a table. A child rather than a border, because
           a border cannot be inset. */}
       <View style={[styles.rule, { backgroundColor: c.border }]} />
-    </Pressable>
+    </View>
   );
 }
 
@@ -347,10 +406,27 @@ const styles = StyleSheet.create({
   /* Centred against all three lines rather than pinned to the first: the badge
      is about the ROW, not about the name. */
   badgeCol: { width: BADGE_WIDTH, alignSelf: 'center', alignItems: 'center' },
+  tickHit: { alignItems: 'center', justifyContent: 'center' },
+  tickPressed: { opacity: 0.55 },
+  /* Mirrors the lineup row's `body`: flex-start is what puts the right-hand
+     figures level with the name rather than floating them against three
+     lines. */
+  body: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.two,
+  },
+  /* 18, down from 22. At 22 it was the same weight as the tier mark and the
+     position accent on the line beside it, so a resting page of thirty rows
+     read as a column of buttons with a collection behind them. The target is
+     unchanged — `hitSlop` on the Pressable takes it to the full row height —
+     so this is only what the circle LOOKS like, not what it is to press. */
   tick: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
