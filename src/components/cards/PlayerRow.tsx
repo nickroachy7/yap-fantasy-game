@@ -178,6 +178,31 @@ export type RowFigure = {
   coins?: number | null;
 };
 
+/**
+ * ONE FIGURE COLUMN FOR ALL THREE BOARDS — how he scores, over what a card of
+ * him is worth.
+ *
+ * Trend, Top and Search were drawing three different things in the same box:
+ * a week's movement, a season total, and a price. A reader moving between them
+ * had to re-learn the right-hand column each time, on rows that were otherwise
+ * identical. This is the shared answer; what makes each board different is its
+ * ORDER, which is what a board is.
+ *
+ * A DASH RATHER THAN 0.0 where he has not played — see `RowFigure.value`, which
+ * is nullable for exactly this. Before week one that is everybody, and printing
+ * a nought for the whole league would be the board inventing a bad season for
+ * the best players in football.
+ */
+export function figureFor(player: DirectoryPlayer, coins?: number | null): RowFigure {
+  return {
+    value: player.gamesPlayed > 0 ? player.fpPerGame.toFixed(1) : null,
+    label: 'FP/G',
+    /* The caller's live price where it has landed, the cached snapshot until it
+       does — see `useDirectoryBoard` for why there are two of them. */
+    coins: coins ?? player.baseCoins,
+  };
+}
+
 export type PlayerRowProps = {
   player: DirectoryPlayer;
   onPress: (player: DirectoryPlayer) => void;

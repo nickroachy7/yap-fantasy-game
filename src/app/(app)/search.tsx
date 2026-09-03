@@ -40,15 +40,15 @@
  * descending, which is what you want when two players share a surname.
  */
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlayerList, type ListedPlayer } from '@/components/cards/PlayerList';
-import { ROW_GUTTER } from '@/components/cards/PlayerRow';
+import { figureFor, ROW_GUTTER } from '@/components/cards/PlayerRow';
+import { useDirectoryBoard } from '@/components/cards/use-directory-board';
 import {
   filterAndSort,
-  loadPlayerDirectory,
   type DirectoryFetch,
   type DirectoryPlayer,
 } from '@/components/cards/player-directory';
@@ -71,33 +71,38 @@ export default function PlayersSearchScreen() {
   const c = Colors[scheme];
   const insets = useSafeAreaInsets();
 
-  const [result, setResult] = useState<DirectoryFetch | null>(null);
-  const [failed, setFailed] = useState(false);
+  /* The same read the two boards make — see `useDirectoryBoard`. Search takes
+     the prices too: a card's worth is one of the things you come here to check,
+     and it must not disagree with the board you came from. */
+  const { result, prices, failed } = useDirectoryBoard();
   const [query, setQuery] = useState('');
-
-  useEffect(() => {
-    let live = true;
-    void (async () => {
-      try {
-        const next = await loadPlayerDirectory();
-        if (live) setResult(next);
-      } catch {
-        if (live) setFailed(true);
-      }
-    })();
-    return () => {
-      live = false;
-    };
-  }, []);
 
   const fixtures = useUpcomingFixtures();
 
+  /**
+   * THE SAME ROW AS TREND AND TOP: a number on the left, and how he scores over
+   * what a card of him is worth on the right.
+   *
+   * THE NUMBER IS AN ORDINAL, NOT A RANK, and the distinction is worth keeping
+   * straight because this file used to argue against drawing one at all. That
+   * argument was about a list whose order changed with a sort strip, where a
+   * number beside a name meant something different from one press to the next.
+   * Search has ONE order — `SORT`, fixed, best season first — so the number is
+   * simply where the row sits in the list you are looking at, and it stays put.
+   *
+   * Every match is listed. There is no cap here and never was; the boards have
+   * dropped theirs to match.
+   */
   const matches = useMemo<ListedPlayer[]>(() => {
     if (!result) return [];
-    return filterAndSort(result.players, { position: 'ALL', query, sort: SORT }).map((player) => ({
-      player,
-    }));
-  }, [result, query]);
+    return filterAndSort(result.players, { position: 'ALL', query, sort: SORT }).map(
+      (player, i) => ({
+        player,
+        rank: i + 1,
+        figure: figureFor(player, prices?.get(player.playerId)),
+      }),
+    );
+  }, [result, query, prices]);
 
   /**
    * Close, not navigate.

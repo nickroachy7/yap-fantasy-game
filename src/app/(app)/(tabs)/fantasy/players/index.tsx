@@ -27,14 +27,12 @@
  */
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { PlayerList, type ListedPlayer } from '@/components/cards/PlayerList';
-import { ROW_GUTTER } from '@/components/cards/PlayerRow';
+import { figureFor, ROW_GUTTER } from '@/components/cards/PlayerRow';
+import { useDirectoryBoard } from '@/components/cards/use-directory-board';
 import {
-  loadPlayerDirectory,
-  peekPlayerDirectory,
-  type DirectoryFetch,
   type DirectoryPlayer,
 } from '@/components/cards/player-directory';
 import { fixtureLabel, useUpcomingFixtures } from '@/components/cards/use-fixtures';
@@ -51,14 +49,59 @@ import { Screen } from '@/components/shell/Screen';
 import { SegmentedControl } from '@/components/shell/SegmentedControl';
 import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilter';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { computeMovers, deltaText } from '@/components/trend/movers';
 
 const FALLBACK_SEASON = 2026;
 
-/** How long a board is. Fifty is a list you scroll; twelve was a teaser. */
-const SHOWN = 50;
+/**
+ * The week's move, in the tray under the row.
+ *
+ * IT USED TO BE THE FIGURE COLUMN, and it lost that slot when all three boards
+ * took one shared column. It could not simply go: this board is SORTED by it,
+ * and a list ranked by a number it does not print is unreadable — you cannot
+ * tell why the eleventh row is eleventh. The tray is the one band with room.
+ *
+ * Signed and coloured, which is the one place in this app a figure carries a
+ * sign, and the sign is the whole content: `+12.4` and `-12.4` are opposite
+ * news about the same size of movement.
+ *
+ * NULL IS A REAL STATE and reads as a dash. Below the movers sit every player
+ * who cleared neither week's `MINIMUM_POINTS`, and they have no move to report
+ * rather than a move of nought.
+ */
+function MoveStrip({ delta }: { delta: number | null }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const tone = delta === null ? c.textTertiary : delta > 0 ? c.positive : c.negative;
+
+  return (
+    <View style={styles.moveStrip}>
+      <Text style={[Type.micro, { color: c.textTertiary }]}>WEEK</Text>
+      <Text style={[Type.strong, NUMERIC, { color: tone }]}>
+        {delta === null ? DASH : deltaText(delta)}
+      </Text>
+    </View>
+  );
+}
+
+
+
+/**
+ * THE BOARD IS NOW THE WHOLE POOL, and the fifty-row cap is gone.
+ *
+ * Fifty was chosen as "a list you scroll" against twelve as "a teaser", and
+ * both were answering the wrong question — the reader wanting the 63rd best
+ * riser had no way to reach him and nothing on screen said he existed. The
+ * directory is already read in full and held in memory, `PlayerRow` is a fixed
+ * height, and `PlayerList` hands `getItemLayout` to the FlatList, so drawing a
+ * thousand rows costs the same as drawing fifty: the ones off screen are never
+ * mounted.
+ *
+ * `MINIMUM_POINTS` still cuts the tail, and that is a different cut — it is
+ * about whether a move MEANS anything, not about how long a list may be.
+ */
 
 /**
  * A player has to have been worth starting in at least one of the two weeks to
@@ -72,8 +115,6 @@ type Direction = 'up' | 'down';
 
 export default function TrendScreen() {
   const router = useRouter();
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
 
   /* Peeked, so a revisit starts on the season it ended on rather than on the
      fallback — which would otherwise send `useSeasonSchedule` after the WRONG
@@ -95,11 +136,15 @@ export default function TrendScreen() {
    * set of players, and saying so in the code is what keeps the two screens
    * from drifting into two ideas of what a player is.
    */
-  /* Seeded from the cache's synchronous peek, so coming back from Leaders draws
-     the board in the first render instead of showing a spinner for a frame
-     while an already-resolved promise settles. See `lib/session-cache`. */
-  const [fetched, setFetched] = useState<DirectoryFetch | null>(() => peekPlayerDirectory());
-  const [directoryFailed, setDirectoryFailed] = useState(false);
+  /* One read for all three boards — the cached directory plus prices allowed to
+     be newer than it, and the way to drop both. See `useDirectoryBoard`. */
+  const {
+    result: fetched,
+    prices,
+    failed: directoryFailed,
+    refreshing,
+    refresh,
+  } = useDirectoryBoard();
 
   const directory = useMemo<Map<string, DirectoryPlayer> | null>(
     () => (fetched ? new Map(fetched.players.map((p) => [p.playerId, p])) : null),
@@ -119,21 +164,6 @@ export default function TrendScreen() {
     };
   }, []);
 
-  useEffect(() => {
-    let live = true;
-    void (async () => {
-      try {
-        const result = await loadPlayerDirectory();
-        if (!live) return;
-        setFetched(result);
-      } catch {
-        if (live) setDirectoryFailed(true);
-      }
-    })();
-    return () => {
-      live = false;
-    };
-  }, []);
 
   const fixtures = useUpcomingFixtures();
   const { games, slates, teams, loading, error } = useSeasonSchedule(season);
@@ -210,38 +240,36 @@ export default function TrendScreen() {
     const rows: ListedPlayer[] = [];
     const taken = new Set<string>();
     for (const m of ordered) {
-      if (rows.length >= SHOWN) break;
       const player = directory.get(m.playerId);
       if (!player) continue;
       taken.add(player.playerId);
       rows.push({
         player,
-        /* The delta leads, because it is what the list is ordered by — a board
-           sorted by movement whose headline figure was a season total would be
-           ranked by a number it does not show. Signed and coloured, which is
-           the one place in this app a figure carries a sign. */
-        figure: {
-          value: deltaText(m.delta),
-          label: 'WK',
-          color: m.delta > 0 ? c.positive : c.negative,
-        },
+        /* THE SAME FIGURE COLUMN AS TOP AND SEARCH — how he scores over what a
+           card of him is worth. The delta this board is ordered by moves to the
+           tray rather than disappearing: a board ranked by a number it does not
+           show is still the thing to avoid, and `MoveStrip` is where it now
+           shows. */
+        figure: figureFor(player, prices?.get(player.playerId)),
+        strip: <MoveStrip delta={m.delta} />,
       });
     }
 
-    if (rows.length < SHOWN) {
-      const filler = [...directory.values()]
-        .filter((p) => !taken.has(p.playerId) && inPosition(p.position))
-        .sort((a, b) => b.seasonFp - a.seasonFp || a.name.localeCompare(b.name))
-        .slice(0, SHOWN - rows.length)
-        .map<ListedPlayer>((player) => ({
-          player,
-          figure: { value: DASH, label: 'WK', color: c.textTertiary },
-        }));
-      rows.push(...filler);
-    }
+    /* EVERYONE ELSE FOLLOWS THE MOVERS, best season first. They have no delta —
+       they did not clear `MINIMUM_POINTS` in either week — so the tray says so
+       rather than the row inventing a movement it cannot support. */
+    const filler = [...directory.values()]
+      .filter((p) => !taken.has(p.playerId) && inPosition(p.position))
+      .sort((a, b) => b.seasonFp - a.seasonFp || a.name.localeCompare(b.name))
+      .map<ListedPlayer>((player) => ({
+        player,
+        figure: figureFor(player, prices?.get(player.playerId)),
+        strip: <MoveStrip delta={null} />,
+      }));
+    rows.push(...filler);
 
-    return rows;
-  }, [directory, movers, pos, direction, c]);
+    return rows.map((row, i) => ({ ...row, rank: i + 1 }));
+  }, [directory, movers, pos, direction, prices]);
 
   const openPlayer = useCallback(
     (player: DirectoryPlayer) =>
@@ -305,7 +333,13 @@ export default function TrendScreen() {
       );
     }
     return (
-      <PlayerList players={board} fixtureFor={fixtureFor} onOpen={openPlayer} />
+      <PlayerList
+        players={board}
+        fixtureFor={fixtureFor}
+        onOpen={openPlayer}
+        refreshing={refreshing}
+        onRefresh={refresh}
+      />
     );
   };
 
@@ -363,6 +397,10 @@ export default function TrendScreen() {
 }
 
 const styles = StyleSheet.create({
+  /* The tray's own row: label then figure, left aligned, at the tray's height.
+     It replaces a five-column stat strip, so it deliberately does not try to
+     fill the width — one fact, stated once. */
+  moveStrip: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   pad: { paddingVertical: Spacing.four },
   controls: { paddingHorizontal: ROW_GUTTER, paddingBottom: Spacing.two, gap: Spacing.two },
   filters: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },

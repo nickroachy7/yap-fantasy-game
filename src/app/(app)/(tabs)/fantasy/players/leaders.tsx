@@ -29,17 +29,13 @@
  * between them were removed is not a board, it is a filtered table.
  */
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { PlayerList, type ListedPlayer } from '@/components/cards/PlayerList';
-import { ROW_GUTTER } from '@/components/cards/PlayerRow';
+import { ROW_GUTTER, figureFor } from '@/components/cards/PlayerRow';
+import { useDirectoryBoard } from '@/components/cards/use-directory-board';
 import {
-  fetchBasePrices,
-  invalidatePlayerDirectory,
-  loadPlayerDirectory,
-  peekPlayerDirectory,
-  type DirectoryFetch,
   type DirectoryPlayer,
 } from '@/components/cards/player-directory';
 import { fixtureLabel, useUpcomingFixtures } from '@/components/cards/use-fixtures';
@@ -48,68 +44,25 @@ import { PositionFilter, type PosFilter } from '@/components/cards/PositionFilte
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Spacing } from '@/constants/theme';
 
-/** How long a board is. The same fifty as the trend board, for the same reason. */
-const SHOWN = 50;
+/**
+ * NO CAP. The board is every ranked player, in the market's order.
+ *
+ * It was fifty, matched to the trend board. Both have dropped it for the same
+ * reason: the pool is already in memory, `PlayerRow` is a fixed height and
+ * `PlayerList` hands `getItemLayout` down, so the rows past the fold cost
+ * nothing until they are scrolled to — and a reader looking for the man ranked
+ * 63rd had no way to reach him and nothing on screen admitting he was there.
+ */
 
 export default function LeadersScreen() {
   const router = useRouter();
 
-  /* Seeded from the cache's synchronous peek. The directory was already held
-     for the session, but awaiting the cached PROMISE still cost a render with
-     nothing in it — which is the flicker you saw flipping over from Trend. See
-     `lib/session-cache`. */
-  const [result, setResult] = useState<DirectoryFetch | null>(() => peekPlayerDirectory());
-  const [failed, setFailed] = useState(false);
+  /* One read, shared with Trend and Search — the cached directory, prices
+     allowed to be newer than it, and the way to drop both. This screen grew all
+     three first and they moved into `useDirectoryBoard` when the other two
+     boards needed the same thing. */
+  const { result, prices, failed, refreshing, refresh } = useDirectoryBoard();
   const [pos, setPos] = useState<PosFilter>('ALL');
-  const [refreshing, setRefreshing] = useState(false);
-  /**
-   * PRICES, READ LIVE, over the top of whatever the cached directory holds.
-   *
-   * The directory is cached for the app session and should be — it is a
-   * thousand rows of season stats that move once a week. The price on each row
-   * is the exception: `refresh-player-values` runs hourly, so a snapshot taken
-   * on the first visit of the day quotes a stale number for the rest of it, and
-   * the collection — which has its own read — disagrees with this board about
-   * what the same card is worth. That is exactly how this was found.
-   */
-  const [prices, setPrices] = useState<Map<string, number> | null>(null);
-
-  useEffect(() => {
-    let live = true;
-    void (async () => {
-      try {
-        const next = await loadPlayerDirectory();
-        if (live) setResult(next);
-        if (next.season !== null) {
-          const fresh = await fetchBasePrices(next.season);
-          if (live) setPrices(fresh);
-        }
-      } catch {
-        if (live) setFailed(true);
-      }
-    })();
-    return () => {
-      live = false;
-    };
-  }, []);
-
-  /* The board's own way out. `invalidatePlayerDirectory` has existed since the
-     cache did and had NO caller, so nothing in the app could ever get a fresher
-     directory than the one it happened to load first. */
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      invalidatePlayerDirectory();
-      const next = await loadPlayerDirectory();
-      setResult(next);
-      setFailed(false);
-      if (next.season !== null) setPrices(await fetchBasePrices(next.season));
-    } catch {
-      setFailed(true);
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
 
   const fixtures = useUpcomingFixtures();
 
@@ -148,8 +101,8 @@ export default function LeadersScreen() {
    * the position number is this list's own ordinal over the market's order —
    * which is exactly what "the 12th best receiver" means.
    */
-  const { board, pool } = useMemo<{ board: ListedPlayer[]; pool: number }>(() => {
-    if (!result) return { board: [], pool: 0 };
+  const board = useMemo<ListedPlayer[]>(() => {
+    if (!result) return [];
     const inPool =
       pos === 'ALL'
         ? result.players.filter((p) => p.marketRank !== null)
@@ -159,10 +112,8 @@ export default function LeadersScreen() {
 
     const rankOf = (p: DirectoryPlayer) => p.marketRank ?? Number.MAX_SAFE_INTEGER;
 
-    return {
-      board: [...inPool]
-        .sort((a, b) => rankOf(a) - rankOf(b))
-        .slice(0, SHOWN)
+    return [...inPool]
+      .sort((a, b) => rankOf(a) - rankOf(b))
         /* The ordinal, not the raw market rank. On the ALL board the two agree
            for the top fifty; on a position board they must not — a receiver
            board that reads 1, 4, 9, 14 is the filtered table this page exists
@@ -191,18 +142,11 @@ export default function LeadersScreen() {
            compared on the part of it that is about them. A copy in hand is
            worth this times its tier plus what it has banked, which is still
            `card_prices`. */
-        .map((player, i) => ({
-          player,
-          rank: i + 1,
-          figure: {
-            value: player.gamesPlayed > 0 ? player.fpPerGame.toFixed(1) : null,
-            label: 'FP/G',
-            /* Live where we have it, the cached snapshot only until it lands. */
-            coins: prices?.get(player.playerId) ?? player.baseCoins,
-          },
-        })),
-      pool: inPool.length,
-    };
+      .map((player, i) => ({
+        player,
+        rank: i + 1,
+        figure: figureFor(player, prices?.get(player.playerId)),
+      }));
   }, [result, pos, prices]);
 
   const openPlayer = useCallback(
@@ -244,20 +188,17 @@ export default function LeadersScreen() {
         fixtureFor={fixtureFor}
         onOpen={openPlayer}
         refreshing={refreshing}
-        onRefresh={onRefresh}
+        onRefresh={refresh}
       />
     );
   };
 
-  /* The count names the POOL as well as the board. "Top 50 of 412" says both
-     how long the list is and how much it left out; "50 players" says only the
-     first, and reads as though that is all there are. A pool that fits inside
-     the board says so instead of claiming to have trimmed something. */
+  /* The board IS the pool now, so the count is one number rather than a claim
+     about how much was trimmed. The "top N of M" form went with the cap — it
+     existed to promise that something had been left out, and nothing is. */
   const context = !result
     ? 'Season leaders'
-    : pool > board.length
-      ? `${result.season ?? ''} season · top ${board.length} of ${pool} by market rank`.trim()
-      : `${result.season ?? ''} season · ${board.length} by market rank`.trim();
+    : `${result.season ?? ''} season · ${board.length} by market rank`.trim();
 
   return (
     <Screen title="Top" measure="table" context={context} scroll={false}>
