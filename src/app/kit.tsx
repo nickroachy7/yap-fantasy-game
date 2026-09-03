@@ -23,7 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActionBar } from '@/components/shell/ActionBar';
 import { TabIcon, type TabIconName } from '@/components/shell/TabIcon';
 import { ContestCard, StatusWord, type Lock } from '@/components/contests/ContestCard';
-import type { ContestTerms, Duel, Settlement } from '@/components/contests/contest-model';
+import type { ContestTerms, Duel, Forecast, Settlement } from '@/components/contests/contest-model';
 import { ContestAbout } from '@/components/contests/ContestAbout';
 import { LobbyHero } from '@/components/contests/LobbyHero';
 import { ContestFieldList } from '@/components/contests/ContestFieldPanel';
@@ -153,6 +153,12 @@ const DEMO_FIELD_UNPLAYED: FieldWeek = {
   week: 3, entrants: 26, low: 0, median: 0, average: 0, high: 0, final: false,
   myPoints: null, myRank: null, ahead: null, result: null,
 };
+/**
+ * The same unplayed week, forecast. `DEMO_FIELD_UNPLAYED` is what the card knew
+ * before `20260903210000` — a field of noughts — and this is what it knows now:
+ * a real spread, with the reader a little under the middle of it.
+ */
+const DEMO_FORECAST: Forecast = { low: 71.4, median: 101.3, high: 138.9, cut: null, myRank: 16 };
 const DEMO_FIELD_AHEAD: FieldWeek = {
   week: 3, entrants: 26, low: 41.2, median: 97.6, average: 112.4, high: 208.3, final: false,
   myPoints: 118.4, myRank: 7, ahead: 19, result: null,
@@ -905,12 +911,33 @@ function Kit() {
               field={DEMO_FIELD_UNPLAYED}
               lock={{ at: DEMO_LOCK_SOON, locked: false, now: DEMO_NOW }}
             />
-            {/* Live, ahead of the median. */}
+            {/* THE SAME UNPLAYED WEEK, FORECAST — and the pair above and below
+                is the whole argument for the switch. Neither card has a point
+                scored in it; this one can still say the reader is sixteenth of
+                twenty-six and 4.2 short of the middle, and the one above it
+                cannot say anything. Both totals still read 0.0 and a dash: the
+                forecast is in the labelled row and the rail, never in the
+                figure. The rail stays neutral, because a projection has not
+                cleared anything yet. */}
+            <KitEntered
+              name="Preseason Week 3"
+              terms={KIT_TERMS_FREE}
+              myPoints={null}
+              field={DEMO_FIELD_UNPLAYED}
+              projected={97.1}
+              forecast={DEMO_FORECAST}
+              lock={{ at: DEMO_LOCK_SOON, locked: false, now: DEMO_NOW }}
+            />
+            {/* Live, ahead of the median — and the projected row has changed
+                meaning with the tense: it is now where this entry FINISHES if
+                the rest of the week goes as forecast. */}
             <KitEntered
               name="Preseason Week 3"
               terms={KIT_TERMS_FREE}
               myPoints={118.4}
               field={DEMO_FIELD_AHEAD}
+              projected={144.6}
+              forecast={{ low: 88.1, median: 128.4, high: 231.0, cut: null, myRank: 6 }}
               lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
             />
             {/* Final, behind it. */}
@@ -2104,6 +2131,8 @@ function KitEntered({
   terms,
   myPoints,
   field,
+  projected = null,
+  forecast = null,
   cut = null,
   opponent = null,
   lock,
@@ -2114,6 +2143,9 @@ function KitEntered({
   terms: ContestTerms;
   myPoints: number | null;
   field: FieldWeek;
+  /** Where this entry is heading, and where the field around it is. */
+  projected?: number | null;
+  forecast?: Forecast | null;
   cut?: number | null;
   /** A head-to-head opponent. Only the kit builds one — see `opponentOf`. */
   opponent?: Duel | null;
@@ -2128,7 +2160,7 @@ function KitEntered({
       prize={prize}
       settled={settled}
       lock={lock}
-      entry={{ myPoints, projected: null, field, cut, opponent }}
+      entry={{ myPoints, projected, forecast, field, cut, opponent }}
     />
   );
 }

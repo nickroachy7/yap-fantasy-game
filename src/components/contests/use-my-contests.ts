@@ -18,7 +18,7 @@ import { useLoader, type Load } from '@/hooks/use-loader';
 import { sessionCache } from '@/lib/session-cache';
 import { supabase } from '@/lib/supabase';
 import type { FieldWeek } from '@/components/lineup/field';
-import type { ContestTerms, PayoutCurve, WinCondition } from './contest-model';
+import type { ContestTerms, Forecast, PayoutCurve, WinCondition } from './contest-model';
 
 export type MyContest = {
   id: string;
@@ -131,6 +131,31 @@ export type MyContest = {
    * find out what it earned. See `wonTokens`.
    */
   myCoins: number | null;
+
+  /**
+   * WHERE YOUR ENTRY IS HEADING — what the slots have banked, plus the
+   * provider's projection for every player who has not kicked off yet.
+   *
+   * `20260903210000` computes it, and the arithmetic is deliberately the one
+   * that CONVERGES: pre-game it is a pure projection, on a Sunday it is what has
+   * happened plus what is still expected, and once the week is final it equals
+   * `field.myPoints` exactly, because nothing is left to project. That is what
+   * makes it safe to draw beside a real score.
+   *
+   * NULL IS A WEEK NOBODY FORECAST, which today means the whole preseason — the
+   * provider publishes projections for the regular season only. The card draws
+   * the dash it drew for its entire life before this.
+   */
+  myProjected: number | null;
+  /**
+   * The same for the rest of the field, as a distribution.
+   *
+   * NULL UNLESS EVERY ENTRY IN THE CONTEST IS FORECAST — the server refuses to
+   * publish half a distribution, because a cut taken over the four entrants who
+   * happen to have projections, in a field of twenty-four, is a number shaped
+   * like a threshold that means nothing. See `Forecast`.
+   */
+  projField: Forecast | null;
 };
 
 type Row = {
@@ -151,6 +176,16 @@ type Row = {
      that does not send it yet. Absent reads as null, which is the same "still
      settling" the real pre-payout state draws. */
   my_coins?: number | string | null;
+  /* OPTIONAL for the same reason `my_coins` is: CI publishes JS without running
+     `db push`, so this update has to survive landing on a database where
+     `20260903210000` has not been applied. Absent reads as null, which is the
+     "this week is not forecast" state the card already knows how to draw. */
+  my_projected?: number | string | null;
+  proj_low?: number | string | null;
+  proj_median?: number | string | null;
+  proj_high?: number | string | null;
+  proj_cut?: number | string | null;
+  proj_rank?: number | string | null;
   recap: boolean | null;
   contest_id: string;
   code: string;
@@ -269,6 +304,22 @@ function rowsToMine(rows: Row[]): MyContest[] {
        settling" line the real pre-payout state draws, which is the right
        thing for both. */
     myCoins: num(r.my_coins),
+    myProjected: num(r.my_projected),
+    /* ALL FIVE OR NONE. The server nulls them together — a field is either
+       wholly forecast or not forecast at all — and this reads them the same
+       way, so a partially-migrated server cannot produce a distribution with a
+       hole in it. `cut` and `myRank` are legitimately null INSIDE a forecast:
+       a median contest has no cut, and neither does a field of one. */
+    projField:
+      r.proj_low === null || r.proj_low === undefined
+        ? null
+        : {
+            low: Number(r.proj_low),
+            median: num(r.proj_median) ?? 0,
+            high: num(r.proj_high) ?? 0,
+            cut: num(r.proj_cut),
+            myRank: num(r.proj_rank),
+          },
     recap: Boolean(r.recap),
   }));
 }

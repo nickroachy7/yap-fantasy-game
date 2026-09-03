@@ -1214,10 +1214,12 @@ function Card({
       lock={{ at: lockAt, locked, now }}
       entry={{
         myPoints: contest.field.myPoints,
-        /* NO PROJECTIONS EXIST. The slot is real and the value is null — see
-           `Entry.projected`. When a pregame number is available this is the one
-           line that changes. */
-        projected: null,
+        /* WHERE THE WEEK IS HEADING, both halves of it. Before kickoff the card
+           compares these two instead of drawing a nought against a dash — see
+           the tense note on `ContestCard`. Both are null on a week the provider
+           does not forecast, and the band goes back to what it always drew. */
+        projected: contest.myProjected,
+        forecast: contest.projField,
         field: contest.field,
         cut: contest.cut,
       }}

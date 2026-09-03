@@ -2670,12 +2670,18 @@ export type Database = {
           my_podium: number
           my_points: number
           my_prize: number
+          my_projected: number
           my_rank: number
           name: string
           payout_curve: Database["public"]["Enums"]["contest_payout_curve"]
           podium_coins: number
           podium_places: number
           prize_pool: number
+          proj_cut: number
+          proj_high: number
+          proj_low: number
+          proj_median: number
+          proj_rank: number
           recap: boolean
           result: string
           score_rate: number

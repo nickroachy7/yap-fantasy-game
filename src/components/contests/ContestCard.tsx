@@ -11,7 +11,7 @@
  *     ├──────────────────────────────────────────────────┤
  *     │ YOU [6TH]              VS         [3RD] TO BEAT  │  SCORE  90pt
  *     │ 88.1                  −9.4                 97.5  │
- *     │ PROJ —                                    PROJ — │
+ *     │ PROJ 121.4                         PROJ 118.0    │
  *     │ ▬▬▬▬▬▬▬(6)▬▬▬┊▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬  │
  *     ├──────────────────────────────────────────────────┤
  *     │ RISK  ◆40  ♥1        │        ◆120  ♥+1  ▣1  WIN │  FOOT   29pt
@@ -145,11 +145,42 @@
  * can grow to five parts without the row breaking or the card growing a second
  * one.
  *
- * NO WIN PROBABILITY, AND NO INVENTED PROJECTION. `Entry.projected` is the slot
- * a real pregame number will land in when there is one — the provider sells
- * none today, so it is null and the row draws a dash under `PROJ`. A dash in a
- * labelled slot is an honest "not yet". A modelled number would be the app's
- * first lie, told in its own reserved row.
+ * NO WIN PROBABILITY, AND NO INVENTED PROJECTION. The numbers in `PROJ` are
+ * the PROVIDER's, totalled — balldontlie's own per-player forecast, in the same
+ * PPR currency the settled result is taken under, so a projection and a score
+ * are the same kind of thing and can be drawn beside each other. Nothing here
+ * models anything. Where the provider says nothing the row still draws a dash,
+ * which is the honest "not yet" it drew for the card's whole life before
+ * `20260903010000`.
+ *
+ * ---------------------------------------------------------------------------
+ * BEFORE KICKOFF THE COMPARISON RUNS ON THE FORECAST
+ * ---------------------------------------------------------------------------
+ *
+ * The band's inputs — your total, the line to beat, the rail's two ends — all
+ * came from scores that had been PLAYED, so from the Tuesday a week opened
+ * until the Sunday it kicked off the card read `0.0` against a dash, with an
+ * empty rail under it. The one moment a manager is choosing a lineup was the
+ * one moment the card said nothing.
+ *
+ * `showForecast` is the switch, and it moves exactly three things: THE MARGIN,
+ * THE RANK, AND THE RAIL. Before anybody has scored, those read off
+ * `entry.forecast` instead of `entry.field`, so the card can say fourth of six
+ * and 3.5 short of the middle on a week with no football in it. The moment the
+ * first point lands it flips back and never returns — real football beats a
+ * projection of it, and a card that dropped back to projections because the
+ * early games were low-scoring would be reporting a week it is watching.
+ *
+ * WHAT THE SWITCH DOES NOT MOVE IS THE TWO FIGURES. They are the played
+ * totals in every tense: the big row is a score and the labelled row beneath it
+ * is a forecast, and neither slot ever holds the other kind of number. See
+ * `mine` for why that was tried the other way round and reverted.
+ *
+ * NOR DOES IT MOVE COLOUR. A green fill is the claim "you are clearing the line
+ * right now", which no projection can make, so the rail stays neutral until the
+ * football is real — the same reasoning that already keeps it neutral while you
+ * are behind on a Sunday morning. The margin keeps its sign colour, because it
+ * is the answer to the question the band is asking.
  */
 import { Pressable, StyleSheet, Text, View, type DimensionValue } from 'react-native';
 
@@ -177,6 +208,7 @@ import {
   wonTokens,
   type ContestTerms,
   type Duel,
+  type Forecast,
   type Settlement,
   type Token,
 } from './contest-model';
@@ -274,24 +306,25 @@ export type Entry = {
   /** Your total, or null before anybody in the field has played. */
   myPoints: number | null;
   /**
-   * The PREGAME projection, and it is null on every contest today.
+   * WHERE YOUR ENTRY IS HEADING: what has been banked, plus the provider's
+   * projection for every player yet to kick off.
    *
-   * The slot exists rather than the branch being absent, because the projected
-   * row has to draw something and the honest choice is between a dash and a
-   * lie. When the provider (or our own model) produces a real number it arrives
-   * here, and the row already knows where to put it.
+   * Null where the week is not forecast at all, which is the whole preseason —
+   * the provider publishes projections for the regular season only, and the row
+   * draws the dash it always drew. It needs nobody else's lineup, so it
+   * survives a contest whose FIELD cannot be forecast; see `forecast`.
    */
   projected: number | null;
   /**
-   * The line to beat, projected to the final whistle. Null, always, today.
+   * The same for everybody else, as a distribution. Null unless EVERY entry in
+   * the field has a forecast — see `Forecast`.
    *
-   * A SEPARATE FIELD rather than a second use of `projected`, because the two
-   * come from different places the day they exist: yours is your lineup's
-   * remaining players, theirs is the field's. Reserving one slot and filling it
-   * from two sources is how a card ends up claiming a projection it does not
-   * have.
+   * A SEPARATE FIELD from `projected` rather than one shape carrying both,
+   * because the two have different preconditions and the day they disagree is
+   * the day the card claims a comparison it cannot make. Yours is your lineup;
+   * this is the field's.
    */
-  projectedBeat?: number | null;
+  forecast?: Forecast | null;
   /** This contest's distribution. Null while it loads. */
   field: FieldWeek | null;
   /** The paying cut under `top_n`. Null under `median`, where the median is it. */
@@ -595,11 +628,49 @@ function Score({
   const played = field !== null && field.high > 0;
   const final = settled !== null || (played && field.final);
 
+  const forecast = entry?.forecast ?? null;
+
+  /**
+   * WHICH TENSE THE BAND IS IN — the one switch, and everything below reads it.
+   *
+   * Until somebody in the field has scored a point there is nothing to compare
+   * but forecasts, so the band compares those instead of drawing `0.0` against
+   * a dash for five days. The moment the first score lands it flips back and
+   * never returns: real football beats a projection of it, and a card that
+   * dropped back to projections because the early games were low-scoring would
+   * be reporting a week it is watching.
+   *
+   * BOTH HALVES ARE REQUIRED. `projected` is yours and `forecast` is the field,
+   * and they have different preconditions — see `Entry`. One without the other
+   * is half a comparison, which is not a cheaper comparison.
+   */
+  const showForecast = !played && !final && forecast !== null && entry?.projected != null;
+
+  /* THE PLAYED LINE TO BEAT — the number the right-hand FIGURE shows, in every
+     tense. The median of an unplayed field is a stored nought rather than a
+     threshold, so before kickoff there is not one. */
   const them = opponentOf(terms, {
     median: field?.median ?? 0,
     cut: entry?.cut ?? null,
     duel: entry?.opponent ?? null,
   });
+
+  /**
+   * THE SAME LINE, PROJECTED — the same derivation run on the forecast's
+   * numbers, so a `top_n` contest projects its cut and a `median` one projects
+   * its middle without the band learning which it is in.
+   *
+   * A duel is the one shape this does not forecast: it is a person, and
+   * `opponentOf` returns their actual total either way.
+   */
+  const themAhead =
+    forecast === null
+      ? null
+      : opponentOf(terms, {
+          median: forecast.median,
+          cut: forecast.cut,
+          duel: entry?.opponent ?? null,
+        });
 
   /**
    * IS THERE ANYBODY TO PLAY? — which is not the same question as whether the
@@ -610,37 +681,70 @@ function Score({
    * entrants is the floor for a middle to be on one side of, and it is the same
    * floor `median_record` enforces. A duel is exempt: it has an opponent rather
    * than a field, and two people is all one ever needs.
+   *
+   * THE FORECAST IS GATED BY IT TOO, and for the identical reason: a projected
+   * median over a field of one is your own projected total, and the row would
+   * print you as the line you have to beat. The entrant count is the FIELD's in
+   * both tenses — a forecast covers every entry or it does not exist, so the
+   * two counts cannot differ. See `Forecast`.
    */
-  const comparable =
-    played && (them.shape === 'duel' || (field !== null && field.entrants >= MIN_ENTRANTS));
+  const anybody = them.shape === 'duel' || (field !== null && field.entrants >= MIN_ENTRANTS);
+  const comparable = (played || showForecast) && anybody;
+  const beatAhead = anybody ? (themAhead?.value ?? null) : null;
+
+  /* WHICH PAIR THE COMPARISON RUNS ON — the played totals once there are any,
+     the forecast until then. The two FIGURES never move: see `mine`. */
+  const value = showForecast ? (entry?.projected ?? null) : (entry?.myPoints ?? null);
+
+  /* THE TWO ENDS OF THE RAIL, from the same pair. */
+  const scale = showForecast
+    ? { low: forecast.low, high: forecast.high }
+    : field === null
+      ? null
+      : { low: field.low, high: field.high };
 
   /* RANK IS WITHHELD WHILE THE WHOLE FIELD IS TIED. Before kickoff every lineup
      sits on a stored nought and `rank()` hands EVERYONE first place, so the test
      is whether the field has SPREAD rather than whether it has played. A field
-     of one is exempt: its rank is unambiguous. */
-  const rank =
-    played && field.myRank !== null && (field.entrants === 1 || field.high > field.low)
+     of one is exempt: its rank is unambiguous.
+     A FORECAST HAS NO SUCH TIE — every entry is a different total before a ball
+     is thrown, which is exactly what makes the projected standing worth saying. */
+  const rank = showForecast
+    ? forecast.myRank
+    : played && field.myRank !== null && (field.entrants === 1 || field.high > field.low)
       ? field.myRank
       : null;
 
-  const beat = comparable ? them.value : null;
-  const margin =
-    entry !== null && entry.myPoints !== null && beat !== null ? entry.myPoints - beat : null;
+  const beat = comparable ? (showForecast ? beatAhead : them.value) : null;
+  const margin = value !== null && beat !== null ? value - beat : null;
 
-  /* 0.0 ONCE THERE IS AN ENTRY, a dash where there is not. The difference is
-     real: an entered week has a total that happens to be nought, and a contest
-     you are not in has no total at all. The line to beat stays a dash until
-     there is a field to derive it from — the median of an unplayed field is a
-     stored nought, not a threshold. */
+  /**
+   * THE FIGURE IS THE SCORE. ALWAYS, IN EVERY TENSE.
+   *
+   * The band briefly promoted the projection into this row before kickoff, on
+   * the argument that the biggest number should be the one carrying the
+   * meaning. It reads wrong: the row under it is labelled `PROJ` and this one
+   * is not, so a projection standing here is an unlabelled forecast wearing the
+   * typography of a result — and on the Sunday it flips back, the same slot
+   * silently changes what kind of number it holds. One row, one kind of number.
+   * The forecast lives in the labelled row underneath, where it is named.
+   *
+   * 0.0 ONCE THERE IS AN ENTRY, a dash where there is not. The difference is
+   * real: an entered week has a total that happens to be nought, and a contest
+   * you are not in has no total at all. The line to beat stays a dash until
+   * there is a field to derive it from — the median of an unplayed field is a
+   * stored nought, not a threshold, and the projected one is stated under it.
+   */
   const mine = entry === null ? DASH : played ? fmt(entry.myPoints) : (0).toFixed(1);
-  const theirs = beat === null ? DASH : fmt(beat);
+  const liveBeat = played && comparable ? them.value : null;
+  const theirs = liveBeat === null ? DASH : fmt(liveBeat);
 
   /* A NOUGHT NOBODY HAS EARNED IS NOT LIT LIKE A SCORE, and a settled total is
      lit brighter than a running one — a result has stopped moving, which is
      exactly what makes it worth reading. */
   const totalTint = !played ? c.textTertiary : final ? c.text : c.textSecondary;
 
-  const beating = entry?.myPoints != null && beat !== null && entry.myPoints >= beat;
+  const beating = value !== null && beat !== null && value >= beat;
 
   /**
    * THE FILL IS NEUTRAL WHILE THE WEEK IS LIVE, AND RED ONLY ONCE IT IS OVER.
@@ -652,7 +756,12 @@ function Score({
    * that looks like a defeat on Sunday morning and then wins is a card that
    * cried wolf. Once it is final, red is simply true.
    */
-  const fillTint = beating ? c.positive : final ? c.negative : c.textSecondary;
+  /* AND A FORECAST NEVER EARNS THE GREEN. "You are clearing the line" is a
+     claim about football that has been played; projected to clear it is not the
+     same sentence, and this is the same colour the app spends on a heart you
+     have actually kept. The margin above still carries its sign. */
+  const fillTint =
+    beating && !showForecast ? c.positive : final ? c.negative : c.textSecondary;
 
   /**
    * THE SCALE'S FLOOR IS NOT ALWAYS THE FIELD'S WORST SCORE.
@@ -677,18 +786,25 @@ function Score({
    * A field where everybody has the same score has no width at all; dividing by
    * it would put every mark at NaN%.
    */
-  const floor = field === null || field.entrants <= 2 ? 0 : field.low;
-  const span = field === null ? 0 : field.high - floor;
+  const floor = scale === null || field === null || field.entrants <= 2 ? 0 : scale.low;
+  const span = scale === null ? 0 : scale.high - floor;
   const at = (v: number) =>
-    field === null || span <= 0 ? 0 : Math.min(1, Math.max(0, (v - floor) / span)) * 100;
+    scale === null || span <= 0 ? 0 : Math.min(1, Math.max(0, (v - floor) / span)) * 100;
 
-  /* A FINISHED WEEK HAS NOTHING LEFT TO PROJECT. The row keeps its height —
-     see ABSENCE RESERVES ITS ROW — and says what it now is instead. */
+  /**
+   * WHERE THE FIGURE ABOVE IT IS HEADING — the same claim in every tense, which
+   * is what makes this row worth reading on a Tuesday and on a Sunday.
+   *
+   * Pre-game it is a pure projection; while the week is live it is what has
+   * been banked plus what is still expected; and a FINISHED WEEK HAS NOTHING
+   * LEFT TO PROJECT, so it says so rather than repeating the total two points
+   * above it. The row keeps its height in all three — see ABSENCE RESERVES ITS
+   * ROW — and a week the provider does not forecast still draws its dash.
+   */
   const projMine = final ? 'FINAL' : `PROJ ${fmt(entry?.projected)}`;
-  const projBeat = final ? 'FINAL' : `PROJ ${fmt(entry?.projectedBeat)}`;
+  const projBeat = final ? 'FINAL' : `PROJ ${fmt(beatAhead)}`;
 
-  const pipAt =
-    entry?.myPoints == null ? 0 : Math.min(PIP_MAX, Math.max(PIP_MIN, at(entry.myPoints)));
+  const pipAt = value === null ? 0 : Math.min(PIP_MAX, Math.max(PIP_MIN, at(value)));
   /* THE DASHES ARE CLAMPED TOO, AND BY LESS. The pip is a 14pt disc and has to
      stay clear of the rail's rounded ends; the mark is 2pt wide and only has to
      stay ON the rail. Two points either side is under half a percent of a
@@ -733,21 +849,19 @@ function Score({
           label="TO BEAT"
           badge={beatSource(terms, entry?.opponent)}
           value={theirs}
-          tint={beat === null ? c.textTertiary : totalTint}
+          tint={liveBeat === null ? c.textTertiary : totalTint}
           proj={projBeat}
         />
       </View>
 
       <View style={styles.slot}>
         <View style={[styles.bar, { backgroundColor: c.backgroundSelected }]}>
-          {entry?.myPoints != null && comparable ? (
-            <View
-              style={[styles.fill, { width: `${at(entry.myPoints)}%`, backgroundColor: fillTint }]}
-            />
+          {value !== null && comparable ? (
+            <View style={[styles.fill, { width: `${at(value)}%`, backgroundColor: fillTint }]} />
           ) : null}
         </View>
         {beat === null ? null : <Dashes left={`${markAt}%`} color={c.text} />}
-        {rank === null || !comparable || entry?.myPoints == null ? null : (
+        {rank === null || !comparable || value === null ? null : (
           <View
             style={[styles.pip, { left: `${pipAt}%`, backgroundColor: final ? fillTint : c.text }]}>
             <Text numberOfLines={1} style={[styles.pipText, NUMERIC, { color: c.background }]}>

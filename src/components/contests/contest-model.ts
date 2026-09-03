@@ -271,6 +271,35 @@ export type Opponent = {
   shape: 'field' | 'duel';
 };
 
+/**
+ * THE SAME DISTRIBUTION, IN THE FUTURE TENSE.
+ *
+ * `FieldWeek` says where a contest's entries HAVE got to; this says where they
+ * are heading. Deliberately the same three numbers plus the same cut, so the
+ * scoring band can be handed either one and does not learn which — `opponentOf`
+ * takes a median and a cut and does not care whether they were played or
+ * projected.
+ *
+ * IT IS ALL OR NOTHING, and that is enforced by the server (`20260903210000`).
+ * A distribution computed over the four entrants who happen to have a forecast,
+ * in a contest of twenty-four, is a number with the shape of a threshold and
+ * none of the meaning. Either every entry in the field is forecast or this is
+ * null.
+ *
+ * `mine` is the exception and sits on `Entry.projected` instead: your own
+ * projected finish needs nobody else's lineup, so it survives a field this
+ * cannot describe.
+ */
+export type Forecast = {
+  low: number;
+  median: number;
+  high: number;
+  /** The projected line to beat, taken at the place the real cut is taken. */
+  cut: number | null;
+  /** Where you would finish if every projection landed. */
+  myRank: number | null;
+};
+
 const ORDINALS = ['0TH', '1ST', '2ND', '3RD'] as const;
 
 /** Uppercase throughout: every caller sets it in a 9pt micro label. */

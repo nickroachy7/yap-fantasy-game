@@ -538,9 +538,11 @@ export function ContestView({
               entered && entry
                 ? {
                     myPoints: entry.field.myPoints,
-                    /* NO PROJECTIONS EXIST. The slot is real and the value is
-                       null — see `Entry.projected`. */
-                    projected: null,
+                    /* THE SAME TWO HALVES THE CAROUSEL PASSES, from the same
+                       read — this page and the card upstairs must not disagree
+                       about where a week is heading. See `ContestCard`. */
+                    projected: entry.myProjected,
+                    forecast: entry.projField,
                     field: entry.field,
                     cut: entry.cut,
                   }

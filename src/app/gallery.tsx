@@ -762,6 +762,10 @@ const CONTEST_FIXTURES: MyContest[] = [
     podiumCoins: 0,
     myPrize: null,
     myCoins: null,
+    /* LIVE, so the projected row is the forward-looking one: 96.4 on the board
+       and 131.7 by the final whistle, against a middle heading for 118.2. */
+    myProjected: 131.7,
+    projField: { low: 62.8, median: 118.2, high: 187.4, cut: null, myRank: 5 },
     recap: false,
     weekLabel: 'PRE 4',
     weekTitle: 'Preseason 4',
@@ -809,6 +813,11 @@ const CONTEST_FIXTURES: MyContest[] = [
     podiumCoins: 0,
     myPrize: null,
     myCoins: null,
+    /* The projected CUT, not a projected median — the same branch the played
+       numbers take, so the two rows of this card cannot disagree about which
+       line it is being judged against. */
+    myProjected: 44.8,
+    projField: { low: 21.6, median: 48.0, high: 79.3, cut: 52.2, myRank: 4 },
     recap: false,
     weekLabel: 'PRE 4',
     weekTitle: 'Preseason 4',
@@ -860,6 +869,11 @@ const CONTEST_FIXTURES: MyContest[] = [
     podiumCoins: 0,
     myPrize: null,
     myCoins: null,
+    /* A TARGET IS ITS OWN FORECAST — it is set before the week opens and does
+       not move, so the projected line is the same 30.0 the played one is. The
+       row that changes is yours: 28.7 on the board, projected past it. */
+    myProjected: 34.5,
+    projField: { low: 34.5, median: 34.5, high: 34.5, cut: 30.0, myRank: 1 },
     recap: false,
     weekLabel: 'PRE 4',
     weekTitle: 'Preseason 4',
