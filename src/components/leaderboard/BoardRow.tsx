@@ -100,6 +100,8 @@ export function BoardRow({
   onToggle,
   onPress,
   pressHint,
+  onOpenProfile,
+  profileOn = 'name',
   rule = true,
   children,
 }: {
@@ -122,6 +124,33 @@ export function BoardRow({
   onPress?: () => void;
   /** What `onPress` does, for the reader who cannot see the list move. */
   pressHint?: string;
+  /**
+   * Open the manager this row is about.
+   *
+   * A LINK ON ONE LINE, not a press on the row. Two of the six boards already
+   * spend the row's own press on something else — the points board expands into
+   * a week-by-week breakdown, the pinned copy of your row jumps the list — so a
+   * profile could not be the row's press everywhere, and a name that is a door
+   * on four boards and not on the other two is worse than a name that is always
+   * a door.
+   *
+   * `accessibilityRole="link"`, and that is load-bearing rather than pedantry:
+   * `link` is the one interactive role react-native-web does NOT render as a
+   * real `<button>`, so this can sit inside the row's own pressable without
+   * being a `<button>` in a `<button>` — the nesting React rejects at runtime,
+   * documented on `SwapSheet`, `DropdownChip` and `PlayerSheetFrame`.
+   */
+  onOpenProfile?: () => void;
+  /**
+   * WHICH LINE CARRIES THE LINK, because the manager is not always the name.
+   *
+   * On five boards line 1 IS the manager. On the cards board line 1 is the
+   * footballer and the manager is line 2 — "Held by dmb" — so the link belongs
+   * there instead. Linking the name on that board would take a reader who
+   * tapped a player's name to somebody's account, which is the wrong page for
+   * the word they pressed.
+   */
+  profileOn?: 'name' | 'secondary';
   /**
    * False for a row that is the last thing inside a frame. The rule is the
    * divider between this row and the next one, and against the bottom edge of
@@ -162,9 +191,23 @@ export function BoardRow({
 
       <View style={styles.lines}>
         <View style={styles.nameLine}>
-          <Text numberOfLines={1} style={[styles.name, { color: c.text }]}>
-            {row.name}
-          </Text>
+          {onOpenProfile && profileOn === 'name' ? (
+            <Pressable
+              onPress={onOpenProfile}
+              accessibilityRole="link"
+              accessibilityLabel={row.name}
+              accessibilityHint="Opens this manager's profile"
+              hitSlop={6}
+              style={({ pressed }) => [styles.nameLink, pressed && styles.linkPressed]}>
+              <Text numberOfLines={1} style={[styles.name, { color: c.text }]}>
+                {row.name}
+              </Text>
+            </Pressable>
+          ) : (
+            <Text numberOfLines={1} style={[styles.name, { color: c.text }]}>
+              {row.name}
+            </Text>
+          )}
           {row.accentToken ? (
             <Text numberOfLines={1} style={[styles.meta, { color: row.accentToken.color }]}>
               {row.accentToken.text}
@@ -179,9 +222,23 @@ export function BoardRow({
           {isMe ? <Text style={[Type.micro, styles.you, { color: c.textSecondary }]}>YOU</Text> : null}
         </View>
 
-        <Text numberOfLines={1} style={[styles.secondary, { color: c.textTertiary }]}>
-          {row.secondary}
-        </Text>
+        {onOpenProfile && profileOn === 'secondary' ? (
+          <Pressable
+            onPress={onOpenProfile}
+            accessibilityRole="link"
+            accessibilityLabel={row.secondary}
+            accessibilityHint="Opens this manager's profile"
+            hitSlop={6}
+            style={({ pressed }) => [styles.secondaryLink, pressed && styles.linkPressed]}>
+            <Text numberOfLines={1} style={[styles.secondary, { color: c.textTertiary }]}>
+              {row.secondary}
+            </Text>
+          </Pressable>
+        ) : (
+          <Text numberOfLines={1} style={[styles.secondary, { color: c.textTertiary }]}>
+            {row.secondary}
+          </Text>
+        )}
 
         {/* The value/unit strip. Each figure reads at body weight in the
             secondary ink with its unit in 9pt caps beneath the eye — the
@@ -296,6 +353,11 @@ const styles = StyleSheet.create({
      way. */
   meta: { fontSize: 11, lineHeight: 15, fontWeight: '500', flexShrink: 0 },
   you: { flexShrink: 0 },
+  /* The link is a wrapper around the name, so it inherits the name's own right
+     to give way and adds nothing to the line's height. */
+  nameLink: { flexShrink: 1, minWidth: 0 },
+  secondaryLink: { flexShrink: 1, minWidth: 0, alignSelf: 'flex-start' },
+  linkPressed: { opacity: 0.6 },
   secondary: { fontSize: 11, lineHeight: 15, fontWeight: '500', flexShrink: 1, minWidth: 0 },
   detailLine: {
     flexDirection: 'row',

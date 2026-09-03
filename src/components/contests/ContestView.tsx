@@ -110,6 +110,7 @@ export function ContestView({
   onBack,
   onClose,
   dismissible,
+  onOpenManager,
 }: {
   code: string;
   /**
@@ -124,6 +125,14 @@ export function ContestView({
   onClose: () => void;
   /** False while this view sits on top of another — see `dismissible`. */
   dismissible?: boolean;
+  /**
+   * Open a manager's account off a name in the field.
+   *
+   * Handed down rather than pushed from here, because inside this sheet a
+   * profile is a FRAME and only `ContestSheet` owns the stack. Absent in the
+   * kit, where the rows have nowhere to go.
+   */
+  onOpenManager?: (userId: string, name: string) => void;
 }) {
   const router = useRouter();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -658,6 +667,7 @@ export function ContestView({
             contestId={contest.id}
             /* The lobby row already counted the field; hold that many rows. */
             expect={contest.entrants}
+            onOpenManager={onOpenManager}
           />
 
           {/* Everything the card prices in eight characters, said in sentences.

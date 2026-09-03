@@ -143,6 +143,17 @@ export default function AppLayout() {
             you back on the row you tapped. Two stacked sheets is the same shape
             `pull` already takes over `packs`. */}
         <Stack.Screen name="entry/[contest]/[user]" options={sheetOptions} />
+        {/* Another manager's account, opened off their name — a row of any of
+            the six boards, your friends list, the directory. Same presentation
+            as the two profiles above, because it is the same kind of object:
+            something you glance at over the app and put down again.
+
+            The param is a USER id, never a player id. Inside the contests sheet
+            the same view is a FRAME rather than a route, so a manager opened
+            off a contest's field does not stack a sheet on a sheet — see
+            `ContestSheet`. This route is every door outside that sheet, plus
+            deep links and a refreshed browser tab. */}
+        <Stack.Screen name="manager/[id]" options={sheetOptions} />
         {/* Packs. Same presentation again, and for the same reason: you open
             it, spend, and put it down. It replaced `collection/shop`, which
             was a whole sub-page for a shelf of two rows — see there. */}

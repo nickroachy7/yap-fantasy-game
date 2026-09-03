@@ -80,6 +80,7 @@ export function ContestFieldPanel({
   title = 'The field',
   expect,
   contestId,
+  onOpenManager,
 }: {
   entrants: FieldEntrant[] | null;
   loading: boolean;
@@ -107,6 +108,20 @@ export function ContestFieldPanel({
    * it.
    */
   contestId: string | null;
+  /**
+   * Open the manager behind a row, as a person rather than as a lineup.
+   *
+   * THE ROW KEEPS ITS OWN PRESS. Tapping a row opens that manager's LINEUP in
+   * place, which is what a reader of a contest wants nine times out of ten; the
+   * tenth is "who is this", and that is the NAME. Two targets on one row, and
+   * they are siblings rather than one inside the other — a `Pressable` in a
+   * `Pressable` is a `<button>` in a `<button>` on web, which React rejects.
+   * The name's role is `link`, the one interactive role react-native-web does
+   * not render as a button element. See `ManagerRow`, which is the same shape.
+   *
+   * Absent in the kit, and absent means the name is plain text.
+   */
+  onOpenManager?: (userId: string, name: string) => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -148,6 +163,7 @@ export function ContestFieldPanel({
       slotCount={slotCount}
       title={title}
       contestId={contestId}
+      onOpenManager={onOpenManager}
     />
   );
 }
@@ -167,6 +183,7 @@ export function ContestFieldList({
   slotCount,
   title = 'The field',
   contestId = null,
+  onOpenManager,
 }: {
   entrants: FieldEntrant[];
   slotCount: number;
@@ -174,6 +191,8 @@ export function ContestFieldList({
   title?: string;
   /** Absent in the kit, where there is no lineup to fetch. */
   contestId?: string | null;
+  /** Absent in the kit, and absent means the name is plain text. */
+  onOpenManager?: (userId: string, name: string) => void;
 }) {
   /* WHOSE TEAM IS OPEN, by user id and one at a time — see the header. State
      rather than a prop because it is a way of reading this list, not a fact
@@ -208,6 +227,9 @@ export function ContestFieldList({
                   contestId
                     ? () => setOpen((was) => (was === e.userId ? null : e.userId))
                     : undefined
+                }
+                onOpenManager={
+                  onOpenManager ? () => onOpenManager(e.userId, e.displayName) : undefined
                 }
               />
               {open === e.userId && contestId ? (
@@ -255,12 +277,15 @@ function EntrantRow({
   slotCount,
   expanded,
   onOpen,
+  onOpenManager,
 }: {
   entrant: FieldEntrant;
   slotCount: number;
   /** Their lineup is drawn under this row right now. */
   expanded: boolean;
   onOpen?: () => void;
+  /** The name becomes a link to their account — see the panel's prop. */
+  onOpenManager?: () => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -297,9 +322,27 @@ function EntrantRow({
         </Text>
       </View>
       <View style={styles.who}>
-        <Text numberOfLines={1} style={[Type.body, { color: c.text }]}>
-          {entrant.displayName}
-        </Text>
+        {onOpenManager ? (
+          /* `link`, not `button`: this sits inside the row's own pressable, and
+             `link` is the one interactive role react-native-web does not render
+             as a real <button> element. A button in a button is the nesting
+             React rejects — see the panel's `onOpenManager`. */
+          <Pressable
+            onPress={onOpenManager}
+            accessibilityRole="link"
+            accessibilityLabel={entrant.displayName}
+            accessibilityHint="Opens this manager's profile"
+            hitSlop={6}
+            style={({ pressed }) => [styles.nameLink, pressed && styles.namePressed]}>
+            <Text numberOfLines={1} style={[Type.body, { color: c.text }]}>
+              {entrant.displayName}
+            </Text>
+          </Pressable>
+        ) : (
+          <Text numberOfLines={1} style={[Type.body, { color: c.text }]}>
+            {entrant.displayName}
+          </Text>
+        )}
         <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
           {subLine(entrant, slotCount)}
         </Text>
@@ -378,6 +421,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.one,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  nameLink: { alignSelf: 'flex-start', maxWidth: '100%' },
+  namePressed: { opacity: 0.6 },
   pressed: { opacity: 0.6 },
   /* Fixed width so the avatars line up whatever the field's size — a rank
      column that grows from 1 to 26 would shunt every name half a character

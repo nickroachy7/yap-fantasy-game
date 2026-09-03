@@ -68,6 +68,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigation, useRouter } from 'expo-router';
 
+import { ManagerView } from '@/components/friends/ManagerView';
 import { ContestView } from './ContestView';
 import { EntryView } from './EntryView';
 import { LobbyView } from './LobbyView';
@@ -93,7 +94,18 @@ export type SheetFrame =
       /** Whose team it is, for the title while the field loads. */
       manager?: string;
       backLabel?: string;
-    };
+    }
+  /**
+   * A MANAGER'S ACCOUNT, as a frame rather than a route.
+   *
+   * `/manager/<id>` exists and is the door from everywhere else in the app —
+   * but pushing it from in here would put a presented sheet on top of a
+   * presented sheet, which is the exact stacking this file was written to
+   * abolish. So the same `ManagerView` renders as the next frame instead: ‹
+   * goes back to the field you tapped, and ✕ still means put the whole thing
+   * down.
+   */
+  | { view: 'manager'; userId: string; manager?: string; backLabel?: string };
 
 export function ContestSheet({ initial }: { initial: SheetFrame }) {
   const router = useRouter();
@@ -169,6 +181,25 @@ export function ContestSheet({ initial }: { initial: SheetFrame }) {
         onBack={pop}
         onClose={close}
         dismissible={!nested}
+        /* A name on a row of the field. The row itself still opens that
+           manager's LINEUP in place — two different questions about the same
+           person, and the field row answers both. */
+        onOpenManager={(userId, manager) =>
+          push({ view: 'manager', userId, manager, backLabel: 'Contest' })
+        }
+      />
+    );
+  }
+
+  if (here.view === 'manager') {
+    return (
+      <ManagerView
+        userId={here.userId}
+        name={here.manager}
+        backLabel={here.backLabel}
+        onBack={pop}
+        onClose={close}
+        dismissible={!nested}
       />
     );
   }
@@ -184,6 +215,11 @@ export function ContestSheet({ initial }: { initial: SheetFrame }) {
         onBack={pop}
         onClose={close}
         dismissible={!nested}
+        /* Whose team this is, as a person rather than as a lineup. The back
+           label names THIS frame, which is the one the reader came from. */
+        onOpenManager={(userId, manager) =>
+          push({ view: 'manager', userId, manager, backLabel: manager ?? 'Team' })
+        }
       />
     );
   }

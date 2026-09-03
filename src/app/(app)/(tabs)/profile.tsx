@@ -6,6 +6,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { CoinLedger, type LedgerEntry } from '@/components/account/CoinLedger';
+import { FriendsPanel } from '@/components/friends/FriendsPanel';
+import { useFriends } from '@/components/friends/use-friends';
 import { StatStrip, type StatItem } from '@/components/account/StatStrip';
 import { TierBreakdown } from '@/components/account/TierBreakdown';
 import { Coin, initialsOf } from '@/components/shell/AppHeader';
@@ -57,7 +59,7 @@ type LedgerRow = { id: string; amount: number; reason: string; created_at: strin
 type WeekRow = { week: number; total_points: number; scored_at: string | null };
 type OwnedRow = { tier: CardTier | null; career_fp: number | null; lineup_starts: number | null };
 
-type TabKey = 'overview' | 'activity' | 'settings';
+type TabKey = 'overview' | 'activity' | 'friends' | 'settings';
 
 /** The enum values are terse; players should not have to read snake_case. */
 const REASON_LABEL: Record<string, string> = {
@@ -84,7 +86,9 @@ export default function ProfileScreen() {
      deep-links into twice. */
   const params = useLocalSearchParams<{ tab?: string }>();
   const [tab, setTab] = useState<TabKey>(
-    params.tab === 'activity' || params.tab === 'settings' ? params.tab : 'overview',
+    params.tab === 'activity' || params.tab === 'settings' || params.tab === 'friends'
+      ? params.tab
+      : 'overview',
   );
   const [slate, setSlate] = useState<Slate | null>(null);
   const [ledger, setLedger] = useState<LedgerRow[] | null>(null);
@@ -113,6 +117,18 @@ export default function ProfileScreen() {
   }
 
   const userId = session?.user.id;
+
+  /**
+   * FRIENDS ARE THEIR OWN READ, not part of `load` below.
+   *
+   * Two reasons, and the second is the real one. They do not depend on the
+   * slate, so folding them into a loader keyed on the season would re-read the
+   * list every time the week rolled over. And a friend action has to re-read
+   * the lists on its own (see `use-friends.ts`) — sharing this screen's loader
+   * would mean accepting a request also re-fetched a season of lineups, a coin
+   * ledger and a whole collection.
+   */
+  const friends = useFriends();
 
   const load = useCallback<Load>(async (live) => {
     // Follow the slate actually being played rather than assuming the regular
@@ -186,9 +202,12 @@ export default function ProfileScreen() {
      back — the loader can only speak for its own read. */
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([reloadSeason(), refresh()]);
+    /* The friends list joins the pull, because it is one of the three things
+       this screen can be showing and a pull on the tab it is showing should
+       refresh what is on screen. */
+    await Promise.all([reloadSeason(), refresh(), friends.refresh()]);
     setRefreshing(false);
-  }, [reloadSeason, refresh]);
+  }, [reloadSeason, refresh, friends]);
 
   const season = useMemo(() => {
     // A submitted-but-unscored week is not a week played: counting it drags the
@@ -394,6 +413,15 @@ export default function ProfileScreen() {
           [
             { value: 'overview', label: 'Overview' },
             { value: 'activity', label: 'Activity', hint: ledger ? String(ledger.length) : undefined },
+            /* The hint is the COUNT OF REQUESTS WAITING ON YOU, not the friend
+               count. A tab's hint is the badge slot, and a badge should say
+               "there is something here to do" — the number of friends you have
+               is on the panel itself and is not news. */
+            {
+              value: 'friends',
+              label: 'Friends',
+              hint: friends.incoming > 0 ? String(friends.incoming) : undefined,
+            },
             { value: 'settings', label: 'Settings' },
           ] satisfies Tab<TabKey>[]
         }
@@ -470,6 +498,11 @@ export default function ProfileScreen() {
           </Panel>
         </>
       ) : null}
+
+      {/* Requests, the list, and the directory — see `FriendsPanel`. The state
+          is held by this screen's hook so the tab's badge and the panel's rows
+          cannot disagree about who is waiting. */}
+      {tab === 'friends' ? <FriendsPanel state={friends} /> : null}
 
       {tab === 'settings' ? (
         <>

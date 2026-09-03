@@ -34,6 +34,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { supabase } from '@/lib/supabase';
 import { BoardControls } from './BoardControls';
+import { useOpenManager } from '@/components/friends/use-open-manager';
 import { BoardRow } from './BoardRow';
 import { BoardTop, hasBoardTop } from './BoardTop';
 import {
@@ -99,6 +100,7 @@ export function PointsBoard({
 
   const loadedSlate = useRef<string | null>(null);
   const list = useRef<FlatList<BoardRowModel>>(null);
+  const openManager = useOpenManager();
 
   // Loading is two-phase, so a slow pull-to-refresh can land after a fast one.
   // `live()` is the token that keeps the older response from winning.
@@ -337,6 +339,9 @@ export function PointsBoard({
             row={item}
             isMe={item.userId === meId}
             unit="points"
+            /* The row's own press is the week-by-week breakdown, so the profile
+               is a link on the name — see `onOpenProfile`. */
+            onOpenProfile={() => openManager(item.userId, item.name)}
             expanded={expandedId === item.userId}
             onToggle={() =>
               setExpandedId((current) => (current === item.userId ? null : item.userId))

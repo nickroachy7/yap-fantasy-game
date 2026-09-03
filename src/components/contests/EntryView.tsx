@@ -58,14 +58,14 @@
  * eight cards with theirs meant leaving the page yours is on.
  */
 import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { EntryLineup } from './EntryLineup';
 import { useContestField, useContestLineup } from './use-contest-field';
 import { BackRow } from './ContestRecapPanel';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { SummaryStrip } from '@/components/ui/SummaryStrip';
-import { Colors, Spacing, Type } from '@/constants/theme';
+import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 /** The place, spelled out. The strip has room and "3RD" reads better than "3". */
@@ -93,6 +93,7 @@ export function EntryView({
   onBack,
   onClose,
   dismissible,
+  onOpenManager,
 }: {
   contestId: string | null;
   userId: string | null;
@@ -114,6 +115,15 @@ export function EntryView({
   onClose: () => void;
   /** False while this view sits on top of another — see `dismissible`. */
   dismissible?: boolean;
+  /**
+   * Their ACCOUNT, as opposed to this one team of theirs.
+   *
+   * A frame on the same stack rather than a route, so ‹ returns to this lineup
+   * — `ContestSheet` owns the push. Undefined on a cold deep link into this
+   * route, where the name is all we were given and there is no stack to push
+   * onto; the sheet is still readable, it simply offers one door fewer.
+   */
+  onOpenManager?: (userId: string, name: string) => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -141,7 +151,19 @@ export function EntryView({
       }
       onClose={onClose}
       dismissible={dismissible}
-      closeLabel="Close lineup">
+      closeLabel="Close lineup"
+      /* THE ONE ACTION ON A RIVAL'S TEAM, pinned so it is reachable without
+         scrolling past their whole lineup. Conditional rather than a component
+         that returns null: the frame draws a bar around whatever it is handed,
+         so nothing to offer must be nothing at all. */
+      footer={
+        onOpenManager && userId ? (
+          <ManagerFooter
+            label={`View ${entrant?.displayName ?? manager ?? 'manager'}'s profile`}
+            onPress={() => onOpenManager(userId, entrant?.displayName ?? manager ?? '')}
+          />
+        ) : undefined
+      }>
       {fieldError ?? error ? (
         <Text style={[Type.fine, { color: c.negative }]}>{fieldError ?? error}</Text>
       ) : (loading || fieldLoading) && slots === null ? null : (
@@ -222,6 +244,44 @@ export function EntryView({
   );
 }
 
+/**
+ * The footer control. A bar with one door in it, drawn the way the friend
+ * button's wide form is drawn — same height, same radius, same border — because
+ * they appear in the same slot on two sheets a reader opens one after the other.
+ */
+function ManagerFooter({ label, onPress }: { label: string; onPress: () => void }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  return (
+    <View style={styles.footer}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="link"
+        accessibilityLabel={label}
+        style={({ pressed }) => [
+          styles.footerButton,
+          { borderColor: c.border, backgroundColor: c.surface },
+          pressed && styles.footerPressed,
+        ]}>
+        <Text numberOfLines={1} style={[Type.strong, { color: c.text }]}>
+          {label}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  footer: { flexDirection: 'row', paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
+  footerButton: {
+    flex: 1,
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: Radius.chip,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.three,
+  },
+  footerPressed: { opacity: 0.7 },
   body: { gap: Spacing.three },
 });

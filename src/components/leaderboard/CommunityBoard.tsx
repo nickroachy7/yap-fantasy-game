@@ -37,6 +37,7 @@ import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
 import { BoardControls } from './BoardControls';
+import { useOpenManager } from '@/components/friends/use-open-manager';
 import { BOARD_ROW_HEIGHT, BoardRow } from './BoardRow';
 import { BoardTop, hasBoardTop } from './BoardTop';
 import {
@@ -81,6 +82,8 @@ export function CommunityBoard({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const list = useRef<FlatList<BoardRowModel>>(null);
+  /* Every name on every board opens the same sheet — see `useOpenManager`. */
+  const openManager = useOpenManager();
 
   const [position, setPosition] = useState<PosFilter>('ALL');
   const [data, setData] = useState<CommunityData | null>(null);
@@ -255,7 +258,15 @@ export function CommunityBoard({
           </View>
         }
         renderItem={({ item }) => (
-          <BoardRow row={item} isMe={item.userId === meId} unit={meta.unit} />
+          <BoardRow
+            row={item}
+            isMe={item.userId === meId}
+            unit={meta.unit}
+            onOpenProfile={() => openManager(item.userId, item.name)}
+            /* On the cards board line 1 is the footballer and the manager is
+               line 2 — "Held by dmb" — so the link goes there. See `profileOn`. */
+            profileOn={id === 'cards' ? 'secondary' : 'name'}
+          />
         )}
       />
     </>

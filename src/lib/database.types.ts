@@ -675,6 +675,33 @@ export type Database = {
           },
         ]
       }
+      friendships: {
+        Row: {
+          addressee_id: string
+          answered_at: string | null
+          created_at: string
+          id: string
+          requester_id: string
+          state: Database["public"]["Enums"]["friend_state"]
+        }
+        Insert: {
+          addressee_id: string
+          answered_at?: string | null
+          created_at?: string
+          id?: string
+          requester_id: string
+          state?: Database["public"]["Enums"]["friend_state"]
+        }
+        Update: {
+          addressee_id?: string
+          answered_at?: string | null
+          created_at?: string
+          id?: string
+          requester_id?: string
+          state?: Database["public"]["Enums"]["friend_state"]
+        }
+        Relationships: []
+      }
       game_config: {
         Row: {
           description: string
@@ -2112,7 +2139,7 @@ export type Database = {
     }
     Functions: {
       apply_injuries: { Args: { payload: Json }; Returns: number }
-      apply_ranking_fallback: {
+      apply_market_blend: {
         Args: { p_format?: string; p_season?: number }
         Returns: Json
       }
@@ -2413,6 +2440,24 @@ export type Database = {
         Args: { p_season: number; p_season_type: number; p_week: number }
         Returns: number
       }
+      find_managers: {
+        Args: { p_limit?: number; p_query?: string }
+        Returns: {
+          cards: number
+          display_name: string
+          friend_state: string
+          member_since: string
+          user_id: string
+        }[]
+      }
+      friend_accept: { Args: { p_user: string }; Returns: string }
+      friend_decline: { Args: { p_user: string }; Returns: string }
+      friend_link: {
+        Args: { p_other: string; p_viewer: string }
+        Returns: string
+      }
+      friend_remove: { Args: { p_user: string }; Returns: string }
+      friend_request: { Args: { p_user: string }; Returns: string }
       game_config_value: {
         Args: { p_default?: number; p_key: string }
         Returns: number
@@ -2462,6 +2507,39 @@ export type Database = {
           card_instance_id: string
           locked: boolean
           starts_at: string
+        }[]
+      }
+      manager_profile: {
+        Args: { p_season?: number; p_season_type?: number; p_user: string }
+        Returns: {
+          best_points: number
+          best_week: number
+          cards: number
+          career_fp: number
+          diamond: number
+          display_name: string
+          field_size: number
+          friend_count: number
+          friend_state: string
+          friends_since: string
+          gold_plus: number
+          in_sets: number
+          losses: number
+          member_since: string
+          players: number
+          points: number
+          points_rank: number
+          rungs: number
+          season: number
+          season_type: number
+          sets_done: number
+          ties: number
+          user_id: string
+          value_coins: number
+          value_rank: number
+          weeks_played: number
+          win_pct: number
+          wins: number
         }[]
       }
       median_record: {
@@ -2522,6 +2600,28 @@ export type Database = {
           win_condition: Database["public"]["Enums"]["contest_win_condition"]
           win_pct: number
           win_rank: number
+        }[]
+      }
+      my_friend_requests: {
+        Args: never
+        Returns: {
+          direction: string
+          display_name: string
+          requested_at: string
+          user_id: string
+        }[]
+      }
+      my_friends: {
+        Args: { p_season?: number; p_season_type?: number }
+        Returns: {
+          cards: number
+          display_name: string
+          friends_since: string
+          points: number
+          rank: number
+          user_id: string
+          value_coins: number
+          weeks_played: number
         }[]
       }
       my_run: { Args: never; Returns: Json }
@@ -2693,6 +2793,7 @@ export type Database = {
       contest_kind: "free" | "lobby"
       contest_payout_curve: "flat" | "linear" | "steep" | "winner_take_all"
       contest_win_condition: "median" | "top_n" | "top_pct" | "target"
+      friend_state: "pending" | "accepted" | "declined"
       rarity: "common" | "uncommon" | "rare" | "epic" | "legendary"
     }
     CompositeTypes: {
@@ -2846,6 +2947,7 @@ export const Constants = {
       contest_kind: ["free", "lobby"],
       contest_payout_curve: ["flat", "linear", "steep", "winner_take_all"],
       contest_win_condition: ["median", "top_n", "top_pct", "target"],
+      friend_state: ["pending", "accepted", "declined"],
       rarity: ["common", "uncommon", "rare", "epic", "legendary"],
     },
   },

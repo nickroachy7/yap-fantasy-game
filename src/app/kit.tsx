@@ -75,6 +75,9 @@ import { LeadersPanel } from '@/components/scores/LeadersPanel';
 import type { Leader, ScoreGame } from '@/components/scores/scoreboard';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { DropdownChip } from '@/components/ui/DropdownChip';
+import { FriendButton } from '@/components/friends/FriendButton';
+import { ManagerRow } from '@/components/friends/ManagerRow';
+import type { FriendLink } from '@/components/friends/friends';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
 import { EntryLineup } from '@/components/contests/EntryLineup';
@@ -698,6 +701,22 @@ export default function KitScreen() {
  */
 const ICON_FINDINGS = validateSet(GLYPHS);
 
+/**
+ * One row per friendship state, in the order the button's own note lists them.
+ *
+ * The metas are deliberately different shapes — a full line, a short one, none
+ * at all — because the row has to hold a name, a chip and a control on a 375pt
+ * phone whether or not there is a second line under it.
+ */
+const KIT_MANAGERS: { link: FriendLink; name: string; meta?: string }[] = [
+  { link: 'none', name: 'dmb', meta: '61 cards' },
+  { link: 'outgoing', name: 'sarah', meta: 'Request sent · Sep 1' },
+  { link: 'incoming', name: 'kp', meta: 'Asked you · Sep 2' },
+  { link: 'friends', name: 'a_very_long_display_name', meta: '#3 · 148.2 pts · 22 cards' },
+  { link: 'declined', name: 'bebo' },
+  { link: 'dismissed', name: 'Durrr', meta: '8 cards' },
+];
+
 function Kit() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -728,6 +747,8 @@ function Kit() {
      any other way — that screen is behind a sign-in too. */
   const [bulkStage, setBulkStage] = useState<BulkStage>('idle');
   const [bulkCount, setBulkCount] = useState(12);
+  /* The friend row's one error line — see the section's note. */
+  const [friendError, setFriendError] = useState<string | null>(null);
   const spendPullCard = (id: string) =>
     setPullActions((held) => {
       const was = held.get(id);
@@ -1882,6 +1903,52 @@ function Kit() {
             />
           </Section>
 
+          <Section
+            title="Manager row"
+            note="Every state a friendship can be in, in the row four lists draw. The buttons call the real RPCs and there is no session behind this page, so a press reports a failure into the line below — the STATES are the thing on show.">
+            {/* ALL SEVEN AT ONCE IS THE POINT. A friendship state is never
+                wrong on its own; it is wrong beside its neighbours — two of
+                them offering the same word, or the one dead end looking
+                pressable. That is only checkable here, in one column. */}
+            <View style={[styles.friendPanel, { borderColor: c.border, backgroundColor: c.surface }]}>
+              {KIT_MANAGERS.map((m, i) => (
+                <ManagerRow
+                  key={m.link}
+                  userId={`kit-${m.link}`}
+                  name={m.name}
+                  meta={m.meta}
+                  link={m.link}
+                  onOpen={() => {}}
+                  onChange={() => {}}
+                  onError={setFriendError}
+                  rule={i < KIT_MANAGERS.length - 1}
+                />
+              ))}
+            </View>
+            {friendError ? (
+              <Text style={[Type.fine, { color: c.negative }]}>{friendError}</Text>
+            ) : null}
+            {/* The wide form, which is the sheet's footer rather than a row. */}
+            <View style={[styles.row, { gap: Spacing.two }]}>
+              <FriendButton
+                userId="kit-wide"
+                name="dmb"
+                link="none"
+                onChange={() => {}}
+                onError={setFriendError}
+                wide
+              />
+              <FriendButton
+                userId="kit-wide-friends"
+                name="dmb"
+                link="friends"
+                onChange={() => {}}
+                onError={setFriendError}
+                wide
+              />
+            </View>
+          </Section>
+
           <Section title="Empty state" note="Bold line, quiet line, at most one action.">
             <Panel>
               <EmptyState
@@ -2084,6 +2151,9 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   content: { padding: Spacing.four, gap: Spacing.five, maxWidth: 760, width: '100%', alignSelf: 'center' },
   section: { gap: Spacing.two },
+  /* A panel's surface without `Panel`'s heading row: the friend rows are the
+     thing on show and a title above them would be the kit's, not the app's. */
+  friendPanel: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, alignItems: 'center' },
   iconCell: { alignItems: 'center', gap: Spacing.two },
   summaryPad: { padding: Spacing.two + 2 },
