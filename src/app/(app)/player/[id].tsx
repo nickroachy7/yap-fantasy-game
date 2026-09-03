@@ -38,11 +38,12 @@ import { PlayerSheetFrame, SheetToneBand } from '@/components/players/PlayerShee
 import { Section, SectionStack } from '@/components/players/Section';
 import { usePlayerPage } from '@/components/players/use-player-page';
 import { Tabs, type Tab } from '@/components/ui/Tabs';
+import { TeamDepthTab } from '@/components/cards/TeamDepthTab';
 import { teamWash } from '@/constants/teams';
 import { Colors, NUMERIC, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-type ProfileTab = 'overview' | 'card' | 'log';
+type ProfileTab = 'overview' | 'card' | 'log' | 'team';
 
 const oneDp = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
@@ -60,6 +61,10 @@ const TABS: Tab<ProfileTab>[] = [
   { value: 'overview', label: 'Overview' },
   { value: 'card', label: 'Cards' },
   { value: 'log', label: 'Game log' },
+  /* LAST, and it is the only one that is not about this man. Overview, Cards
+     and Game log all answer "what about him"; Team answers "what is around
+     him", which is context for the other three rather than a peer of them. */
+  { value: 'team', label: 'Team' },
 ];
 
 export default function PlayerDetailScreen() {
@@ -242,6 +247,10 @@ export default function PlayerDetailScreen() {
         ) : null}
 
         {tab === 'log' ? <GameLogTab profile={profile} sections={sections} /> : null}
+
+        {tab === 'team' ? (
+          <TeamDepthTab team={player.team} season={player.season} playerId={player.playerId} />
+        ) : null}
       </>
     );
   };

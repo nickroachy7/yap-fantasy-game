@@ -89,23 +89,49 @@ export default function LeadersScreen() {
    * Which is also why a player with no games is simply absent: he has no rank,
    * and a board is a list of ranks.
    */
+  /**
+   * THE BOARD IS THE MARKET'S, NOT OURS, and that is what makes it a board in
+   * September.
+   *
+   * It used to rank on `overallRank`, which this app computes from points
+   * actually scored this season. That is the right number in December and no
+   * number at all in preseason: `assignRanks` leaves anyone with no games
+   * unranked, so before week one it is null for EVERY player and this screen
+   * was an empty state. A season board that only exists once the season is half
+   * over is not much of a season board.
+   *
+   * `marketRank` is the provider's consensus, which exists before a snap is
+   * taken. It is also the honest answer to what this page claims: "the best
+   * cards" is a forward-looking statement, and ranking it on points already
+   * banked answered a different question — who has been best SO FAR.
+   *
+   * THE POSITION BOARDS RE-RANK RATHER THAN FILTER, which is unchanged and is
+   * the point of the note at the head of this file: picking WR gives the top
+   * fifty receivers numbered 1..50. The market publishes only an overall rank
+   * with any coverage (`position_rank` is present for a fifth of the board), so
+   * the position number is this list's own ordinal over the market's order —
+   * which is exactly what "the 12th best receiver" means.
+   */
   const { board, pool } = useMemo<{ board: ListedPlayer[]; pool: number }>(() => {
     if (!result) return { board: [], pool: 0 };
     const inPool =
       pos === 'ALL'
-        ? result.players.filter((p) => p.overallRank !== null)
+        ? result.players.filter((p) => p.marketRank !== null)
         : result.players.filter(
-            (p) => p.posRank !== null && (p.position ?? '').toUpperCase() === pos,
+            (p) => p.marketRank !== null && (p.position ?? '').toUpperCase() === pos,
           );
 
-    const rankOf = (p: DirectoryPlayer) =>
-      (pos === 'ALL' ? p.overallRank : p.posRank) ?? Number.MAX_SAFE_INTEGER;
+    const rankOf = (p: DirectoryPlayer) => p.marketRank ?? Number.MAX_SAFE_INTEGER;
 
     return {
       board: [...inPool]
         .sort((a, b) => rankOf(a) - rankOf(b))
         .slice(0, SHOWN)
-        .map((player) => ({ player })),
+        /* The ordinal, not the raw market rank. On the ALL board the two agree
+           for the top fifty; on a position board they must not — a receiver
+           board that reads 1, 4, 9, 14 is the filtered table this page exists
+           not to be. */
+        .map((player, i) => ({ player, rank: i + 1 })),
       pool: inPool.length,
     };
   }, [result, pos]);
@@ -137,7 +163,7 @@ export default function LeadersScreen() {
           title="Nobody has played yet"
           body={
             pos === 'ALL'
-              ? 'A board needs scored games. Once a week has been played and swept, the leaders appear here.'
+              ? 'A board needs the market\'s rankings, and that read came back empty. It refreshes weekly.'
               : `No ${pos} has a scored game this season yet.`
           }
         />
@@ -153,8 +179,8 @@ export default function LeadersScreen() {
   const context = !result
     ? 'Season leaders'
     : pool > board.length
-      ? `${result.season ?? ''} season · top ${board.length} of ${pool} by points`.trim()
-      : `${result.season ?? ''} season · ${board.length} ranked by points`.trim();
+      ? `${result.season ?? ''} season · top ${board.length} of ${pool} by market rank`.trim()
+      : `${result.season ?? ''} season · ${board.length} by market rank`.trim();
 
   return (
     <Screen title="Top" measure="table" context={context} scroll={false}>

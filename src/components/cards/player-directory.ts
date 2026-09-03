@@ -34,6 +34,21 @@ export type DirectoryPlayer = {
   experience: number | null;
   /* --- derived, see `assignRanks` --- */
   posRank: number | null;
+  /**
+   * WHERE THE MARKET PUTS HIM, from `/fantasy/rankings` — 1 is the best player
+   * on the board.
+   *
+   * A different claim from `overallRank`, and the two must not be confused.
+   * `overallRank` is OURS and it is backward-looking: it sorts by points
+   * actually scored this season, so in September it is null for everybody,
+   * because nobody has played. This is the market's forward-looking consensus,
+   * which exists before a snap is taken and is the only ranking that can order
+   * a board in preseason.
+   *
+   * Null for a player the provider does not rank — about a fifth of the
+   * directory, and all of them people no fantasy board has an opinion about.
+   */
+  marketRank: number | null;
   /** Rank across EVERY position, by season points. Null until he has played. */
   overallRank: number | null;
   /* --- from `player_card_market()`, merged in by `fetchPlayerDirectory` --- */
@@ -135,6 +150,7 @@ export function normalise(row: DirectoryRow, bio?: PlayerBio): DirectoryPlayer {
     college: bio?.college ?? null,
     experience: bio?.experience ?? null,
     posRank: null,
+    marketRank: null,
     overallRank: null,
     market: null,
   };
@@ -195,6 +211,37 @@ export function parseExperience(raw: string | null | undefined): number | null {
  * like "some players have no age".
  */
 const BIO_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'PK'];
+
+/**
+ * The market's board, keyed by player id.
+ *
+ * `ppr` because that is what our scoring is — see `scoring_rules` v3. The
+ * provider also publishes `standard`, `superflex` and `elimination`, and they
+ * disagree by design; reading the one that matches our rules is what stops the
+ * board ordering players by a game we are not playing.
+ *
+ * Failure is soft. A directory with no ranks is the directory as it was last
+ * week; a directory that refuses to load because a ranking read failed is a
+ * blank screen over a decoration.
+ */
+async function fetchMarketRanks(season: number): Promise<Map<string, number>> {
+  const byId = new Map<string, number>();
+  try {
+    const rows = await fetchAllPages<{ player_id: string; overall_rank: number }>((from, to) =>
+      supabase
+        .from('player_rankings')
+        .select('player_id, overall_rank')
+        .eq('season', season)
+        .eq('format', 'ppr')
+        .order('player_id', { ascending: true })
+        .range(from, to),
+    );
+    for (const r of rows) byId.set(r.player_id, r.overall_rank);
+  } catch {
+    /* Soft — see above. */
+  }
+  return byId;
+}
 
 async function fetchPlayerBios(): Promise<Map<string, PlayerBio>> {
   const rows = await fetchAllPages<{
@@ -390,11 +437,17 @@ export async function fetchPlayerDirectory(): Promise<DirectoryFetch> {
     for (const row of page) rows.push(row);
   }
 
+  /* The board is season-scoped and the season is only known after the probe
+     above, so unlike the bios this cannot be started early. It is one small
+     indexed read and it fails soft. */
+  const ranks = season === null ? new Map<string, number>() : await fetchMarketRanks(season);
+
   const [bios, market] = await Promise.all([biosPromise, marketPromise]);
   const players = rows.map((row) => {
     const p = normalise(row, bios.get(row.player_id ?? ''));
     // Absent means "no copies in circulation", which the row draws as dashes.
     p.market = market.get(p.playerId) ?? null;
+    p.marketRank = ranks.get(p.playerId) ?? null;
     return p;
   });
   assignRanks(players);

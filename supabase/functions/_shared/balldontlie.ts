@@ -20,11 +20,13 @@
 
 import type {
   GameQuery,
+  ProviderDepthRow,
   ProviderFantasyPoints,
   ProviderGame,
   ProviderInjury,
-  ProviderProjection,
   ProviderPlayer,
+  ProviderProjection,
+  ProviderRanking,
   ProviderSalary,
   ProviderSeasonStat,
   ProviderStanding,
@@ -359,6 +361,79 @@ export class BalldontlieProvider implements StatsProvider {
       out.push({ ...base, raw: (row.stats ?? {}) as Record<string, unknown> });
     }
     return out;
+  }
+
+  /**
+   * The market's board for a season — every player, every format.
+   *
+   * One walk of `/fantasy/rankings`, which returns each player once with a
+   * `rankings[]` array inside him rather than one row per format. Flattened
+   * here so the caller gets rows it can upsert directly.
+   *
+   * `position_rank` arrives as a float and is passed through as one. See
+   * `ProviderRanking` for why only `overall_rank` is trustworthy.
+   */
+  async listRankings(season: number): Promise<ProviderRanking[]> {
+    const params = new URLSearchParams({ season: String(season) });
+    const rows = await this.#paginate<Record<string, any>>('/fantasy/rankings', params);
+
+    const out: ProviderRanking[] = [];
+    for (const row of rows) {
+      const pid = row.player?.id;
+      if (typeof pid !== 'number') continue;
+      for (const r of (row.rankings ?? []) as Record<string, any>[]) {
+        if (typeof r?.overall_rank !== 'number' || typeof r?.type !== 'string') continue;
+        out.push({
+          playerExternalId: pid,
+          season,
+          format: r.type,
+          overallRank: r.overall_rank,
+          positionRank: typeof r.position_rank === 'number' ? r.position_rank : null,
+          auctionValue: typeof r.auction_value === 'number' ? r.auction_value : null,
+        });
+      }
+    }
+    return out;
+  }
+
+  /**
+   * One club's depth chart, folded.
+   *
+   * THE FEED REPEATS A MAN AT CONSECUTIVE DEPTHS — 121 rows for 100 distinct
+   * (slot, player) pairs on a single club, e.g. one running back listed at both
+   * RB4 and RB5. Taking the MINIMUM is what turns that back into a chart: it is
+   * his best claim on the slot, and it is stable, where taking the last row
+   * seen would depend on page order.
+   *
+   * Rows with no depth are dropped rather than defaulted. A player the provider
+   * cannot place is not "first choice", and inventing a 1 for him would put him
+   * above men it did place.
+   */
+  async listTeamDepth(teamExternalId: number): Promise<ProviderDepthRow[]> {
+    const rows = await this.#paginate<Record<string, any>>(
+      `/teams/${teamExternalId}/roster`,
+      new URLSearchParams(),
+    );
+
+    const best = new Map<string, ProviderDepthRow>();
+    for (const row of rows) {
+      const pid = row.player?.id;
+      const slot = typeof row.position === 'string' ? row.position : null;
+      const depth = row.depth;
+      if (typeof pid !== 'number' || !slot || typeof depth !== 'number') continue;
+
+      const key = `${slot}:${pid}`;
+      const seen = best.get(key);
+      if (seen && seen.depth <= depth) continue;
+      best.set(key, {
+        teamExternalId,
+        playerExternalId: pid,
+        slot,
+        depth,
+        injuryStatus: typeof row.injury_status === 'string' ? row.injury_status : null,
+      });
+    }
+    return [...best.values()];
   }
 
   async listInjuries(): Promise<ProviderInjury[]> {

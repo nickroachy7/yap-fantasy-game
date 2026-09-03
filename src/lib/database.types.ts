@@ -968,6 +968,51 @@ export type Database = {
         }
         Relationships: []
       }
+      player_rankings: {
+        Row: {
+          auction_value: number | null
+          format: string
+          overall_rank: number
+          player_id: string
+          position_rank: number | null
+          season: number
+          updated_at: string
+        }
+        Insert: {
+          auction_value?: number | null
+          format: string
+          overall_rank: number
+          player_id: string
+          position_rank?: number | null
+          season: number
+          updated_at?: string
+        }
+        Update: {
+          auction_value?: number | null
+          format?: string
+          overall_rank?: number
+          player_id?: string
+          position_rank?: number | null
+          season?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_rankings_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["player_id"]
+          },
+          {
+            foreignKeyName: "player_rankings_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       player_season_stats: {
         Row: {
           games_played: number | null
@@ -1553,6 +1598,58 @@ export type Database = {
         }
         Relationships: []
       }
+      team_depth: {
+        Row: {
+          depth: number
+          injury_status: string | null
+          player_id: string
+          season: number
+          slot: string
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          depth: number
+          injury_status?: string | null
+          player_id: string
+          season: number
+          slot: string
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          depth?: number
+          injury_status?: string | null
+          player_id?: string
+          season?: number
+          slot?: string
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_depth_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["player_id"]
+          },
+          {
+            foreignKeyName: "team_depth_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_depth_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_standings: {
         Row: {
           conference_record: string | null
@@ -1976,6 +2073,10 @@ export type Database = {
     }
     Functions: {
       apply_injuries: { Args: { payload: Json }; Returns: number }
+      apply_ranking_fallback: {
+        Args: { p_format?: string; p_season?: number }
+        Returns: Json
+      }
       assign_card_rarity: {
         Args: { p_production_season?: number; p_season: number }
         Returns: Json

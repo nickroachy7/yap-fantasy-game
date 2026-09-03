@@ -1098,32 +1098,30 @@ export function WeekFigure({
           {DASH}
         </Text>
       )}
-      {/* PROJ KEEPS ITS LINE, and the state does not take it.
-
-          This slot briefly carried LIVE/FINAL instead, on the reasoning that a
-          label printing a dash forever was dead space. It was the wrong trade
-          twice over. The fixture line two lines left already says FINAL @ LAC
-          and Q3 04:22 — so the state was being printed twice in one row — and
-          projections were coming, which made this a reserved slot rather than
-          an empty one. Taking it would have meant giving it back later. It has
-          a number in it now, which settles that argument for good.
-
-          What tells you a figure is live is the figure itself, in the positive
-          colour, with the clock beside the fixture. That is one signal on the
-          thing it is about, not two competing for the same row.
-
+      {/* THE LABEL IS GONE, AND THE POSITION IS WHAT SAYS WHAT THIS IS.
+ 
+          It read `PROJ 19.7` while the slot was still mostly a dash, when the
+          word was doing real work: a bare em dash under a bare number is
+          punctuation, and `PROJ —` is a statement. With a figure in it the word
+          has stopped earning its place — every row on the board carries the
+          same two numbers in the same order, the big one is the week and the
+          quiet one under it is the forecast, and a caption repeated down eight
+          rows is teaching something the column taught on the first row.
+ 
+          THE COLUMN KEEPS ITS 64 ANYWAY, and it is worth saying why, because
+          `PROJ` is what set that width and dropping it looks like it should buy
+          the name twenty points back. It does not: `RIGHT_WIDTH` is shared with
+          the collection row, whose top figure is a career total and runs to
+          `3140.2`. The lineup could afford to narrow; the thing it shares the
+          number with could not, and one width across both boards is the reason
+          they line up at all.
+ 
           STILL A DASH WHERE NOBODY HAS FORECAST, and never a number we made up.
           The ~460 players the provider projects do not cover a deep roster, and
-          a bye is projected for no one. See the head of this file.
-
-          THE LABEL NEVER LEAVES, even with a figure beside it. `19.7` alone
-          under a settled score is a second unlabelled number in the same
-          glance, and the two are not the same quantity — one is Sunday and the
-          other is a guess about it. */}
+          a bye is projected for no one. The dash is now the only thing this
+          line can say that the figure above it does not, which is the argument
+          for keeping the line at all. */}
       <View style={styles.projLine}>
-        <Text numberOfLines={1} style={[Type.micro, { color: c.textTertiary }]}>
-          PROJ
-        </Text>
         <Text numberOfLines={1} style={[styles.projValue, NUMERIC, { color: c.textTertiary }]}>
           {projected === null || projected === undefined ? DASH : projected.toFixed(1)}
         </Text>

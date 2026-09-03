@@ -27,6 +27,8 @@ import type { DirectoryPlayer } from './player-directory';
 
 export type ListedPlayer = {
   player: DirectoryPlayer;
+  /** His place on the board. Only a ranked list passes one — see `PlayerRow`. */
+  rank?: number;
   /** Overrides the row's right-hand number. Omit for season points. */
   figure?: RowFigure;
 };
@@ -55,6 +57,7 @@ export function PlayerList({
       renderItem={({ item }) => (
         <PlayerRow
           player={item.player}
+          rank={item.rank}
           figure={item.figure}
           onPress={onOpen}
           fixture={fixtureFor?.(item.player.team)}

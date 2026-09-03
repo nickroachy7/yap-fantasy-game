@@ -46,7 +46,8 @@
  *     skipped rather than stored as nought: an unscored week and a week scoring
  *     nothing are different facts and the board draws them differently.
  *
- * Body: { season?: number, weeks?: number[], mode?: 'both'|'points'|'projections' }
+ * Body: { season?: number, weeks?: number[],
+ *         mode?: 'both'|'points'|'projections'|'rankings'|'depth' }
  * Defaults to the current season and, with no weeks given, every week the
  * provider currently publishes projections for.
  */
@@ -147,6 +148,9 @@ Deno.serve(async (req) => {
       unknownPlayers: 0,
       weeksWithNoProjection: [] as number[],
       weeksWithNoResult: [] as number[],
+      rankingsWritten: 0,
+      depthWritten: 0,
+      teamsWithNoChart: [] as number[],
     };
 
     for (const week of weeks) {
@@ -252,6 +256,90 @@ Deno.serve(async (req) => {
             .upsert(batch, { onConflict: 'stat_line_id,rules_version' });
           if (error) throw error;
           summary.pointsWritten += batch.length;
+        }
+      }
+    }
+
+    /* ---- rankings ---------------------------------------------------------
+     * SEASON-SCOPED, so it is outside the week loop entirely. A consensus board
+     * is a preseason artefact that drifts over weeks; refetching it per week
+     * would be eighteen identical walks.                                     */
+    if (mode === 'rankings') {
+      const ranks = await provider.listRankings(season);
+      const rows = ranks.flatMap((r) => {
+        const playerId = playerByExternal.get(r.playerExternalId);
+        if (!playerId) {
+          summary.unknownPlayers += 1;
+          return [];
+        }
+        return [{
+          player_id: playerId,
+          season: r.season,
+          format: r.format,
+          overall_rank: r.overallRank,
+          position_rank: r.positionRank,
+          auction_value: r.auctionValue,
+          updated_at: new Date().toISOString(),
+        }];
+      });
+
+      for (const batch of chunk(rows, CHUNK)) {
+        const { error } = await supabase
+          .from('player_rankings')
+          .upsert(batch, { onConflict: 'player_id,season,format' });
+        if (error) throw error;
+        summary.rankingsWritten += batch.length;
+      }
+    }
+
+    /* ---- depth charts -----------------------------------------------------
+     * ONE REQUEST PER CLUB — there is no league-wide chart endpoint, so this is
+     * 32 walks. Sequential rather than parallel: the whole job is ~32 requests
+     * against a 600/min budget, and a burst of 32 concurrent walks is the one
+     * shape that can trip a rate limit for no gain in wall time that matters.
+     */
+    if (mode === 'depth') {
+      const teams = await selectAllPages<{ id: string; external_id: number }>((from, to) =>
+        supabase.from('teams').select('id, external_id').range(from, to)
+      );
+
+      for (const team of teams) {
+        let chart: Awaited<ReturnType<typeof provider.listTeamDepth>> = [];
+        try {
+          chart = await provider.listTeamDepth(team.external_id);
+        } catch {
+          /* One club failing must not lose the other thirty-one. */
+          summary.teamsWithNoChart.push(team.external_id);
+          continue;
+        }
+        if (chart.length === 0) {
+          summary.teamsWithNoChart.push(team.external_id);
+          continue;
+        }
+
+        const rows = chart.flatMap((d) => {
+          const playerId = playerByExternal.get(d.playerExternalId);
+          if (!playerId) {
+            summary.unknownPlayers += 1;
+            return [];
+          }
+          return [{
+            team_id: team.id,
+            season,
+            slot: d.slot,
+            depth: d.depth,
+            player_id: playerId,
+            injury_status: d.injuryStatus,
+            updated_at: new Date().toISOString(),
+          }];
+        });
+
+        for (const batch of chunk(rows, CHUNK)) {
+          const { error } = await supabase
+            .from('team_depth')
+            .upsert(batch, { onConflict: 'team_id,season,slot,player_id' });
+          if (error) throw error;
+          summary.depthWritten += batch.length;
         }
       }
     }

@@ -130,6 +130,39 @@ export interface ProviderProjection extends ProviderFantasyPoints {
   raw: Record<string, unknown>;
 }
 
+/**
+ * One player's place on the market's board, in ONE scoring format.
+ *
+ * `overallRank` is the only field a caller may depend on: measured on the 2026
+ * board, it is complete for all 1,033 ranked players while `positionRank` is
+ * present for 226 and `auctionValue` is zero for 877. The two soft fields are
+ * carried because they are free, not because anything can be built on them.
+ */
+export interface ProviderRanking {
+  playerExternalId: number;
+  season: number;
+  /** `ppr`, `standard`, `superflex`, `elimination`. */
+  format: string;
+  overallRank: number;
+  /** Fractional by design — a consensus of several boards, e.g. 1.25. */
+  positionRank: number | null;
+  auctionValue: number | null;
+}
+
+/**
+ * One line of a club's depth chart.
+ *
+ * `slot` is the provider's own vocabulary (`LT`, `RCB`, `WR-2`), which is finer
+ * than a player's position and is the entire information content of a chart.
+ */
+export interface ProviderDepthRow {
+  teamExternalId: number;
+  playerExternalId: number;
+  slot: string;
+  depth: number;
+  injuryStatus: string | null;
+}
+
 export interface ProviderInjury {
   playerExternalId: number;
   status: string | null;
@@ -217,6 +250,21 @@ export interface StatsProvider {
    * will eventually be compared against a differently-scored number.
    */
   listProjections(season: number, week: number): Promise<ProviderProjection[]>;
+  /**
+   * The market's board for a season, all four formats in one walk.
+   *
+   * Season-scoped, not week-scoped — a consensus ranking is a preseason
+   * artefact that drifts slowly, unlike a projection which is per-fixture.
+   */
+  listRankings(season: number): Promise<ProviderRanking[]>;
+  /**
+   * One club's depth chart.
+   *
+   * There is NO depth-chart endpoint; this reads the `depth` field on
+   * `/teams/{id}/roster`, which is why it takes a team and not a season. See
+   * the implementation for the duplicate rows it has to fold.
+   */
+  listTeamDepth(teamExternalId: number): Promise<ProviderDepthRow[]>;
   listInjuries(): Promise<ProviderInjury[]>;
   listSalaries(query: SalaryQuery): Promise<ProviderSalary[]>;
   /**

@@ -78,6 +78,7 @@
 import { memo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { BADGE_WIDTH } from '@/components/lineup/LineupRow';
 import { PlayerAvatar, AVATAR_SIZE } from './PlayerAvatar';
 import { DASH } from '@/components/ui/DataTable';
 import { positionColors } from '@/constants/positions';
@@ -162,6 +163,16 @@ export type PlayerRowProps = {
   fixture?: string | null;
   figure?: RowFigure;
   /**
+   * His place on the board, drawn to the LEFT of the portrait.
+   *
+   * Optional, and the option is the point: only a list whose ORDER IS ITS
+   * SUBJECT may draw one. On the directory the order changes with every sort
+   * chip, so a number beside a name would mean a different thing from one press
+   * to the next — see the head of `leaders.tsx`, which makes the same argument
+   * from the other side.
+   */
+  rank?: number;
+  /**
    * Replaces the tray's contents.
    *
    * The default strip is a HISTOGRAM OF A PLAYER — how many copies of him exist
@@ -179,7 +190,7 @@ export type PlayerRowProps = {
   strip?: ReactNode;
 };
 
-function PlayerRowInner({ player, onPress, fixture, figure, strip }: PlayerRowProps) {
+function PlayerRowInner({ player, onPress, fixture, figure, strip, rank }: PlayerRowProps) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const accent = positionColors(player.position, scheme).accent;
@@ -205,6 +216,20 @@ function PlayerRowInner({ player, onPress, fixture, figure, strip }: PlayerRowPr
         { backgroundColor: pressed ? c.backgroundElement : c.background },
       ]}>
       <View style={styles.identity}>
+        {/* THE PLACE ON THE BOARD, OUTSIDE THE PORTRAIT AND BEFORE IT.
+            Only the Top board passes one — see `leaders.tsx`: a rank beside a
+            name means nothing on a list whose order changes with the sort key,
+            and everything on a list whose order IS the subject.
+            Right-aligned in a fixed box so 1 and 50 share a right edge and the
+            portraits behind them start at one x. Tabular figures for the same
+            reason. */}
+        {rank === undefined ? null : (
+          <Text
+            numberOfLines={1}
+            style={[styles.boardRank, NUMERIC, { color: c.textTertiary }]}>
+            {rank}
+          </Text>
+        )}
         <View style={styles.avatar}>
           <PlayerAvatar />
         </View>
@@ -420,6 +445,23 @@ const styles = StyleSheet.create({
   /* Reserved at the portrait's size, so a licensed image drops in without the
      row being redesigned around it. See PlayerAvatar. */
   avatar: { width: AVATAR_SIZE, alignSelf: 'center' },
+  /* THE COMPETE BOARD'S BADGE COLUMN, to the point: same width, same centring,
+     same x for everything that follows it. `BADGE_WIDTH` is imported rather
+     than re-typed because two screens whose left columns agree by coincidence
+     are two screens that stop agreeing on the next change — the same argument
+     `InventoryRow` makes for borrowing it.
+ 
+     CENTRED, NOT RIGHT-ALIGNED. Right-aligning squares 1 and 50 against each
+     other, which is the correct instinct for a column of figures and the wrong
+     one here: this is a LABEL on the portrait beside it, the way the slot badge
+     labels the row it opens, and a label sits in the middle of its own box. */
+  boardRank: {
+    width: BADGE_WIDTH,
+    textAlign: 'center',
+    fontSize: 13,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
   /* `flexShrink` on the NAME only, and `flexShrink: 0` on everything beside it:
      left to share, `WR8` and `— BUF` collapsed to `W…` and `— …`, which is the
      rank and the club rendered as noise. The name is the one thing on the line
