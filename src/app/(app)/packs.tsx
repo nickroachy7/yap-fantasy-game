@@ -276,16 +276,35 @@ export default function PacksScreen() {
       tone={gold}
       onClose={close}
       closeLabel="Close packs">
+      {/* THE BALANCE SITS WHERE THE LOBBY'S HEARTS SIT, and it is the same
+          object: a title on the left, the currency the screen is priced in as a
+          pill at the right end, one line of prose under both. `LobbyHero` has
+          the account of why that shape won there — a header a reader takes in
+          on the way past rather than a block they have to get through — and a
+          player moving between the two sheets should find their two counters in
+          the same place rather than learning a second layout.
+
+          IT WAS A HERO: a 9pt YOUR BALANCE label, the figure at `Type.page`,
+          and a two-line paragraph. Three stacked lines and 26pt of number to
+          say what the masthead says on every other screen in 26pt of pill —
+          which put the first pack most of the way down a phone. */}
       <SheetToneBand tone={gold}>
         <View style={styles.hero}>
-          <Text style={[Type.micro, { color: c.textTertiary }]}>YOUR BALANCE</Text>
-          <View style={styles.balance}>
-            <Coin size={16} color={gold} />
-            <Text style={[Type.page, NUMERIC, { color: c.text }]}>{coins.toLocaleString()}</Text>
+          <View style={styles.titleRow}>
+            <Text style={[Type.page, { color: c.text }]}>Packs</Text>
+            <View style={styles.spacer} />
+            {/* The masthead's own pill, at the masthead's own size — the same
+                one the lobby draws its heart count in. */}
+            <View style={[styles.pill, { backgroundColor: c.background }]}>
+              <Coin size={12} color={gold} />
+              <Text style={[Type.strong, NUMERIC, { color: c.text }]}>
+                {coins.toLocaleString()}
+              </Text>
+            </View>
           </View>
-          <Text style={[Type.bodyRelaxed, styles.measure, { color: c.textSecondary }]}>
-            Cards arrive from packs. Every one starts at bronze and climbs a tier by scoring
-            fantasy points in your lineup.
+          <Text style={[Type.body, styles.measure, { color: c.textTertiary }]}>
+            Every card starts at bronze and climbs a tier by scoring fantasy points in your
+            lineup.
           </Text>
         </View>
       </SheetToneBand>
@@ -328,8 +347,20 @@ export default function PacksScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: { gap: Spacing.two, paddingBottom: Spacing.three },
-  balance: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  /* `LobbyHero`'s band: a title row, and the sentence under it separated by
+     nothing but the two line boxes' own leading. */
+  hero: { paddingTop: Spacing.two, paddingBottom: Spacing.two + 2, gap: Spacing.half },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  spacer: { flex: 1 },
+  /* The masthead's pill, and the lobby's — see the note on the hero. */
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one + 1,
+    paddingHorizontal: Spacing.two,
+    height: 26,
+    borderRadius: 13,
+  },
   measure: { maxWidth: 560 },
   notice: {
     borderWidth: StyleSheet.hairlineWidth,

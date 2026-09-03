@@ -1578,7 +1578,7 @@ function Kit() {
 
           <Section
             title="Pack shelf"
-            note="The three rows a shelf can hold: a free once-per-player pack (spent, so the button is dead), a free daily (claimable), and a paid repeatable one — which is the only kind that carries the ×1/×5/×10 row, because it is the only kind you could buy twice anyway. The ×10 here costs more than the fixture's 1,240 coins, so it is dimmed; pressing it is still allowed and the money line answers with the shortfall.">
+            note="A pack is a contest card with one extra zone — head, foot, and the action row that spends coins. Three rows: a free once-per-player pack (whose five position guarantees get the whole foot, because a free pack has no cost half to share it with), a free daily, and a paid repeatable one — the only kind that carries the ×1/×5/×10 row, because it is the only kind you could buy twice anyway. The ×10 here costs more than the fixture's 1,240 coins, so it is dimmed; pressing it is still allowed and the foot's COST half answers with the shortfall. A once-per-player pack that has been CLAIMED is not shown at all — it leaves the shelf rather than sitting there dead — so this shelf keeps the starter unspent.">
             <Panel>
               <View style={styles.summaryPad}>
                 <PackShelf

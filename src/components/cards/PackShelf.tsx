@@ -17,14 +17,57 @@
  * and the gaps between blocks, and a second `ScrollView` inside it would break
  * both.
  *
- * Behaviour carried across verbatim where it was already right: a claimed
- * one-per-player pack must render as a disabled "Claimed" button rather than
- * letting the user fire the RPC and read a raw Postgres error, and a zero coin
- * cost reads as "Free".
+ * ---------------------------------------------------------------------------
+ * A PACK IS DRAWN AS A CONTEST CARD IS DRAWN, AND THAT IS THE 2026-09-03 PASS
+ * ---------------------------------------------------------------------------
+ *
+ * It was a 230pt panel: a two-line head, a hairline, a three-row spec sheet
+ * with a 76pt label gutter, another hairline, a quantity row and an action row
+ * whose money line ran to two lines beside the button. Three of those on one
+ * sheet is 700pt of shelf, and the second pack was below the fold on a phone.
+ *
+ * The lobby had the same problem two months earlier and solved it: a contest is
+ * a bordered, clipped card divided into ZONES of fixed height, each painting its
+ * own fill, separated by hairlines — a head that names the thing and prices it,
+ * and a foot that states the trade in token rows. See `ContestCard`, which owns
+ * that anatomy and the reasoning behind every measurement in it. This file now
+ * borrows the anatomy rather than inventing a second one, so a reader who has
+ * learned to scan a contest card can scan a pack without relearning anything:
+ *
+ *     HEAD    34   glyph · name │ what is in it            price
+ *     FOOT    29   GUARANTEED tokens          │  1,900 → 1,800
+ *     ACTION  52   ×1 ×5 ×10                        [ Open ]
+ *
+ * IT IS 115pt AND NOT 63pt, WHICH IS WHAT A COLLAPSED CONTEST CARD COSTS. The
+ * difference is the action zone, and it is not padding: a contest card IS the
+ * button — the whole card opens a page — while a pack card has to carry the
+ * control that SPENDS COINS, and that control cannot be a 29pt strip inside a
+ * foot. It gets a zone with a 40pt button in it, which is the smallest honest
+ * answer. Everything above the action row is the contest card's geometry to the
+ * point.
+ *
+ * EVERY ZONE IS A FIXED HEIGHT AND NOTHING IN THE CARD WRAPS, which is a bug
+ * fix rather than a preference. The first cut gave the foot two `flex: 1` halves
+ * holding wrapping token rows; on device the cost half inherited a zero flex
+ * basis, rendered zero wide with its coin outside the card's clip, and its
+ * tokens — having no width to sit in — wrapped one per line and took a 29pt zone
+ * out to ninety. `Guaranteed` has the full account. The rule that came out of it:
+ * one field gives and truncates, one field never gives, every flex factor is
+ * named rather than inherited from a shorthand, and the zone's height is a
+ * number.
+ *
+ * THE FOOT'S RIGHT FIELD IS ABSENT ON A FREE PACK rather than reading `Free`,
+ * which the head says two inches away in green. What the row spends that space
+ * on is the starter pack's five position tokens — the only real guarantee in the
+ * table today, and otherwise the first thing to get clipped.
+ *
+ * Behaviour carried across verbatim where it was already right: a daily that
+ * has been used up must read as coming back rather than as spent, and a zero
+ * coin cost reads as "Free".
  *
  * BUYING SEVERAL AT ONCE is the card's one control beyond the button. See
- * `BULK_COUNTS` and the note on the quantity row for which packs get it and
- * why the free ones do not.
+ * `BULK_COUNTS` and the note on the action zone for which packs get it and why
+ * the free ones do not.
  *
  * What a pack contains is stated from DATA or not at all. `guaranteed_positions`
  * is real and is the one promise we can make about a pack's contents, so it is
@@ -32,7 +75,9 @@
  * one card at every lineup position" when the row actually deals RB×2 and WR×3.
  * Pull rates are NOT shown: `packs.odds` holds weights over rarity bands that
  * are still being tuned, and printing them as odds would be a promise the game
- * does not currently keep.
+ * does not currently keep. The per-card `PULL RATES · Not published yet` row is
+ * gone with the spec sheet — it was a whole row per pack saying what the one
+ * footnote under the shelf already says once.
  */
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -87,6 +132,29 @@ export type Pulled = {
  * at a time, so ten five-card packs is already fifty swipes.
  */
 const BULK_COUNTS = [1, 5, 10] as const;
+
+/**
+ * THE ZONES, AND THEY ARE `ContestCard`'s OWN NUMBERS.
+ *
+ * 34 of head and 29 of foot are that card's `HEAD_H` and `FOOT_H` verbatim, for
+ * that card's reasons: the head is sized by the 20pt line box a `Type.section`
+ * name sits in plus the zone's air, and the foot by a 15pt token row plus the
+ * same. Copying the constants rather than importing them is deliberate — a
+ * contest card and a pack card are two objects that agree, not one object in two
+ * files, and an import would make a change to the lobby's geometry silently
+ * resize the shop.
+ *
+ * `ACTION_H` is the one measurement this card owns, and it is derived rather
+ * than chosen: 40pt of button — the floor for something a thumb has to hit on
+ * the first try, and the height the open button already had — plus `ZONE_PAD`
+ * top and bottom.
+ */
+const HEAD_H = 34;
+const FOOT_H = 29;
+const BUTTON_H = 40;
+/** The air inside every zone, top and bottom. One constant, one decision. */
+const ZONE_PAD = Spacing.one + 3;
+const ACTION_H = BUTTON_H + ZONE_PAD * 2;
 
 /**
  * Lineup order, so coverage reads QB → PK. It cannot come off the jsonb: it
@@ -175,10 +243,39 @@ export function PackShelf({
     );
   }
 
+  /**
+   * A SPENT ONCE-PER-PLAYER PACK LEAVES THE SHELF ENTIRELY.
+   *
+   * It used to stay, drawn in full with a dead "Claimed" button under it — a
+   * whole card, permanently, for the one pack in the table that can never be
+   * opened again. That is a third of this sheet spent saying no, and it said it
+   * on every visit for the rest of the account's life. It is not history worth
+   * keeping either: what the starter pack dealt is in the collection, which is
+   * the screen this sheet opens over.
+   *
+   * IT IS KEYED ON `once_per_user`, NOT ON THE CODE. Any pack the table marks
+   * as one-per-player is spent the moment it has been opened, so a second one
+   * added later disappears on the same rule rather than needing this list
+   * amending.
+   *
+   * A DAILY IS NOT FILTERED, and the distinction is the whole reason this is a
+   * filter and not a `claimed` flag. A daily is used up for TODAY and comes back
+   * in a few hours; removing it would make a recurring reward look like a
+   * feature that had been taken away. It stays, with the button reading "Back
+   * tomorrow" — see `claimedToday`.
+   */
+  const shelf = packs.filter((p) => !(p.once_per_user && (openings.get(p.id) ?? 0) > 0));
+
   return (
     <>
+      {/* A COLUMN, WHICH IS THE LOBBY'S `stack`. The cards were a wrapping row
+          at a 300pt flex basis, which is the right layout for tall panels and
+          the wrong one for these: at 115pt they are lobby cards, and the lobby
+          draws its cards full width one under the other separated by space
+          rather than by rules. On the wide-web dialog a full-width card is what
+          a contest gets there too. */}
       <View style={styles.shelf}>
-        {packs.map((p) => (
+        {shelf.map((p) => (
           <PackCard
             key={p.id}
             pack={p}
@@ -205,7 +302,27 @@ export function PackShelf({
 
 /* ---- parts ------------------------------------------------------------- */
 
-export function CoverageChip({ entry }: { entry: Coverage }) {
+/** Two things side by side, at the width `ContestCard`'s head divider uses. */
+function Rule({ tall = false }: { tall?: boolean }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  return (
+    <View style={[styles.rule, tall && styles.ruleTall, { backgroundColor: c.borderStrong }]} />
+  );
+}
+
+/**
+ * One position the pack promises, as a token rather than as a chip.
+ *
+ * IT WAS A BORDERED CHIP and the border is what had to go. Five outlined boxes
+ * inside a card that is itself an outlined box is three levels of edge in one
+ * row, and the contest foot — which states the whole trade in `♥ 1` and `◆ 40`
+ * — proved a token needs no container to read as one unit. What separates them
+ * is space: the gap between two tokens is four times the gap inside one, which
+ * is `ContestCard`'s own ratio and the point below which the eye stops seeing
+ * pairs.
+ */
+export function CoverageToken({ entry }: { entry: Coverage }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
@@ -214,22 +331,52 @@ export function CoverageChip({ entry }: { entry: Coverage }) {
       accessible
       accessibilityRole="text"
       accessibilityLabel={`${entry.count} ${entry.position}`}
-      style={[styles.chip, { backgroundColor: c.surfaceSunken, borderColor: c.border }]}>
-      <Text style={[Type.label, { color: c.text }]}>{entry.position}</Text>
-      <Text style={[Type.label, NUMERIC, { color: c.textTertiary }]}>{`×${entry.count}`}</Text>
+      style={styles.token}>
+      <Text style={[Type.fine, { color: c.text }]}>{entry.position}</Text>
+      <Text style={[Type.fine, NUMERIC, { color: c.textTertiary }]}>{`×${entry.count}`}</Text>
     </View>
   );
 }
 
-/** One row of the pack's spec sheet: a 9pt label and a value on the same line. */
-function SpecRow({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * What the pack promises, as the foot's left field.
+ *
+ * IT IS THE ONE FIELD THAT GIVES, and it is `flexShrink` on a NOWRAP row rather
+ * than a wrapping box. The first cut of this foot was two `flex: 1` halves with
+ * wrapping token rows, and it failed on device in the one way a flex bug always
+ * fails: `flex: 1` expands to a basis of 0%, a `flex: 0` layered on top of it
+ * changes only the grow and shrink factors, so the cost field kept the zero
+ * basis, rendered zero wide, spilled its coin outside the card's clip — and its
+ * tokens, having no width to sit in, wrapped one per line and pushed a 29pt zone
+ * out to ninety. Web tolerated it (`flexBasis: 'auto'` is honoured there); Yoga
+ * did not.
+ *
+ * So nothing here uses the `flex` shorthand and nothing wraps. Every factor is
+ * named on its own, the zone takes a fixed height, and the worst a bad
+ * measurement can now do is truncate a string.
+ */
+function Guaranteed({ coverage }: { coverage: Coverage[] }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
   return (
-    <View style={styles.specRow}>
-      <Text style={[Type.micro, styles.specLabel, { color: c.textTertiary }]}>{label}</Text>
-      <View style={styles.specValue}>{children}</View>
+    <View style={styles.give}>
+      <Text numberOfLines={1} style={[Type.micro, styles.fieldLabel, { color: c.textTertiary }]}>
+        GUARANTEED
+      </Text>
+      <View style={styles.tokens}>
+        {coverage.length > 0 ? (
+          coverage.map((entry) => <CoverageToken key={entry.position} entry={entry} />)
+        ) : (
+          // An empty guaranteed_positions is a real answer, not missing data:
+          // this pack promises nothing about which positions turn up. Tertiary,
+          // which is `ContestCard`'s treatment for a token that is a word rather
+          // than a quantity.
+          <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
+            Any position
+          </Text>
+        )}
+      </View>
     </View>
   );
 }
@@ -271,16 +418,16 @@ function PackCard({
 
   const isDaily = pack.daily_limit !== null;
   /**
-   * Two kinds of "claimed", and they must not read the same. A once-per-player
-   * pack is SPENT — that button is never coming back. A daily is merely used up
-   * for now, and telling somebody "already claimed" for something that returns
-   * in a few hours is how a reward turns into a dead end.
+   * A daily is merely used up FOR NOW, and telling somebody "already claimed"
+   * for something that returns in a few hours is how a reward turns into a dead
+   * end. The other kind of claimed — a spent once-per-player pack — is not a
+   * state this card can be in any more: the shelf drops those rows before they
+   * reach here (see `PackShelf`).
    *
    * Null while the status is still loading: treated as claimed, because a
    * button that works is the safer thing to arrive at late.
    */
   const claimedToday = isDaily && dailyAvailable !== true;
-  const claimed = (pack.once_per_user && opened > 0) || claimedToday;
   const free = pack.coin_cost === 0;
 
   /**
@@ -304,169 +451,208 @@ function PackCard({
   const total = pack.coin_cost * buying;
 
   const affordable = coins >= total;
-  const blocked = locked || claimed || !affordable;
+  const blocked = locked || claimedToday || !affordable;
   const coverage = coverageOf(pack.guaranteed_positions);
 
   const label = claimedToday
     ? 'Back tomorrow'
-    : claimed
-      ? 'Claimed'
-      : free
-        ? 'Claim free pack'
-        : buying > 1
-          ? `Open ${buying}`
-          : 'Open';
+    : free
+      ? 'Claim free pack'
+      : buying > 1
+        ? `Open ${buying}`
+        : 'Open';
+
   /**
-   * The one line that answers "can I press this, and what happens to my
-   * balance if I do". Stating the shortfall beats "Not enough coins", which
-   * leaves the player to do the subtraction against a number in the header.
+   * WHAT THE PRESS DOES TO THE BALANCE, IN ONE STRING, OR NOTHING.
    *
-   * THE TOTAL LEADS ON A BULK BUY, because the figure printed at the top of the
-   * card is the price of ONE and the press spends `buying` of them. A line that
-   * only showed the balance either side of the purchase would leave the player
-   * to work out what the difference was for.
+   * `1,900 → 1,800`, AND IT ANSWERS THE BULK ROW FOR FREE. The head prints the
+   * price of ONE and the press spends `buying` of them, so a figure that only
+   * repeated the head would go stale the moment ×5 is tapped. The balance either
+   * side of the press cannot: at ×5 of 200 it reads `1,900 → 900`, which is both
+   * the total and what is left, in the space one of them would have taken.
+   *
+   * THE SHORTFALL IS A NUMBER, NOT A CONDITION, which is the lobby's rule for a
+   * contest you cannot afford — `100 SHORT` tells you what the trip to the shop
+   * is for where "Not enough coins" tells you to go and count. It falls back to
+   * the total when the arithmetic does not come out positive, so a balance that
+   * has moved under a cached row cannot produce `0 SHORT`.
+   *
+   * EMPTY ON A FREE PACK, and empty means the field is not drawn at all — see
+   * the foot. There is no arithmetic to state and the head already says FREE.
    */
-  const money = claimedToday
-    ? 'Claimed today — a new one every day'
-    : claimed
-      ? 'Already claimed — one per player'
-      : free
-        ? 'Free · does not touch your balance'
-        : affordable
-          ? buying > 1
-            ? `${total.toLocaleString()} coins · ${coins.toLocaleString()} → ${(coins - total).toLocaleString()}`
-            : `${coins.toLocaleString()} → ${(coins - total).toLocaleString()} coins`
-          : `${(total - coins).toLocaleString()} more coins needed`;
+  const shortfall = total - coins;
+  const money = free
+    ? null
+    : affordable
+      ? `${coins.toLocaleString()} → ${(coins - total).toLocaleString()}`
+      : `${(shortfall > 0 ? shortfall : total).toLocaleString()} SHORT`;
 
   const packGlyph = PACK_GLYPHS[pack.code];
 
   return (
-    <View style={[styles.pack, { backgroundColor: c.surface, borderColor: c.border }]}>
-      <View style={styles.packHead}>
-        {/* The mark is keyed off `packs.code`, so a pack added to the table
-            without a glyph here simply renders without one rather than
-            crashing or falling back to the wrong picture. */}
-        {packGlyph ? (
-          <Icon
-            glyph={packGlyph}
-            color={free ? c.positive : c.textSecondary}
-            size={28}
-            focused
-          />
-        ) : null}
-        <View style={styles.packTitle}>
-          <Text numberOfLines={2} style={[Type.section, { color: c.text }]}>
-            {pack.name}
-          </Text>
-          <Text style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
-            {`${pack.card_count} cards`}
-            {pack.once_per_user ? ' · one per player' : ''}
-            {isDaily ? ' · one a day' : ''}
-            {opened > 0 && !pack.once_per_user && !isDaily ? ` · opened ${opened}×` : ''}
-          </Text>
-        </View>
-
-        {free ? (
-          <Text style={[Type.label, styles.freeTag, { color: c.positive, borderColor: c.positive }]}>
-            FREE
-          </Text>
-        ) : (
-          <View style={styles.price}>
-            <Coin size={9} color={accent} />
-            <Text style={[Type.figure, NUMERIC, { color: c.text }]}>
-              {pack.coin_cost.toLocaleString()}
+    <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.borderStrong }]}>
+      {/* HEAD — the pack, named and priced. `ContestCard`'s head to the point:
+          a mark, the name, a divider, one line on what the thing is, and the
+          state at the right end. What a contest puts in that corner is a
+          countdown or an outcome; what a pack puts there is what it costs,
+          which is the same kind of fact — the one thing about this row that
+          decides whether you act on it. */}
+      <View style={[styles.zone, styles.head]}>
+        <View style={styles.headRow}>
+          <View style={styles.headLeft}>
+            {/* The mark is keyed off `packs.code`, so a pack added to the table
+                without a glyph here simply renders without one rather than
+                crashing or falling back to the wrong picture. */}
+            {packGlyph ? (
+              <Icon
+                glyph={packGlyph}
+                color={free ? c.positive : c.textSecondary}
+                size={16}
+                focused
+              />
+            ) : null}
+            <Text numberOfLines={1} style={[Type.section, styles.headName, { color: c.text }]}>
+              {pack.name}
+            </Text>
+            <Rule />
+            <Text
+              numberOfLines={1}
+              style={[Type.fine, NUMERIC, styles.headGive, { color: c.textTertiary }]}>
+              {`${pack.card_count} cards`}
+              {pack.once_per_user ? ' · one per player' : ''}
+              {isDaily ? ' · one a day' : ''}
+              {opened > 0 && !pack.once_per_user && !isDaily ? ` · opened ${opened}×` : ''}
             </Text>
           </View>
-        )}
+
+          {/* THE PRICE NEVER GIVES, and the line above it is what shortens —
+              the same give-order the contest head sets between its entry count
+              and its status word. A clipped price is the one string here that
+              becomes actively wrong. */}
+          {free ? (
+            <Text style={[Type.label, styles.headHold, { color: c.positive }]}>FREE</Text>
+          ) : (
+            <View style={[styles.price, styles.headHold]}>
+              <Coin size={9} color={accent} />
+              <Text style={[Type.figure, NUMERIC, { color: c.text }]}>
+                {pack.coin_cost.toLocaleString()}
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
 
-      <View style={[styles.rule, { backgroundColor: c.border }]} />
+      {/* FOOT — what the pack promises, and what the press does to the balance.
+          The contest card's foot with one field per side, at that card's
+          height, and every measurement in it stated rather than inherited.
 
-      <SpecRow label="GUARANTEED">
-        {coverage.length > 0 ? (
-          <View style={styles.chipRow}>
-            {coverage.map((entry) => (
-              <CoverageChip key={entry.position} entry={entry} />
-            ))}
-          </View>
-        ) : (
-          // An empty guaranteed_positions is a real answer, not missing data:
-          // this pack promises nothing about which positions turn up.
-          <Text style={[Type.body, { color: c.textSecondary }]}>No position guarantee</Text>
-        )}
-      </SpecRow>
+          THE RIGHT FIELD IS ONE STRING AND IT NEVER GIVES. It was a labelled
+          half holding a coin, a total and an arrow, and three tokens is what
+          made it lose the width fight and take the zone's height with it. The
+          arrow already says which direction the money goes, so `COST` was a
+          label the row could not afford — and the total is the head's job for a
+          single buy and the balance's own arithmetic for a bulk one.
 
-      <SpecRow label="PULL RATES">
-        <Text style={[Type.body, { color: c.textTertiary }]}>Not published yet</Text>
-      </SpecRow>
+          IT IS ABSENT ON A FREE PACK rather than reading `Free`, which the head
+          says two inches away in green. What the row spends that space on is the
+          starter pack's five position tokens, which are the only real guarantee
+          in the table and would otherwise be the one thing that gets clipped. */}
+      <View style={[styles.zone, styles.foot, { borderTopColor: c.borderStrong }]}>
+        <Guaranteed coverage={coverage} />
 
-      <View style={[styles.rule, { backgroundColor: c.border }]} />
+        {money ? (
+          <>
+            <Rule tall />
+            <Text
+              numberOfLines={1}
+              style={[
+                Type.fine,
+                NUMERIC,
+                styles.hold,
+                { color: affordable ? c.textTertiary : c.warning },
+              ]}>
+              {money}
+            </Text>
+          </>
+        ) : null}
+      </View>
 
-      {/* HOW MANY, on its own row above the button rather than beside it.
+      {/* ACTION — the one zone a contest card has no use for, because a contest
+          card is itself the button. This is the control that spends coins, so it
+          gets a row of its own with a 40pt target in it rather than a strip
+          inside the foot.
 
-          The action row is a button with a hard 128pt floor and a money line
-          that runs to two lines beside it, inside a card that is 240pt at its
-          narrowest — there is no third slot in there, and every attempt at one
-          either shrank the button below a thumb or pushed the money line to
-          three lines. Above it the chips get the full measure and read as what
-          they are: the thing you set before you press.
+          HOW MANY, THEN THE PRESS, left to right in the order they are used.
+          The counts were tried beside the money line and under it; here they
+          share the row with the button because the money line has moved into
+          the foot, which is what freed the space that never existed before.
 
           A CHIP YOU CANNOT AFFORD IS STILL PRESSABLE, and that is deliberate.
-          Selecting it is how you find out what ten costs — the money line
-          answers with the shortfall and the button goes dead, which is the same
-          pair of facts a pack you cannot afford at all already shows. Disabling
-          the chip would leave the player guessing at the number. */}
-      {bulkable && !claimed ? (
-        <View
-          style={styles.countRow}
-          accessibilityRole="radiogroup"
-          accessibilityLabel="How many packs to open">
-          {BULK_COUNTS.map((n) => {
-            const on = buying === n;
-            const reach = pack.coin_cost * n <= coins;
-            return (
-              <Pressable
-                key={n}
-                onPress={() => setCount(n)}
-                disabled={locked}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: on, disabled: locked }}
-                accessibilityLabel={`Open ${n === 1 ? 'one pack' : `${n} packs`}, ${(
-                  pack.coin_cost * n
-                ).toLocaleString()} coins`}
-                style={({ pressed }) => [
-                  styles.countChip,
-                  {
-                    backgroundColor: on ? c.backgroundSelected : 'transparent',
-                    borderColor: on ? accent : c.border,
-                  },
-                  /* Dimmed, not disabled — see the note above. */
-                  !reach && !on && styles.outOfReach,
-                  locked && styles.disabled,
-                  pressed && !locked && styles.pressed,
-                ]}>
-                <Text
-                  style={[Type.label, NUMERIC, { color: on ? c.text : c.textSecondary }]}>
-                  {`×${n}`}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
+          Selecting it is how you find out what ten costs — the foot answers with
+          the shortfall and the button goes dead, which is the same pair of facts
+          a pack you cannot afford at all already shows. Disabling the chip would
+          leave the player guessing at the number. */}
+      <View style={[styles.zone, styles.action, { borderTopColor: c.borderStrong }]}>
+        {bulkable ? (
+          <View
+            style={styles.counts}
+            accessibilityRole="radiogroup"
+            accessibilityLabel="How many packs to open">
+            {BULK_COUNTS.map((n) => {
+              const on = buying === n;
+              const reach = pack.coin_cost * n <= coins;
+              return (
+                <Pressable
+                  key={n}
+                  onPress={() => setCount(n)}
+                  disabled={locked}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: on, disabled: locked }}
+                  accessibilityLabel={`Open ${n === 1 ? 'one pack' : `${n} packs`}, ${(
+                    pack.coin_cost * n
+                  ).toLocaleString()} coins`}
+                  style={({ pressed }) => [
+                    styles.countChip,
+                    {
+                      backgroundColor: on ? c.backgroundSelected : 'transparent',
+                      borderColor: on ? accent : c.border,
+                    },
+                    /* Dimmed, not disabled — see the note above. */
+                    !reach && !on && styles.outOfReach,
+                    locked && styles.disabled,
+                    pressed && !locked && styles.pressed,
+                  ]}>
+                  <Text style={[Type.label, NUMERIC, { color: on ? c.text : c.textSecondary }]}>
+                    {`×${n}`}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
 
-      <View style={styles.actionRow}>
         <Pressable
           onPress={() => onOpen(buying)}
           disabled={blocked}
           accessibilityRole="button"
-          // The reason a disabled button is disabled lives in the money line
-          // next to it, which a screen reader would reach only after the button.
-          accessibilityLabel={`${label}: ${pack.name}. ${money}`}
+          /* The reason a disabled button is disabled is in the foot, which a
+             screen reader reaches BEFORE the button — so the label states the
+             arithmetic in full rather than making it navigate back for it. */
+          accessibilityLabel={`${label}: ${pack.name}. ${
+            claimedToday
+              ? 'Claimed today, a new one every day'
+              : free
+                ? 'Free, does not touch your balance'
+                : affordable
+                  ? `${total.toLocaleString()} coins, ${coins.toLocaleString()} to ${(
+                      coins - total
+                    ).toLocaleString()}`
+                  : `${(shortfall > 0 ? shortfall : total).toLocaleString()} more coins needed`
+          }`}
           accessibilityState={{ disabled: blocked, busy }}
           style={({ pressed }) => [
             styles.openButton,
-            { backgroundColor: claimed || !affordable ? c.backgroundSelected : accent },
+            { backgroundColor: claimedToday || !affordable ? c.backgroundSelected : accent },
             blocked && styles.disabled,
             pressed && !blocked && styles.pressed,
           ]}>
@@ -487,15 +673,12 @@ function PackCard({
               numberOfLines={1}
               style={[
                 Type.strong,
-                { color: claimed || !affordable ? c.textSecondary : '#17130A' },
+                { color: claimedToday || !affordable ? c.textSecondary : '#17130A' },
               ]}>
               {label}
             </Text>
           )}
         </Pressable>
-        <Text numberOfLines={2} style={[Type.fine, NUMERIC, styles.money, { color: c.textSecondary }]}>
-          {money}
-        </Text>
       </View>
     </View>
   );
@@ -503,52 +686,121 @@ function PackCard({
 
 const styles = StyleSheet.create({
   centred: { alignItems: 'center', justifyContent: 'center', padding: Spacing.four },
-  /* Packs sit side by side wherever there is room — which in a sheet means the
-     wide-web dialog and nothing else. maxWidth stops the single remaining pack
-     stretching the full 720 once the starter is claimed, which reads as a
-     banner rather than as a shelf. */
-  shelf: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three },
-  pack: {
-    flexGrow: 1,
-    flexBasis: 300,
-    minWidth: 240,
-    maxWidth: 480,
-    borderWidth: StyleSheet.hairlineWidth,
+  /* The lobby's `stack`: cards separated by space rather than by rules, because
+     a hairline between two bordered cards reads as a third edge. */
+  shelf: { gap: Spacing.two },
+
+  /**
+   * A WHOLE POINT OF BORDER, and a fill under zones that paint their own.
+   *
+   * Both are `ContestCard`'s findings rather than fresh decisions. A hairline
+   * is one physical pixel — right for a divider between two rows and too little
+   * line for the one edge that states the shape of a card. And `overflow:
+   * hidden` antialiases the zones against the rounded outline, so without an
+   * opaque fill behind the whole card the corners show a hair of the page
+   * through the gap between the clip and the border.
+   */
+  card: {
+    borderWidth: 1,
     borderRadius: Radius.panel,
-    padding: Spacing.three,
-    gap: Spacing.two,
-  },
-  packHead: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
-  packTitle: { flex: 1, minWidth: 0, gap: 1 },
-  price: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1 },
-  freeTag: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 4,
-    paddingHorizontal: Spacing.one + 1,
-    paddingVertical: 2,
     overflow: 'hidden',
+    /* The single remaining pack must not stretch the full 720 of the wide-web
+       dialog, which reads as a banner rather than as a shelf. */
+    maxWidth: 560,
   },
-  rule: { height: StyleSheet.hairlineWidth },
-  specRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, minHeight: 20 },
-  specLabel: { width: 76 },
-  specValue: { flex: 1, minWidth: 0 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one + 2 },
-  chip: {
+
+  /* EVERY ZONE, ONE GEOMETRY — `Spacing.three` of gutter, which is the sheet's
+     own and the lobby card's own. */
+  zone: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: ZONE_PAD,
+    justifyContent: 'center',
+  },
+
+  head: { height: HEAD_H },
+  /* Fixed at the name's own line height, so the price (22pt) and a FREE word
+     (13pt) both land on the name's line without moving the zone. */
+  headRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 4,
-    paddingHorizontal: Spacing.one + 1,
-    paddingVertical: 2,
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    height: Type.section.lineHeight,
   },
-  countRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
-  /* Sized off the open button's 40pt minimum rather than off the coverage
-     chips beside them: these are things you press, and a 20pt chip in a row of
-     things you press is a miss waiting to happen. */
+  headLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1, minWidth: 0, flex: 1 },
+  /* `minWidth: 0` is what lets a long name truncate instead of shoving the
+     card count off the card. */
+  headName: { flexShrink: 1, minWidth: 0 },
+  /* The strings that give, and the one that never does. See the head's note. */
+  headGive: { flexShrink: 1, minWidth: 0 },
+  headHold: { flexShrink: 0 },
+  price: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1 },
+
+  /* A hairline between two fields. The tall variant stretches the foot's full
+     content box rather than declaring a height of its own. */
+  rule: { width: StyleSheet.hairlineWidth, height: 10, flexShrink: 0 },
+  ruleTall: { height: undefined, alignSelf: 'stretch', marginHorizontal: Spacing.two + 2 },
+
+  /**
+   * A FIXED HEIGHT, AND NO `flex` SHORTHAND ANYWHERE BELOW IT.
+   *
+   * Both are the fix for the same bug — see `Guaranteed`. A `minHeight` let a
+   * field that had lost its width wrap itself into three lines and take the
+   * zone from 29pt to ninety; a height cannot, so the worst a bad measurement
+   * does now is truncate a string. And every grow/shrink/basis factor is named
+   * on its own, because `flex: 1` sets a basis of 0% that a later `flex: 0`
+   * silently keeps.
+   */
+  foot: {
+    height: FOOT_H,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  /* THE FIELD THAT GIVES: takes what is left and truncates into it. */
+  give: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  /* THE FIELD THAT DOES NOT. A clipped `1,900 → 1,8` is the one string in this
+     zone that becomes actively wrong rather than merely shorter. */
+  hold: { flexGrow: 0, flexShrink: 0 },
+  /* The label names the field; a truncated `GUARAN…` names nothing. It is the
+     tokens that give. */
+  fieldLabel: { flexGrow: 0, flexShrink: 0 },
+  /* NOWRAP, DELIBERATELY — see the zone's note. The gap BETWEEN tokens is four
+     times the gap inside one; below about three to one the eye stops reading
+     them as pairs and sees a single run of glyphs and digits. */
+  tokens: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three - 4,
+    minWidth: 0,
+    flexGrow: 0,
+    flexShrink: 1,
+    overflow: 'hidden',
+  },
+  token: { flexDirection: 'row', alignItems: 'center', gap: 3, flexShrink: 0 },
+
+  action: {
+    height: ACTION_H,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  counts: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2, flexShrink: 0 },
+  /* Sized off the open button's height rather than off the foot's tokens: these
+     are things you press, and a 20pt target in a row of things you press is a
+     miss waiting to happen. */
   countChip: {
-    minWidth: 52,
-    minHeight: 34,
+    minWidth: 44,
+    height: BUTTON_H - 6,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
@@ -557,18 +809,16 @@ const styles = StyleSheet.create({
   },
   /* A count the balance does not cover. Still pressable — see the row's note. */
   outOfReach: { opacity: 0.45 },
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  /* Takes whatever the counts leave, so a pack with no bulk row gets a
+     full-width button and one with a bulk row still gets a wide target. */
   openButton: {
-    paddingVertical: Spacing.two + 2,
-    paddingHorizontal: Spacing.three,
+    flex: 1,
+    height: BUTTON_H,
     borderRadius: Radius.chip,
-    minWidth: 128,
-    minHeight: 40,
+    paddingHorizontal: Spacing.three,
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
   },
-  money: { flexShrink: 1 },
   disabled: { opacity: 0.55 },
   pressed: { opacity: 0.8 },
   // Sentences, not a grid: hold them to a readable line even in the wide dialog.

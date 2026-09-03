@@ -550,8 +550,19 @@ export const SHELF_FIXTURE: ShelfPack[] = [
   },
 ];
 
-/** The starter is spent, which is what makes its button read "Claimed". */
-export const SHELF_OPENINGS = new Map<string, number>([['pk-starter', 1]]);
+/**
+ * How many times each fixture pack has been opened.
+ *
+ * THE STARTER IS UNSPENT HERE, and it used to be the opposite — one opening, so
+ * its button read "Claimed". A spent once-per-player pack does not draw a dead
+ * card any more; it leaves the shelf entirely (see `PackShelf`), so a fixture
+ * that claimed it would delete the row this section exists to show.
+ *
+ * The standard pack carries a count instead, which is the head's `opened 12×`
+ * state — the only pack kind that can have one, since the other two are capped
+ * at one open ever and one open a day.
+ */
+export const SHELF_OPENINGS = new Map<string, number>([['pk-standard', 12]]);
 
 type ShelfPack = {
   id: string;
