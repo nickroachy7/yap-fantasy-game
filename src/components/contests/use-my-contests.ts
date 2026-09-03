@@ -23,7 +23,7 @@ import type { ContestTerms, PayoutCurve, WinCondition } from './contest-model';
 export type MyContest = {
   id: string;
   code: string;
-  kind: 'free' | 'lobby';
+  kind: 'free' | 'lobby' | 'friendly';
   name: string;
   formatCode: string;
   formatName: string;
@@ -154,7 +154,7 @@ type Row = {
   recap: boolean | null;
   contest_id: string;
   code: string;
-  kind: 'free' | 'lobby';
+  kind: 'free' | 'lobby' | 'friendly';
   name: string;
   format_code: string;
   format_name: string;

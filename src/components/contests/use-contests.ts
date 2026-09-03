@@ -34,7 +34,7 @@ import type { ContestTerms, PayoutCurve, WinCondition } from './contest-model';
 export type Contest = {
   id: string;
   code: string;
-  kind: 'free' | 'lobby';
+  kind: 'free' | 'lobby' | 'friendly';
   name: string;
   formatCode: string;
   formatName: string;
@@ -110,12 +110,36 @@ export type Contest = {
    * that cannot be taken. See `20260830030000`.
    */
   recap: boolean;
+
+  /**
+   * WHO BUILT IT, and null on everything the game built itself.
+   *
+   * A friendly and a lobby row are the same object to every function that
+   * scores or pays one, and they are NOT the same offer to a reader: "Flex
+   * Three" is a fixture and "Nick's Sunday Six" is an invitation from a person.
+   * These four fields are the whole difference on screen.
+   */
+  createdBy: string | null;
+  /** The creator's display name, already resolved. Null unless friendly. */
+  creatorName: string | null;
+  /**
+   * The six characters that admit somebody to the room — AND ONLY THE CREATOR
+   * EVER RECEIVES IT. `contest_lobby` nulls this column for everybody else, so
+   * a guest cannot fill a room with people the creator did not ask for.
+   */
+  joinCode: string | null;
+  /**
+   * Seats spoken for: everyone invited or self-admitted who has not declined.
+   * NOT the same as `entrants`, which counts filed lineups — a room of six with
+   * two lineups in it still has four seats gone.
+   */
+  invited: number | null;
 };
 
 type Row = {
   id: string;
   code: string;
-  kind: 'free' | 'lobby';
+  kind: 'free' | 'lobby' | 'friendly';
   name: string;
   format_code: string;
   format_name: string;
@@ -142,6 +166,10 @@ type Row = {
   podium_coins: number | null;
   prize_pool_bps: number;
   recap: boolean | null;
+  created_by: string | null;
+  creator_name: string | null;
+  join_code: string | null;
+  invited: number | null;
 };
 
 export type ContestsState = {
@@ -187,6 +215,10 @@ function rowsToContests(rows: Row[]): Contest[] {
     podiumCoins: Number(r.podium_coins ?? 0),
     prizePoolBps: Number(r.prize_pool_bps ?? 0),
     recap: Boolean(r.recap),
+    createdBy: r.created_by ?? null,
+    creatorName: r.creator_name ?? null,
+    joinCode: r.join_code ?? null,
+    invited: r.invited === null || r.invited === undefined ? null : Number(r.invited),
   }));
 }
 

@@ -1,0 +1,40 @@
+-- A third kind of contest, and nothing else.
+--
+-- ---------------------------------------------------------------------------
+-- WHY THIS IS A MIGRATION ON ITS OWN
+-- ---------------------------------------------------------------------------
+--
+-- `alter type ... add value` cannot be used in the same TRANSACTION that adds
+-- it. `supabase db push` runs without a wrapping transaction so a single file
+-- would usually survive, but `apply_migration` and psql's `--single-transaction`
+-- both wrap — and the failure is "unsafe use of new value of enum type", from a
+-- statement four hundred lines below the one that caused it.
+--
+-- So the value lands here and is first used in `20260903140100`. That is the
+-- whole content of this file, deliberately.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT `friendly` MEANS, AND WHY IT IS A KIND RATHER THAN A FLAG
+-- ---------------------------------------------------------------------------
+--
+--   free      one per week, everybody is in it, cannot be left, sets the field
+--             median every season record is scored against.
+--   lobby     stamped from `contest_templates` every week, open to everyone.
+--   friendly  authored by a MANAGER, visible only to the people they invite.
+--
+-- A boolean `is_private` would have been the smaller change and it would have
+-- been the wrong one: `kind` is already the column every reader switches on,
+-- and all three of these differ in who may see the row, who may leave it, and
+-- who decides its terms. Adding a fourth axis to describe the same distinction
+-- twice is how two facts get to disagree.
+--
+-- WHAT THIS BUYS FOR FREE is that every kind-agnostic function in the schema
+-- already handles it. `contest_results`, `contest_payouts`, `contest_field`,
+-- `award_contest_prizes` and `settle_run_week` were all written against the
+-- contest ROW rather than against its kind, and the handful that do test kind
+-- test it against `'free'` — the auto-entered, unleaveable, median-setting one.
+-- A friendly is not free, so every one of those tests already answers correctly.
+-- The only function that names `'lobby'` is `ensure_week_contests`, which
+-- stamps templates and has no business knowing about this.
+
+alter type public.contest_kind add value if not exists 'friendly';

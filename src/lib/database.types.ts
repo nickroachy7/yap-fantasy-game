@@ -416,23 +416,58 @@ export type Database = {
       contest_formats: {
         Row: {
           code: string
+          created_by: string | null
           description: string | null
           name: string
           slot_count: number
         }
         Insert: {
           code: string
+          created_by?: string | null
           description?: string | null
           name: string
           slot_count: number
         }
         Update: {
           code?: string
+          created_by?: string | null
           description?: string | null
           name?: string
           slot_count?: number
         }
         Relationships: []
+      }
+      contest_invites: {
+        Row: {
+          contest_id: string
+          created_at: string
+          declined_at: string | null
+          invited_by: string | null
+          user_id: string
+        }
+        Insert: {
+          contest_id: string
+          created_at?: string
+          declined_at?: string | null
+          invited_by?: string | null
+          user_id: string
+        }
+        Update: {
+          contest_id?: string
+          created_at?: string
+          declined_at?: string | null
+          invited_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contest_invites_contest_id_fkey"
+            columns: ["contest_id"]
+            isOneToOne: false
+            referencedRelation: "contests"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contest_templates: {
         Row: {
@@ -509,11 +544,13 @@ export type Database = {
         Row: {
           code: string
           created_at: string
+          created_by: string | null
           entry_fee_coins: number
           format_code: string
           hearts_at_risk: number
           hearts_on_win: number
           id: string
+          join_code: string | null
           kind: Database["public"]["Enums"]["contest_kind"]
           max_entrants: number | null
           name: string
@@ -532,11 +569,13 @@ export type Database = {
         Insert: {
           code: string
           created_at?: string
+          created_by?: string | null
           entry_fee_coins?: number
           format_code: string
           hearts_at_risk?: number
           hearts_on_win?: number
           id?: string
+          join_code?: string | null
           kind: Database["public"]["Enums"]["contest_kind"]
           max_entrants?: number | null
           name: string
@@ -555,11 +594,13 @@ export type Database = {
         Update: {
           code?: string
           created_at?: string
+          created_by?: string | null
           entry_fee_coins?: number
           format_code?: string
           hearts_at_risk?: number
           hearts_on_win?: number
           id?: string
+          join_code?: string | null
           kind?: Database["public"]["Enums"]["contest_kind"]
           max_entrants?: number | null
           name?: string
@@ -2251,6 +2292,8 @@ export type Database = {
           user_id: string
         }[]
       }
+      can_see_contest: { Args: { p_contest: string }; Returns: boolean }
+      cancel_friendly: { Args: { p_contest_code: string }; Returns: Json }
       card_actions: { Args: { p_card_instance_ids: string[] }; Returns: Json }
       card_profile: { Args: { p_card_instance_id: string }; Returns: Json }
       claim_carry: { Args: { p_card_instance_ids?: string[] }; Returns: Json }
@@ -2338,6 +2381,8 @@ export type Database = {
         Returns: {
           affordable: boolean
           code: string
+          created_by: string
+          creator_name: string
           entrants: number
           entry_fee_coins: number
           format_code: string
@@ -2345,6 +2390,8 @@ export type Database = {
           hearts_at_risk: number
           hearts_on_win: number
           id: string
+          invited: number
+          join_code: string
           kind: Database["public"]["Enums"]["contest_kind"]
           max_entrants: number
           my_filled: number
@@ -2398,6 +2445,21 @@ export type Database = {
           user_id: string
         }[]
       }
+      create_friendly_contest: {
+        Args: {
+          p_entry_fee: number
+          p_invite?: string[]
+          p_max_entrants: number
+          p_name: string
+          p_payout_curve?: string
+          p_slots: Json
+          p_target_points?: number
+          p_win_condition: string
+          p_win_pct?: number
+          p_win_rank?: number
+        }
+        Returns: Json
+      }
       current_run: {
         Args: never
         Returns: {
@@ -2431,6 +2493,7 @@ export type Database = {
       daily_pack_status: { Args: never; Returns: Json }
       daily_set_day: { Args: never; Returns: string }
       daily_set_position: { Args: { p_day: string }; Returns: string }
+      decline_friendly: { Args: { p_contest_code: string }; Returns: Json }
       ensure_all_contests: { Args: never; Returns: number }
       ensure_free_contest: {
         Args: { p_season: number; p_season_type: number; p_week: number }
@@ -2450,6 +2513,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      format_shape_name: { Args: { p_slots: Json }; Returns: string }
       friend_accept: { Args: { p_user: string }; Returns: string }
       friend_decline: { Args: { p_user: string }; Returns: string }
       friend_link: {
@@ -2458,6 +2522,17 @@ export type Database = {
       }
       friend_remove: { Args: { p_user: string }; Returns: string }
       friend_request: { Args: { p_user: string }; Returns: string }
+      friendly_members: {
+        Args: { p_contest_code: string }
+        Returns: {
+          declined: boolean
+          entered: boolean
+          invited: boolean
+          is_owner: boolean
+          name: string
+          user_id: string
+        }[]
+      }
       game_config_value: {
         Args: { p_default?: number; p_key: string }
         Returns: number
@@ -2476,6 +2551,11 @@ export type Database = {
         }
         Returns: Json
       }
+      invite_to_friendly: {
+        Args: { p_contest_code: string; p_users: string[] }
+        Returns: number
+      }
+      join_friendly: { Args: { p_join_code: string }; Returns: Json }
       leaderboard: {
         Args: {
           p_limit?: number
@@ -2611,6 +2691,21 @@ export type Database = {
           user_id: string
         }[]
       }
+      my_friendly_invites: {
+        Args: never
+        Returns: {
+          code: string
+          created_at: string
+          entrants: number
+          entry_fee_coins: number
+          format_name: string
+          from_id: string
+          from_name: string
+          max_entrants: number
+          name: string
+          slot_count: number
+        }[]
+      }
       my_friends: {
         Args: { p_season?: number; p_season_type?: number }
         Returns: {
@@ -2625,6 +2720,7 @@ export type Database = {
         }[]
       }
       my_run: { Args: never; Returns: Json }
+      new_join_code: { Args: never; Returns: string }
       open_pack: {
         Args: { p_pack_code: string }
         Returns: {
@@ -2790,7 +2886,7 @@ export type Database = {
         | "run_wipe"
         | "contest_prize"
         | "weekly_podium"
-      contest_kind: "free" | "lobby"
+      contest_kind: "free" | "lobby" | "friendly"
       contest_payout_curve: "flat" | "linear" | "steep" | "winner_take_all"
       contest_win_condition: "median" | "top_n" | "top_pct" | "target"
       friend_state: "pending" | "accepted" | "declined"
@@ -2944,7 +3040,7 @@ export const Constants = {
         "contest_prize",
         "weekly_podium",
       ],
-      contest_kind: ["free", "lobby"],
+      contest_kind: ["free", "lobby", "friendly"],
       contest_payout_curve: ["flat", "linear", "steep", "winner_take_all"],
       contest_win_condition: ["median", "top_n", "top_pct", "target"],
       friend_state: ["pending", "accepted", "declined"],

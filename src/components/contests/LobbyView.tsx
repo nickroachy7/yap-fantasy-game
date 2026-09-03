@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ContestCard, StatusWord } from '@/components/contests/ContestCard';
 import { settlementOf } from '@/components/contests/contest-model';
@@ -17,6 +17,8 @@ import {
   type HistoryEntry,
 } from '@/components/contests/use-contest-history';
 import { LobbyHero } from './LobbyHero';
+import { useFriendlyInvites } from './use-friendly-invites';
+import type { ContestInvite } from './friendly';
 import { weekTitleOf } from '@/components/contests/use-my-contests';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
@@ -111,6 +113,7 @@ export function LobbyView({
   arrivedOn,
   onClose,
   onOpenContest,
+  onCreate,
 }: {
   /**
    * WHICH SHELF THIS OPENED ON, from the route.
@@ -129,6 +132,8 @@ export function LobbyView({
   onClose: () => void;
   /** Push a contest onto the sheet's stack, by code. Was `router.push`. */
   onOpenContest: (code: string) => void;
+  /** Push the builder. See `SheetFrame` for why it is a frame and not a route. */
+  onCreate: () => void;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -168,6 +173,10 @@ export function LobbyView({
    */
   const { contests: mine } = useMyContests();
   const { coins, run } = usePlayer();
+  /* THE TO-DO LIST, which is NOT the same as "friendlies I can see" — an
+     invitation you have answered is in the lists above like any other contest.
+     See `use-friendly-invites`. */
+  const invites = useFriendlyInvites();
 
   /* THE OPEN LIST IS WHAT YOU ARE NOT ALREADY IN, which is now a statement
      about this one section rather than about the sheet — the contests you have
@@ -220,7 +229,13 @@ export function LobbyView({
      clock: the lobby is whatever `contest_lobby` says is enterable, and asking
      the device what week it is would be a second opinion that can differ. */
   const week = live.length > 0 ? weekTitleOf(live[0].seasonType, live[0].week) : undefined;
-  const open = live.filter((c) => c.kind !== 'free' && c.mine === null);
+  const open = live.filter((c) => c.kind === 'lobby' && c.mine === null);
+  /* THE FRIENDLY SHELF'S OWN ROWS, and they come out of `Community` above by
+     the same token. A friendly is not open to every manager, so listing it
+     under a heading that says so would be the one wrong word on the shelf.
+     Rows you have already ENTERED stay in Entered — a contest in two lists is
+     the "where do I edit this" problem this sheet's header is about. */
+  const friendlies = live.filter((c) => c.kind === 'friendly' && c.mine === null);
 
   /* ONE HEART PER HEART AT STAKE, which is `ContestCarousel`'s own mapping for
      the rail this header now mirrors: a contest staking two contributes two.
@@ -421,13 +436,54 @@ export function LobbyView({
           sentence for somebody looking at a list of contests to enter. */}
       <Footnote />
 
-      {/* FRIENDLY, NAMED BEFORE IT EXISTS.
-          A previous pass deleted this as "an empty shelf naming a feature that
-          does not exist". That was the wrong call: a lobby with one kind of
-          contest in it does not tell a player the other kind is coming, and the
-          shelf is one quiet row. It is the cheapest possible promise. */}
-      <Section label="Friendly" count={0} hint="Play a week against people you invite.">
-        <ComingSoon />
+      {/* FRIENDLY, WHICH IS NO LONGER A PROMISE.
+          The shelf named this feature before it existed — deliberately, as the
+          cheapest possible statement that the lobby had a second kind of
+          contest coming. It has one now, and the shelf keeps its place at the
+          bottom of the scroll for the reason the order was chosen: the week is
+          lived downward, and a contest you have to BUILD is the last thing you
+          reach for, after everything already on offer has been read.
+
+          THREE THINGS LIVE HERE, in the order they demand attention: what
+          somebody has asked you to join, what you are running yourself, and the
+          two doors — build one, or type in a code. */}
+      <Section
+        label="Friendly"
+        count={invites.count + friendlies.length}
+        hint="Your own contests, and the ones you have been asked to."
+        action={<ArchiveLink onPress={onCreate} label="Build one" />}>
+        <View style={styles.stack}>
+          {invites.error ? <ErrorLine message={invites.error} /> : null}
+
+          {(invites.invites ?? []).map((i) => (
+            <InviteRow
+              key={i.code}
+              invite={i}
+              onOpen={() => onOpenContest(i.code)}
+              onDecline={() => invites.decline(i.code).catch(() => {})}
+            />
+          ))}
+
+          {friendlies.map((c) => (
+            <ContestEntry
+              key={c.id}
+              contest={c}
+              coins={coins}
+              onPress={() => onOpenContest(c.code)}
+            />
+          ))}
+
+          {invites.count === 0 && friendlies.length === 0 && !loading ? (
+            <SectionEmpty text="Nothing yet. Build a contest on your own terms and invite whoever you like — or paste a code somebody sent you." />
+          ) : null}
+
+          <JoinByCode
+            onJoin={async (code) => {
+              const r = await invites.join(code);
+              onOpenContest(r.code);
+            }}
+          />
+        </View>
       </Section>
 
         </>
@@ -752,37 +808,168 @@ function SectionEmpty({ text }: { text: string }) {
 }
 
 /**
- * The friendly lobby's one row: an empty shelf that says what will be on it.
+ * An invitation, as a row with two answers on it.
+ *
+ * ---------------------------------------------------------------------------
+ * IT IS NOT A CONTEST CARD, AND THAT IS THE POINT
+ * ---------------------------------------------------------------------------
+ *
+ * Every other row on this sheet is `ContestCard` — the contest's identity,
+ * drawn identically in the lobby and over your lineup, so that entering never
+ * changes the shape of the thing you entered. An invitation is a different
+ * object: the subject is the PERSON who asked, and the decision is whether to
+ * look at all. Drawing it as a contest card would bury "Roach asked you" inside
+ * a fee and a win condition, which is the one fact that decides the tap.
+ *
+ * So it is a row, it names the asker first, and the contest's real card is one
+ * tap behind it. Tapping opens the contest; the only thing answered HERE is no.
+ *
+ * DECLINE IS THE ONLY BUTTON because it is the only answer this row can give.
+ * Accepting is entering, which costs coins and needs a lineup — it belongs on
+ * the contest's own page behind its own terms, not on a two-line row where a
+ * mis-tap would spend money.
  */
-function ComingSoon() {
+function InviteRow({
+  invite,
+  onOpen,
+  onDecline,
+}: {
+  invite: ContestInvite;
+  onOpen: () => void;
+  onDecline: () => void;
+}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+
   return (
-    <View style={[styles.soon, { borderColor: c.border }]}>
-      <Text style={[Type.strong, { color: c.textTertiary }]}>Coming soon</Text>
+    <Pressable
+      onPress={onOpen}
+      accessibilityRole="button"
+      accessibilityLabel={`${invite.name}, from ${invite.fromName}`}
+      style={({ pressed }) => [
+        styles.invite,
+        { borderColor: c.border, backgroundColor: c.backgroundElement },
+        pressed && styles.pressed,
+      ]}>
+      <View style={styles.rowText}>
+        <Text numberOfLines={1} style={[Type.strong, { color: c.text }]}>
+          {invite.name}
+        </Text>
+        <Text numberOfLines={1} style={[Type.fine, { color: c.textSecondary }]}>
+          {invite.fromName} asked you · {invite.slotCount} card
+          {invite.slotCount === 1 ? '' : 's'} · {invite.entryFeeCoins} coins
+        </Text>
+      </View>
+      <StatusChip label="Invited" tone="warning" />
+      <Text
+        accessibilityRole="button"
+        accessibilityLabel={`Decline ${invite.name}`}
+        onPress={onDecline}
+        style={[Type.fine, styles.decline, { color: c.textTertiary }]}>
+        Decline
+      </Text>
+    </Pressable>
+  );
+}
+
+/**
+ * The other door into a friendly: six characters somebody sent you.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY A CODE EXISTS AT ALL, next to a friends list
+ * ---------------------------------------------------------------------------
+ *
+ * `invite_to_friendly` takes accepted friends only, which is the right rule —
+ * an invite is a message, and a message from a stranger with a name they typed
+ * is a surface this game does not want. But it means a group of six needs
+ * fifteen friendships before it can describe itself, and the group already has
+ * somewhere to talk. The code travels there instead.
+ *
+ * IT ADMITS YOU TO THE ROOM, NOT TO THE CONTEST. Entering is still `set_lineup`
+ * with its fee, so a code that leaks costs its holder a look at a lobby row.
+ * That is why this control is quiet and at the bottom: it is not an offer, it
+ * is a way of finding one.
+ */
+function JoinByCode({ onJoin }: { onJoin: (code: string) => Promise<void> }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  const go = async () => {
+    setBusy(true);
+    setFailed(null);
+    try {
+      await onJoin(code);
+      setCode('');
+    } catch (err) {
+      setFailed(err instanceof Error ? err.message : 'That code did not work.');
+    }
+    setBusy(false);
+  };
+
+  return (
+    <View style={styles.join}>
+      <View style={[styles.joinField, { borderColor: c.border, backgroundColor: c.backgroundElement }]}>
+        <TextInput
+          value={code}
+          onChangeText={(v) => setCode(v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+          placeholder="Have a code?"
+          placeholderTextColor={c.textTertiary}
+          autoCapitalize="characters"
+          autoCorrect={false}
+          accessibilityLabel="Contest join code"
+          style={[Type.body, NUMERIC, styles.joinInput, { color: c.text }]}
+        />
+        {busy ? (
+          <ActivityIndicator />
+        ) : code.length === 6 ? (
+          <Text
+            accessibilityRole="button"
+            accessibilityLabel="Join with this code"
+            onPress={go}
+            style={[Type.fine, { color: c.textSecondary }]}>
+            Join ›
+          </Text>
+        ) : null}
+      </View>
+      {failed ? <Text style={[Type.fine, { color: c.negative }]}>{failed}</Text> : null}
     </View>
   );
 }
 
 
 /**
- * The door to the season, on the title row rather than in the list.
+ * A door on a section's title row, rather than a row in its list.
  *
- * IT IS A LINK AND NOT A ROW, because what is behind it is no longer the point
- * of this section — the cards are. A row of its own would be a second object
- * competing with the results it sits among, at the exact size that says "read
- * me first".
+ * IT IS A LINK AND NOT A ROW, because what is behind it is not the point of the
+ * section — the cards are. A row of its own would be a second object competing
+ * with the contests it sits among, at the exact size that says "read me first".
+ *
+ * TWO SHELVES USE IT NOW and they are the same shape of thing: Recent points at
+ * the season behind it, Friendly points at the builder. Both are "the rest of
+ * this, one tap on", which is why one component draws both rather than the
+ * build door becoming a button competing with the invitations under it.
  */
-function ArchiveLink({ onPress }: { onPress: () => void }) {
+function ArchiveLink({
+  onPress,
+  label = 'All weeks',
+  hint = 'See every week you have finished',
+}: {
+  onPress: () => void;
+  label?: string;
+  hint?: string;
+}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   return (
     <Text
       accessibilityRole="button"
-      accessibilityLabel="See every week you have finished"
+      accessibilityLabel={hint}
       onPress={onPress}
       style={[Type.fine, { color: c.textSecondary }]}>
-      All weeks ›
+      {label} ›
     </Text>
   );
 }
@@ -923,5 +1110,25 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.two,
   },
   pressed: { opacity: 0.6 },
+  invite: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.control,
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.three,
+  },
+  decline: { paddingHorizontal: Spacing.one },
+  join: { gap: Spacing.one },
+  joinField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.control,
+    paddingHorizontal: Spacing.three,
+  },
+  joinInput: { flex: 1, height: 44, letterSpacing: 2 },
   footnote: { marginTop: Spacing.two },
 });

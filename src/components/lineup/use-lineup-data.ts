@@ -322,7 +322,7 @@ type ContestRow = {
   id: string;
   code: string;
   name: string;
-  kind: 'free' | 'lobby';
+  kind: 'free' | 'lobby' | 'friendly';
   format_code: string;
   entry_fee_coins: number;
 };
@@ -342,7 +342,7 @@ export type LineupContest = {
   id: string;
   code: string;
   name: string;
-  kind: 'free' | 'lobby';
+  kind: 'free' | 'lobby' | 'friendly';
   formatCode: string;
   entryFeeCoins: number;
   /** True until the entry exists — the fee has not been taken yet. */
@@ -422,25 +422,49 @@ export type LineupData = {
 };
 
 /**
- * THE SLOT SHAPES, FETCHED ONCE A SESSION.
+ * THE SLOT SHAPES, FETCHED ONCE A SESSION — BUT ONLY THE ONES IN PLAY.
  *
- * `contest_format_slots` is the only thing this hook reads that cannot change
- * while the app is open: a format's slots are seeded by a migration and are
- * the same rows for every player on every week. It was nonetheless refetched
- * on every mount, in the second of two sequential waves — so opening a contest
- * paid a round trip to be told the same twenty-eight rows the board had
- * already been told on launch, and the empty slots could not be drawn until it
- * came back. That is the delay you see as "the slots take a moment".
+ * A format's slots cannot change while the app is open: they are written once,
+ * when the format is created, and never edited. So this is cached for the
+ * session. It was nonetheless refetched on every mount, in the second of two
+ * sequential waves — so opening a contest paid a round trip to be told the same
+ * twenty-eight rows the board had already been told on launch, and the empty
+ * slots could not be drawn until it came back. That is the delay you see as
+ * "the slots take a moment".
  *
  * `sessionCache` is the pattern `useCollection` already uses for exactly this:
  * memory first, network once, and an `invalidate` for when it is wrong. It is
  * safe to hold across a sign-out because there is nothing of anybody's in it —
  * no RLS scoping, no user column, the same answer for an anonymous reader.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY IT IS NO LONGER `select *`
+ * ---------------------------------------------------------------------------
+ *
+ * It used to fetch EVERY format's slots on the argument that there were seven
+ * of them holding twenty-eight rows between them, and that filtering would put
+ * a round trip on every carousel swipe to save nothing. That argument died with
+ * `20260903180441`: a manager who builds a contest creates a FORMAT, so this
+ * table now grows with the game rather than with its migrations, and an
+ * unfiltered read is one that gets slower every week for every player —
+ * including the ones who have never built anything.
+ *
+ * Worse, it would silently truncate. PostgREST caps `.select()` at 1000 rows
+ * with no signal, so somewhere past a few hundred custom formats the board
+ * would start drawing lineups with slots missing and nothing would say why.
+ *
+ * So it takes the codes actually on this week's slate — a dozen at most, all of
+ * them already in hand from the contests query — and caches per code, so a
+ * second week that shares a format pays nothing for it.
  */
-const formatSlotCache = sessionCache<'all', Map<string, SlotConfig[]>>(async () => {
+const formatSlotCache = sessionCache<string, Map<string, SlotConfig[]>>(async (codes) => {
+  const wanted = codes.split(',').filter(Boolean);
+  if (wanted.length === 0) return new Map<string, SlotConfig[]>();
+
   const { data, error } = await supabase
     .from('contest_format_slots')
     .select('format_code, slot, eligible_positions, display_order')
+    .in('format_code', wanted)
     .order('display_order');
   if (error) throw error;
 
@@ -457,7 +481,13 @@ const formatSlotCache = sessionCache<'all', Map<string, SlotConfig[]>>(async () 
   return byFormat;
 });
 
-/** For a migration that adds or re-slots a format while the app is open. */
+/**
+ * For a migration that adds or re-slots a format while the app is open — and,
+ * now, for a contest built during the session, whose format did not exist when
+ * this cache was last filled. `createFriendly` does not have to call it: the
+ * key is the slate's format list, so a new format is simply a key that has
+ * never been read.
+ */
 export function invalidateFormatSlots(): void {
   formatSlotCache.invalidate();
 }
@@ -481,11 +511,12 @@ export function useLineupData(contestCode?: string, hint?: LineupContest | null)
    * load no longer depends on `contestCode` at all.
    */
   const [contestRows, setContestRows] = useState<ContestRow[]>([]);
-  /* Seeded from memory, so a second visit draws its slots on the first paint
-     rather than after a round trip — see `formatSlotCache`. */
-  const [formatSlots, setFormatSlots] = useState<Map<string, SlotConfig[]>>(
-    () => formatSlotCache.peek('all') ?? new Map(),
-  );
+  /* NO LONGER SEEDED FROM MEMORY, and it costs a frame on a second visit.
+     The cache is keyed on the slate's format list now, and the slate is not
+     known until the load runs — so there is nothing to peek AT before the
+     first query comes back. The empty map draws empty slots for that frame,
+     which is what the board already shows while the collection loads. */
+  const [formatSlots, setFormatSlots] = useState<Map<string, SlotConfig[]>>(new Map());
   const [myLineups, setMyLineups] = useState<SlateLineup[]>([]);
   const [inPlay, setInPlay] = useState(false);
   const [hasLiveGame, setHasLiveGame] = useState(false);
@@ -531,11 +562,15 @@ export function useLineupData(contestCode?: string, hint?: LineupContest | null)
     const owned = coll.data.filter((r): r is CollectionRow & { id: string } => Boolean(r.id));
     const playerIds = [...new Set(owned.map((r) => r.player_id).filter((id): id is string => Boolean(id)))];
 
-    /* EVERY CONTEST ON THE SLATE, EVERY FORMAT'S SLOTS, AND EVERY LINEUP YOU
-       HOLD — all of it, in one batch, because none of it is big and picking a
-       contest out of it afterwards is free. This is what makes a carousel
-       swipe cost nothing; see the note on `contestRows`. */
-    const [contestsRes, fmtRes, minesRes, lock, gamesRes, stats, projRows] = await Promise.all([
+    /* EVERY CONTEST ON THE SLATE AND EVERY LINEUP YOU HOLD — in one batch,
+       because none of it is big and picking a contest out of it afterwards is
+       free. This is what makes a carousel swipe cost nothing; see the note on
+       `contestRows`.
+
+       THE FORMAT SLOTS USED TO RIDE HERE and cannot any more: they are fetched
+       BY CODE now, and the codes are what this query returns. See
+       `formatSlotCache` for why an unfiltered read stopped being safe. */
+    const [contestsRes, minesRes, lock, gamesRes, stats, projRows] = await Promise.all([
       s
         ? supabase
             .from('contests')
@@ -544,14 +579,6 @@ export function useLineupData(contestCode?: string, hint?: LineupContest | null)
             .eq('season_type', s.season_type)
             .eq('week', s.week)
         : Promise.resolve({ data: null, error: null }),
-      /* Every format's slots, not just the one in front: fetching one would put
-         a round trip on every swipe to save nothing. Served from memory after
-         the first read of the session — see `formatSlotCache`. */
-      /* Caught rather than thrown: a rejection here would reject the whole
-         batch and empty a screen the other five queries could still fill. The
-         cache stores successes only, so a failure is simply retried next
-         mount. */
-      formatSlotCache.read('all').catch(() => null),
       /* RLS scopes this to you, so no user filter is sent and none would help.
          It answers three questions at once: which contests you are in, what
          each of those lineups holds, and — for every contest that is NOT the
@@ -601,14 +628,25 @@ export function useLineupData(contestCode?: string, hint?: LineupContest | null)
        if both the slot config and the collection fail, because it is the one
        that empties the screen. */
     if (contestsRes.error) failure = failure ?? contestsRes.error.message;
-    if (!fmtRes) failure = failure ?? 'Could not load the contest formats.';
     if (minesRes.error) failure = failure ?? minesRes.error.message;
 
-    setContestRows((contestsRes.data ?? []) as ContestRow[]);
+    const rows = (contestsRes.data ?? []) as ContestRow[];
+    setContestRows(rows);
 
-    /* Already grouped by format — the cache does it once per session rather
-       than on every load, because the board asks for one format's slots on
-       every paint and the answer never changes. */
+    /* THE SHAPES FOR THIS SLATE, and only for this slate.
+       The key is the sorted code list, so the same week is the same key and is
+       served from memory; a week that shares every format with the last one is
+       free even though it is a different week. Caught rather than thrown, as
+       it was inside the batch: a rejection must not empty a screen the other
+       queries could still fill. */
+    const codes = [...new Set(rows.map((r) => r.format_code))].sort().join(',');
+    const fmtRes = await formatSlotCache.read(codes).catch(() => null);
+    if (!live()) return;
+    if (!fmtRes) failure = failure ?? 'Could not load the contest formats.';
+
+    /* Already grouped by format — the cache does it once per key rather than
+       on every load, because the board asks for one format's slots on every
+       paint and the answer never changes. */
     setFormatSlots(fmtRes ?? new Map());
     setMyLineups((minesRes.data ?? []) as unknown as SlateLineup[]);
 

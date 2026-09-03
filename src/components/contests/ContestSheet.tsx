@@ -70,6 +70,7 @@ import { useNavigation, useRouter } from 'expo-router';
 
 import { ManagerView } from '@/components/friends/ManagerView';
 import { ContestView } from './ContestView';
+import { CreateContestView } from './CreateContestView';
 import { EntryView } from './EntryView';
 import { LobbyView } from './LobbyView';
 
@@ -105,7 +106,17 @@ export type SheetFrame =
    * goes back to the field you tapped, and ✕ still means put the whole thing
    * down.
    */
-  | { view: 'manager'; userId: string; manager?: string; backLabel?: string };
+  | { view: 'manager'; userId: string; manager?: string; backLabel?: string }
+  /**
+   * THE BUILDER, as a frame on this stack rather than a route.
+   *
+   * It has no deep link and deliberately none: `/contests` is a place, and a
+   * half-filled builder is not — a URL that reopens an empty form is a promise
+   * the app cannot keep. It is reached from the Friendly shelf and it leaves by
+   * PUSHING the contest it made, so ‹ from a new contest goes back to the lobby
+   * and not into the form that built it.
+   */
+  | { view: 'create'; backLabel?: string };
 
 export function ContestSheet({ initial }: { initial: SheetFrame }) {
   const router = useRouter();
@@ -191,6 +202,27 @@ export function ContestSheet({ initial }: { initial: SheetFrame }) {
     );
   }
 
+  if (here.view === 'create') {
+    return (
+      <CreateContestView
+        backLabel={here.backLabel}
+        onBack={pop}
+        onClose={close}
+        dismissible={!nested}
+        /* REPLACES ITSELF rather than stacking on. A builder left underneath
+           its own result is a screen the reader can return to and press
+           "Build it" on a second time — and the second press would build a
+           second contest, since the draft is still perfectly valid. */
+        onBuilt={(code) =>
+          setStack((st) => [
+            ...st.slice(0, -1),
+            { view: 'contest', code, backLabel: 'Contests' },
+          ])
+        }
+      />
+    );
+  }
+
   if (here.view === 'manager') {
     return (
       <ManagerView
@@ -229,6 +261,7 @@ export function ContestSheet({ initial }: { initial: SheetFrame }) {
       arrivedOn={here.arrivedOn}
       onClose={close}
       onOpenContest={(code) => push({ view: 'contest', code, backLabel: 'Contests' })}
+      onCreate={() => push({ view: 'create', backLabel: 'Contests' })}
     />
   );
 }

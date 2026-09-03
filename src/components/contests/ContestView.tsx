@@ -97,6 +97,7 @@ import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { BackRow } from './ContestRecapPanel';
+import { FriendlyPanel } from './FriendlyPanel';
 import { supabase } from '@/lib/supabase';
 import { Colors, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -553,6 +554,27 @@ export function ContestView({
             settled={settled}
           />
 
+          {/* THE ROOM, DIRECTLY UNDER THE CARD and above everything else.
+              On a friendly the first question is not "how am I doing" — it is
+              "who else is actually coming", because until somebody else files
+              there is no contest. On every other kind of contest this is
+              simply absent, which is why it is a whole panel rather than a
+              line in the rules: there is nothing to say about the guest list
+              of a lobby row that anybody can enter. */}
+          {contest.kind === 'friendly' ? (
+            <FriendlyPanel
+              code={contest.code}
+              creatorName={contest.creatorName}
+              joinCode={contest.joinCode}
+              maxEntrants={contest.maxEntrants}
+              /* Called off: the row this page is about no longer exists, so
+                 going back is the only coherent destination. Falls through to
+                 the close when there is nothing underneath. */
+              onCancelled={() => (backLabel ? onBack() : onClose())}
+              onOpenManager={onOpenManager}
+            />
+          ) : null}
+
           {/* ONE PAGE, IN THE ORDER A CONTEST IS READ.
               It was three tabs — Lineup, Rankings, Rules — and the argument for
               them was real: the page had been four screens of stacked panels,
@@ -719,7 +741,7 @@ export function ContestView({
 function lobbyStatus(
   mine: { filled: number } | null | undefined,
   contest: {
-    kind: 'free' | 'lobby';
+    kind: 'free' | 'lobby' | 'friendly';
     entryFeeCoins: number;
     affordable: boolean;
     slotCount: number;
