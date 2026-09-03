@@ -394,7 +394,7 @@ export function CreateContestView({
         {/* ══════════════════════════════ WHAT IT IS — before the roster,
             because none of it depends on the roster and everybody already
             knows the answers. */}
-        <View style={[styles.card, { borderColor: c.border, backgroundColor: c.backgroundElement }]}>
+        <View style={styles.list}>
           <Row label="Name" first>
             <TextInput
               value={d.name}
@@ -436,7 +436,7 @@ export function CreateContestView({
         </View>
 
         {/* ═════════════════════════════════════════════════════ POSITIONS */}
-        <Heading
+        <Section
           label="Positions"
           value={`${d.slots.length} card${d.slots.length === 1 ? '' : 's'}`}
         />
@@ -546,9 +546,9 @@ export function CreateContestView({
             roster, because all of it reads against the roster: "top 3 of 8"
             means nothing until the seats are set, and the pool is the fee
             times them. */}
-        <Heading label="Scoring" />
+        <Section label="Scoring" />
 
-        <View style={[styles.card, { borderColor: c.border, backgroundColor: c.backgroundElement }]}>
+        <View style={styles.list}>
           <Pressable
             accessibilityRole="button"
             accessibilityState={{ expanded: open === 'win' }}
@@ -673,7 +673,7 @@ export function CreateContestView({
         </View>
 
         {/* ════════════════════════════════════════════════════════ INVITE */}
-        <Heading
+        <Section
           label="Invite"
           value={d.invite.length > 0 ? `${d.invite.length} chosen` : undefined}
         />
@@ -783,6 +783,32 @@ export function CreateContestView({
  * stacking context, no scrim to dismiss, and — on a form this long — no moment
  * where the thing you were reading is covered by the thing you are choosing.
  */
+/**
+ * A section title: small, capitalised, spaced, and OUTSIDE the card below it.
+ *
+ * It used to be the same weight and size as a setting's own label, sitting
+ * directly above a list of them — so "Scoring" and "Pool split" were the same
+ * kind of object at the same emphasis and the eye had nothing to group by. A
+ * section marker has to be a different SPECIES of text from the things it
+ * names, not a bigger instance of one.
+ */
+function Section({ label, value }: { label: string; value?: string }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  return (
+    <View style={styles.section}>
+      <Text style={[Type.micro, styles.sectionLabel, { color: c.textTertiary }]}>
+        {label.toUpperCase()}
+      </Text>
+      {value ? (
+        <Text style={[Type.micro, NUMERIC, styles.sectionLabel, { color: c.textTertiary }]}>
+          {value.toUpperCase()}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 function Options<T extends string>({
   options,
   value,
@@ -799,7 +825,24 @@ function Options<T extends string>({
   const c = Colors[scheme];
 
   return (
-    <View style={[styles.options, { backgroundColor: c.backgroundElement }]}>
+    /* RECESSED, INSET AND DARKER — because the bug this fixes is that an open
+       list looked exactly like the settings around it. Both were bold label
+       over muted description on `backgroundElement`, so "Beat the median" (a
+       choice) and "Pool split" (a setting) were the same object, and the list
+       read as four more settings that had appeared out of nowhere.
+
+       Three things separate them now and they are deliberately all at once,
+       because any one of them alone was too quiet: the block is set IN from
+       both edges so it is visibly nested under its row, it is painted on the
+       page's own darker ground rather than the card's, and its labels are
+       body weight rather than strong. A choice should look like something you
+       are being offered, not like something you have set.
+
+       IT IS THE LIGHTER GROUND, NOT THE DARKER ONE, since the grey trays came
+       off the settings groups — with the page as the base, raised is the only
+       direction left that means anything. */
+    <View
+      style={[styles.options, { backgroundColor: c.backgroundElement, borderColor: c.border }]}>
       {options.map((o, i) => {
         const on = o.value === value;
         return (
@@ -812,16 +855,18 @@ function Options<T extends string>({
             style={({ pressed }) => [
               styles.option,
               i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border },
-              (pressed || on) && { backgroundColor: c.backgroundSelected },
+              pressed && { backgroundColor: c.backgroundSelected },
             ]}>
             {o.badge}
             <View style={styles.rowText}>
-              <Text style={[Type.strong, { color: c.text }]}>{o.label}</Text>
+              <Text style={[on ? Type.strong : Type.body, { color: c.text }]}>{o.label}</Text>
               {o.hint ? (
                 <Text style={[Type.micro, { color: c.textTertiary }]}>{o.hint}</Text>
               ) : null}
             </View>
-            {on ? <Text style={[Type.fine, { color: c.textSecondary }]}>✓</Text> : null}
+            {/* The tick is the only accent in the block, so the current choice
+                is findable without reading any of the labels. */}
+            {on ? <Text style={[Type.strong, { color: c.positive }]}>✓</Text> : null}
           </Pressable>
         );
       })}
@@ -830,28 +875,31 @@ function Options<T extends string>({
   );
 }
 
-/** The value a `Select` row shows, and the caret that says it opens. */
+/**
+ * The value on a row that OPENS something, drawn as a pill with a caret.
+ *
+ * The other three things that can sit in a row's right-hand column — a stepper,
+ * a status chip, a bare figure — are all visibly bounded objects, and this was
+ * plain text with a small triangle after it. So the two rows on this screen
+ * that actually open a list were the two that looked least like controls.
+ *
+ * A bordered pill costs nothing and makes the affordance the same one the
+ * reference settings screens use for exactly this: a value you can change,
+ * with the arrow that says how.
+ */
 function SelectValue({ label, open }: { label: string; open: boolean }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   return (
-    <View style={styles.selectValue}>
+    <View
+      style={[
+        styles.selectValue,
+        { borderColor: c.border, backgroundColor: open ? c.backgroundSelected : c.background },
+      ]}>
       <Text numberOfLines={1} style={[Type.strong, { color: c.text }]}>
         {label}
       </Text>
-      <Text style={[Type.fine, { color: c.textTertiary }]}>{open ? '▴' : '▾'}</Text>
-    </View>
-  );
-}
-
-/** A section title, with an optional figure on the right. */
-function Heading({ label, value }: { label: string; value?: string }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  return (
-    <View style={styles.heading}>
-      <Text style={[Type.figure, { color: c.text }]}>{label}</Text>
-      {value ? <Text style={[Type.figure, NUMERIC, { color: c.textTertiary }]}>{value}</Text> : null}
+      <Text style={[Type.micro, { color: c.textTertiary }]}>{open ? '▲' : '▼'}</Text>
     </View>
   );
 }
@@ -875,6 +923,8 @@ function Row({
 }: {
   label: string;
   hint?: string;
+  /** Unused now the rule hangs below each row; kept so call sites still read
+      top-to-bottom without renumbering when a row is inserted. */
   first?: boolean;
   last?: boolean;
   children: React.ReactNode;
@@ -882,17 +932,20 @@ function Row({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   return (
-    <View
-      style={[
-        styles.row,
-        !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border },
-        last && styles.rowLast,
-      ]}>
-      <View style={styles.rowText}>
-        <Text style={[Type.strong, { color: c.text }]}>{label}</Text>
-        {hint ? <Text style={[Type.micro, { color: c.textTertiary }]}>{hint}</Text> : null}
+    <View>
+      <View style={styles.row}>
+        <View style={styles.rowText}>
+          <Text style={[Type.strong, { color: c.text }]}>{label}</Text>
+          {hint ? <Text style={[Type.micro, { color: c.textTertiary }]}>{hint}</Text> : null}
+        </View>
+        <View style={styles.rowControl}>{children}</View>
       </View>
-      <View style={styles.rowControl}>{children}</View>
+      {/* THE RULE IS A CHILD, INSET TO THE GUTTER — `StarterRow`'s own
+          arrangement, for its own reason: a border cannot be inset, and a line
+          ruled edge to edge reads as a table where an inset one reads as the
+          gap between two rows. Drawing it the same way is what makes the
+          settings and the lineup above them one continuous list. */}
+      {last ? null : <View style={[styles.rule, { backgroundColor: c.border }]} />}
     </View>
   );
 }
@@ -956,22 +1009,40 @@ function Stepper({
 }
 
 const styles = StyleSheet.create({
-  page: { gap: Spacing.two, paddingBottom: Spacing.six },
-  heading: {
+  /* NO GAP ON THE PAGE. Spacing is owned by the sections and the cards, so
+     that a heading can sit CLOSE to the card it names and far from the one
+     above it. A uniform gap makes every block equidistant, which is the layout
+     equivalent of saying everything is equally related to everything. */
+  page: { paddingBottom: Spacing.six },
+  section: {
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
-    marginTop: Spacing.three,
+    marginTop: Spacing.five,
+    marginBottom: Spacing.two,
+    paddingHorizontal: Spacing.half,
   },
+  /* Small, spaced capitals: a label for a group rather than a title for a
+     thing. Nothing else on the screen is set this way. */
+  sectionLabel: { letterSpacing: 1.2 },
 
-  card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.panel, overflow: 'hidden' },
+  /* NO PANEL. The bordered, grey-filled card round each group has gone: with
+     the sections labelled above them it was a second, weaker way of saying the
+     same thing, and it put three different greys on one screen — page, card,
+     and the open list inside the card — none of which meant anything.
+     The rows sit on the page's own ground now and run edge to edge, exactly as
+     the lineup rows above them do, so the whole screen is ONE surface with
+     rules across it rather than a stack of trays. */
+  list: { marginHorizontal: -Spacing.three },
+  /* `StarterRow`'s inset, so its rules and these line up down the page. */
+  rule: { height: StyleSheet.hairlineWidth, marginHorizontal: Spacing.three },
 
   /* EDGE TO EDGE. `PlayerSheetFrame`'s content is padded by `Spacing.three`
      and a lineup row is not: on the board the row's background runs the whole
      width and only its RULE is inset, which is what makes a list of them read
      as a table rather than as a column of cards. Cancelling the padding here
      is the only way to get that inside a padded sheet. */
-  slots: { marginTop: Spacing.one, marginHorizontal: -Spacing.three },
+  slots: { marginHorizontal: -Spacing.three },
   /* Inside the full-bleed block, so its own gutter is put back by hand — the
      rows want the edges and a button does not. */
   add: {
@@ -987,15 +1058,16 @@ const styles = StyleSheet.create({
 
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
 
+  /* Taller and airier than a list row needs to be, because most of these carry
+     a sentence under the label and a cramped one reads as fine print. */
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    minHeight: 56,
+    paddingVertical: Spacing.three,
+    minHeight: 64,
   },
-  rowLast: {},
   /* The label column takes what is left and the control keeps its natural
      width. `flexShrink` rather than a fixed basis, so a long hint wraps instead
      of pushing the control off the end of the row. */
@@ -1012,16 +1084,37 @@ const styles = StyleSheet.create({
   shoulder: { paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
   stepperValue: { minWidth: 44, textAlign: 'center' },
 
-  /* The opened list. Tinted rather than bordered, so it reads as the row
-     above it having unfolded rather than as a separate panel that arrived. */
-  options: { overflow: 'hidden' },
-  selectValue: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  /* THE OPENED LIST, SET IN FROM BOTH EDGES. The inset is the whole point: it
+     is what says these rows belong UNDER the one above rather than beside it.
+     Bordered as well as darker, because on a light scheme the two grounds are
+     close enough that the edge is doing most of the work. */
+  /* THE OPEN LIST IS NOW THE ONLY RAISED THING ON THE SCREEN, which is the
+     point: with the trays gone it is the one place a lighter ground still means
+     something — "this appeared because you pressed the row above it". Inset
+     from both edges as well, so it is visibly nested rather than merely tinted. */
+  options: {
+    marginHorizontal: Spacing.three,
+    marginBottom: Spacing.three,
+    borderRadius: Radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
+    paddingVertical: Spacing.two + 2,
+  },
+  /* A bounded object, like every other control in the right-hand column. */
+  selectValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.chip,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one + 2,
   },
   remove: {
     alignItems: 'center',
