@@ -24,9 +24,21 @@
  *
  * A REJECTED READ IS NOT CACHED. It is dropped from the in-flight map so the
  * next mount retries, which is what keeps one network blip from making a screen
- * permanently empty for the rest of the session. Successes are kept until
- * something explicitly invalidates them — these are all "changes when the
- * nightly sync runs" reads, not live ones.
+ * permanently empty for the rest of the session.
+ *
+ * SUCCESSES ARE KEPT UNTIL SOMETHING INVALIDATES THEM, OR UNTIL `maxAgeMs`.
+ * The unbounded version of this was written for reads that "change when the
+ * nightly sync runs", and that assumption was true of every caller until a
+ * SELL VALUE became one of the cached fields. Prices move hourly — see
+ * `refresh-player-values` — so a collection read taken at breakfast quoted the
+ * wrong number by lunch, and the same card showed two different prices on two
+ * screens with nothing to say which was right.
+ *
+ * The stale value is deliberately KEPT when it expires rather than dropped. It
+ * still paints the first frame, exactly as before, and only the in-flight
+ * promise is released so the mount effect goes back to the network and
+ * converges. Dropping it instead would trade a wrong number for a spinner,
+ * which is the trade this whole file exists to refuse.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -96,9 +108,20 @@ export type SessionCache<K extends string, V> = {
 
 export function sessionCache<K extends string, V>(
   fetch: (key: K) => Promise<V>,
+  options?: {
+    /**
+     * How long a settled value may be served before the next `read` goes back
+     * to the network. Omit for a value that only changes when something
+     * explicitly invalidates it — which is most of them.
+     */
+    maxAgeMs?: number;
+  },
 ): SessionCache<K, V> {
   const inFlight = new Map<string, Promise<V>>();
   const settled = new Map<string, V>();
+  /** When each key last landed. Only consulted when `maxAgeMs` is set. */
+  const landedAt = new Map<string, number>();
+  const maxAgeMs = options?.maxAgeMs;
   /** Per-key invalidation counts, plus a whole-cache one. Both only rise. */
   const bumps = new Map<string, number>();
   const listeners = new Set<(key: K) => void>();
@@ -106,6 +129,17 @@ export function sessionCache<K extends string, V>(
 
   return {
     read(key) {
+      /* Expired: release the resolved promise so this read goes to the network.
+         `settled` is left alone on purpose — see the header, the stale value is
+         still the best first frame available. */
+      if (maxAgeMs !== undefined) {
+        const landed = landedAt.get(key);
+        if (landed !== undefined && Date.now() - landed > maxAgeMs) {
+          inFlight.delete(key);
+          landedAt.delete(key);
+        }
+      }
+
       const held = inFlight.get(key);
       if (held) return held;
       /**
@@ -126,7 +160,10 @@ export function sessionCache<K extends string, V>(
       const startedAt = epoch + (bumps.get(key) ?? 0);
       const attempt = fetch(key).then(
         (value) => {
-          if (epoch + (bumps.get(key) ?? 0) === startedAt) settled.set(key, value);
+          if (epoch + (bumps.get(key) ?? 0) === startedAt) {
+            settled.set(key, value);
+            landedAt.set(key, Date.now());
+          }
           return value;
         },
         (err) => {
@@ -145,11 +182,13 @@ export function sessionCache<K extends string, V>(
         epoch += 1;
         inFlight.clear();
         settled.clear();
+        landedAt.clear();
         return;
       }
       bumps.set(key, (bumps.get(key) ?? 0) + 1);
       inFlight.delete(key);
       settled.delete(key);
+      landedAt.delete(key);
     },
     version(key) {
       return epoch + (bumps.get(key) ?? 0);
@@ -161,6 +200,7 @@ export function sessionCache<K extends string, V>(
          overtaken by it and cannot write the pre-patch rows back. See `read`. */
       bumps.set(key, (bumps.get(key) ?? 0) + 1);
       settled.set(key, next);
+      landedAt.set(key, Date.now());
       inFlight.delete(key);
       for (const fire of listeners) fire(key);
     },

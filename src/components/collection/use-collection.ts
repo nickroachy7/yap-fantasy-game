@@ -93,7 +93,22 @@ async function fetchAllRows(): Promise<CollectionCard[]> {
 }
 
 /** One collection, one key — RLS decides whose. */
-const collection = sessionCache<'mine', CollectionCard[]>(fetchAllRows);
+/**
+ * A MINUTE, because one of these columns is a PRICE.
+ *
+ * Everything else the collection holds is a fact about a card you own and only
+ * changes when you do something — and every one of those actions already calls
+ * `invalidateCollection`. `sell_value` is the exception: it is derived from
+ * `player_values`, which `refresh-player-values` rewrites every hour, so it
+ * moves under a reader who is doing nothing at all. Left unbounded, the same
+ * copy showed 124 here and 165 on the players board, with nothing on either
+ * screen to say which was right.
+ *
+ * The stale rows still paint instantly — see `sessionCache`, expiry releases
+ * the promise and keeps the value — so this costs a background read a minute at
+ * most, and never a spinner.
+ */
+const collection = sessionCache<'mine', CollectionCard[]>(fetchAllRows, { maxAgeMs: 60_000 });
 
 /**
  * Forget the held collection. The next read pages it again.
