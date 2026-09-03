@@ -1967,6 +1967,45 @@ export type Database = {
         }
         Relationships: []
       }
+      player_base_price: {
+        Row: {
+          base_coins: number | null
+          player_id: string | null
+          season: number | null
+          source: string | null
+          value_score: number | null
+        }
+        Insert: {
+          base_coins?: never
+          player_id?: string | null
+          season?: number | null
+          source?: string | null
+          value_score?: number | null
+        }
+        Update: {
+          base_coins?: never
+          player_id?: string | null
+          season?: number | null
+          source?: string | null
+          value_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_values_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["player_id"]
+          },
+          {
+            foreignKeyName: "player_values_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       player_directory: {
         Row: {
           card_id: string | null

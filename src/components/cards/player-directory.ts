@@ -49,6 +49,18 @@ export type DirectoryPlayer = {
    * directory, and all of them people no fantasy board has an opinion about.
    */
   marketRank: number | null;
+  /**
+   * WHAT A FRESH COPY OF HIM IS WORTH, in coins.
+   *
+   * Not the price of any card you hold — that is `card_prices`, keyed on the
+   * copy, because tier and settled points belong to the copy and not to the
+   * footballer. This is the base the directory can honestly print: bronze with
+   * nothing earned, which is the number every tier is a multiple of. See
+   * `player_base_price`.
+   *
+   * Null for a player with no value row at all.
+   */
+  baseCoins: number | null;
   /** Rank across EVERY position, by season points. Null until he has played. */
   overallRank: number | null;
   /* --- from `player_card_market()`, merged in by `fetchPlayerDirectory` --- */
@@ -151,6 +163,7 @@ export function normalise(row: DirectoryRow, bio?: PlayerBio): DirectoryPlayer {
     experience: bio?.experience ?? null,
     posRank: null,
     marketRank: null,
+    baseCoins: null,
     overallRank: null,
     market: null,
   };
@@ -237,6 +250,35 @@ async function fetchMarketRanks(season: number): Promise<Map<string, number>> {
         .range(from, to),
     );
     for (const r of rows) byId.set(r.player_id, r.overall_rank);
+  } catch {
+    /* Soft — see above. */
+  }
+  return byId;
+}
+
+/**
+ * What a fresh copy of each player fetches. Soft-failing, like the ranks: a
+ * board with no prices is last week's board, and a board that refuses to draw
+ * because a price read failed is a blank screen.
+ */
+async function fetchBasePrices(season: number): Promise<Map<string, number>> {
+  const byId = new Map<string, number>();
+  try {
+    /* `player_id` is nullable on the row type because every column of a VIEW is
+       — Postgres cannot prove otherwise. It is never null in practice; the
+       guard below is the type system's price, not a real case. */
+    const rows = await fetchAllPages<{ player_id: string | null; base_coins: number | null }>(
+      (from, to) =>
+        supabase
+          .from('player_base_price')
+          .select('player_id, base_coins')
+          .eq('season', season)
+          .order('player_id', { ascending: true })
+          .range(from, to),
+    );
+    for (const r of rows) {
+      if (r.player_id !== null && r.base_coins !== null) byId.set(r.player_id, r.base_coins);
+    }
   } catch {
     /* Soft — see above. */
   }
@@ -440,7 +482,10 @@ export async function fetchPlayerDirectory(): Promise<DirectoryFetch> {
   /* The board is season-scoped and the season is only known after the probe
      above, so unlike the bios this cannot be started early. It is one small
      indexed read and it fails soft. */
-  const ranks = season === null ? new Map<string, number>() : await fetchMarketRanks(season);
+  const [ranks, prices] =
+    season === null
+      ? [new Map<string, number>(), new Map<string, number>()]
+      : await Promise.all([fetchMarketRanks(season), fetchBasePrices(season)]);
 
   const [bios, market] = await Promise.all([biosPromise, marketPromise]);
   const players = rows.map((row) => {
@@ -448,6 +493,7 @@ export async function fetchPlayerDirectory(): Promise<DirectoryFetch> {
     // Absent means "no copies in circulation", which the row draws as dashes.
     p.market = market.get(p.playerId) ?? null;
     p.marketRank = ranks.get(p.playerId) ?? null;
+    p.baseCoins = prices.get(p.playerId) ?? null;
     return p;
   });
   assignRanks(players);

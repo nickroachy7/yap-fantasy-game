@@ -131,7 +131,28 @@ export default function LeadersScreen() {
            for the top fifty; on a position board they must not — a receiver
            board that reads 1, 4, 9, 14 is the filtered table this page exists
            not to be. */
-        .map((player, i) => ({ player, rank: i + 1 })),
+        /* WHAT A CARD OF HIM FETCHES, in place of the season's points.
+ 
+           The figure column holds one number and this is the one that belongs
+           beside a rank: the board is ordered by what the market thinks of a
+           player, and the price is that opinion in coins. Season points are the
+           right figure on Search, where you arrive with a name and want to know
+           how he has done — and they are a dash for everybody here until a week
+           has been played, which is most of the reason this board had nothing
+           to say in September.
+ 
+           It is the BASE — bronze, nothing earned — so two players are compared
+           on the part of the price that is about them. A copy in hand is worth
+           this times its tier, plus what it has banked. See
+           `player_base_price`. */
+        .map((player, i) => ({
+          player,
+          rank: i + 1,
+          figure:
+            player.baseCoins === null
+              ? undefined
+              : { value: player.baseCoins.toLocaleString(), label: 'COINS' },
+        })),
       pool: inPool.length,
     };
   }, [result, pos]);
