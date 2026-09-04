@@ -292,7 +292,13 @@ export function LobbyView({
        seam this sheet has now spent three passes closing, reappearing as soon
        as you scroll. */
     <PlayerSheetFrame
-      surface={c.backgroundElement}
+      /* NO RAISED SURFACE ON A PAGE. `backgroundElement` is what separates a
+         sheet from the app it covers — it is lighter than the page on purpose,
+         so the edge between the two reads. A page covers nothing, so the same
+         colour draws a panel hovering on a ground that is not behind it, which
+         is precisely what made this still look like a pop-up after it stopped
+         being one. Undefined, and the page's own black shows through. */
+      surface={frame === 'page' ? undefined : c.backgroundElement}
       title={
         view === 'recap'
           ? (reading?.name ?? 'Contest')
@@ -390,7 +396,11 @@ export function LobbyView({
           reaches `HANDLE_BLOCK + OVERSCROLL_REACH` above its own content
           precisely so neither can happen. A surface rather than a tone: see
           the prop's own note. */}
-      <SheetToneBand surface={c.backgroundElement}>
+      {/* Same call as the frame's above, and it has to be the same or the seam
+          comes back the other way round: a flat hero band on a raised frame
+          reads as a hole rather than a panel. On a page both go transparent and
+          the hero sits on the page, which is what a heading does. */}
+      <SheetToneBand surface={frame === 'page' ? undefined : c.backgroundElement}>
         <LobbyHero run={run} staked={staked} week={week} />
       </SheetToneBand>
 

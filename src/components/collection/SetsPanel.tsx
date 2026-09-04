@@ -405,12 +405,15 @@ export function SetsPanel({
     );
 
   return (
-    /* `surface` rather than `tone`: a sheet full of sets is not about a club or
+    /* `surface` rather than `tone`: a board full of sets is not about a club or
        a tier and has no hue to be washed in — the same call `LobbyView` makes,
-       and the same step on the dark scale, so the two sheets a player opens
-       from the two boards are made of the same material. */
+       and the same step on the dark scale, so the two screens a player reaches
+       from the two boards are made of the same material.
+       AND NONE OF IT AS A PAGE, for the reason spelled out at `LobbyView`'s own
+       call: the raised step exists to separate a sheet from what it covers, and
+       a page covers nothing. */
     <PlayerSheetFrame
-      surface={c.backgroundElement}
+      surface={frame === 'page' ? undefined : c.backgroundElement}
       title="Sets"
       subtitle={context}
       frame={frame}

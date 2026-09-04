@@ -133,12 +133,14 @@ export function PlayerSheetFrame({
    *
    * A page is none of that. It IS the app — it sits in a section's navigator
    * under the strip that switches to it, fills the space it is given, and is
-   * left by navigating rather than by dismissing. What it keeps is everything
-   * that was never about the presentation: the scroller, the title that fades
-   * in once its full-size counterpart has scrolled away, the `pinned` row, and
-   * the footer. Those are the reason this mode is a branch here rather than a
-   * second component — they are ~400 lines of scroll-driven behaviour that the
-   * lobby and the sets board would otherwise own two copies of.
+   * left by navigating rather than by dismissing. What it keeps is what was
+   * never about the presentation: the scroller, the `pinned` row and the
+   * footer. That is the reason this is a branch here rather than a second
+   * component — the scroll-driven pinning is behaviour the lobby and the sets
+   * board would otherwise own two copies of.
+   *
+   * It does NOT keep the title bar; the strip above a page already names it.
+   * See the page branch for that argument in full.
    *
    * The default is `'sheet'`, so every existing caller is unchanged by
    * construction. Only a route mounted inside a section should pass `'page'`.
@@ -250,7 +252,14 @@ export function PlayerSheetFrame({
    * shows the bar too, as it always has — decoration there, marking "this came
    * from the bottom", with the ✕ still doing the work.
    */
-  const draggable = Platform.OS === 'ios' && !isWeb;
+  /* A PAGE IS NEVER DRAGGABLE, and this is the root the other flags hang off.
+     It is not only about the grabber: `draggable` also feeds `floats` and the
+     `covered` offset the pinned row's scroll threshold is measured against, and
+     that second one is the quiet bug — on iOS it would have gone on reserving
+     `HANDLE_BLOCK` for a handle the page does not draw, so the sets filters
+     would pin at the wrong scroll position with nothing on screen explaining
+     why. Settle it here rather than at each use. */
+  const draggable = frame === 'sheet' && Platform.OS === 'ios' && !isWeb;
   /**
    * WHETHER A DRAG CAN ACTUALLY TAKE THIS SHEET AWAY RIGHT NOW.
    *
@@ -754,6 +763,61 @@ export function PlayerSheetFrame({
     </ScrollView>
   );
 
+  /**
+   * THE PAGE, AND IT IS TESTED BEFORE THE PLATFORM.
+   *
+   * ---------------------------------------------------------------------------
+   * WHY THIS BRANCH IS FIRST, WHICH IS THE WHOLE BUG IT FIXES
+   * ---------------------------------------------------------------------------
+   *
+   * It used to sit between the two web returns, AFTER `if (!isWeb)` — so on a
+   * phone the native branch returned first and a page rendered the full iOS
+   * sheet: grabber, floating bar, sheet fill. It looked correct in a browser
+   * and wrong on every device, which is the worst place to put a platform
+   * check.
+   *
+   * `frame` is not a platform question. It says whether this thing is presented
+   * over the app or IS the app, and that answer is the same on iOS, Android and
+   * web — so it has to be settled before anything asks what platform we are on.
+   * Everything below this line is a sheet, and may go on assuming it.
+   *
+   * ---------------------------------------------------------------------------
+   * WHAT A PAGE IS MADE OF
+   * ---------------------------------------------------------------------------
+   *
+   * The simplest of the three compositions, and every part of the other two
+   * that is missing here is a part that only ever existed to make a floating
+   * surface behave: no backdrop, because there is nothing behind to dim; no
+   * grabber, because there is no gesture; no card, because there is no edge.
+   *
+   * NO TITLE BAR EITHER, and that is a design call rather than an omission.
+   * `bar` earns its height on a sheet by holding the ✕ and the title that fades
+   * in once the hero scrolls away. A page has no ✕, and it sits under a strip
+   * that already names it — so at rest the bar was ~44pt of empty chrome
+   * between the strip and the heading, on exactly the screens this move was
+   * meant to make cleaner. The hero says what the page is; the strip says where
+   * it is.
+   *
+   * `pinnedRow` STAYS, because it is the one thing in the header that is about
+   * the content rather than the presentation — the sets filters that would
+   * otherwise scroll out of reach. It appears only once its in-content twin has
+   * gone under, so it costs nothing at rest.
+   *
+   * The background is the PAGE's. A sheet is lighter than what it covers so the
+   * edge between them reads; a page covers nothing, and taking `surfaceSheet`
+   * here is what made these read as panels floating on a ground that was not
+   * there.
+   */
+  if (frame === 'page') {
+    return (
+      <View collapsable={false} style={styles.pageRoot}>
+        {pinnedRow}
+        {scroller}
+        {footerBar}
+      </View>
+    );
+  }
+
   if (!isWeb) {
     /**
      * The page sheet already IS the surface — draw on it, do not draw another.
@@ -779,33 +843,6 @@ export function PlayerSheetFrame({
         {footerBar}
         {floatingHeader}
         {floatingHandle}
-      </View>
-    );
-  }
-
-  /**
-   * THE PAGE. In flow, filling its parent, with no backdrop and nothing over
-   * the app — see `frame`.
-   *
-   * It is deliberately the SIMPLEST of the three compositions, and that is the
-   * point: every part of the other two that is missing here is a part that only
-   * ever existed to make a floating surface behave. The bar is in flow because
-   * there is no top edge to dress; there is no handle because there is no
-   * gesture; there is no `Pressable` behind it because there is nothing to
-   * dismiss. What is left is the bar, the scroller and the footer, in the
-   * order a page has always drawn them.
-   *
-   * The background is the PAGE's, not `surfaceSheet`. A sheet is lighter than
-   * what it covers so the edge between them reads; a page covers nothing, and
-   * taking the sheet colour here would draw a panel floating on a background
-   * that is not there.
-   */
-  if (frame === 'page') {
-    return (
-      <View collapsable={false} style={styles.pageRoot}>
-        {header}
-        {scroller}
-        {footerBar}
       </View>
     );
   }
