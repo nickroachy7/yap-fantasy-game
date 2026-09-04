@@ -799,8 +799,8 @@ const styles = StyleSheet.create({
     padding: Spacing.one,
     gap: Spacing.one,
   },
-  /* GLYPH OVER THE WORD, and the cells SHARE the tray with no cap on how wide
-     one may get.
+  /* GLYPH BESIDE THE WORD, and the cells SHARE the tray with no cap on how
+     wide one may get.
 
      There was a `maxWidth: 132`, and dropping it is the deliberate part. It was
      measured for a bar with no button beside it: two uncapped cells each took
@@ -816,29 +816,47 @@ const styles = StyleSheet.create({
      for Collection and Players, and ~161 for Leaderboard, which has no button
      to leave room for.
 
-     A FLAT VERSION WAS TRIED AND REVERTED — glyph beside the word, hugging its
-     labels, ~26pt instead of ~45. It bought real height back on three screens
-     and gave the cells unequal widths to do it. The height was not the problem
-     being solved.
+     THE CELL WAS A COLUMN — glyph over label, 45pt — and a flat version had
+     already been tried once and reverted. The revert note is worth keeping
+     because it is half right: that attempt let the cells HUG their labels, so
+     Inventory and Sets came out different widths and the bar stopped reading as
+     one control with a position in it. It concluded that flat was the mistake.
+     The unequal widths were.
 
-     EXACTLY TWO CHILDREN, glyph over label, and that is a constraint rather
-     than a description. A cell is a flex column in a flex row, so a third line
-     in ONE cell stretches every cell in the bar: the "Soon" badge Sets used to
-     carry made the Collection strip 66pt where every other section's was 55,
-     and — because these cells centre their content — pushed its siblings
-     visibly lower than the same items elsewhere. Anything that wants to say
-     more about a destination belongs in the rail, which is a list of rows, or
-     on the destination itself. */
+     They came from dropping `flexGrow`/`flexBasis`, which have nothing to do
+     with the axis inside the cell. Kept — as they are here — the cells still
+     split the tray evenly and only their contents lie down: same widths, same
+     even division, 30pt instead of 45. That is a row of chrome shorter above
+     every browsing screen in the app, which on a phone is the top of the list
+     you came to read.
+
+     EXACTLY TWO CHILDREN, and that is a constraint rather than a description.
+     It survives the axis change and is the reason the change is safe: a cell is
+     a flex box in a flex row, so a third element in ONE cell resizes every cell
+     in the bar. As a column that showed up as height — the "Soon" badge Sets
+     used to carry made the Collection strip 66pt where every other section's
+     was 55 — and as a row it would show up as width, pushing that cell's
+     siblings narrower than the same items elsewhere. Either way it is one cell
+     deciding the shape of the whole control. Anything that wants to say more
+     about a destination belongs in the rail, which is a list of rows, or on the
+     destination itself. */
   item: {
     flexGrow: 1,
     flexBasis: 0,
-    // Still a floor: it is what "AVAILABLE" needs at 9pt, and it is what lets
-    // the bar scroll rather than ellipsise if a section ever carries enough
-    // items to overflow the row.
-    minWidth: 62,
+    /* Still a floor, and it moved with the axis. It is what the longest label
+       needs BESIDE an 18pt glyph rather than under it — "AVAILABLE" at 9pt, the
+       gap, and the glyph — and it is what lets the bar scroll rather than
+       ellipsise if a section ever carries enough items to overflow the row.
+       Laid out flat a cell is about a third wider than it was, so the old 62
+       would have let three items ellipsise on a phone instead of scrolling. */
+    minWidth: 88,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
+    /* Wider than the 3 that separated the two lines. Vertical space between a
+       glyph and the word under it reads as one object; horizontal space is the
+       only thing keeping them from touching, and 3 has them colliding. */
+    gap: Spacing.two - 2,
     paddingVertical: Spacing.one + 2,
     borderRadius: Radius.control,
   },
