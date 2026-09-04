@@ -94,8 +94,17 @@ import { useSets } from './use-sets';
 export function SetsPanel({
   onOpenSet,
   onClose,
+  frame = 'sheet',
 }: {
   onOpenSet: (code: string) => void;
+  /**
+   * Whether this is the sets SHEET or the Collect section's Sets PAGE.
+   *
+   * Passed through to `PlayerSheetFrame`; nothing this panel draws changes
+   * between the two. As a page it is the second tab of the Collect strip, so
+   * the strip is how it is reached and left and `onClose` is never called.
+   */
+  frame?: 'sheet' | 'page';
   /**
    * Put the sheet down.
    *
@@ -404,6 +413,7 @@ export function SetsPanel({
       surface={c.backgroundElement}
       title="Sets"
       subtitle={context}
+      frame={frame}
       onClose={onClose}
       closeLabel="Close sets"
       pinned={pinned}>

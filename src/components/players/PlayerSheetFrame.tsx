@@ -95,6 +95,7 @@ export function PlayerSheetFrame({
   onClose,
   closeLabel = 'Close player profile',
   dismissible = true,
+  frame = 'sheet',
   footerGlass = false,
   tone,
   surface,
@@ -123,6 +124,26 @@ export function PlayerSheetFrame({
    * place, so there is still one way out and it is unambiguous.
    */
   dismissible?: boolean;
+  /**
+   * SHEET (the default) or PAGE, and the whole component turns on it.
+   *
+   * Everything above assumes this thing is presented OVER the app: it draws a
+   * backdrop to separate itself from what it covers, sizes itself as a dialog
+   * or a bottom sheet, owns a dismiss gesture, and offers a way out.
+   *
+   * A page is none of that. It IS the app — it sits in a section's navigator
+   * under the strip that switches to it, fills the space it is given, and is
+   * left by navigating rather than by dismissing. What it keeps is everything
+   * that was never about the presentation: the scroller, the title that fades
+   * in once its full-size counterpart has scrolled away, the `pinned` row, and
+   * the footer. Those are the reason this mode is a branch here rather than a
+   * second component — they are ~400 lines of scroll-driven behaviour that the
+   * lobby and the sets board would otherwise own two copies of.
+   *
+   * The default is `'sheet'`, so every existing caller is unchanged by
+   * construction. Only a route mounted inside a section should pass `'page'`.
+   */
+  frame?: 'sheet' | 'page';
   /**
    * The footer draws its own material — see `GlassBar`.
    *
@@ -250,7 +271,11 @@ export function PlayerSheetFrame({
    * Android, and a sheet with no way out at all would be worse than either.
    */
   const dragCloses = draggable && dismissible;
-  const showClose = !dragCloses;
+  /* A page has nothing to close. `frame="page"` is not a sheet with its chrome
+     hidden — there is no surface over the app to dismiss, so a ✕ would be a
+     button that either does nothing or navigates somewhere the reader did not
+     ask to go. The strip above it is how you leave. */
+  const showClose = frame === 'sheet' && !dragCloses;
 
   /**
    * Whether the bar is taken OUT of the layout and drawn over the content.
@@ -270,7 +295,11 @@ export function PlayerSheetFrame({
    * and a close button, not a sheet dragged up from an edge, and there is no
    * top edge for a wash to mark.
    */
-  const floats = draggable || (isWeb && !wide);
+  /* A page never floats its chrome. Floating exists so the tone wash can reach
+     a sheet's top edge under a grabber the platform drew; a page has no such
+     edge and no grabber, and floating the bar there would hang it over the
+     first row of content with nothing to justify the overlap. */
+  const floats = frame === 'sheet' && (draggable || (isWeb && !wide));
   /* The ✕ moves out of the bar when the bar floats: the bar is invisible at
      rest (`titleFade` is 0) and the only way out must not be. It is drawn as
      its own floating element instead, above everything. */
@@ -432,12 +461,17 @@ export function PlayerSheetFrame({
      SwapSheet had to fix. */
   useEffect(() => {
     if (!isWeb) return;
+    /* Not on a page. Escape dismisses the thing on top, and on a page there is
+       nothing on top — binding it here would make the key navigate the reader
+       out of a tab they were simply reading, which is the same wrong answer the
+       ✕ gives. See `frame`. */
+    if (frame === 'page') return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [isWeb, onClose]);
+  }, [isWeb, onClose, frame]);
 
   const titleText = (
     <>
@@ -749,6 +783,33 @@ export function PlayerSheetFrame({
     );
   }
 
+  /**
+   * THE PAGE. In flow, filling its parent, with no backdrop and nothing over
+   * the app — see `frame`.
+   *
+   * It is deliberately the SIMPLEST of the three compositions, and that is the
+   * point: every part of the other two that is missing here is a part that only
+   * ever existed to make a floating surface behave. The bar is in flow because
+   * there is no top edge to dress; there is no handle because there is no
+   * gesture; there is no `Pressable` behind it because there is nothing to
+   * dismiss. What is left is the bar, the scroller and the footer, in the
+   * order a page has always drawn them.
+   *
+   * The background is the PAGE's, not `surfaceSheet`. A sheet is lighter than
+   * what it covers so the edge between them reads; a page covers nothing, and
+   * taking the sheet colour here would draw a panel floating on a background
+   * that is not there.
+   */
+  if (frame === 'page') {
+    return (
+      <View collapsable={false} style={styles.pageRoot}>
+        {header}
+        {scroller}
+        {footerBar}
+      </View>
+    );
+  }
+
   /* The construction below is SwapSheet's, deliberately copied rather than
      improved on. The first version wrapped the card in an extra View and put
      `pointerEvents="box-none"` on the centring box — react-native-web
@@ -996,6 +1057,10 @@ const styles = StyleSheet.create({
    * height.
    */
   sheetRoot: { flex: 1, height: '100%' },
+  /* No colour of its own — the section's page is already painted underneath,
+     and a background here would be a second one drawn over it. See the page
+     branch. */
+  pageRoot: { flex: 1, height: '100%' },
   band: {
     marginHorizontal: -Spacing.three,
     paddingHorizontal: Spacing.three,

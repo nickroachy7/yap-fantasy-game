@@ -270,11 +270,15 @@ export const PACKS: NavChild = {
  * is not a bar item.
  */
 export const CONTESTS: NavChild = {
-  href: "/contests",
+  href: "/fantasy/compete/contests",
   label: "Contests",
   icon: "contests",
-  takeover: true,
-  detached: true,
+  /* NEITHER `takeover` NOR `detached` ANY MORE, and both removals are the
+     point. It is a page inside Compete now, so `SectionNav` navigates to it
+     with `replace` like any sibling tab rather than pushing a modal, it draws
+     as a bar item instead of hiding in the tray, `webSectionOf` folds it into
+     the section's heading tabs, and `isOverlayPath` correctly stops calling it
+     an overlay. */
 };
 
 /**
@@ -339,11 +343,13 @@ export const SEARCH: NavChild = {
  * the tabs. Nothing draws it as a nav item — `detached` says so.
  */
 export const SETS: NavChild = {
-  href: "/sets",
+  href: "/fantasy/collect/sets",
   label: "Sets",
   icon: "sets",
-  takeover: true,
-  detached: true,
+  /* A page under Collect, on the same terms as `CONTESTS` above — see the note
+     there for what dropping `takeover` and `detached` each buys. The
+     collection's toolbar chip still reads `SETS.href`, so it followed the route
+     without being told. */
 };
 
 export const FANTASY_SECTIONS: NavSection[] = [
@@ -354,6 +360,26 @@ export const FANTASY_SECTIONS: NavSection[] = [
     href: "/fantasy/compete",
     label: "Compete",
     icon: "lineup",
+    /* TWO PAGES AGAIN, AND THIS TIME THERE ARE TWO.
+       Compete carried a bar until 5cbdf44 took it off, and the argument was
+       sound: the lobby had become a sheet, which left ONE page under the row.
+       A switcher offering a single destination is a permanent row of chrome
+       that can only ever return you to where you already are.
+       What changed is not the argument but the count. Contests is a page again
+       (see `CONTESTS`), so the row now switches between two real screens — the
+       lineup you are filling and the contests you can enter it into — which is
+       the thing a bar is for. The cost is the same row it always was, and it is
+       paid for now.
+       THE INDEX IS THE FIRST CHILD, listed explicitly rather than implied.
+       `SectionNav` highlights on `pathname === child.href`, so the section's
+       own index has to appear here or landing on Compete would draw a bar with
+       nothing lit — a switcher that claims you are nowhere. It is called
+       Lineups, plural, for the reason the section stopped being called Lineup:
+       with a lobby you have one per contest. */
+    children: [
+      { href: "/fantasy/compete", label: "Lineups", icon: "lineup" },
+      CONTESTS,
+    ],
     /* NO CHILDREN, and it is the only board with none. Its second view became a
        sheet reached from the carousel — see `CONTESTS` — which leaves one page
        under this row and nothing for a bar to switch between. `SectionNav`
@@ -371,6 +397,18 @@ export const FANTASY_SECTIONS: NavSection[] = [
     href: "/fantasy/collect",
     label: "Collect",
     icon: "collection",
+    /* The same two-real-destinations argument as Compete above, arriving at the
+       same answer one commit later. a48b419 made Sets a sheet on the reasoning
+       that the exit belongs on the board holding the cards it is an exit for —
+       which is still true, and is why the toolbar chip stays. What it does not
+       settle is where Sets LIVES: a chip is a shortcut, and a shortcut is not a
+       reason for the destination to be homeless.
+       Inventory rather than Collection, because the section is already called
+       Collect and a tab repeating its parent's word says nothing. */
+    children: [
+      { href: "/fantasy/collect", label: "Inventory", icon: "inventory" },
+      SETS,
+    ],
     /* COLLECT CARRIES THE DAILY-PACK DOT, because Collect carries the shop —
        see `PACKS`, which is a chip on this board's toolbar and, on a phone,
        the only deliberate door to it.
@@ -686,21 +724,16 @@ const WEB_NAV_SPEC: WebNavSpec[] = [
      because they are genuinely one board again, and now matched by Compete.
      The rail was never the thing that wanted them separate; a phone was. */
   { href: "/fantasy/compete", section: "/fantasy/compete", measure: "form" },
-  /* The lobby, as its own row rather than as a tab under Compete — the same
-     treatment `/packs` gets below and for the same reason: it is a sheet, not a
-     view of the board. On a phone the carousel's last card is the way in; a
-     rail has room to name it outright. */
-  { href: "/contests" },
-  /* NO TABS LEFT TO FOLD — Sets was the second view and is the sheet below.
-     `section` stays so the row still lights for anything under
-     `/fantasy/collect`, and `measure` stays because it is the width the board
-     asks for whether or not there is a heading to hang tabs in. */
+  /* THE LOBBY AND SETS ARE NOT ROWS ANY MORE. Each had one here while it was a
+     sheet — the treatment `/packs` still gets below, on the argument that a
+     sheet is not a view of the board and a rail has room to name it outright.
+     Both are pages under their sections now, so `webSectionOf` folds them into
+     that section's heading tabs, and leaving the rows in would list each screen
+     twice on a desktop: once as a peer of the board it lives in, and again as a
+     tab inside it. The fold is what a wide screen has instead of the phone's
+     strip, and it is fed by the same `children` — declare the page once, and
+     both presentations pick it up. */
   { href: "/fantasy/collect", section: "/fantasy/collect", measure: "table" },
-  /* Sets, as its own row rather than as a tab under Collect — the same
-     treatment `/contests` gets above and for the same reason: it is a sheet,
-     not a view of the board. On a phone the board's toolbar carries the door; a
-     rail has room to name it outright. */
-  { href: "/sets" },
   /* Directly under the board that makes you want more cards, which is the
      question it answers. It is still the sheet it is on a phone (see
      `(app)/_layout`), opened over the app rather than navigated to; a rail row

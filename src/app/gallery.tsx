@@ -266,8 +266,8 @@ const VIEW_TITLE: Record<View_, string> = {
 /** Drives the rail's active/nested state, which is otherwise unreachable here. */
 const VIEW_PATH: Record<View_, string> = {
   inventory: "/fantasy/collect",
-  sets: "/sets",
-  checklist: "/sets",
+  sets: "/fantasy/collect/sets",
+  checklist: "/fantasy/collect/sets",
   leaderboard: "/fantasy/leaderboard",
   lineup: "/fantasy/compete",
   recap: "/fantasy/compete",

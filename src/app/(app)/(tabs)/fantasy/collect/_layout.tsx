@@ -6,7 +6,7 @@ import { SectionFrame } from '@/components/shell/SectionFrame';
  * COLLECT: the cards you own.
  *
  * ---------------------------------------------------------------------------
- * IT IS ONE PAGE NOW, AND THE BAR IS GONE
+ * TWO PAGES, AND THE BAR IS BACK: INVENTORY AND SETS
  * ---------------------------------------------------------------------------
  *
  * Sets were lifted out of Collection on 2026-08-21 to sit beside it, then
@@ -20,21 +20,22 @@ import { SectionFrame } from '@/components/shell/SectionFrame';
  * chrome above a board whose whole subject is the cards underneath it — and it
  * still put the exit one deliberate tap away, just a shorter one.
  *
- * Sets is a SHEET over the collection now, opened by a chip at the end of the
- * board's own toolbar beside the shop. See `SETS` in `sections.ts`. The exit is
- * on the screen holding the cards it is an exit for, which is closer than the
- * tab ever was, and the board gets the row back.
+ * Sets spent a few days as a SHEET over the collection, opened by a chip on the
+ * board's own toolbar. That move was right about the exit and wrong about the
+ * address: putting the door where the intent forms does not require the
+ * destination to be homeless. Sets is a page beside Inventory again, and the
+ * toolbar chip still points at it — see `SETS` in `sections.ts`.
  *
- * THE PACKS BUTTON WENT THE SAME WAY. It was this frame's `action` — chrome
- * rendered above the navigator, which was the right place for it while there
- * was a bar for it to sit beside. With no bar there is nothing to hang it on,
- * and it is one of the two doors on the toolbar now, drawn by `DoorChip`
- * exactly as the lineup's rail draws its pair.
+ * THE PACKS BUTTON STAYS ON THE TOOLBAR, and does not come back up here. It was
+ * this frame's `action` once, but Packs is genuinely a sheet — an errand you
+ * open, spend in, and put down — so it is not a third tab and never was. It
+ * keeps its `DoorChip` beside the one for Sets, which is now a shortcut sitting
+ * next to a door.
  *
- * `SectionFrame` stays, and draws nothing: a section with no children has no
- * bar. What it still supplies is the frame state every page in here reads —
- * that a masthead is already on screen. Compete has been in exactly this shape
- * since its own lobby became a sheet.
+ * `SectionFrame` needed no change: it draws whatever `childrenOf` reports, drew
+ * nothing while that was empty, and draws two items now. What it also supplies
+ * is the frame state every page in here reads — that a masthead is already on
+ * screen. Compete is in exactly this shape, one section over.
  */
 export default function CollectLayout() {
   return (

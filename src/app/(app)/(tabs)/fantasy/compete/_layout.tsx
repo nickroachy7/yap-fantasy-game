@@ -18,15 +18,20 @@ import { SectionFrame } from '@/components/shell/SectionFrame';
  * deadline on it — and cost the week's actual decision a tap it never used to
  * need. Contests are what you scroll to; your lineup is what you land on.
  *
- * THE SECTION IS ONE PAGE NOW. The lobby was the second, under a two-item bar
- * this frame drew above every visit; it is a sheet over the board instead, and
- * the way in is the last card of the lineup carousel — see `CONTESTS` in
- * `sections.ts` for what that bought and what it cost.
+ * TWO PAGES, UNDER A TWO-ITEM BAR — Lineups and Contests. The lobby spent a
+ * few days as a sheet over the board, reached from the last card of the lineup
+ * carousel, and the bar came off with it because one destination is not
+ * something to switch between. It is a page again and the bar is back; see
+ * `FANTASY_SECTIONS` in `sections.ts` for what turned that argument around.
  *
- * `SectionFrame` stays. It draws no bar for a section with no children and
- * costs nothing, and it is what a second page under Compete would need on the
- * day there is one. What it still supplies is the frame state every page in
- * here reads — that a masthead is already on screen.
+ * The carousel's last card still opens it — a shortcut to a sibling tab now
+ * rather than a door onto a sheet, which is why `LineupEditor` replaces where
+ * it used to push.
+ *
+ * `SectionFrame` needed no change for any of this. It draws whatever
+ * `childrenOf` reports and drew nothing while that was empty, which is exactly
+ * what it was left in place for. What it also supplies is the frame state every
+ * page in here reads — that a masthead is already on screen.
  */
 export default function CompeteLayout() {
   return (

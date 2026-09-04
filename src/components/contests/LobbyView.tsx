@@ -114,6 +114,7 @@ export function LobbyView({
   onClose,
   onOpenContest,
   onCreate,
+  frame = 'sheet',
 }: {
   /**
    * WHICH SHELF THIS OPENED ON, from the route.
@@ -134,6 +135,15 @@ export function LobbyView({
   onOpenContest: (code: string) => void;
   /** Push the builder. See `SheetFrame` for why it is a frame and not a route. */
   onCreate: () => void;
+  /**
+   * Whether this is the contests SHEET or the Compete section's contests PAGE.
+   *
+   * Passed straight through to `PlayerSheetFrame`, which is where the two
+   * presentations actually differ; everything this file draws is the same
+   * either way. The page is the second tab of the Compete strip, so it is
+   * reached and left by that strip and `onClose` is never called.
+   */
+  frame?: 'sheet' | 'page';
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -296,6 +306,7 @@ export function LobbyView({
          subtitle is the one line a reader gets before the list, so it says
          whichever of the two is news. */
       subtitle={context}
+      frame={frame}
       onClose={onClose}
       closeLabel="Close contests">
       {view === 'invites' ? (

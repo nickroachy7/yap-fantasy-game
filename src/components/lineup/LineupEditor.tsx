@@ -1399,7 +1399,7 @@ export function LineupEditor({
     pinned || results.unseen.length === 0 ? null : (
       <WelcomeBackBanner
         entries={results.unseen}
-        onOpen={() => router.push('/contests')}
+        onOpen={() => router.replace('/fantasy/compete/contests')}
         /* Newest first, so the head of the list is the whole span. */
         onDismiss={() => results.acknowledge(results.unseen[0].finalizedAt)}
       />
@@ -1421,18 +1421,22 @@ export function LineupEditor({
         locked={allLocked}
         now={now}
         run={run}
-        /* The contests screen, over this board. It is a sheet rather than a page
-           now, so this pushes and closing puts the reader back on the lineup
-           they were filling — see `CONTESTS` in `sections.ts`.
+        /* The contests screen, which is the SIBLING TAB of this one again — so
+           this REPLACES rather than pushes. A push would stack the second tab
+           on top of the first inside one section, leaving a back gesture that
+           undoes a tab switch; the strip above both does not work that way and
+           neither should the card. See `CONTESTS` in `sections.ts`.
 
            THE SHELF TRAVELS IN THE URL. The rail asks for one face of the
            screen and a recap link elsewhere asks for another; the alternative
-           was lifting `contests.tsx`'s view state up into a store so a board two
-           routes away could set it, which is a lot of machinery for a string
-           the router already carries. */
+           was lifting the contests page's view state up into a store so a board
+           two routes away could set it, which is a lot of machinery for a
+           string the router already carries. */
         onEnter={(view) =>
-          router.push(
-            view === 'history' ? { pathname: '/contests', params: { view } } : '/contests',
+          router.replace(
+            view === 'history'
+              ? { pathname: '/fantasy/compete/contests', params: { view } }
+              : '/fantasy/compete/contests',
           )
         }
         width={cardWidth}

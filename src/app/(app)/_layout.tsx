@@ -188,20 +188,18 @@ export default function AppLayout() {
             animationDuration: 240,
           }}
         />
-        {/* The contest lobby, which was a page beside the lineup under a
-            two-item bar. It is the same kind of object as the three above —
-            open it, enter something, put it down — and the bar it cost was two
-            thirds of the chrome on the game's main screen. Reached from the
-            last card of the lineup carousel; see `CONTESTS` in `sections.ts`. */}
-        {/* The lobby, which is also the archive: `contests` swaps its own
-            content rather than presenting a second sheet over itself. See the
-            note on `view` there — a sheet stacked on a sheet is the layering
-            `pull.tsx` was already burned by once. */}
-        <Stack.Screen name="contests" options={sheetOptions} />
-        {/* Sets, over the collection. Same presentation as packs and the lobby,
-            and it arrived here from the same direction: it was a tab beside the
-            board and is a door on it. See `SETS` in `sections.ts`. */}
-        <Stack.Screen name="sets" options={sheetOptions} />
+        {/* THE LOBBY AND SETS ARE NOT MOUNTED HERE ANY MORE. Both were sheets
+            over the app, and both are pages inside their own sections now —
+            `(tabs)/fantasy/compete/contests` and `(tabs)/fantasy/collect/sets`
+            — so the tab navigator holds them and this stack has nothing to say
+            about either. See `FANTASY_SECTIONS` for why the strip wanted them
+            back.
+            The builder came the other way for exactly the same reason. It used
+            to be a frame on `ContestSheet`'s internal stack, which only worked
+            while the lobby was itself a sheet; with the lobby a page there is no
+            modal around it, so the builder needs its own route up here to be
+            presented over one. */}
+        <Stack.Screen name="contest/create" options={sheetOptions} />
         {/* The death screen. An ORDINARY PUSH, and that is the decision:
             every other route in this stack is presented over the app, and this
             one deliberately is not.
