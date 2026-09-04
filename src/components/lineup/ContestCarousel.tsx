@@ -81,7 +81,6 @@ import {
 import {
   FlatList,
   Platform,
-  Pressable,
   StyleSheet,
   View,
   useWindowDimensions,
@@ -107,10 +106,9 @@ import {
   type HeartResult,
   type HeartSpan,
 } from "@/components/runs/Hearts";
-import { DOOR_HEIGHT, DoorChip, Plus } from "@/components/ui/DoorChip";
-import { Colors, Spacing, selectionAccent } from "@/constants/theme";
+import { DOOR_HEIGHT } from "@/components/ui/DoorChip";
+import { Spacing } from "@/constants/theme";
 import type { PlayerState } from "@/context/PlayerContext";
-import { useColorScheme } from "@/hooks/use-color-scheme";
 
 /**
  * The air between one card and the next.
@@ -230,7 +228,6 @@ export function ContestCarousel({
   locked,
   now,
   run,
-  onEnter,
   width,
 }: {
   contests: MyContest[];
@@ -255,17 +252,6 @@ export function ContestCarousel({
    * nothing here, exactly as the masthead used to decide. See the foot.
    */
   run: PlayerState["run"];
-  /**
-   * Open the contests screen, on one of its shelves.
-   *
-   * IT STILL TAKES A SHELF even though the rail only ever asks for `open`. The
-   * archive was the left-hand door on this row and it is gone — a shortcut to a
-   * view one tap inside the room the other door opens — but `contests.tsx` is
-   * three views behind one route and a recap link elsewhere still arrives at
-   * the same screen by the same param. Narrowing this to a bare callback would
-   * hide that the destination has shelves at all.
-   */
-  onEnter: (view: "open" | "history") => void;
   /**
    * The measured width of the column this sits in.
    *
@@ -602,26 +588,19 @@ export function ContestCarousel({
     return { start, count: pips.filter((p) => p.contest === contest).length };
   };
 
-  /**
-   * Hearts riding on a live entry, which is what the free count is measured
-   * against. Settled contests do not hold one — theirs came back or did not —
-   * and a contest you have not entered has not taken one yet.
-   */
-  const committed = contests.reduce(
-    (n, ct) =>
-      n +
-      (!ct.recap && ct.lineupId !== null ? Math.max(0, ct.heartsAtRisk) : 0),
-    0,
-  );
 
   /**
    * NO CARDS IS STILL A RAIL, and the rail is the way out.
    *
    * This returned null, which took the lobby down with the cards — a player
    * whose week had rolled over got eight empty slots and no way to enter
-   * anything. It then returned the lobby TILE for the same reason. The tile is
-   * gone (see the note on `onEnter`) and the argument is unchanged: whatever
-   * empties this list must not also remove the door. The rail carries it now.
+   * anything. It then returned the lobby TILE, then the rail's labelled door,
+   * each for the same reason.
+   * THAT WHOLE CLASS OF BUG IS NOW SOMEBODY ELSE'S. The way into contests is
+   * the Compete strip, one row above this component and outside it, so no
+   * state this file can reach — an empty week included — can take it away. The
+   * rail is kept here because the RACK is still worth drawing with no cards;
+   * it is no longer load-bearing as an exit.
    *
    * `my_contest_cards` always returns the free contest, so this should be
    * unreachable — it is kept because the next thing to empty the list will not
@@ -630,12 +609,9 @@ export function ContestCarousel({
   if (contests.length === 0) {
     return rack ? (
       <RunRail
-        run={rack}
-        committed={committed}
         pips={[]}
         focus={null}
         onGo={goTo}
-        onEnter={onEnter}
       />
     ) : null;
   }
@@ -689,12 +665,9 @@ export function ContestCarousel({
       </View>
       {rack ? (
         <RunRail
-          run={rack}
-          committed={committed}
           pips={pips}
           focus={spanFor(page)}
           onGo={goTo}
-          onEnter={onEnter}
         />
       ) : null}
     </View>
@@ -826,208 +799,42 @@ function Page({
  * spent was drawn nowhere near it.
  */
 function RunRail({
-  run,
-  committed,
   pips,
   focus,
   onGo,
-  onEnter,
 }: {
-  run: NonNullable<PlayerState["run"]>;
-  /**
-   * Hearts held by a live entry, counted off the same walk that placed the
-   * highlights — NOT `run.wagered`.
-   *
-   * `run.wagered` is the server's count and it is right; it just cannot say
-   * WHICH card each heart belongs to, and the carousel now draws cards you have
-   * not entered. Deriving both from one walk is what stops the rail lighting
-   * one heart while the sentence under it counts a different set.
-   */
-  committed: number;
   /** One per card on the board, in the carousel's order — see `ContestHearts`. */
   pips: { contest: number; result: HeartResult | null; entered: boolean }[];
   focus: HeartSpan | null;
   onGo: (page: number) => void;
-  /** The contests screen. See the carousel's prop. */
-  onEnter: (view: "open" | "history") => void;
 }) {
-  const scheme = useColorScheme() === "dark" ? "dark" : "light";
-  const c = Colors[scheme];
-  const accent = selectionAccent(scheme);
-
-  const held = Math.max(0, run.hearts);
-  const staked = Math.min(Math.max(0, committed), held);
-  const free = held - staked;
-
-  /**
-   * A TRAY AND A BUTTON, and the tray is the one that stretches.
-   *
-   * ---------------------------------------------------------------------------
-   * WHAT THIS REPLACED
-   * ---------------------------------------------------------------------------
-   *
-   * First a 22pt `+` in a circle with `1 free · Contests` set beside it. Two
-   * objects for one idea: the words carried the meaning and could not be
-   * pressed, the circle took the press and said nothing a `+` does not say
-   * everywhere. Worse, the text sat hard against the button and read as its
-   * label — the one part of the row that looked tappable was the part that was
-   * not.
-   *
-   * Then one gold pill, which fixed the labelling and broke two other things.
-   *
-   * ---------------------------------------------------------------------------
-   * GOLD IS FILLED, BECAUSE IT ONLY MEANS ONE THING NOW
-   * ---------------------------------------------------------------------------
-   *
-   * This spent a while as an outline, and the reason was real: `selectionAccent`
-   * was spoken TWICE on this row. The focused heart wore gold corner ticks —
-   * this app's mark for "this is the one you are looking at" — so a gold button
-   * put "you are here" and "press me" in one hue forty points apart, and the eye
-   * could not rank them. Draining the button to a line resolved that without
-   * touching the rack.
-   *
-   * The rack gave up its ticks instead (see `ContestHearts`), and THAT is what
-   * earns the fill back. Gold now appears exactly once on this row and means
-   * exactly one thing.
-   *
-   * The other objection to a fill — that a gold slab out-shouts the card it
-   * serves — turned out to be an argument about SIZE wearing a colour's clothes.
-   * At 32pt with a 13/600 two-word label it did. At 28 with 12/500 and one word
-   * it is a chip, and a call to action is allowed to be the brightest chip in a
-   * row that is otherwise a status readout.
-   *
-   * ---------------------------------------------------------------------------
-   * THE GLYPH IS THE VERB, SO THE WORD CAN BE THE ROOM
-   * ---------------------------------------------------------------------------
-   *
-   * The label has been "Contests", then "Enter contest", and is now "Contests"
-   * again — which is not a circle, because what changed underneath it is the
-   * `+`.
-   *
-   * "Contests" was wrong beside a BARE `+`: two objects, neither of which said
-   * what pressing would do. A verb fixed that by making the button a sentence.
-   * But a verb over-claims here. `contests.tsx` is not a lobby — it is three
-   * views (open contests, `Recent contests`, and a recap reader), so "enter"
-   * names one of the things you go there for and hides the other, on a row whose
-   * own hearts are already half settled receipts.
-   *
-   * With a `+` in front the labour divides properly: the GLYPH carries the act,
-   * the WORD carries the room. "+ Contests" reads as "a new one" to anyone
-   * glancing and as "the contests screen" to anyone reading, which is the only
-   * version of this button that has been true of both.
-   *
-   * ---------------------------------------------------------------------------
-   * THE DEAD AIR IS INSIDE SOMETHING NOW
-   * ---------------------------------------------------------------------------
-   *
-   * `space-between` is not composition: it pushed a rack of flat glyphs to one
-   * edge and a slab to the other with a hundred points of nothing between, and
-   * the row read as two leftovers rather than one thing.
-   *
-   * The rack now sits in a tray that STRETCHES to just short of the button, so
-   * the slack is enclosed rather than spanned. It also solves the growth
-   * problem for free: the tray is the flexible box, so a week with eight cards
-   * squeezes the hearts and never the door.
-   *
-   * ---------------------------------------------------------------------------
-   * THE FREE COUNT GOES IN THE TRAY, NOT IN THE BUTTON
-   * ---------------------------------------------------------------------------
-   *
-   * The tray is the RUN — what you hold and what is left of it — and the button
-   * is the ACT. The count is a fact about the run, so it is the tray's right-hand
-   * occupant and the last thing read before the button, which is the position it
-   * wants without being mistaken for the label again. The tray's own edge is
-   * what keeps that distinction now; before, nothing did.
-   *
-   * It is not the rack restated. `pips` is one heart per CARD ON THE BOARD —
-   * staked, settled, or waiting on a contest you have not entered — so a heart
-   * you hold and have promised to nothing appears nowhere in the rack. This
-   * count is the only place it exists on the screen, and it is the fact that
-   * decides whether the button is worth pressing.
-   *
-   * NO GLYPH ON IT. A fifth heart drawn inside a rack of pips reads as a fifth
-   * pip. The words carry it.
-   *
-   * When nothing is free the count goes and the button drops to the quiet fill
-   * — still there, still pressable, because the screen behind it is worth
-   * reading either way, but no longer pointing at a spend the run cannot make.
-   */
-  /* Whether there is a heart left to spend, which is the only thing the row's
-     right-hand end changes with. See the note on the chip. */
-  const live = free > 0;
-
+  /* WHAT IS LEFT OF THIS ROW IS A READOUT.
+     It used to end in the lobby door and open with a `+` shortcut to the same
+     place, and most of the argument that lived here was about how to rank those
+     two against each other — which of them took the accent, how big the chip
+     could be before it out-shouted the card above it. All of that went with the
+     doors: contests are the Compete strip's second tab now, so the row has no
+     call to action left to balance and no gold to spend. It says how many
+     hearts are riding and which contest each one belongs to. */
   return (
     <View style={styles.rail}>
-      {/**
-       * THE RUN, AT THE HEAD OF THE ROW: a way in, then what is riding.
-       *
-       * ---------------------------------------------------------------------
-       * THE COUNT WENT BACK UP TO THE MASTHEAD
-       * ---------------------------------------------------------------------
-       *
-       * A pill here said how many hearts you HOLD, one glance from the pips
-       * saying which of them this week has committed, and that pairing was the
-       * reason to draw it. It has gone back to `AppHeader` — see the note
-       * there: a heart is now stakeable from a contest sheet presented over any
-       * page, so a count that exists on one board is a count you have to go and
-       * look up.
-       *
-       * The rack did NOT go with it. A rack is one pip per card, each carrying
-       * free, wagered or killed, each a link to the contest it rides on, and
-       * none of that survives at masthead size. Held travels; riding stays.
-       *
-       * ---------------------------------------------------------------------
-       * WHAT TOOK THE SLOT IS A DOOR, WHICH IS A REVERSAL
-       * ---------------------------------------------------------------------
-       *
-       * The pill's own note ended "IT IS A READOUT AND NOT A DOOR — nothing on
-       * the run's own state is pressable". That rule stands for readouts; what
-       * is here now is not one. The count left, and rather than let the pips
-       * slide to the rail's edge the slot carries a second way into the lobby,
-       * under the left thumb, at the end of the row a right-handed player never
-       * reaches without moving their grip.
-       *
-       * IT IS THE SAME ROOM AS THE CHIP AT THE FAR END, deliberately. Two doors
-       * to one place on one row is normally the duplication this file argues
-       * against — see the packs door it just lost — and the defence is reach
-       * rather than discovery: the chip is the labelled door that TEACHES the
-       * lobby exists, this is the shortcut for somebody who has already learned
-       * it. If the chip is ever unlabelled or moved, this stops being a
-       * shortcut and starts being the ambiguity below.
-       *
-       * A BARE `+` IS AMBIGUOUS AND THAT IS NOT SOLVED, only bounded. The
-       * chip's own note retired a bare `+` from this row once, because a glyph
-       * alone among hearts could add a heart, a card or a slot. What contains
-       * it now: the accessible label names the room, and the mark is in the
-       * QUIET ink — gold still appears exactly once on this row, on the chip
-       * that is the real call to action. A second accent here would make the
-       * row choose between two doors to the same place.
-       */}
+      {/* THE RUN, AT THE HEAD OF THE ROW: what is riding, and nothing else.
+          The COUNT is not drawn here — it went back to `AppHeader`, because a
+          heart is stakeable from screens this rail is not on and a count that
+          lives on one board is a count you have to go and look up. The RACK
+          stayed: one pip per card, each carrying free/wagered/killed and each a
+          link to the contest it rides on, none of which survives at masthead
+          size. Held travels; riding stays. */}
       <View style={styles.run}>
-        {/* IT GOES WHEN NOTHING IS FREE, on the same rule as the chip's own
-            mark at the far end of this row — and here it is the whole control
-            rather than a mark on one, because there is no word underneath it to
-            stay true. A bare `+` offered to a run with nothing to stake is the
-            ambiguity above at its worst: a glyph that can only mean "add",
-            beside a rack of hearts, when nothing can be added. The labelled
-            door is still there for the recaps. */}
-        {live ? (
-          <Pressable
-            onPress={() => onEnter("open")}
-            accessibilityRole="button"
-            accessibilityLabel="Contest lobby"
-            /* Reaches past 44 from a 28pt mark, the same trick `DoorChip` uses —
-             see `DOOR_HEIGHT`. */
-            hitSlop={9}
-            style={({ pressed }) => [
-              styles.enter,
-              { backgroundColor: c.surface },
-              pressed && styles.pressed,
-            ]}
-          >
-            <Plus color={c.textSecondary} />
-          </Pressable>
-        ) : null}
+        {/* THE LOBBY SHORTCUT IS GONE, and so is the labelled door at the end
+            of this row. Both opened the contests screen, which is the Compete
+            strip's second tab now — a permanent switcher one row up, on every
+            page in the section. A door beside a tab to the same room is not a
+            second way in, it is the same way in drawn twice, and this row was
+            already spending its whole width arguing about which of the two
+            should carry the accent.
+            What the rail keeps is what only it can say: how many hearts are
+            held, and which contest each pip belongs to. */}
 
         {/**
          * THE PAGER, BESIDE THE COUNT RATHER THAN ON THE COLUMN'S CENTRE.
@@ -1063,122 +870,6 @@ function RunRail({
         </View>
       </View>
 
-      {/**
-       * ONE DOOR AT THE END OF THE ROW, AND IT IS BIGGER FOR BEING ALONE.
-       *
-       * ---------------------------------------------------------------------
-       * PACKS LEFT
-       * ---------------------------------------------------------------------
-       *
-       * `+ Packs` sat beside this, on the argument that the band was the whole
-       * answer to "what can I spend, and where" — a heart and the contest that
-       * takes it, coins and the shop that takes them.
-       *
-       * The band no longer holds that half. The coin balance is in the masthead
-       * and the heart count has gone up to join it, so the row is not the
-       * wallet any more; it is the run and the way into a contest. A shop door
-       * on it was the one object serving a currency the row had stopped
-       * mentioning. Packs is reached from the collection, which is the board
-       * where "I need more cards" is the actual next thought.
-       *
-       * ---------------------------------------------------------------------
-       * WHICH IS WHY THE CHIP CAN GROW
-       * ---------------------------------------------------------------------
-       *
-       * This was tried at 32 with a 13/600 two-word label and backed out: a
-       * PAIR of chips that size was plainly the biggest object on the row, and
-       * a door has to rank below the card it serves.
-       *
-       * The objection was about the pair. One chip at 32 is a single call to
-       * action under a card, which is what this screen's main button is
-       * supposed to be — and the two words are what buy the growth: "Contests"
-       * named a room in a way that could be read as a filter on the board above
-       * it. "Contest Lobby" cannot be anything but somewhere to go.
-       *
-       * `large` on `DoorChip` is that size, declared once so the collection's
-       * quiet pair cannot drift into it.
-       */}
-      <View style={styles.doors}>
-        {/**
-         * THE WAY INTO ANOTHER CONTEST.
-         *
-         * The lobby was reachable only by swiping past every card to a tile at
-         * the end of the carousel — fine when you are in one contest, a chore
-         * when you are in four, and it is the app's main call to action either
-         * way. A button at a fixed position under the thumb costs one tap from
-         * any page.
-         *
-         * IT NEVER SHRINKS AND IT NEVER MOVES. The pager beside it is the half
-         * that gives. Whatever happens to the left of it, the door stays the
-         * same size in the same corner.
-         *
-         * THE FREE COUNT IS NOT SPELLED OUT, and it no longer has to be. `1
-         * free` was a tray's occupant and could not be moved next to this
-         * button without reading as its label — but the pill at the head of the
-         * row now states what is held, the pips state what is committed, and
-         * the difference between them is the answer that phrase was for.
-         *
-         * ---------------------------------------------------------------------
-         * THE GOLD IS ON THE MARK, NOT ON THE SLAB
-         * ---------------------------------------------------------------------
-         *
-         * This has been an outline, then a filled gold pill, and the swing was
-         * never really about the button. It was about what else the row was
-         * doing. The row has been emptied since — the tray went, the edge
-         * chevrons went, the pager came down to 16pt — so the same gold slab
-         * that was one strong object among several would now be the only loud
-         * thing on a quiet band, sitting directly under the card that is the
-         * screen's actual subject.
-         *
-         * So the pill stays and the fill goes quiet. It has to stay a pill:
-         * this is the app's main call to action, and it is the LABELLED door to
-         * the contests screen — the shortcut at the head of the row is the same
-         * room, but only this one says so. What carries the state is the `+` —
-         * struck in the accent when a heart is free, absent when none is. Gold
-         * appears once on this screen, at nine points, on the one mark whose
-         * whole job is to say the act is voluntary. The shortcut's `+` is
-         * deliberately NOT the accent for that reason: two gold marks at
-         * opposite ends of a row, opening the same door, would make the row
-         * choose between them.
-         */}
-        <DoorChip
-          large
-          label="Contest Lobby"
-          accessibilityLabel={
-            live
-              ? `Contest lobby. ${free === 1 ? "1 heart" : `${free} hearts`} free`
-              : "Contest lobby"
-          }
-          onPress={() => onEnter("open")}
-          fill={c.backgroundElement}
-          ink={c.text}
-          /**
-           * THE `+` LEADS THE WORD, and that is not the `+` that was once
-           * removed from this row.
-           *
-           * What was wrong before was a `+` ALONE: a bare glyph in a row of
-           * hearts could add a heart, a card or a slot, and the words that said
-           * which sat outside the button where they could not be pressed.
-           *
-           * Leading a label it has the opposite problem to solve and solves it
-           * well — the glyph is what the eye finds at a glance and the noun is
-           * what settles the ambiguity, so "a new contest, by choice" arrives
-           * in one look instead of a read.
-           *
-           * DRAWN, NOT TYPED. A `+` glyph sits high in its own line box, so
-           * centring it needs a hand-tuned baseline nudge that drifts the first
-           * time the type size changes — an earlier circle carried exactly that
-           * hack. Two bars cannot drift.
-           *
-           * IT GOES WHEN NOTHING IS FREE, because by then it is a promise the
-           * run cannot keep. Leaving it on would be the one part of the button
-           * still offering a new contest to somebody with nothing to stake.
-           * What is left is the room's name, which is the half that stays true
-           * — there are still recaps in there to read.
-           */
-          lead={live ? <Plus color={accent} /> : null}
-        />
-      </View>
     </View>
   );
 }

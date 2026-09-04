@@ -687,15 +687,11 @@ function InventoryFixture() {
             }}
           />
           <View style={styles.inventorySpacer} />
+          {/* ONE DOOR. Sets is the Collect strip's second tab now, so its chip
+              went from the real toolbar; this fixture follows, because a
+              gallery that draws a control the app no longer has is a reference
+              that teaches the wrong screen. */}
           <View style={styles.inventoryDoors}>
-            <DoorChip
-              label="Sets"
-              accessibilityLabel="Sets"
-              onPress={() => {}}
-              fill={c.backgroundElement}
-              ink={c.text}
-              lead={<Plus color={c.textSecondary} />}
-            />
             <DoorChip
               label="Packs"
               accessibilityLabel="Packs"
@@ -1424,7 +1420,6 @@ function LineupFixture() {
              states and the focused pip can be seen moving as you swipe — see
              `Foot` in the carousel. */
           run={FIXTURE_PLAYER.run}
-          onEnter={() => {}}
           width={carouselWidth}
         />
       </View>

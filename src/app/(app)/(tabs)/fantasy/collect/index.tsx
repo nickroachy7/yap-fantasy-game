@@ -78,7 +78,7 @@ import { InventoryRow } from '@/components/collection/InventoryRow';
 import { sortCards, summarise, type CollectionCard } from '@/components/collection/types';
 import { useCollection } from '@/components/collection/use-collection';
 import { Screen } from '@/components/shell/Screen';
-import { PACKS, SETS } from '@/components/shell/sections';
+import { PACKS } from '@/components/shell/sections';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { DoorChip, Plus } from '@/components/ui/DoorChip';
 import { quietScrollbar } from '@/components/ui/scroll-strip';
@@ -471,47 +471,42 @@ export default function InventoryScreen() {
                 controls were narrowing something that no longer needs
                 narrowing. See `visible`.
 
-                THE DOORS ARE THE LINEUP RAIL'S, and deliberately the same
-                object — `DoorChip`, at the same height, with the same `+`. The
-                collection's toolbar and the carousel's rail are now the same
-                shape: a readout about the thing above, and the pair of places
-                you leave it for. A player who has learned "+ Contests" on
-                Sunday has learned this row too.
+                THE DOOR IS THE LINEUP RAIL'S OLD OBJECT, and there is one of
+                it. This row and the carousel's rail were deliberately the same
+                shape — a readout about the thing above, then the places you
+                leave it for — and they still match, because the rail has no
+                doors left either. Both sections put their destinations in the
+                strip and kept only what a strip cannot carry: an errand.
 
-                ORDER IS BY WHAT THE ACT COSTS. Sets is where cards GO — the one
-                exit that preserves board value — and it costs you a card, so it
-                is read first. Packs is the shop, and a shop is what you visit
-                once you know what you need. Same rule as the rail's Contests
-                before Packs.
+                THE ORDER ARGUMENT IS RETIRED WITH THE PAIR. It used to read
+                Sets before Packs, by what the act costs — Sets is where cards
+                GO and it costs you a card; a shop is what you visit once you
+                know what you need. With one chip there is nothing to order, and
+                the ranking that matters now is between the chip and the tab
+                above it, which the strip settles by being permanent.
 
-                NEITHER `+` TAKES THE ACCENT. On the rail the contests mark is
-                gold because it is the one control on the screen that spends a
-                heart, and gold appears exactly once there. Nothing on this row
-                spends anything — both doors merely open a room — so both marks
-                are quiet, and the loudest object on the row stays the coin in
-                the value readout, which is the fact it is about. */}
+                THE `+` STAYS QUIET. It was quiet because nothing on this row
+                spends anything, and that is still true — Packs opens a room,
+                and what you spend is decided inside it. The loudest object on
+                the row remains the coin in the value readout, which is the fact
+                the row is about. */}
             <View style={styles.toolbar}>
               <CollectionValue sellValue={stats.sellValue} />
               {/* See `RosterCount` for why the margin beside it is
                   load-bearing. */}
               <RosterCount roster={roster} />
               <View style={styles.spacer} />
-              <View style={styles.doors}>
-                <DoorChip
-                  label={SETS.label}
-                  accessibilityLabel="Sets"
-                  onPress={() => router.push(SETS.href as never)}
-                  fill={c.backgroundElement}
-                  ink={c.text}
-                  lead={<Plus color={c.textSecondary} />}
-                />
-                {/* NOTHING ON WIDE. The rail carries Packs as a row of its own
-                    there, and a second door two inches to the right of the
-                    first is the duplication the rail's own notes talk it out
-                    of — the rule `PacksButton` applied before this chip
-                    replaced it. Sets has a rail row too and keeps its chip at
-                    every width, exactly as Contests does on the lineup. */}
-                {wide ? null : (
+              {/* ONE DOOR, AND ONLY ON A PHONE. Sets had the other and does
+                  not need it: it is the Collect strip's second tab now, a
+                  switcher one row above this toolbar and present on both of
+                  this section's pages. A chip beside a tab to the same room is
+                  the same way in drawn twice.
+                  Packs is not a tab and never will be — it is an errand you
+                  open, spend in and put down — so it keeps its chip, and keeps
+                  it on the same rule as before: nothing on wide, where the rail
+                  carries Packs as a row of its own. */}
+              {wide ? null : (
+                <View style={styles.doors}>
                   <DoorChip
                     label={PACKS.label}
                     accessibilityLabel="Packs"
@@ -520,8 +515,8 @@ export default function InventoryScreen() {
                     ink={c.text}
                     lead={<Plus color={c.textSecondary} />}
                   />
-                )}
-              </View>
+                </View>
+              )}
             </View>
 
             <FlatList
