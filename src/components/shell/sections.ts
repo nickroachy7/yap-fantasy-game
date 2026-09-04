@@ -215,9 +215,10 @@ export type NavTab = {
  * carried the WALLET — a heart and the contest that takes it, coins and the
  * shop that takes them, on the screen where a player is already deciding.
  *
- * The wallet has moved. The coin balance was always in the masthead and the
- * heart count has gone up to join it, so the rail is the run and the way into a
- * contest, and a shop door on it served a currency the row no longer mentions.
+ * The wallet has moved. The coin balance was always in the masthead, the heart
+ * count went up to join it and then the mechanic went entirely, so the rail is
+ * a pager and the way into a contest, and a shop door on it served a currency
+ * the row no longer mentions.
  *
  * ON A PHONE THAT LEAVES EXACTLY ONE DELIBERATE DOOR — this chip, on Collect.
  * The empty-collection state and the one-time auto-open are doors too, and

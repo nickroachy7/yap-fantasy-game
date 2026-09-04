@@ -9,7 +9,7 @@
  * to one line — which is the right shape for something you compare against four
  * other cards, and the wrong shape for a rule. "Top 3 of 12 win" is a price
  * tag; it does not say that the pool is weighted by place, that the fee funds
- * it, that a loss takes a heart, or that a card spent here cannot play anywhere
+ * it, or that a card spent here cannot play anywhere
  * else this week.
  *
  * Those sentences existed nowhere. The contest page carried two paragraphs of
@@ -35,12 +35,10 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Hearts } from '@/components/runs/Hearts';
 import { Panel } from '@/components/ui/Panel';
 import { MIN_ENTRANTS } from '@/components/lineup/field';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import type { PlayerState } from '@/context/PlayerContext';
 
 import { formatLine, payingPlaces, topPrize, winLine, type ContestTerms } from './contest-model';
 
@@ -50,7 +48,6 @@ export function ContestAbout({
   title = 'How it works',
   prizePoolBps,
   leavable,
-  run,
 }: {
   terms: ContestTerms;
   name: string;
@@ -67,22 +64,6 @@ export function ContestAbout({
    * that has not noticed what week it is.
    */
   leavable: boolean;
-  /**
-   * THE READER'S OWN RACK, not a picture of a heart.
-   *
-   * This row drew a single `Heart state="wagered"` — the blade-through glyph
-   * that means "this one is committed" — as decoration beside the stake. Two
-   * things were wrong with it. It asserted a state that was not the reader's:
-   * on a contest you have not entered, nothing is staked. And it spent the
-   * row's one graphic on a symbol when the actual question is *how many have I
-   * got left*, which is the whole reason the rack exists.
-   *
-   * A PROP RATHER THAN `usePlayer()`, because this component is in the kit and
-   * the kit lives outside `PlayerProvider` — a hook here would throw on the one
-   * page built to render every state of it. Null draws nothing, which is what
-   * a player with no run yet gets.
-   */
-  run: PlayerState['run'];
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
@@ -136,29 +117,6 @@ export function ContestAbout({
         <Fact term="Every start" body={`${terms.scoreRate} coins a point`}>
           {`Every card you field earns coins for what it scores, in this contest and in all of them — ${terms.scoreRate} a point, multiplied by that card's tier, from ×1.0 at bronze to ×1.4 at diamond. It is paid whether you win or lose${terms.entryFeeCoins > 0 ? ' and it is on top of anything the pool pays' : ''}, which is why a card sitting on your bench is the only card in your collection earning nothing at all.`}
         </Fact>
-        ) : null}
-
-        {terms.heartsAtRisk > 0 || terms.heartsOnWin > 0 ? (
-          <Fact
-            term="Your run"
-            body={
-              terms.heartsAtRisk > 0
-                ? `${terms.heartsAtRisk === 1 ? '1 heart' : `${terms.heartsAtRisk} hearts`} on the line`
-                : 'Nothing at risk'
-            }
-            mark={
-              run ? (
-                /* Staked pips are marked here too — see the note on the
-                   board's rail for why they came back. This row says what you
-                   HOLD and which of those are already riding; the words beside
-                   it say what THIS contest asks you to put up on top. */
-                <Hearts hearts={run.hearts} wagered={run.wagered} rack={run.rack} size={13} />
-              ) : undefined
-            }>
-            {terms.heartsAtRisk > 0
-              ? `Losing here costs your run ${terms.heartsAtRisk === 1 ? 'a heart' : `${terms.heartsAtRisk} hearts`}, and a run with no hearts left is wiped.${terms.heartsOnWin > 0 ? ` Winning heals ${terms.heartsOnWin === 1 ? 'one' : String(terms.heartsOnWin)}, up to the rack you have earned.` : ''}`
-              : `This one cannot end a run. Winning still heals ${terms.heartsOnWin === 1 ? 'a heart' : `${terms.heartsOnWin} hearts`}.`}
-          </Fact>
         ) : null}
 
         <Fact term="Locking" body="One card at a time">
@@ -238,7 +196,7 @@ export function ContestAbout({
  * One rule: a label, the short answer, and the sentence that qualifies it.
  *
  * THE SHORT ANSWER IS THE LINE PEOPLE READ. Somebody skimming this panel gets
- * "Beat the median / 240 coins so far / 1 heart on the line" down the left of the
+ * "Beat the median / 240 coins so far / Needs 3 entries" down the left of the
  * page and can stop there; the paragraph under it is for the reader who has
  * stopped on that row. Both are always drawn, because a rule that hides its own
  * explanation behind a tap is a rule nobody reads.
@@ -295,7 +253,7 @@ function Fact({
 }: {
   term: string;
   body: string;
-  /** A glyph beside the short answer — the heart, on the run's row. */
+  /** A glyph beside the short answer, where a row has one to draw. */
   mark?: React.ReactNode;
   children: React.ReactNode;
 }) {

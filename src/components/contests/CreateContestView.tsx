@@ -60,7 +60,6 @@ import { Fragment, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Chip } from '@/components/ui/Chip';
-import { StatusChip } from '@/components/ui/StatusChip';
 import { PositionBadge } from '@/components/ui/PositionBadge';
 import { BADGE_SIZE, BADGE_WIDTH, StarterRow } from '@/components/lineup/LineupRow';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
@@ -348,8 +347,6 @@ export function CreateContestView({
       formatName: shapeName(d.slots),
       slotCount: d.slots.length,
       entryFeeCoins: d.entryFee,
-      heartsAtRisk: 0,
-      heartsOnWin: 0,
       winCondition: d.winCondition,
       winRank: d.winRank,
       winPct: d.winPct,
@@ -656,20 +653,12 @@ export function CreateContestView({
             />
           ) : null}
 
-          <Row label="Prize pool" hint="90% of the fees collected, if it fills">
+          <Row label="Prize pool" hint="90% of the fees collected, if it fills" last>
             <Text style={[Type.strong, NUMERIC, { color: c.text }]}>
               {fullPool.toLocaleString()}
             </Text>
           </Row>
 
-          {/* THE ONE RULE THAT IS NOT A SETTING, stated where the stakes are.
-              Every other contest in the lobby that costs coins also costs a
-              heart, so the ABSENCE of a stake is news rather than an omission —
-              and a reader wondering why there is no risk control deserves the
-              answer here rather than in its silence. */}
-          <Row label="Hearts" hint="A friendly can never end a run" last>
-            <StatusChip label="None at risk" tone="neutral" />
-          </Row>
         </View>
 
         {/* ════════════════════════════════════════════════════════ INVITE */}

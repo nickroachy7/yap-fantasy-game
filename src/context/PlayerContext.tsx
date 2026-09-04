@@ -1,20 +1,16 @@
 /**
- * The signed-in player's headline state: coins, hearts and identity.
+ * The signed-in player's headline state: coins, roster and identity.
  *
  * Lives in context because the header renders on every tab — without this each
  * screen would fetch the balance separately and they would drift apart after a
  * pack opening.
  *
- * THE RUN IS HERE FOR THE SAME REASON THE BALANCE IS. Hearts are the second
- * resource this game asks a player to spend, they are drawn in the same strip
- * of chrome, and they move on the same events — entering a contest costs coins
- * and puts a heart at risk in one action. Loading them separately would let the
- * header show a fee it can afford next to a run that has already ended.
- *
- * `my_run()` CREATES a run on first read, which is why it is called from the
- * chrome rather than from the lobby: the run has to exist before anything can
- * price itself against it, and the alternative — creating one at entry — means
- * a player cannot see what they are risking until after they have risked it.
+ * THE RUN USED TO BE HERE and is not any more. Hearts were the second resource
+ * this game asked a player to spend, so they were loaded on the same event as
+ * the balance and drawn in the same strip of chrome. The mechanic is gone (see
+ * the migration `the_run_stops_asking_for_hearts`) and with it the only reader
+ * — so the `my_run` call went too rather than being left to warm a field
+ * nothing draws. Coins are the one currency in the chrome now.
  *
  * ---------------------------------------------------------------------------
  * THE ROSTER IS HERE TOO, AND IT REPLACED A SECOND COUNT OF THE SAME ROWS
@@ -52,7 +48,6 @@ import {
   recountRoster,
   type RosterStatus,
 } from "@/components/recap/recap";
-import { parseRun, type Run } from "@/components/runs/run";
 import { useAuth } from "@/context/AuthContext";
 import { useLoader, type Load } from "@/hooks/use-loader";
 import { supabase } from "@/lib/supabase";
@@ -70,11 +65,6 @@ export type PlayerState = {
    * be taken at all — see `LineupEditor`.
    */
   roster: RosterStatus | null;
-  /**
-   * The live run, or the dead one still owed a carry. Null only before the
-   * first load — every signed-in player has one, because reading it makes one.
-   */
-  run: Run | null;
   /**
    * TODAY'S FREE PACK IS STILL THERE.
    *
@@ -135,7 +125,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [coins, setCoins] = useState(0);
   const [displayName, setDisplayName] = useState("player");
   const [roster, setRoster] = useState<RosterStatus | null>(null);
-  const [run, setRun] = useState<Run | null>(null);
   const [dailyPack, setDailyPack] = useState(false);
 
   const load = useCallback<Load>(
@@ -170,7 +159,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
        * fact, so a comment claiming it for a batch is a claim about tables it
        * has not checked.
        */
-      const [profile, balance, rosterRow, runRow, dailyRow] = await Promise.all(
+      const [profile, balance, rosterRow, dailyRow] = await Promise.all(
         [
           supabase
             .from("profiles")
@@ -190,7 +179,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
            `my_collection` filters on, so the grid and the header cannot
            disagree about how many cards you have. */
           supabase.rpc("roster_status"),
-          supabase.rpc("my_run"),
           /* Whether today's free pack is unclaimed. See `dailyPack` on
            `PlayerState`; the pack shelf asks the same question of the same
            RPC, and neither of them counts openings to answer it. */
@@ -199,13 +187,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       );
       if (!live()) return;
       const failure =
-        profile.error ?? balance.error ?? rosterRow.error ?? runRow.error;
+        profile.error ?? balance.error ?? rosterRow.error;
       if (failure) return failure.message;
       setDisplayName(profile.data?.display_name ?? "player");
       setCoins(balance.data?.balance ?? 0);
       setRoster(parseRoster(rosterRow.data));
-      setRun(parseRun(runRow.data));
-      /* NOT IN `failure` ABOVE, deliberately. The four reads before it are the
+      /* NOT IN `failure` ABOVE, deliberately. The three reads before it are the
          chrome — a header with no balance is broken and should say so. This one
          decorates a nav item, so a failure costs an absent dot and must not
          blank the masthead behind it. */
@@ -239,7 +226,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       displayName,
       cardCount: roster?.held ?? 0,
       roster,
-      run,
       dailyPack,
       loading: loading || !session,
       error,
@@ -250,7 +236,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       coins,
       displayName,
       roster,
-      run,
       dailyPack,
       loading,
       error,

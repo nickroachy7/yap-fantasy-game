@@ -36,13 +36,12 @@
  * the weeks a player is most likely to be looking at it.
  *
  * NOTHING IS RECOMPUTED HERE. The rank, the field size, the prize and the
- * hearts are the server's, frozen at settlement; see `contest_history`.
+ * the prize is the server's, frozen at settlement; see `contest_history`.
  */
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BackRow, weekLabel } from '@/components/contests/ContestRecapPanel';
 import { Coin } from '@/components/shell/AppHeader';
-import { Heart } from '@/components/runs/Hearts';
 import { useContestHistory, type HistoryEntry } from '@/components/contests/use-contest-history';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
@@ -80,7 +79,7 @@ export function ContestHistoryPanel({
 }: ReturnType<typeof useContestHistory> & {
   onBack: () => void;
   /* THE ROW HANDS THE WHOLE ENTRY UP, not a code to look up again. Everything
-     the recap needs — result, score, place, prize, hearts — is already on it,
+     the recap needs — result, score, place, prize — is already on it,
      frozen at settlement, and the contest it names is very likely too old for
      `contest_lobby` to answer about. See `ContestRecapPanel`. */
   onOpen: (entry: HistoryEntry) => void;
@@ -211,25 +210,17 @@ function HistoryRow({ entry, onPress }: { entry: HistoryEntry; onPress: () => vo
             {[week, place].filter(Boolean).join(' · ')}
           </Text>
         </View>
-        {/* WHAT IT PAID AND WHAT IT COST, on their own line and only when there
-            is one. A contest that staked no heart and paid no coins — which is
-            the free one, every week — should not draw two empty slots to say
-            so. */}
-        {entry.prizeCoins || entry.heartsDelta ? (
+        {/* WHAT IT PAID, on its own line and only when it paid something. A
+            contest that paid no coins — which is the free one, most weeks —
+            should not draw an empty slot to say so. This carried a heart delta
+            beside the prize until the mechanic was removed. */}
+        {entry.prizeCoins ? (
           <View style={styles.meta}>
             {entry.prizeCoins ? (
               <View style={styles.pair}>
                 <Coin size={10} color={gold} />
                 <Text style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
                   {`+${entry.prizeCoins}`}
-                </Text>
-              </View>
-            ) : null}
-            {entry.heartsDelta ? (
-              <View style={styles.pair}>
-                <Heart size={11} state={entry.heartsDelta > 0 ? 'free' : 'killed'} />
-                <Text style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
-                  {entry.heartsDelta > 0 ? `+${entry.heartsDelta}` : `${entry.heartsDelta}`}
                 </Text>
               </View>
             ) : null}

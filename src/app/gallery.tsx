@@ -146,27 +146,6 @@ const FIXTURE_PLAYER: PlayerState = {
     isNear: false,
     remaining: 16,
   },
-  /* Two hearts held against a rack of three, one of the two already riding on
-     this week's slate, and one win off the next carry rung. Picked to exercise
-     ALL THREE heart states at once — safe, wagered and broken — because a full
-     rack with nothing wagered draws the same as a fresh account and would show
-     only one of them. */
-  run: {
-    id: "fixture-run",
-    hearts: 2,
-    maxHearts: 5,
-    rack: 3,
-    wagered: 1,
-    wageredIn: 1,
-    wins: 2,
-    losses: 1,
-    endedAt: null,
-    awaitingCarry: false,
-    carrySlots: 0,
-    nextRung: { atWins: 3, cardSlots: 1 },
-    heldCards: 14,
-    lostCards: 0,
-  },
   /* A free pack waiting, so the strip's news dot is visible for design work.
      See `dailyPack` on `PlayerState`. */
   dailyPack: true,
@@ -1268,8 +1247,6 @@ const CONTEST_FIXTURES: MyContest[] = [
       ahead: 7,
       result: null,
     },
-    heartsAtRisk: 1,
-    heartsOnWin: 0,
     winCondition: "median",
     winRank: null,
     winPct: null,
@@ -1313,8 +1290,6 @@ const CONTEST_FIXTURES: MyContest[] = [
       ahead: 2,
       result: null,
     },
-    heartsAtRisk: 1,
-    heartsOnWin: 1,
     winCondition: "top_n",
     winRank: 3,
     winPct: null,
@@ -1375,8 +1350,6 @@ const CONTEST_FIXTURES: MyContest[] = [
       ahead: 0,
       result: null,
     },
-    heartsAtRisk: 0,
-    heartsOnWin: 1,
     winCondition: "target",
     winRank: null,
     winPct: null,
@@ -1420,10 +1393,6 @@ function LineupFixture() {
           lockAt={null}
           locked={false}
           now={Date.parse("2026-08-25T12:00:00Z")}
-          /* The fixture run, so the rack under the card draws all three heart
-             states and the focused pip can be seen moving as you swipe — see
-             `Foot` in the carousel. */
-          run={FIXTURE_PLAYER.run}
           onEnter={() => {}}
           width={carouselWidth}
         />

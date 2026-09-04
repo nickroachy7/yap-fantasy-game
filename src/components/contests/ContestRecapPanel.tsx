@@ -25,7 +25,7 @@
  * ---------------------------------------------------------------------------
  *
  * The row you tapped, which already carries the result, the score, the place,
- * the prize and the hearts — all frozen at settlement by `contest_history`, so
+ * and the prize — both frozen at settlement by `contest_history`, so
  * nothing here re-derives a figure. Plus two reads that work on any contest at
  * any age, because neither joins a slate:
  *
@@ -45,7 +45,6 @@ import { ResultMark } from '@/components/contests/ContestHistoryPanel';
 import type { HistoryEntry } from '@/components/contests/use-contest-history';
 import { useContestField, useContestLineup } from '@/components/contests/use-contest-field';
 import { Coin } from '@/components/shell/AppHeader';
-import { Heart } from '@/components/runs/Hearts';
 import { useAuth } from '@/context/AuthContext';
 import { Colors, NUMERIC, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -92,21 +91,13 @@ export function ContestRecapPanel({
           <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
             {[weekLabel(entry.seasonType, entry.week), place].filter(Boolean).join(' · ')}
           </Text>
-          {entry.prizeCoins || entry.heartsDelta ? (
+          {entry.prizeCoins ? (
             <View style={styles.tallies}>
               {entry.prizeCoins ? (
                 <View style={styles.pair}>
                   <Coin size={10} color={gold} />
                   <Text style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
                     {`+${entry.prizeCoins}`}
-                  </Text>
-                </View>
-              ) : null}
-              {entry.heartsDelta ? (
-                <View style={styles.pair}>
-                  <Heart size={11} state={entry.heartsDelta > 0 ? 'free' : 'killed'} />
-                  <Text style={[Type.fine, NUMERIC, { color: c.textSecondary }]}>
-                    {entry.heartsDelta > 0 ? `+${entry.heartsDelta}` : `${entry.heartsDelta}`}
                   </Text>
                 </View>
               ) : null}

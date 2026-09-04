@@ -486,7 +486,7 @@ export default function InventoryScreen() {
 
                 NEITHER `+` TAKES THE ACCENT. On the rail the contests mark is
                 gold because it is the one control on the screen that spends a
-                heart, and gold appears exactly once there. Nothing on this row
+                lobby door, and gold appears exactly once there. Nothing on this row
                 spends anything — both doors merely open a room — so both marks
                 are quiet, and the loudest object on the row stays the coin in
                 the value readout, which is the fact it is about. */}

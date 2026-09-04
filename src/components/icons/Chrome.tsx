@@ -11,7 +11,7 @@
  * traced ones and "two icon languages in one set is worse than either alone."
  *
  * These two are not in that set, and the boundary is nameable rather than
- * convenient: `glyphs.ts` draws the GAME — coins, packs, tiers, hearts, runs.
+ * convenient: `glyphs.ts` draws the GAME — coins, packs, tiers, runs.
  * Every mark in it depicts a thing the player owns or wins, and every one is
  * illustrative enough that tracing is the only way to get it right.
  *
@@ -90,7 +90,7 @@ export function BackChevron({ size = 20, color, accessibilityLabel }: ChromeProp
  * straight flanks from the root radius out to a flat crest — which is the same
  * construction as the chamfers and shoulders everywhere else in this house.
  * A gear of round-ended lugs would be the one soft mark in a faceted set, and
- * `Hearts` already documents the cost of that: the valentine had to be cut
+ * The retired heart set documented the cost of that: the valentine had to be cut
  * into facets to sit beside `Coin` at all.
  *
  * The hole is a second subpath under `evenodd` rather than a lighter disc

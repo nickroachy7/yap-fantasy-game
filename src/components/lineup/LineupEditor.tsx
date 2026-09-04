@@ -395,7 +395,7 @@ export function LineupEditor({
     reload,
     reloadLineup,
   } = useLineupData(contestCode, contestHint);
-  const { run, roster } = usePlayer();
+  const { roster } = usePlayer();
 
   /**
    * Edits are an overlay on the saved lineup rather than a copy of it. Copying
@@ -1420,7 +1420,6 @@ export function LineupEditor({
         lockAt={nextLockAt ?? lockAt}
         locked={allLocked}
         now={now}
-        run={run}
         /* The contests screen, over this board. It is a sheet rather than a page
            now, so this pushes and closing puts the reader back on the lineup
            they were filling — see `CONTESTS` in `sections.ts`.

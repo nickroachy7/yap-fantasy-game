@@ -69,7 +69,7 @@ export const Colors = {
      *
      * IT IS NOT GOLD, AND THAT IS THE WHOLE REASON IT EXISTS. `selectionAccent`
      * already means two things within a hundred points of the contest card —
-     * "this is the one you are looking at" on a focused heart, and "press me"
+     * "this is the one you are looking at" on a focused mark, and "press me"
      * on the Contests button directly under the carousel. A gold LIVE would be
      * a third meaning for one hue on one screen, and the eye cannot rank three.
      *

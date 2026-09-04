@@ -16,7 +16,7 @@
  * news is the wrong trade.
  *
  * AND THE RESULT IS NOT URGENT. Nothing about it needs answering — the week is
- * over, the hearts have already moved, the coins are already in the wallet. A
+ * over, the results are already recorded, the coins are already in the wallet. A
  * modal is for a question, and this is an announcement.
  *
  * So it sits at the top of the board, above the carousel, in the reading order

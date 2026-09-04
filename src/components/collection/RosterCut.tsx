@@ -27,7 +27,7 @@
  * DRAWN IN SVG RATHER THAN AS A DASHED BORDER. React Native honours
  * `borderStyle: 'dashed'` only when every edge carries the same width, so a
  * top-only dashed rule is a solid rule on Android and a coin toss elsewhere.
- * `react-native-svg` is already a dependency — the wordmark and the heart rack
+ * `react-native-svg` is already a dependency — the wordmark and the glyph set
  * are both drawn with it — and a `Line` with a dash array is exact on every
  * platform, at the dash length we asked for.
  */

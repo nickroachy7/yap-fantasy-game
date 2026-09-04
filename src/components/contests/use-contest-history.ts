@@ -48,11 +48,6 @@ export type HistoryEntry = {
    * one a row of icons is most likely to flatten.
    */
   result: 'W' | 'L' | 'T' | null;
-  /**
-   * What this contest did to the run's hearts, frozen at settlement. Null for
-   * every contest that staked none — which includes the free one, every week.
-   */
-  heartsDelta: number | null;
   prizeCoins: number | null;
   /** When the week was swept. The rail's 24-hour window is measured off this. */
   finalizedAt: string;
@@ -70,7 +65,6 @@ type HistoryRow = {
   rnk: number | string | null;
   entrants: number | string | null;
   result: string | null;
-  hearts_delta: number | string | null;
   prize_coins: number | string | null;
   finalized_at: string;
 };
@@ -97,7 +91,6 @@ function toEntry(r: HistoryRow): HistoryEntry {
     rank: num(r.rnk),
     entrants: num(r.entrants),
     result: asResult(r.result),
-    heartsDelta: num(r.hearts_delta),
     prizeCoins: num(r.prize_coins),
     finalizedAt: r.finalized_at,
   };

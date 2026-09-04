@@ -8,7 +8,7 @@
  *
  * BOTH RPCS ARE SECURITY DEFINER OVER RLS-HIDDEN ROWS, so what they return is
  * deliberate rather than incidental: a name, a score, a place, a result, a
- * prize, a lineup. Nothing about anybody's collection, wallet, run or hearts.
+ * prize, a lineup. Nothing about anybody's collection, wallet or run.
  * See `20260826030000` and `20260830010000`.
  *
  * THE LINEUP IS A SEPARATE CALL because it belongs to a separate SCREEN. Every
