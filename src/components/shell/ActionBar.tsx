@@ -214,10 +214,36 @@ export function ActionBar({ actions, wide }: { actions: Action[]; wide: boolean 
  * hand-rolled circles meaning the same thing is exactly the drift this file's
  * header warns about.
  */
+/**
+ * The errand beside the tray: a round button, in the tray's own material.
+ *
+ * ---------------------------------------------------------------------------
+ * IT WAS FILLED IN THE ACCENT AND THAT WAS THE WRONG WEIGHT
+ * ---------------------------------------------------------------------------
+ *
+ * A saturated circle with a solid glyph made this the loudest object in the
+ * chrome — brighter than the tab you are actually on, permanent on every page
+ * of the section, and sitting one gap from a tray of deliberately quiet cells.
+ *
+ * It also contradicted a rule this app applies everywhere else and had already
+ * argued out twice, on the lineup rail and on the collection toolbar: a control
+ * that merely OPENS A ROOM stays quiet, and the accent is spent on the one mark
+ * whose job is to say an act costs something. Packs opens a room. What you
+ * spend is decided inside it.
+ *
+ * So it takes `surface` and the hairline, which is exactly what the tray beside
+ * it is made of — the two read as one control with two parts rather than as a
+ * button shouting next to a menu. The glyph is HOLLOW and in the secondary ink,
+ * matching an inactive tray cell, for the same reason: this is never the thing
+ * you are on.
+ *
+ * WHAT STILL SEPARATES IT is the shape, and the shape alone is enough. A circle
+ * among rectangles is a different KIND of object, which is the whole distinction
+ * `detached` exists to draw — the tray holds places, this is an errand.
+ */
 export function DetachedAction({ action }: { action: Action }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const accent = selectionAccent(scheme);
 
   return (
     <Pressable
@@ -226,12 +252,13 @@ export function DetachedAction({ action }: { action: Action }) {
       accessibilityLabel={action.label}
       style={({ pressed }) => [
         styles.detached,
-        { backgroundColor: accent },
+        { backgroundColor: c.surface, borderColor: c.border },
         pressed ? styles.pressed : null,
       ]}>
-      {/* `focused` so the glyph is the SOLID variant: it sits on the accent,
-          where a 1.6pt outline in the same dark ink reads as a smudge. */}
-      <ActionIcon name={action.icon} color={c.background} focused size={20} />
+      {/* `focused={false}` is the HOLLOW variant, which is the same glyph an
+          inactive tray cell draws — the solid one was for sitting on the accent
+          fill this no longer has. */}
+      <ActionIcon name={action.icon} color={c.textSecondary} focused={false} size={20} />
     </Pressable>
   );
 }
@@ -823,6 +850,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    /* The tray's hairline, on the tray's fill — see `DetachedAction`. The
+       border is what keeps the circle legible now that it is no longer a bright
+       disc: `surface` against the page is a small step, and without an edge the
+       button reads as a slightly lighter smudge rather than an object. */
+    borderWidth: StyleSheet.hairlineWidth,
   },
   box: { alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.65 },

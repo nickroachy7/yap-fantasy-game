@@ -379,6 +379,16 @@ export const FANTASY_SECTIONS: NavSection[] = [
     children: [
       { href: "/fantasy/compete", label: "Lineups", icon: "lineup" },
       CONTESTS,
+      /* THE SAME ERRAND, ON THE OTHER BOARD. Packs is declared `detached` (see
+         its own note under Collect) so it draws as the round button after the
+         tray rather than as a third place.
+         It belongs on both strips for the reason it belongs anywhere: the shop
+         is where a thin roster gets thicker, and the screen you are on when you
+         discover the roster is thin is at least as often the lineup you are
+         trying to fill as the inventory you are sorting. A door that only
+         exists on one of the two boards is a door you have to remember the
+         location of. */
+      PACKS,
     ],
     /* NO CHILDREN, and it is the only board with none. Its second view became a
        sheet reached from the carousel — see `CONTESTS` — which leaves one page
