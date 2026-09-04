@@ -61,9 +61,25 @@
  * box — and a little more air against the coin than the coin takes against the
  * gear, so the two read as two objects rather than as a set. See `life`.
  *
- * HEARTS READ FIRST, then coins. Same rule the rail's doors follow — order by
- * stake. A heart is the scarce thing with a death behind it and a coin is
- * merely money, so the row states the risk before it states the balance.
+ * THEY ARE STACKED, AND COINS SIT ON TOP.
+ *
+ * Side by side, the order was hearts then coins — the rail's rule, order by
+ * stake, the risk stated before the balance. That rule was about READING
+ * ORDER in a row, and a column does not have one to spend: both balances are
+ * inside a glance of each other, so nothing is "stated first" in the way a row
+ * states it. What a column has instead is a top line, which is the one the eye
+ * lands on when it is not looking for either.
+ *
+ * That is the coin. Not because money outranks a life — it does not — but
+ * because of how often each changes. The balance moves on every pack, sale,
+ * entry and payout; the heart figure moves once a week at settlement, if at
+ * all. The top of the stack is where a changing number belongs, and parking
+ * the static one there would put the quiet figure in the loud position.
+ *
+ * The stack is right-aligned rather than centred, and the shapes stay
+ * different, for the reason the whole note above exists: stacking is exactly
+ * where a reader starts to expect a matched pair, so the asymmetry has to keep
+ * working harder, not less.
  *
  * ---------------------------------------------------------------------------
  * THE HEART UP HERE IS ALWAYS WHOLE
@@ -553,33 +569,51 @@ export function AppHeader({
               its `free` state at every count because this is what you HOLD;
               a staked heart is still yours, and which of them are staked is a
               question the rail answers. */}
-          {showHearts ? (
-            <View
-              accessible
-              accessibilityRole="text"
-              accessibilityLabel={
-                loading || !run
-                  ? "Hearts"
-                  : held === 1
-                    ? "1 heart"
-                    : `${held} hearts`
-              }
-              style={styles.life}
-            >
-              <Heart size={12} state="free" />
-              <Text style={[styles.figure, NUMERIC, { color: c.text }]}>
-                {loading || !run ? "—" : String(held)}
-              </Text>
-            </View>
-          ) : null}
-          {showCoins ? (
-            <Pill
-              mark={<Coin size={12} color={accent} />}
-              value={loading ? "—" : coins.toLocaleString()}
-              color={c.text}
-              surface={c.surface}
-            />
-          ) : null}
+          {/* STACKED, NOT SIDE BY SIDE. The two balances sit one above the
+              other and share a right edge against the gear. What that buys is
+              horizontal: laid out in a row they cost the masthead the heart,
+              a 7pt joint and the coin — and the note on `row` is a record of
+              how little there was to spend. Stacked, they cost the width of
+              the WIDER one, which hands the wordmark back roughly the whole
+              heart. The row's own tightness is unchanged; there is simply less
+              in it.
+
+              The shapes do NOT converge. A bare mark over a pill is the same
+              argument `life` makes at length — a coin is a balance, a heart is
+              a life total — and stacking is exactly where a reader would start
+              to expect a matched pair, so the asymmetry has to keep working
+              harder, not less. Right-aligned rather than centred for the same
+              reason: a shared right edge is alignment, a shared centre line
+              would be pairing. */}
+          <View style={styles.balances}>
+            {showCoins ? (
+              <Pill
+                mark={<Coin size={12} color={accent} />}
+                value={loading ? "—" : coins.toLocaleString()}
+                color={c.text}
+                surface={c.surface}
+              />
+            ) : null}
+            {showHearts ? (
+              <View
+                accessible
+                accessibilityRole="text"
+                accessibilityLabel={
+                  loading || !run
+                    ? "Hearts"
+                    : held === 1
+                      ? "1 heart"
+                      : `${held} hearts`
+                }
+                style={styles.life}
+              >
+                <Heart size={12} state="free" />
+                <Text style={[styles.figure, NUMERIC, { color: c.text }]}>
+                  {loading || !run ? "—" : String(held)}
+                </Text>
+              </View>
+            ) : null}
+          </View>
           <Link href={settingsHref as never} asChild>
             <Pressable
               accessibilityRole="button"
@@ -720,7 +754,30 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    marginRight: 5,
+    /* The 5pt that used to hold the heart off the coin horizontally is gone —
+       stacked, that joint is `balances.gap`.
+
+       THIS 8 IS THE PILL'S OWN `paddingHorizontal`, PAID BY A THING WITH NO
+       PILL. Right-aligning the two boxes is not the alignment that matters:
+       the pill insets its figure by 8 and a bare mark does not, so matching
+       box edges puts the heart's digit 8pt to the right of the coin's, and a
+       stack of two numbers is read DOWN — the figures are what the eye lines
+       up, not the containers around them. Borrowing the pill's padding as
+       empty space is what makes the two digits share an edge while the fill
+       still stops where it should. */
+    paddingRight: 8,
+    flexShrink: 0,
+  },
+  /* The stack. Right-aligned so both balances share the edge the gear sits
+     against; see the note at the call site for why they are not centred and
+     why the two keep different shapes. `paddingRight` replaces the 5pt `life`
+     used to carry, holding the whole stack off the gear rather than one of
+     its rows. */
+  balances: {
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: 4,
+    paddingRight: 5,
     flexShrink: 0,
   },
   /* Mirrors `lead` exactly, and must keep doing so. See `TRAIL`. */
