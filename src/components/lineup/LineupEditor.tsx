@@ -56,6 +56,7 @@ import { BenchBoard } from '@/components/lineup/BenchBoard';
 import { RowSkeleton } from '@/components/lineup/LineupRow';
 import { ContestCarousel } from '@/components/lineup/ContestCarousel';
 import { WelcomeBackBanner } from '@/components/contests/WelcomeBackBanner';
+import { SectionHead } from '@/components/ui/SectionHead';
 import { useAuth } from '@/context/AuthContext';
 import { useContestHistory } from '@/components/contests/use-contest-history';
 import {
@@ -1495,8 +1496,10 @@ export function LineupEditor({
           {/* Headings rather than tabs. Both boards are always on the page, so
               what these have to do is name them and say how full each is. */}
           <SectionHead
+            tight
             label="Starting lineup"
             hint={`${filled}/${slots.length} filled`}
+            hintLabel={`${filled} of ${slots.length} slots filled`}
             tone={filled < slots.length ? c.warning : c.textTertiary}
           />
           <View style={styles.bleed}>
@@ -1518,6 +1521,7 @@ export function LineupEditor({
           {showBench ? (
             <>
               <SectionHead
+                tight
                 label="Bench"
                 hint={`${bench.length} card${bench.length === 1 ? '' : 's'}`}
                 tone={c.textTertiary}
@@ -1721,18 +1725,6 @@ function useSettledResults(pinned: boolean) {
   return { unseen, acknowledge };
 }
 
-/** A board's name and its count, on one baseline. */
-function SectionHead({ label, hint, tone }: { label: string; hint: string; tone: string }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-  return (
-    <View style={styles.sectionHead}>
-      <Text style={[Type.section, { color: c.text }]}>{label}</Text>
-      <Text style={[Type.micro, { color: tone }]}>{hint.toUpperCase()}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   enter: { paddingVertical: Spacing.two, borderRadius: 12, alignItems: 'center' },
   enterLabel: { fontWeight: '700' },
@@ -1742,16 +1734,6 @@ const styles = StyleSheet.create({
      content; this gives that padding back, and the rows supply their own
      gutter — which is why LineupRow's is 16 and not the directory's 14. */
   bleed: { marginHorizontal: -Spacing.three },
-  /* Negative top margin against `Screen`'s 14pt content gap: a heading belongs
-     to the board under it, and an even 14 above and below made it float
-     between the two. */
-  sectionHead: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: Spacing.two,
-    marginBottom: -Spacing.one - 2,
-  },
   /* A line, not a button: it reports, it does not ask. Fixed height so the
      page does not jump as it moves between saving, saved and locked. */
   status: {

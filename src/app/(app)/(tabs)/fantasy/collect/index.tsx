@@ -66,8 +66,8 @@ import {
 
 import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { CollectionValue } from '@/components/collection/CollectionValue';
+import { SectionHead } from '@/components/ui/SectionHead';
 import { RosterAlert } from '@/components/collection/RosterAlert';
-import { RosterCount } from '@/components/collection/RosterCount';
 import { BulkBar } from '@/components/collection/BulkBar';
 import { SELECTION_MAX, sellTotal } from '@/components/collection/bulk';
 import { RosterCut } from '@/components/collection/RosterCut';
@@ -447,59 +447,48 @@ export default function InventoryScreen() {
           </ScrollView>
         ) : (
           <>
-            {/* TWO READOUTS, A SWITCH, AND TWO DOORS — in that order, left to
-                right, which is what the row is FOR read as a sentence: this is
-                what you have, this is what you can do to it, and these are the
-                places you go from here.
+            {/* TWO LINES, NOT ONE ROW: the value, then the board's own head.
 
-                THE READOUTS PAIR UP ON THE LEFT. Value and the cap used to sit
-                at opposite ends with the controls between them, which was the
-                right arrangement while the controls were the row's subject.
-                They are two facts about one collection — what it is worth, how
-                full it is — and they belong together at the head of the row
-                where they can be read in one glance.
+                IT WAS A SINGLE ROW — value, cap, a spacer, and two doors —
+                arranged as a sentence read left to right: what you have, what
+                you can do to it, where you go from here. The doors have since
+                gone to the strip (see the note below), and with them went the
+                reason the row was a row. What was left was two unrelated facts
+                sharing a line because they used to have company on it.
 
-                THE FILTERS ARE GONE. Position, tier, the decision chips and the
-                sort were `InventoryControls`, and they existed because a grid
-                of thirty squares could not be read: a filter was how you found
-                a card. The rows say everything the squares could not, so the
-                controls were narrowing something that no longer needs
-                narrowing. See `visible`.
+                THEY ARE NOT THE SAME KIND OF FACT. Value is about the
+                collection as a portfolio — one number, gold, the only thing on
+                the page denominated in coins. The cap is about the LIST
+                UNDERNEATH: how many rows there are and how many there may be.
+                Reading them off one line asked the eye to switch subject
+                mid-sentence.
 
-                THE DOOR IS THE LINEUP RAIL'S OLD OBJECT, and there is one of
-                it. This row and the carousel's rail were deliberately the same
-                shape — a readout about the thing above, then the places you
-                leave it for — and they still match, because the rail has no
-                doors left either. Both sections put their destinations in the
-                strip and kept only what a strip cannot carry: an errand.
+                SO THE CAP BECAME A HEADING, which is what it always was. `31/30
+                HELD` beside the word "Inventory" is the same object the lineup
+                page opens both of its boards with — `SectionHead`, a name on
+                the left and a count on the right — and that is the point rather
+                than a resemblance: Compete and Collect are the two halves of one
+                loop, and a reader who has learned the shape on one tab should
+                find it meaning the same thing on the other.
 
-                THE ORDER ARGUMENT IS RETIRED WITH THE PAIR. It used to read
-                Sets before Packs, by what the act costs — Sets is where cards
-                GO and it costs you a card; a shop is what you visit once you
-                know what you need. With one chip there is nothing to order, and
-                the ranking that matters now is between the chip and the tab
-                above it, which the strip settles by being permanent.
+                THE TONE IS WHERE THE CAP SPEAKS. `textTertiary` under the
+                limit, `warning` over it — exactly as the lineup's head turns
+                when a slot is empty. The red banner still says what to DO about
+                it; the head only has to say that something is off, which is all
+                a count can say without becoming a sentence.
 
-                THE `+` STAYS QUIET. It was quiet because nothing on this row
-                spends anything, and that is still true — Packs opens a room,
-                and what you spend is decided inside it. The loudest object on
-                the row remains the coin in the value readout, which is the fact
-                the row is about. */}
+                THE VALUE KEEPS ITS OWN LINE and its own gold, and is now the
+                only thing on it. */}
             <View style={styles.toolbar}>
               <CollectionValue sellValue={stats.sellValue} />
-              {/* See `RosterCount` for why the margin beside it is
-                  load-bearing. */}
-              <RosterCount roster={roster} />
-              <View style={styles.spacer} />
-              {/* NO DOORS LEFT ON THIS ROW. Sets went to the strip as a tab and
-                  Packs has followed it there as the round button on its right,
-                  which is `ActionBar`'s shape for an errand — see `PACKS` in
-                  `sections.ts`.
-                  What that leaves is a toolbar that is purely a READOUT about
-                  the cards underneath it: what they are worth, and how many of
-                  the cap they fill. That is what this row was always best at;
-                  the doors were here because there was no bar to hang them on,
-                  and now there is. */}
+              {roster ? (
+                <SectionHead
+                  label="Inventory"
+                  hint={`${roster.held}/${roster.cap} held`}
+                  hintLabel={`${roster.held} of ${roster.cap} cards held`}
+                  tone={roster.isOver ? c.warning : c.textTertiary}
+                />
+              ) : null}
             </View>
 
             <FlatList
@@ -634,16 +623,16 @@ const styles = StyleSheet.create({
   /* `Spacing.one + 2` below rather than `Spacing.two`: with every control at
      `ControlDiameter` the strip is 32pt tall, and 8pt under a 32pt strip made
      the band read as taller than the thing in it. */
+  /* A COLUMN NOW, not a row — see the note at the render. The gap is the joint
+     between the value line and the board's head; the two used to be separated
+     by a `spacer` that pushed them to opposite ends of one line. */
   toolbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: Spacing.one + 2,
     paddingHorizontal: GUTTER,
     paddingBottom: Spacing.one + 2,
   },
   /* The give in the row, and the ONLY give: everything else is a fixed readout
      or a chip that must not shrink. */
-  spacer: { flex: 1, minWidth: 0 },
   /* The two doors, as one cluster rather than two buttons that happen to be
      near each other — the same gap the lineup rail sets between its own pair,
      which is the chip's internal one. */

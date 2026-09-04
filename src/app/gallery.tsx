@@ -30,8 +30,8 @@ import {
 
 import { InventoryRow } from "@/components/collection/InventoryRow";
 import { CollectionValue } from "@/components/collection/CollectionValue";
+import { SectionHead } from "@/components/ui/SectionHead";
 import { RosterAlert } from "@/components/collection/RosterAlert";
-import { RosterCount } from "@/components/collection/RosterCount";
 import { summarise } from "@/components/collection/types";
 import {
   CARD_PROFILE_NEVER_STARTED,
@@ -671,23 +671,23 @@ function InventoryFixture() {
           mode left to enter. What is left is two readouts and the two doors. */}
       <View style={styles.inventoryControls}>
         <View style={styles.inventoryRow}>
-          <CollectionValue sellValue={stats.sellValue} />
-          <RosterCount
-            roster={{
-              held: 31,
-              cap: 30,
-              warnAt: 24,
-              overBy: 2,
-              isOver: true,
-              isNear: true,
-              remaining: 0,
-            }}
-          />
-          <View style={styles.inventorySpacer} />
-          {/* NO DOORS. Both went to the Collect strip — Sets as a tab, Packs as
+          {/* TWO LINES, matching the board: the value on its own, then the
+              list's head. Shown OVER the cap, because that is the state with
+              something to look at — the hint turns `warning` and the band below
+              says what to do about it. Under the cap the hint is
+              `textTertiary` and this reads as an ordinary heading.
+
+              NO DOORS. Both went to the Collect strip — Sets as a tab, Packs as
               the round button beside it — so the real toolbar is a readout and
               nothing else. The fixture follows: a gallery drawing controls the
               app no longer has is a reference that teaches the wrong screen. */}
+          <CollectionValue sellValue={stats.sellValue} />
+          <SectionHead
+            label="Inventory"
+            hint="31/30 held"
+            hintLabel="31 of 30 cards held"
+            tone={Colors.dark.warning}
+          />
         </View>
         {/* The one state that draws a band. Under the cap it is null, and it is
             layout-neutral, so the gutter comes from here. */}
@@ -704,20 +704,17 @@ function InventoryFixture() {
             }}
           />
         </View>
+        {/* The ordinary state, under the cap: same two lines, and the hint is
+            just a count. This pair is the whole reason the head carries a tone
+            rather than a word — nothing else about the block changes. */}
         <View style={styles.inventoryRow}>
           <CollectionValue sellValue={232} />
-          <RosterCount
-            roster={{
-              held: 14,
-              cap: 30,
-              warnAt: 24,
-              overBy: 0,
-              isOver: false,
-              isNear: false,
-              remaining: 16,
-            }}
+          <SectionHead
+            label="Inventory"
+            hint="14/30 held"
+            hintLabel="14 of 30 cards held"
+            tone={Colors.dark.textTertiary}
           />
-          <View style={styles.inventorySpacer} />
         </View>
         {/* Full-bleed, like the list they are in — each row carries its own
             gutter and draws its own inset rule. */}
@@ -1763,14 +1760,13 @@ const styles = StyleSheet.create({
   boardControls: { marginHorizontal: -Spacing.three },
   /* Same escape for the inventory's row, which carries its own gutter. */
   inventoryControls: { marginHorizontal: -Spacing.three },
+  /* A column, mirroring the board's own `toolbar` — the value line, then the
+     list's head. It was a row while the two readouts shared one line. */
   inventoryRow: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: Spacing.one + 2,
     paddingHorizontal: Spacing.three,
     paddingBottom: Spacing.one + 2,
   },
-  inventorySpacer: { flex: 1, minWidth: 0 },
   /* The doors, as one cluster — the product's own gap. */
   rows: { gap: 1 },
   row: {
