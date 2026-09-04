@@ -955,6 +955,7 @@ const settled = (
   rank: result === 'W' ? 2 : 14,
   entrants: result === null ? 1 : 26,
   result,
+  heartsDelta: result === 'W' ? 1 : result === 'L' ? -1 : 0,
   prizeCoins: result === 'W' ? 120 : null,
   finalizedAt: '2026-08-31T10:00:00.000Z',
 });

@@ -294,7 +294,7 @@ export default function PacksScreen() {
             <Text style={[Type.page, { color: c.text }]}>Packs</Text>
             <View style={styles.spacer} />
             {/* The masthead's own pill, at the masthead's own size — the same
-                one the lobby draws its own figures in. */}
+                one the lobby draws its heart count in. */}
             <View style={[styles.pill, { backgroundColor: c.background }]}>
               <Coin size={12} color={gold} />
               <Text style={[Type.strong, NUMERIC, { color: c.text }]}>

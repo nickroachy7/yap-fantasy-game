@@ -35,25 +35,107 @@
  * a home already, as a tab inside Profile.
  *
  * ---------------------------------------------------------------------------
- * ONE PILL, AND IT USED TO BE TWO OBJECTS
+ * ONE PILL AND ONE BARE MARK, WHICH IS NOT THE SAME AS TWO PILLS
  * ---------------------------------------------------------------------------
  *
- * The trailing group carried a heart count beside the coin balance, and the
- * shape of that pair was argued over at some length: a divided capsule, then
- * two matching pills, then a bare mark for the heart against a pill for the
- * coin. The reasoning was that a coin is spent and earned back — two-way, a
- * balance — while a heart was staked and lost and never earned, one-way, a
- * life total, and two same-shaped neighbours behaving oppositely is the one
- * pairing a reader cannot learn.
+ * These were bare figures on the page, then briefly one divided capsule, and
+ * then a pill each. The capsule was arguing that hearts and coins are one fact
+ * — a wallet — and the configuration is what killed that: a league can run
+ * coins without hearts, so the capsule had to grow rules about when its divider
+ * exists and which corners round, and a container whose shape depends on config
+ * is a container the eye cannot learn.
  *
- * Hearts are gone from the game (see the migration
- * `the_run_stops_asking_for_hearts`) and the distinction went with them. What
- * is left is the coin, in the pill it always had.
+ * A pill each has no such state, and that is where this landed first — two
+ * matching pills, hearts then coins. Matching was the bug. The capsule was
+ * wrong to say hearts and coins are ONE fact; a matched pair says something
+ * nearly as wrong, which is that they are two facts of the SAME KIND.
  *
- * The half of that argument worth keeping is about WIDTH, and it is recorded
- * at `WORDMARK_WEB_TIGHT`: the trailing group is what the wordmark competes
- * with for a 375pt masthead, and dropping the heart handed back the room the
- * brand needed. Anything re-added here spends it again.
+ * They are not. A coin is spent and earned back — two-way, a balance. A heart
+ * is staked and lost and never earned — one-way, a life total. The trap that
+ * follows is concrete: the coin figure drops when you spend, the heart figure
+ * does not drop when you stake, and same-shaped neighbours behaving oppositely
+ * is the one pairing a reader cannot learn.
+ *
+ * So the heart gave up the fill. A pill reads as a container of something
+ * countable; a bare mark and figure reads as a state. Same type, same size, no
+ * box — and a little more air against the coin than the coin takes against the
+ * gear, so the two read as two objects rather than as a set. See `life`.
+ *
+ * HEARTS READ FIRST, then coins. Same rule the rail's doors follow — order by
+ * stake. A heart is the scarce thing with a death behind it and a coin is
+ * merely money, so the row states the risk before it states the balance.
+ *
+ * ---------------------------------------------------------------------------
+ * THE HEART UP HERE IS ALWAYS WHOLE
+ * ---------------------------------------------------------------------------
+ *
+ * It never wears the blade and it never breaks, whatever the run is doing. Two
+ * near-misses are worth recording, because both are the obvious thing to reach
+ * for and both are wrong.
+ *
+ * COUNTING DOWN FREE-TO-STAKE, so the figure falls when you enter. That is the
+ * wrong number three times over:
+ *
+ *   IT REPORTS A HEART YOU OWN AS GONE, which is precisely the bug `Hearts` was
+ *   rewritten to fix — three held with two staked reading as "I have one left
+ *   and I have lost two".
+ *
+ *   IT RE-TEACHES A LESSON THAT WAS DELETED. Free falls on entry and returns on
+ *   a win, so the chrome would say winning gives a heart back — the exact claim
+ *   `hearts_on_win` was zeroed to stop making (20260902030000). A price is not
+ *   refunded for good play.
+ *
+ *   IT MAKES DEATH SILENT. Held 3, enter, free 2; lose, held 2 and free stays
+ *   2. The figure would not move at the one moment the run actually descends,
+ *   which is the whole tension of a run.
+ *
+ * PUTTING THE BLADE ON THE MARK when something is riding, which fixes all
+ * three — the count holds still and the state is what changes. It was built,
+ * and it is still the wrong object HERE.
+ *
+ * A heart is RISKED, not submitted. You have not handed anything over by
+ * entering; you have agreed that something could happen to it, and until the
+ * week settles it is as whole as it ever was. So the figure at the top of every
+ * screen is what you HOLD, drawn whole, because that is what it is.
+ *
+ * The blade is not deleted, it is LOCATED. It belongs on the rack, where there
+ * is one pip per contest and a blade names WHICH heart is on the line and what
+ * it is riding on. Up here it could only say "something, somewhere", which is
+ * an alarm without an address — and it would put a knife through the app's
+ * chrome on every screen for the whole of a normal week.
+ *
+ * WHAT FOLLOWS, STATED SO IT IS A CHOICE AND NOT A GAP: this figure does not
+ * move when you enter a contest. Nothing in the masthead does. Entering is
+ * shown where entering happens — the contest sheet draws the full rack beside
+ * the stake, and the rail draws it under the card — and the chrome is left
+ * saying the one thing it can say from every screen at once.
+ *
+ * ---------------------------------------------------------------------------
+ * THE HEART COUNT CAME BACK UP, AND WHAT CAME WITH IT DID NOT
+ * ---------------------------------------------------------------------------
+ *
+ * This figure has now lived here, moved down to `RunRail`, and come back. The
+ * argument that sent it down was that a heart is risked by exactly one object
+ * and that object is on the compete board, so up here it sat on Collection and
+ * Players — screens where a heart cannot move — with nothing linking it to the
+ * contest risking one.
+ *
+ * That premise has weakened. `/contest/[code]` is a sheet presented OVER any
+ * page, and friendly contests mean an invitation can reach a player standing
+ * anywhere; a heart is now stakeable from on top of the collection. A count
+ * that only exists on one board is a count you have to go and look up.
+ *
+ * WHAT STAYED DOWN IS THE PART THAT COULD NOT COME. The rail draws a RACK —
+ * one pip per card on the board, each carrying free, wagered or killed, and
+ * each a link to the contest it rides on. None of that survives at 12pt in a
+ * masthead, and it should not try: a rack of five up here beside a coin
+ * balance is a page indicator wearing hearts.
+ *
+ * So the split is by KIND, not by place. The masthead answers "how many do I
+ * hold" from everywhere, in one glyph and one figure. The rail answers "which
+ * of them are riding, and on what" where the answer can be acted on. Neither
+ * says the other, which is the same division the two had when they were one
+ * glance apart — only now the first half travels.
  *
  * THE COIN STAYS for the reason it always did: it is spent everywhere. Packs,
  * entries and sells all move it, from wherever you happen to be standing.
@@ -139,6 +221,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { YapMark } from "@/components/brand/YapLogo";
 import { BackChevron, Gear } from "@/components/icons/Chrome";
+import { Heart } from "@/components/runs/Hearts";
 import { Colors, Spacing, TierColors } from "@/constants/theme";
 import { usePlayer } from "@/context/PlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -215,17 +298,16 @@ const WORDMARK_MIN_SCALE = 0.8;
  * 393 is the first width where 14 fits outright — the iPhone 14/15/16 and up.
  * Below it every handset is 375 or 390.
  *
- * IT WENT TO 11.5 FOR A DAY, back when a heart PILL sat beside the coin.
+ * IT WENT TO 11.5 FOR A DAY, while the heart was a PILL beside the coin.
  * Measured in the browser at 375 with both pills up and a five-figure balance,
  * the wordmark rendered at 104.0 into 104.0 of box — fitting exactly, with
  * nothing left, so the next coin digit would have truncated the brand to "YAP
  * FANTAS…" with no warning and on the narrow phones only.
  *
- * Un-pilling the heart handed back 11 points, which was more than the
- * tightening was buying, so the brand went back to 12.5; removing the heart
- * altogether handed back the rest. The trailing group is now one pill, and the
- * measurement below is from before even the un-pilling — so it is the
- * PESSIMISTIC one, and the real clearance is wider than it says.
+ * Un-pilling the heart (see `life`) handed back 11 points, which is more than
+ * the tightening was buying, so the brand is back at 12.5. Re-measured at 375
+ * with the same balance: 97.3 of wordmark in 154 of box, about 20 points spare
+ * — roughly a digit and a half of coin.
  *
  * THE WALL IS STILL THERE, further out: seven figures of coin exhausts it, on
  * web by truncating and on native by hitting `WORDMARK_MIN_SCALE`. The fix
@@ -289,16 +371,15 @@ export type HeaderIdentity = {
 };
 
 /**
- * Which currencies this league runs in its header. Coins, unless a league says
+ * Which currencies this league runs in its header. Both, unless a league says
  * otherwise.
  *
- * A ONE-KEY OBJECT RATHER THAN A BOOLEAN, deliberately. It was two keys while
- * hearts existed, and the callers that pass it — `Screen`, `Sidebar`, the
- * league chrome — name the currency they mean rather than passing a bare flag
- * whose subject has to be looked up. A second currency is a key, not a
- * signature change.
+ * HEARTS ARE A COUNT HERE AND A RACK ON THE BOARD, and switching them off up
+ * here does not switch off the rail — a league that hides the masthead figure
+ * still draws its pips where a heart can actually move. See the header on why
+ * the two halves split by kind rather than by place.
  */
-export type HeaderCurrencies = { coins?: boolean };
+export type HeaderCurrencies = { coins?: boolean; hearts?: boolean };
 
 /** One balance: a mark, a figure, and nothing else. See the header on pills. */
 function Pill({
@@ -346,7 +427,7 @@ export function AppHeader({
   const accent = TierColors[scheme].gold.accent;
   const top = useSafeAreaInsets().top;
   const { width } = useWindowDimensions();
-  const { coins, loading } = usePlayer();
+  const { coins, run, loading } = usePlayer();
 
   /* See `WORDMARK_WEB_TIGHT`. Native leaves this at the set size and lets
      `adjustsFontSizeToFit` do the work. */
@@ -356,6 +437,13 @@ export function AppHeader({
       : undefined;
 
   const showCoins = currencies?.coins !== false;
+  const showHearts = currencies?.hearts !== false;
+
+  /* Hearts HELD — not the rack, and not what is riding. `run` is null only
+     before the first `my_run()` lands, which is the same window `loading`
+     covers for coins, so both report the same dash rather than one flashing a
+     zero the player does not have. */
+  const held = Math.max(0, run?.hearts ?? 0);
 
   return (
     <View
@@ -460,6 +548,30 @@ export function AppHeader({
 
         {/* TRAILING — variable width, right edge held by the gear. */}
         <View style={styles.right}>
+          {/* THE RUN'S SIZE, NOT ITS SHAPE. One glyph and one figure — see the
+              header on why the rack stayed on the rail. The heart is drawn in
+              its `free` state at every count because this is what you HOLD;
+              a staked heart is still yours, and which of them are staked is a
+              question the rail answers. */}
+          {showHearts ? (
+            <View
+              accessible
+              accessibilityRole="text"
+              accessibilityLabel={
+                loading || !run
+                  ? "Hearts"
+                  : held === 1
+                    ? "1 heart"
+                    : `${held} hearts`
+              }
+              style={styles.life}
+            >
+              <Heart size={12} state="free" />
+              <Text style={[styles.figure, NUMERIC, { color: c.text }]}>
+                {loading || !run ? "—" : String(held)}
+              </Text>
+            </View>
+          ) : null}
           {showCoins ? (
             <Pill
               mark={<Coin size={12} color={accent} />}
@@ -576,6 +688,41 @@ const styles = StyleSheet.create({
   /* `flexShrink: 0` so a long name truncates rather than squeezing the
      balances — the figures are the reason the right side exists. */
   right: { flexDirection: "row", alignItems: "center", gap: 7, flexShrink: 0 },
+  /**
+   * THE RUN'S SIZE — a bare mark and a figure, with NO PILL under it.
+   *
+   * ---------------------------------------------------------------------------
+   * WHY IT IS NOT THE COIN'S SHAPE
+   * ---------------------------------------------------------------------------
+   *
+   * It was a matching pill for a day, and matching was the bug. A coin and a
+   * heart are different grammar: coins are spent and earned back, two-way, a
+   * BALANCE. Hearts are staked and lost and never earned — one-way, a LIFE
+   * TOTAL. `settle_run_week` is the only writer of `runs.hearts` and its only
+   * non-zero delta is negative (20260902030000).
+   *
+   * Two identical pills side by side assert those are the same kind of thing,
+   * which is the argument the divided capsule was killed for, quietly re-made
+   * in a softer form. And it sets a concrete trap: the coin figure drops when
+   * you spend, the heart figure does NOT drop when you stake. Same shape,
+   * adjacent, opposite behaviour, is the one pairing a reader cannot learn.
+   *
+   * So the fill goes. A pill reads as a container of something countable; a
+   * bare mark reads as a state. The figure keeps the pill's type — it is still
+   * a number in the chrome and should weigh the same — but nothing boxes it.
+   *
+   * THE MARGIN IS THE OTHER HALF. `right` spaces its children at 7, which is
+   * the coin-to-gear joint; this takes 5 more against the coin so the two do
+   * not read as a set. Small, and it is the difference between two objects and
+   * a pair.
+   */
+  life: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginRight: 5,
+    flexShrink: 0,
+  },
   /* Mirrors `lead` exactly, and must keep doing so. See `TRAIL`. */
   trail: { width: TRAIL, flexShrink: 0 },
   /* No border. Two bordered pills side by side on a black page is four

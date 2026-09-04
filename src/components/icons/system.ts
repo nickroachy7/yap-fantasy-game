@@ -19,8 +19,6 @@
  *   TabIcon      24pt box, 1.6 stroke, hollow when inactive and solid when
  *                active, geometry never changes between states
  *   Hearts       faceted rather than round, because the house language is
- *                (retired with the mechanic; the reasoning is kept — it is the
- *                clearest statement of why this set has facets at all)
  *                the rotated square, concentric rings and corner ticks
  *   TierMotif    form differs per tier, so the signal survives greyscale
  *   PositionGlyph shape encodes the group; the corner radius is the cue
@@ -116,8 +114,7 @@ export type StrokeWeight = keyof typeof STROKE;
  * Corner radii. A scale, not a free number.
  *
  * `sharp` is a true corner and is the default: this is a faceted house, and
- * The retired heart set documented at length why the soft valentine was cut
- * into facets to
+ * `Hearts` documents at length why the soft valentine was cut into facets to
  * belong beside `Coin` and `TierMotif`. Rounding is the exception you reach for
  * on a glyph that depicts something genuinely soft.
  */
@@ -416,8 +413,7 @@ export function spoke(
 
 /**
  * Corner ticks — the "this one is picked" motif, lifted from
- * `TierColors.cornerTicks`, and the focus treatment the retired heart rack
- * used.
+ * `TierColors.cornerTicks` and `Hearts`' focus treatment.
  *
  * Returned as four separate subpaths so the caller can stroke them. They sit
  * OUTSIDE the keyline on purpose: they frame a glyph rather than being part of
@@ -491,8 +487,7 @@ export type Glyph = {
   label?: string;
   /**
    * Parts allowed to break the live area, named so the exception is a decision
-   * rather than an oversight. The retired heart glyphs needed it: a hilt and two
- * torn halves
+   * rather than an oversight. `Hearts` needs this: its hilt and its torn halves
    * leave the box by design.
    */
   bleeds?: boolean;

@@ -41,10 +41,10 @@
  * the page is #080808, the card's dominant bands were #212121, and the ring
  * around them was #5E5E5E on a screen whose every other edge is #272727.
  *
- * THE HEADER PILLS SETTLED IT. The coin balance in `AppHeader` is
- * `surface` #171717 with NO border, it sits two inches above this card, and it
- * reads as a distinct floating object without either of the devices this card
- * was spending. It is the app's existing answer to "an object on the
+ * THE HEADER PILLS SETTLED IT. The hearts and coins balances in `AppHeader` are
+ * `surface` #171717 with NO border, they sit two inches above this card, and
+ * they read as distinct floating objects without either of the devices this
+ * card was spending. They are the app's existing answer to "an object on the
  * near-black page", so the card is made of the same thing: `surface`, edge to
  * edge, with the ring down to `borderStrong`.
  *
@@ -188,6 +188,7 @@ import { Icon } from '@/components/icons/Icon';
 import { formatFlex3, formatRoster, formatWr, packStandard } from '@/components/icons/glyphs';
 import type { Glyph } from '@/components/icons/system';
 
+import { Heart } from '@/components/runs/Hearts';
 import { Coin } from '@/components/shell/AppHeader';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -512,10 +513,10 @@ function Head({
  * at the end of a row. Dropping it cost nothing in height: the row was already
  * sized by the contest's name.
  *
- * BLUE IS A FOURTH SEMANTIC HUE AND IT IS DELIBERATE. Gold is taken within a
- * hundred points of this card — `selectionAccent` leads the Contests button
- * under the carousel — and red is taken by losing. See the `live` note in
- * `theme.ts`.
+ * BLUE IS A FOURTH SEMANTIC HUE AND IT IS DELIBERATE. Gold is taken twice
+ * within a hundred points of this card — `selectionAccent` marks the focused
+ * heart and fills the Contests button under the carousel — and red is taken by
+ * losing. See the `live` note in `theme.ts`.
  */
 export function StatusMark({
   lock,
@@ -751,14 +752,14 @@ function Score({
    * Green while you are past the line is honest — you are clearing it right
    * now. Red while you are behind is not the same claim, because being behind
    * at eleven on a Sunday with four players yet to take a snap means nothing at
-   * all, and the app already uses that red for a contest you have LOST. A card
+   * all, and the app already uses that red for a heart you have LOST. A card
    * that looks like a defeat on Sunday morning and then wins is a card that
    * cried wolf. Once it is final, red is simply true.
    */
   /* AND A FORECAST NEVER EARNS THE GREEN. "You are clearing the line" is a
      claim about football that has been played; projected to clear it is not the
-     same sentence, and this is the same colour the app spends on a week you
-     have actually won. The margin above still carries its sign. */
+     same sentence, and this is the same colour the app spends on a heart you
+     have actually kept. The margin above still carries its sign. */
   const fillTint =
     beating && !showForecast ? c.positive : final ? c.negative : c.textSecondary;
 
@@ -961,8 +962,8 @@ function Side({
  * ---------------------------------------------------------------------------
  *
  * The band this replaces was two columns, each reserving two blank rows so the
- * card's height could not move. It reserved them because "Up to 120 coins · 1
- * pack" does not fit in half a card's width — and it fits easily as `◆120 ▣1`
+ * card's height could not move. It reserved them because "Up to 120 coins · ♥ +1
+ * heart" does not fit in half a card's width — and it fits easily as `◆120 ♥+1`
  * alongside a third token, on one line. See `Token` in `contest-model`.
  *
  * BOTH LABELS LEAD THEIR OWN SIDE, so each half reads left to right in the same
@@ -1016,7 +1017,7 @@ function Foot({
  * One half of the trade: a label, then its tokens.
  *
  * THE UNIT WORD IS ELASTIC. A side carrying one token has room to print it —
- * `◆ 40 coins`, `◆ 1.5 a point` — and a side carrying two or three does not, so
+ * `♥ 1 heart`, `◆ 1.5 a point` — and a side carrying two or three does not, so
  * it drops to bare numbers. The free contest is one token a side, and it is
  * both the contest every new player meets first and the one with the most room,
  * so the card teaches its glyphs in words before it asks anybody to read them
@@ -1024,7 +1025,8 @@ function Foot({
  *
  * THE GLYPHS CARRY THE HUE, NOT THE NUMBERS. A green `120` reads as coins you
  * already hold; a green coin beside a white `120` reads as a promise denominated
- * in coins, which is what it is. A fee on the risk side stays `textSecondary` —
+ * in coins, which is what it is. On the risk side the heart is `negative`
+ * because losing one is the actual damage, while a fee is `textSecondary` —
  * full red on a 40-coin entry price reads as an error.
  */
 function TokenRow({
@@ -1083,6 +1085,19 @@ function Mark({ token, side }: { token: Token; side: 'risk' | 'win' }) {
   const c = Colors[scheme];
   const tint = side === 'win' ? c.positive : c.textSecondary;
 
+  if (token.kind === 'heart') {
+    /* A HEART THAT WAS TAKEN IS DRAWN AS TAKEN. `Hearts` already owns the two
+       shapes — whole and torn — that tell those apart on the rack under the
+       carousel. Drawing a lost heart whole here would be the one place in the
+       app where the glyph and the word beside it disagree. */
+    return (
+      <Heart
+        size={11}
+        state={token.killed ? 'killed' : 'free'}
+        color={token.killed ? undefined : side === 'win' ? c.positive : c.negative}
+      />
+    );
+  }
   /* THE COIN, NOT THE GEM. `glyphs.coin` is the old faceted-gem artwork from
      before the currency was renamed, and it survived here because this card
      draws its marks through `Icon` while the rest of the app draws coins with
@@ -1099,8 +1114,9 @@ function Mark({ token, side }: { token: Token; side: 'risk' | 'win' }) {
      itself change colour halfway across one row, so a grey disc and a gold disc
      sat eight characters apart both meaning "coin". A reader has to learn the
      glyph before the hierarchy is worth anything, and two of them teaches it
-     twice. The RANKING SURVIVES ELSEWHERE — the label above says RISK or WIN —
-     so nothing is lost by letting one currency have one colour. */
+     twice. The RANKING SURVIVES ELSEWHERE — the heart is still `negative` on
+     the risk side and `positive` on the win side, and the label above says RISK
+     — so nothing is lost by letting one currency have one colour. */
   if (token.kind === 'coin') {
     return <Coin size={11} color={TierColors[scheme].gold.accent} />;
   }
@@ -1139,8 +1155,8 @@ function Mark({ token, side }: { token: Token; side: 'risk' | 'win' }) {
  * board and vague inside `ContestSheet`. The ring is what makes one fill work
  * on two grounds.
  *
- * It also keeps a fix worth not losing. On the lineup board the rail under the
- * carousel is `surface`, and the card was once `surfaceSheet` — one
+ * It also keeps a fix worth not losing. On the lineup board the hearts tray
+ * under the carousel is `surface`, and the card was once `surfaceSheet` — one
  * step DARKER — so the accessory was brighter than the object it serves. The
  * card and the tray are level now and the card has the outline, which is the
  * right order without making the card louder to get there.

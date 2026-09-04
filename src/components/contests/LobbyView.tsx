@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -19,6 +20,7 @@ import { LobbyHero } from './LobbyHero';
 import { useFriendlyInvites } from './use-friendly-invites';
 import type { ContestInvite } from './friendly';
 import { weekTitleOf } from '@/components/contests/use-my-contests';
+import { StatusChip } from '@/components/ui/StatusChip';
 import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -87,16 +89,16 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  * which is what stops the lobby becoming an arbitrage run with three bad cards.
  * That is why the reward column names the career_fp as well as the coins.
  *
- * WHICH IS THE OTHER THING THIS SCREEN HAS TO SAY. Two contests at the same
- * fee are not the same product — the win condition and the prize split are what
- * separate them — so the terms are drawn on the card itself rather than left to
- * the contest page to disclose after the tap. This mattered more when a stake
- * could also cost a heart and end a run; the disclosure rule outlived the
- * stake that motivated it, and is right on its own.
+ * WHICH IS THE OTHER THING THIS SCREEN HAS TO SAY. Some of these contests can
+ * end your run (`hearts_at_risk`, 20260825130000) and some cannot, and nothing
+ * about a fee or a format tells them apart — both cost the same 40 coins. A
+ * player who enters a run-ending contest without being told it was one has been
+ * ambushed by their own lobby, so the stake is drawn on the card itself rather
+ * than left to the contest page to disclose after the tap.
  *
- * A MARK IS ONLY ON CARDS THAT HAVE ONE. A "0" note on a contest that does not
- * charge would make the free thing look like a lesser version of the paid one,
- * when it is simply a different offer.
+ * THE STAKE MARK IS ONLY ON CARDS THAT HAVE ONE. A "0 hearts" note on the safe
+ * contests would make the safe thing look like a lesser version of the risky
+ * one, when it is simply a different offer.
  */
 /**
  * Which of the sheet's two faces is showing.
@@ -135,6 +137,7 @@ export function LobbyView({
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  const router = useRouter();
   const [view, setView] = useState<View_>(arrivedOn === 'history' ? 'history' : 'open');
   /**
    * WHICH OF THE FOUR SHELVES THE LOBBY IS SHOWING.
@@ -169,7 +172,7 @@ export function LobbyView({
    * is the board's own query, so nothing new is being asked of the server.
    */
   const { contests: mine } = useMyContests();
-  const { coins } = usePlayer();
+  const { coins, run } = usePlayer();
   /* THE TO-DO LIST, which is NOT the same as "friendlies I can see" — an
      invitation you have answered is in the lists above like any other contest.
      See `use-friendly-invites`. */
@@ -233,6 +236,17 @@ export function LobbyView({
      Rows you have already ENTERED stay in Entered — a contest in two lists is
      the "where do I edit this" problem this sheet's header is about. */
   const friendlies = live.filter((c) => c.kind === 'friendly' && c.mine === null);
+
+  /* ONE HEART PER HEART AT STAKE, which is `ContestCarousel`'s own mapping for
+     the rail this header now mirrors: a contest staking two contributes two.
+     Settled entries are excluded — a heart that has already been decided is
+     not riding on anything, whatever it did to the run. */
+  const staked = playing.flatMap((m) =>
+    Array.from({ length: Math.max(0, m.heartsAtRisk) }, () => ({
+      result: null,
+      entered: m.lineupId !== null,
+    })),
+  );
 
   /**
    * THE BAR, WITH THE COUNTS ON IT.
@@ -314,14 +328,21 @@ export function LobbyView({
 
       {/* THE HEADER IS A BLOCK THAT ENDS ON THE TABS, which is the set sheet's
           arrangement and the reason its header reads as one object rather than
-          as a title with loose rows under it.
+          as a title with loose rows under it. Everything inside the band
+          answers "what is my run"; everything below it is contests.
 
-          IT USED TO HAVE A SUBJECT — the run — because nothing under it could
-          be read without one: every stake was priced partly in hearts, and the
-          reader needed to know how many were left in the same glance. Hearts
-          are gone, prices are coins, and the masthead already carries the
-          balance. So the band is a title and a week now, and the page under it
-          is what the sheet is actually for. */}
+          THE RUN IS THE SUBJECT because nothing under it can be read without
+          it: every stake on this sheet is priced in hearts, and a player
+          deciding whether to risk one needs to know how many are left in the
+          same glance. It is also the only full rack left on a phone now that
+          the masthead has stopped drawing one — see `AppHeader`. The carousel
+          shows the hearts a contest you are IN has on the line; this shows the
+          run they come out of, which is the fact you need before entering
+          another.
+
+          A DEAD RUN IS NOT PART OF THE HEADER. It is a call to action with
+          cards hanging on it, and it belongs where the eye lands after the
+          header rather than inside a block about standings — see `RunRail`. */}
       {/* THE HEADER IS A BAND AND THE PAGE IS FOUR NAMED LISTS.
           It was a band that ended on a four-tab bar — Open, Entered, Recent,
           Friendly — and that bar was a real answer to a real problem: the four
@@ -359,8 +380,10 @@ export function LobbyView({
           precisely so neither can happen. A surface rather than a tone: see
           the prop's own note. */}
       <SheetToneBand surface={c.backgroundElement}>
-        <LobbyHero week={week} />
+        <LobbyHero run={run} staked={staked} week={week} />
       </SheetToneBand>
+
+      {run?.awaitingCarry ? <DeadRun run={run} onClaim={() => router.push('/run-over')} /> : null}
 
       {/* THE TWO DOORS THAT ARE NOT CONTESTS, at the top where an action
           belongs rather than at the bottom where a list ends.
@@ -518,6 +541,64 @@ export function LobbyView({
         </>
       )}
     </PlayerSheetFrame>
+  );
+}
+
+/**
+ * A run that has ended and is waiting to be settled.
+ *
+ * ---------------------------------------------------------------------------
+ * IT IS THE ONLY RUN STATE LEFT IN THIS FILE, AND THAT IS THE POINT
+ * ---------------------------------------------------------------------------
+ *
+ * A live run used to be drawn here too — as a status line, then as a filled
+ * panel, then as a one-row rail — and it is the header now (`LobbyHero`). The
+ * two states were never variations of each other and the split makes that
+ * legible rather than merely true.
+ *
+ * A LIVE RUN IS A STANDING. Hearts, a record, a ladder: read every week, asking
+ * for nothing, and therefore something to put in a header where a reader takes
+ * it in on the way past.
+ *
+ * A DEAD RUN IS A QUESTION WITH CARDS HANGING ON IT. Nothing with hearts on it
+ * can be entered until it is answered, and `current_run` will not start a new
+ * run over it — so it is drawn in the negative colour, given a button, and
+ * placed BELOW the header where the eye lands after reading it rather than
+ * inside a block about standings.
+ *
+ * It does not replace the lobby or block it. The free contest is still live and
+ * still needs a lineup — see the note on presentation in `_layout` for why a
+ * death is never allowed to become a lockout.
+ */
+function DeadRun({
+  run,
+  onClaim,
+}: {
+  run: NonNullable<ReturnType<typeof usePlayer>['run']>;
+  onClaim: () => void;
+}) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+
+  return (
+    <Pressable
+      onPress={onClaim}
+      accessibilityRole="button"
+      style={({ pressed }) => [
+        styles.dead,
+        { borderColor: c.negative },
+        pressed && styles.pressed,
+      ]}>
+      <View style={styles.rowText}>
+        <Text style={[Type.strong, { color: c.text }]}>Your run ended</Text>
+        <Text style={[Type.fine, { color: c.textSecondary }]}>
+          {run.carrySlots > 0
+            ? `${run.wins} wins — bring ${run.carrySlots} card${run.carrySlots === 1 ? '' : 's'} back.`
+            : 'Nothing comes back. Start the next one.'}
+        </Text>
+      </View>
+      <StatusChip label="Open" tone="warning" />
+    </Pressable>
   );
 }
 
@@ -1183,8 +1264,9 @@ const styles = StyleSheet.create({
   sectionTop: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two },
   sectionSpacer: { flex: 1 },
   sectionEmpty: { paddingBottom: Spacing.two },
-  /* A block of text and one affordance on the right: the shape every row on
-     this sheet uses for a thing that opens a different screen. */
+  /* The same shape as the dead-run row above it — a block of text and one
+     affordance on the right — because they are the same kind of object: a thing
+     on this sheet that opens a different screen. */
   historyRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1205,7 +1287,38 @@ const styles = StyleSheet.create({
   /* Takes the room the chip does not, so a long line truncates rather than
      pushing the status off the right edge. */
   rowText: { flex: 1, gap: 2 },
-
+  /**
+   * THE RUN GETS A PANEL NOW, and the note it overturns was right about its own
+   * layout: "no panel, no border — a live run is a status line, and a box
+   * around it would give it the weight of something that needs acting on."
+   *
+   * It was a status line while it was one 11pt row under the masthead's rack.
+   * It is the first block on the sheet now and it is the frame every price
+   * below it is read through — a stake of one heart means nothing until you
+   * know whether you hold three or hold this one — so it is the thing the sheet
+   * opens WITH rather than a caption over the list.
+   *
+   * `surface` and no border: it is lifted off the sheet by material, the way a
+   * `Panel` is, rather than outlined like the two rows under it. Those are
+   * doors and this is not.
+   */
+  /**
+   * THE RUN'S BLOCK: a rail, and the warning it grows on the last heart.
+   *
+   * NO FILL, NO BORDER, NO RADIUS — see `RunRail`. It was a panel and the panel
+   * was the problem: a boxed 130pt block is an object on the page, and the run
+   * is a STATUS, which is a thing you read past. The board's rail under the
+   * carousel is drawn the same way and for the same reason.
+   */
+  run: { gap: Spacing.two, paddingHorizontal: Spacing.one },
+  /* Count at one end, rack at the other, exactly as the lineup rail sets its
+     own two ends. */
+  runRail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
   /* The rack never gives; a long count truncates before the pips move. */
   runCount: { flexShrink: 1, minWidth: 0 },
   /* A card you cannot pay for, still readable and no longer competing. */

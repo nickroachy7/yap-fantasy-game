@@ -10,12 +10,12 @@
  * `contest_lobby()` is SECURITY DEFINER for exactly that reason and returns
  * only aggregates — a count and a boolean — never anybody else's rows.
  *
- * IT ALSO CARRIES THE TERMS. The fee is not the whole product — the win
- * condition and the prize split are what separate two 40-coin rows — so they
- * come down with the row rather than being looked up per contest. This once
- * carried `hearts_at_risk` and `hearts_on_win` for a stronger version of the
- * same argument: a contest that could END A RUN had to be impossible to draw
- * like one that could not. Hearts are gone and the columns are no longer read.
+ * IT ALSO CARRIES THE STAKES. A contest that can end a run and one that cannot
+ * are not the same product, and the difference is invisible from the fee — both
+ * cost 40 coins. `hearts_at_risk`, `hearts_on_win` and the win condition come
+ * down with the row so a lobby can never draw the two identically; entering
+ * something that kills a run without being told it could is the worst surprise
+ * this feature can hand somebody.
  *
  * NOT SESSION-CACHED, unlike the collection and the sets. Those answer "what do
  * I own", which changes only when you act; this answers "what is open, how full
@@ -66,7 +66,7 @@ export type Contest = {
    *   `target`   beat `targetPoints`. No field needed, so it settles even when
    *              you are the only entrant.
    *
-   * A row has to say which it is BEFORE a fee is committed to it.
+   * A row has to say which it is BEFORE a heart is committed to it.
    */
   winCondition: WinCondition;
   /** For `top_n`: the last place that still counts as a win. */
@@ -83,6 +83,13 @@ export type Contest = {
    * the app never hardcodes a rate the payout might not be using.
    */
   scoreRate: number;
+  /** Hearts a loss here costs the run. 0 means it cannot end you. */
+  heartsAtRisk: number;
+  /** Hearts a win heals, capped at the run's maximum. */
+  heartsOnWin: number;
+  /** Hearts the caller's run is holding, or null before they have one. */
+  myHearts: number | null;
+
   /**
    * Coins this contest has collected that it will pay back out.
    *
@@ -152,6 +159,9 @@ type Row = {
   target_points: number | null;
   payout_curve: PayoutCurve;
   score_rate: number | null;
+  hearts_at_risk: number;
+  hearts_on_win: number;
+  my_hearts: number | null;
   prize_pool: number;
   podium_coins: number | null;
   prize_pool_bps: number;
@@ -198,6 +208,9 @@ function rowsToContests(rows: Row[]): Contest[] {
         : Number(r.target_points),
     payoutCurve: r.payout_curve ?? 'flat',
     scoreRate: Number(r.score_rate ?? 0),
+    heartsAtRisk: Number(r.hearts_at_risk ?? 0),
+    heartsOnWin: Number(r.hearts_on_win ?? 0),
+    myHearts: r.my_hearts === null || r.my_hearts === undefined ? null : Number(r.my_hearts),
     prizePool: Number(r.prize_pool ?? 0),
     podiumCoins: Number(r.podium_coins ?? 0),
     prizePoolBps: Number(r.prize_pool_bps ?? 0),
@@ -278,6 +291,8 @@ export function termsOfContest(c: Contest): ContestTerms {
     formatName: c.formatName,
     slotCount: c.slotCount,
     entryFeeCoins: c.entryFeeCoins,
+    heartsAtRisk: c.heartsAtRisk,
+    heartsOnWin: c.heartsOnWin,
     winCondition: c.winCondition,
     winRank: c.winRank,
     winPct: c.winPct,

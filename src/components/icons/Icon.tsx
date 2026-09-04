@@ -68,8 +68,7 @@ export function Icon({
 
   // Masks are referenced by id, and two icons on one screen must not share
   // one. `useId` is stable across re-renders and unique per instance, which is
-  // the same problem the run's heart glyphs solved for their clip paths,
-  // back when the set had any.
+  // the same problem `Hearts` solves for its clip paths.
   const maskId = `knock-${useId()}`;
 
   const knockouts = glyph.parts.filter((p) => p.role === 'knockout');

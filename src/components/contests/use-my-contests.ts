@@ -39,6 +39,16 @@ export type MyContest = {
   filled: number;
   /** This contest's own distribution, shaped for `ContestCard`. */
   field: FieldWeek;
+  /**
+   * Hearts a loss here costs the run, and hearts a win heals.
+   *
+   * THE FREE CONTEST'S CARD IS THE ONLY PLACE ITS STAKE IS EVER DRAWN. The
+   * lobby list filters the free contest out — nobody chose it and nobody can
+   * leave it — so without this the game's main contest would be the one that
+   * could end a run without saying so anywhere.
+   */
+  heartsAtRisk: number;
+  heartsOnWin: number;
 
   /**
    * HOW THIS CONTEST IS WON, which the card had no way of knowing.
@@ -149,6 +159,8 @@ export type MyContest = {
 };
 
 type Row = {
+  hearts_at_risk: number;
+  hearts_on_win: number;
   win_condition: WinCondition;
   win_rank: number | null;
   win_pct: number | string | null;
@@ -275,6 +287,8 @@ function rowsToMine(rows: Row[]): MyContest[] {
       ahead: num(r.ahead),
       result: (r.result as FieldWeek['result']) ?? null,
     },
+    heartsAtRisk: Number(r.hearts_at_risk ?? 0),
+    heartsOnWin: Number(r.hearts_on_win ?? 0),
     winCondition: r.win_condition,
     winRank: r.win_rank === null || r.win_rank === undefined ? null : Number(r.win_rank),
     winPct: num(r.win_pct),
@@ -382,6 +396,8 @@ export function termsOfEntry(c: MyContest): ContestTerms {
     formatName: c.formatName,
     slotCount: c.slotCount,
     entryFeeCoins: c.entryFeeCoins,
+    heartsAtRisk: c.heartsAtRisk,
+    heartsOnWin: c.heartsOnWin,
     winCondition: c.winCondition,
     winRank: c.winRank,
     winPct: c.winPct,

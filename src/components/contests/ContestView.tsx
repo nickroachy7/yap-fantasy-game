@@ -101,6 +101,7 @@ import { FriendlyPanel } from './FriendlyPanel';
 import { supabase } from '@/lib/supabase';
 import { Colors, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { usePlayer } from '@/context/PlayerContext';
 import { useAuth } from '@/context/AuthContext';
 
 
@@ -138,6 +139,7 @@ export function ContestView({
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
+  const { run } = usePlayer();
   const { contests, loading, error, reload } = useContests();
   const [leaving, setLeaving] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -700,6 +702,9 @@ export function ContestView({
             name={contest.name}
             prizePoolBps={contest.prizePoolBps}
             leavable={contest.kind === 'lobby' && !contest.recap}
+            /* The rack the reader is staking, drawn the way every other surface
+               draws it — see the note on `run` in `ContestAbout`. */
+            run={run}
           />
         </View>
       )}

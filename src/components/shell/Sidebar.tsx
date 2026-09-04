@@ -39,6 +39,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { YapMark } from '@/components/brand/YapLogo';
 import { ActionIcon } from '@/components/shell/ActionBar';
+import { Hearts } from '@/components/runs/Hearts';
 import { Coin, initialsOf } from '@/components/shell/AppHeader';
 import {
   isSheetPath,
@@ -81,7 +82,7 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
    * is up. See `isSheetPath` and `useSteadyPathname`.
    */
   const pathname = useSteadyPathname(pathnameOverride ?? realPathname, isSheetPath);
-  const { coins, displayName, loading } = usePlayer();
+  const { coins, displayName, run, loading } = usePlayer();
 
   return (
     <View style={[styles.rail, { backgroundColor: ChromeBand }]}>
@@ -93,18 +94,28 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
           <YapMark height={19} ink={ChromeBand} />
           <Text style={styles.wordmark}>YAP FANTASY</Text>
         </View>
-        {/* The rail is the wide-web replacement for `AppHeader`, which is
+        {/* TWO PILLS, NOT ONE, and the hearts get their own because they are a
+            different resource with a different failure — running out of coins
+            means you cannot buy, running out of hearts means the run is over.
+            Sharing a pill would read as one balance with a decorative prefix.
+
+            The rail is the wide-web replacement for `AppHeader`, which is
             suppressed at this breakpoint, so anything the masthead shows has to
-            be shown here too or it simply does not exist on desktop. That is
-            one pill now: this carried a heart rack beside the coins until the
-            mechanic was removed, and `resources` still wraps because a second
-            resource would land here again. */}
+            be shown here too or it simply does not exist on desktop. */}
         <View style={styles.resources}>
           <View style={[styles.coins, { borderColor: accent }]}>
             <Coin color={accent} size={10} />
             <Text style={[styles.balance, NUMERIC]}>{loading ? '—' : coins.toLocaleString()}</Text>
             <Text style={styles.coinsLabel}>coins</Text>
           </View>
+          {/* Hidden while a death is unanswered, exactly as in the masthead:
+              an empty rack repeated on every screen is the death screen's line
+              to deliver, not the chrome's. */}
+          {!loading && run && !run.awaitingCarry ? (
+            <View style={[styles.hearts, { borderColor: 'rgba(255,255,255,0.18)' }]}>
+              <Hearts hearts={run.hearts} wagered={run.wagered} rack={run.rack} size={12} />
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -217,9 +228,18 @@ const styles = StyleSheet.create({
   brandBlock: { paddingHorizontal: 18, gap: 12, marginBottom: 22 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   wordmark: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', letterSpacing: 1.8 },
-  /* Wraps, so a second resource on a narrow rail drops to a line of its own
-     rather than squeezing the coin figure. */
+  /* Wraps, so a five-heart run on a narrow rail drops to a second line rather
+     than squeezing the coin figure. */
   resources: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  hearts: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 11,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
   coins: {
     flexDirection: 'row',
     alignItems: 'center',

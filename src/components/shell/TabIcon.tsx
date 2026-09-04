@@ -11,8 +11,7 @@
  * so the claim was false for nine days and nobody noticed, because a comment
  * that states a fact about the repo has nothing checking it.
  *
- * The distinction it was drawing still holds and is worth keeping: the game's
- * own marks and
+ * The distinction it was drawing still holds and is worth keeping: `Hearts` and
  * the brand mark are ARTWORK, with path data lifted from a source of truth
  * elsewhere, and they earn a renderer. These five are GEOMETRY — rectangles and
  * circles on a 24pt grid — and a dependency to draw a circle would be one.

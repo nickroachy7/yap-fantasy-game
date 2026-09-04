@@ -29,6 +29,7 @@ import { LobbyHero } from '@/components/contests/LobbyHero';
 import { ContestFieldList } from '@/components/contests/ContestFieldPanel';
 import type { FieldEntrant } from '@/components/contests/use-contest-field';
 import type { FieldWeek } from '@/components/lineup/field';
+import type { Run } from '@/components/runs/run';
 import { BADGE_SIZE, BADGE_WIDTH, BenchRow, StarterRow } from '@/components/lineup/LineupRow';
 import { SwapSheet, type SwapRequest } from '@/components/lineup/SwapSheet';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
@@ -36,6 +37,7 @@ import type { LineupCard } from '@/components/lineup/model';
 import { PlayerRow } from '@/components/cards/PlayerRow';
 import type { DirectoryPlayer } from '@/components/cards/player-directory';
 import { CollectionSummary } from '@/components/collection/CollectionSummary';
+import { ContestHearts, Hearts } from '@/components/runs/Hearts';
 import { SearchField, SortChips } from '@/components/ui/Controls';
 import { summarise } from '@/components/collection/types';
 import {
@@ -192,13 +194,14 @@ const DEMO_FIELD_CUT: FieldWeek = {
 /**
  * The three shapes of terms the card is asked to draw.
  *
- * `KIT_TERMS_FREE` is the game's main contest: no fee, no pool. It is the case
- * that must draw NO terms rail at all — a "0 coins / 0 pool" strip would make
- * the contest everybody is in look like a lesser version of the ones they
- * chose.
+ * `KIT_TERMS_FREE` is the game's main contest: no fee, no pool, one heart. It
+ * is the case that must draw NO terms rail at all — a "0 coins / 0 pool" strip
+ * would make the contest everybody is in look like a lesser version of the
+ * ones they chose.
  */
 const KIT_TERMS_FREE: ContestTerms = {
   formatName: 'Full Roster', slotCount: 8, entryFeeCoins: 0,
+  heartsAtRisk: 1, heartsOnWin: 0,
   winCondition: 'median', winRank: null, winPct: null, targetPoints: null,
   payoutCurve: 'flat', scoreRate: 1.5,
   prizePool: 0,
@@ -206,6 +209,7 @@ const KIT_TERMS_FREE: ContestTerms = {
 };
 const KIT_TERMS_MEDIAN: ContestTerms = {
   formatName: 'Flex Three', slotCount: 3, entryFeeCoins: 40,
+  heartsAtRisk: 0, heartsOnWin: 0,
   winCondition: 'median', winRank: null, winPct: null, targetPoints: null,
   payoutCurve: 'flat', scoreRate: 1.5,
   prizePool: 120,
@@ -247,8 +251,48 @@ const KIT_FIELD: FieldEntrant[] = [
   },
 ];
 
+/* Two contests with a heart on each — the state the header is written for.
+   `ContestHearts` takes one entry per heart at stake, not one per contest. */
+const KIT_STAKED = [
+  { result: null, entered: true },
+  { result: null, entered: true },
+];
+
+/**
+ * A run mid-way through: four pips, three still held, two of them staked.
+ *
+ * The rack fixture the contest rules panel needs, and it is deliberately NOT a
+ * fresh run — a rack of three untouched hearts draws one state and hides the
+ * two that carry the meaning (a blade for staked, a tear for lost).
+ */
+const KIT_RUN: Run = {
+  id: 'kit-run',
+  hearts: 3,
+  maxHearts: 4,
+  rack: 4,
+  wagered: 2,
+  wageredIn: 2,
+  wins: 5,
+  losses: 1,
+  endedAt: null,
+  awaitingCarry: false,
+  /* Five wins stands on
+     the 3-win rung and keeps one card, with the next rung at six. The fixture
+     said three cards and a rung at eight — numbers from no ladder that has ever
+     shipped — and the header drew them beside a table that disagreed. */
+  carrySlots: 1,
+  nextRung: { atWins: 6, cardSlots: 2 },
+  heldCards: 24,
+  lostCards: 0,
+};
+
+/* The server's own four rows — `run_carry_ladder`, 20260825110000. Copied here
+   rather than fetched because the kit has no session; the real header reads the
+   table, which is the whole argument in `useRunLadder`. */
+
 const KIT_TERMS_TOP_N: ContestTerms = {
   formatName: 'WR Room', slotCount: 3, entryFeeCoins: 40,
+  heartsAtRisk: 1, heartsOnWin: 1,
   winCondition: 'top_n', winRank: 3, winPct: null, targetPoints: null,
   payoutCurve: 'steep', scoreRate: 1.5,
   prizePool: 240,
@@ -803,21 +847,31 @@ function Kit() {
 
           <Section
             title="Contests header"
-            note="The contests sheet’s header, and what is left of it. It was the set checklist’s hero pointed at a RUN — a figure at page size, the rule in full, a progress bar and the carry ladder as four rows — and on the set sheet that shape is right, because the set IS the page. A lobby is not: you come here to ENTER something, the contests are the page, and the run was only the context you priced them against. Measured off the real sheet on an iPhone 17 Pro, the header and its tab bar ran to 348pt of an 874pt screen — forty per cent — so the first contest sat below the fold on every visit and four of those rows were static config re-read every time. That cut it to two lines: a rack and a record on the title, and a sentence doing the arithmetic on how close the run was to being wiped. Removing hearts cut it again, because all four survivors were about the run. What is left is a title and a week. The band itself survives, and the argument for it was never about its contents: a header needs a plane or it is a title with loose rows under it. It also lost a wash on the way — it wore `Brand.lime` at the sheet’s `TONE_PEAK` of 0.26, where #C7F53D over #101010 resolves to a dark olive, and a brand hue at 26% is not read as brand; at that weight it reads as a STATE, which is the one thing a neutral header must not do."
+            note="The contests sheet’s header. It was the set checklist’s hero pointed at a RUN — a figure at page size, the rule in full, a progress bar and the ladder as four rows — and on the set sheet that shape is right, because the set IS the page. A lobby is not: you come here to ENTER something, the contests are the page, and the run is the context you price them against. Measured off the real sheet on an iPhone 17 Pro, the header and its tab bar ran to 348pt of an 874pt screen — forty per cent — so the first contest sat below the fold on every visit and four of those rows were static config re-read every time. Every fact survives at a fraction of the height: the rack and the record ride the title line, the rack’s figure says how many hearts are free to STAKE rather than how many are held, the rule keeps only the half that is a number — how many hearts are left to lose — and the ladder went from four rows down the screen to four segments across it. Those segments ARE the progress bar; the old fill and the old rungs were one fact drawn twice in two places that could only agree. The mark on a rung is still a PLACE and not a claim: the rung you stand on is tinted `positive`, the ones behind it fall to `textTertiary` rather than getting ticks, because ticking them would promise four cards to somebody who keeps one. The ladder is the server’s table, never a constant — `run_carry_slots()` is what a death actually settles against. And the band lost its wash: it wore `Brand.lime` at the sheet’s `TONE_PEAK` of 0.26, where #C7F53D over #101010 resolves to a dark olive, and a brand hue at 26% is not read as brand — at that weight it reads as a STATE, which is the one thing a neutral header must not do. The band itself survives on `surfaceSheet`, because the argument for it was never about hue: a header needs a plane or it is a title with loose rows under it."
             >
             <View style={{ gap: Spacing.four }}>
               {/* The band paints itself now — there is no wash to reproduce by
                   hand, which is what the removed first instance was for. */}
-              <LobbyHero week="Preseason 4" />
-              {/* And with no week resolved yet, which is what the sheet draws
-                  for the moment between opening and the first load landing. */}
-              <LobbyHero />
+              <LobbyHero run={KIT_RUN} staked={KIT_STAKED} week="Preseason 4" />
+              {/* A fresh run: no record, bottom rung, nothing carried. */}
+              <LobbyHero
+                run={{ ...KIT_RUN, wins: 0, losses: 0, wagered: 0, wageredIn: 0, carrySlots: 0, nextRung: { atWins: 3, cardSlots: 1 } }}
+                staked={KIT_STAKED}
+                week="Preseason 4"
+              />
+              {/* One heart left, deep in the ladder — the week the sheet is
+                  most worth reading and the state the copy is written for. */}
+              <LobbyHero
+                run={{ ...KIT_RUN, hearts: 1, wagered: 1, wageredIn: 1, wins: 9, losses: 4 }}
+                staked={KIT_STAKED}
+                week="Week 1"
+              />
             </View>
           </Section>
 
           <Section
             title="Contest card"
-            note="THREE ZONES ON ONE PLANE. Every zone is `surface` #171717 — the header balance pills' own fill — and the two seams between them are `borderStrong` hairlines sitting inside the declared heights. That is the 2026-09-02 pass, and it undoes a striped card whose head and foot were `backgroundElement` #212121 inside a #5E5E5E ring. On a board where nothing else is elevated at all, the one object carrying a fill AND an outline AND internal bands read as grey and pasted on; the pills clear the same page on +15 and no border whatsoever, which is what settled the value. The well could not simply be darkened instead, because this card also draws inside `ContestSheet` on a #101010 floor, where a recessed band lands two points clear of its ground and is not a band. Each zone answers exactly one question. THE HEAD is which contest this is, how it is won, how full it is and what state it is in — one row, four facts, a name and a status word at the outer edges with the objective and the entry count inboard of them. It was two rows and the first was half empty; one row fits, because the heaviest contest measures about 410 of the 460 points available. The objective sits at TERTIARY now, which reverses two earlier calls (13pt semibold in the primary colour, then labelled `TO WIN` to calm it down) and is safe for one specific reason: the scoring band restates it as `TO BEAT` over a `MEDIAN` or `3RD` chip, directly above the number being chased. The head no longer carries it alone. THE GIVE-ORDER IS THE OLD LESSON KEPT — if the row runs out, the NAME and the ENTRY COUNT truncate and the objective never does, because this card once shipped `Full Roster · 8 cards · Beat the med…` on every entered card before lock. The status is coloured TEXT rather than a pill: a filled chip is a second object on a card that is meant to read as one quiet plane, and a single word at the end of a row is findable by colour alone. It carries the countdown before lock (`OPEN` told a reader what `9D 5H` already implies), then `LIVE` in the new `live` blue, then `WON` / `LOST` / `TIE`. Blue is a fourth semantic hue and it is deliberate: gold is spoken once within a hundred points of this card, on the Contests button — and red is spoken by losing. THE MIDDLE IS NOTHING BUT SCORING. Your total on the left, the total you have to beat on the right, `VS` and the margin in a fixed column between them so the sign cannot drag it off centre. Both totals are the SAME SIZE, which reverses a pass that ranked yours above theirs as a benchmark: the number you are judged against is not a footnote on your own score, it is the other half of one comparison. `TO BEAT` is a constant and the format is a chip — `COMMUNITY`, `THE CUT · 3RD` and a handle were three words for one idea and none of them said beat this. THE PACE BAR IS THE POINT OF THE WHOLE CARD: a 4pt rail, a dashed mark at the win condition, and a pip carrying your rank at your own total, so a player can tell whether they are on course without adding up eight players. Above the dashes is winning and below is losing, and the gap between the pip and the dashes IS the deficit. It takes three inputs and knows nothing else — a scale, your value, and the line — which is why the head-to-head cards here are the same component and not a `TugBar`. Two measurements in it are bug fixes rather than taste: the dashes are 18pt against a 14pt pip because at 11 the pip covered the line completely at the one moment it matters most, and the SCALE ANCHORS AT NOUGHT on a field of two, because low-to-high on a duel is exactly the two totals — the leader always fills the rail, the trailer never does, and the bar says nothing about by how much. RANK IS SAID TWICE ON PURPOSE: the chip is a standing, the pip is a distance. It is withheld entirely before the field has spread, because every lineup sits on a stored nought pregame and `rank()` hands everyone first place. THE FOOT IS TOKENS, NOT SENTENCES. A glyph and a number is four characters where the sentence was seventeen, so a side can grow to five parts — coins, a pack, a card — without the row breaking or the card growing a second one. That is what retired two columns each reserving a blank line. The unit word is ELASTIC: a side carrying one token prints it (`◆ 40 coins`, `◆ 1.5 a point`) and a side carrying two or three drops to bare numbers, so the free contest — the one every new player meets first, and the one with the most room — teaches the glyphs in words before anything asks them to be read cold. Labels are constant, `RISK` and `WIN`, turning to `STAKED` and `WON` at settlement; the modality that used to live there (`UP TO`, `SHARE`, `EARNS`) is gone, which costs the up-to on a capped top prize and is noted at `winTokens`. SEPARATORS HAVE A VOCABULARY WITH TWO WORDS: a solid `borderStrong` hairline divides two things that sit next to each other — fields within a zone, and since the material steps went, one zone from the next — a dashed line is the line you have to cross, and the dashed line appears exactly once on the card. THE WHOLE CARD IS 153pt — 34 + 90 + 29 — against 164, and the saving is small and not the point. A lineup row underneath is 62. The first two cards here are lobby cards; the rest are entered, and the ones that matter are the top-three contest where the median decides nothing and the mark is the CUT, the field of ONE which is its own low and high and therefore has nobody to play, both duels, and the last four — the settled states, including final-and-unpaid, where `WON` says still settling rather than claiming a nought."
+            note="THREE ZONES ON ONE PLANE. Every zone is `surface` #171717 — the header balance pills' own fill — and the two seams between them are `borderStrong` hairlines sitting inside the declared heights. That is the 2026-09-02 pass, and it undoes a striped card whose head and foot were `backgroundElement` #212121 inside a #5E5E5E ring. On a board where nothing else is elevated at all, the one object carrying a fill AND an outline AND internal bands read as grey and pasted on; the pills clear the same page on +15 and no border whatsoever, which is what settled the value. The well could not simply be darkened instead, because this card also draws inside `ContestSheet` on a #101010 floor, where a recessed band lands two points clear of its ground and is not a band. Each zone answers exactly one question. THE HEAD is which contest this is, how it is won, how full it is and what state it is in — one row, four facts, a name and a status word at the outer edges with the objective and the entry count inboard of them. It was two rows and the first was half empty; one row fits, because the heaviest contest measures about 410 of the 460 points available. The objective sits at TERTIARY now, which reverses two earlier calls (13pt semibold in the primary colour, then labelled `TO WIN` to calm it down) and is safe for one specific reason: the scoring band restates it as `TO BEAT` over a `MEDIAN` or `3RD` chip, directly above the number being chased. The head no longer carries it alone. THE GIVE-ORDER IS THE OLD LESSON KEPT — if the row runs out, the NAME and the ENTRY COUNT truncate and the objective never does, because this card once shipped `Full Roster · 8 cards · Beat the med…` on every entered card before lock. The status is coloured TEXT rather than a pill: a filled chip is a second object on a card that is meant to read as one quiet plane, and a single word at the end of a row is findable by colour alone. It carries the countdown before lock (`OPEN` told a reader what `9D 5H` already implies), then `LIVE` in the new `live` blue, then `WON` / `LOST` / `TIE`. Blue is a fourth semantic hue and it is deliberate: gold is spoken twice within a hundred points of this card — the focused heart and the Contests button — and red is spoken by losing. THE MIDDLE IS NOTHING BUT SCORING. Your total on the left, the total you have to beat on the right, `VS` and the margin in a fixed column between them so the sign cannot drag it off centre. Both totals are the SAME SIZE, which reverses a pass that ranked yours above theirs as a benchmark: the number you are judged against is not a footnote on your own score, it is the other half of one comparison. `TO BEAT` is a constant and the format is a chip — `COMMUNITY`, `THE CUT · 3RD` and a handle were three words for one idea and none of them said beat this. THE PACE BAR IS THE POINT OF THE WHOLE CARD: a 4pt rail, a dashed mark at the win condition, and a pip carrying your rank at your own total, so a player can tell whether they are on course without adding up eight players. Above the dashes is winning and below is losing, and the gap between the pip and the dashes IS the deficit. It takes three inputs and knows nothing else — a scale, your value, and the line — which is why the head-to-head cards here are the same component and not a `TugBar`. Two measurements in it are bug fixes rather than taste: the dashes are 18pt against a 14pt pip because at 11 the pip covered the line completely at the one moment it matters most, and the SCALE ANCHORS AT NOUGHT on a field of two, because low-to-high on a duel is exactly the two totals — the leader always fills the rail, the trailer never does, and the bar says nothing about by how much. RANK IS SAID TWICE ON PURPOSE: the chip is a standing, the pip is a distance. It is withheld entirely before the field has spread, because every lineup sits on a stored nought pregame and `rank()` hands everyone first place. THE FOOT IS TOKENS, NOT SENTENCES. A glyph and a number is four characters where the sentence was seventeen, so a stake can grow to five parts — coins, a heart, a pack — without the row breaking or the card growing a second one. That is what retired two columns each reserving a blank line. The unit word is ELASTIC: a side carrying one token prints it (`♥ 1 heart`, `◆ 1.5 a point`) and a side carrying two or three drops to bare numbers, so the free contest — the one every new player meets first, and the one with the most room — teaches the glyphs in words before anything asks them to be read cold. Labels are constant, `RISK` and `WIN`, turning to `STAKED` and `WON` at settlement; the modality that used to live there (`UP TO`, `SHARE`, `EARNS`) is gone, which costs the up-to on a capped top prize and is noted at `winTokens`. SEPARATORS HAVE A VOCABULARY WITH TWO WORDS: a solid `borderStrong` hairline divides two things that sit next to each other — fields within a zone, and since the material steps went, one zone from the next — a dashed line is the line you have to cross, and the dashed line appears exactly once on the card. THE WHOLE CARD IS 153pt — 34 + 90 + 29 — against 164, and the saving is small and not the point. A lineup row underneath is 62. The first two cards here are lobby cards; the rest are entered, and the ones that matter are the top-three contest where the median decides nothing and the mark is the CUT, the field of ONE which is its own low and high and therefore has nobody to play, both duels, and the last four — the settled states, including final-and-unpaid, where `WON` says still settling rather than claiming a nought."
 
           >
             {/* THE LOBBY PAIR, AND THEY ARE TWO ZONES RATHER THAN THREE. A
@@ -981,10 +1035,12 @@ function Kit() {
               settled={{ result: 'W', coins: 148 }}
               lock={{ at: DEMO_LOCK_PAST, locked: true, now: DEMO_NOW }}
             />
-            {/* LOST, WHICH IS THE HALF THE OFFER COULD NOT SAY. The status
-                word carries it and the foot says what the week actually paid —
-                the cards were still paid, because the faucet is not a prize and
-                does not care who won. */}
+            {/* LOST, WHICH IS THE HALF THE OFFER COULD NOT SAY. The heart is
+                drawn torn and in the negative colour — `Hearts` already owns
+                that shape for the rail directly under the carousel, so the
+                glyph and the word beside it agree — and the cards were still
+                paid, because the faucet is not a prize and does not care who
+                won. */}
             <KitEntered
               name="Preseason Week 2"
               terms={{ ...KIT_TERMS_FREE, entrants: DEMO_FIELD_BEHIND.entrants }}
@@ -1002,7 +1058,7 @@ function Kit() {
                 underneath. */}
             <KitEntered
               name="WR Room"
-              terms={KIT_TERMS_TOP_N}
+              terms={{ ...KIT_TERMS_TOP_N, heartsOnWin: 1 }}
               myPoints={54.8}
               /* Second of six and inside the places, which is what a W in a
                  top-three contest has to look like. The base fixture is the
@@ -1044,6 +1100,58 @@ function Kit() {
           </Section>
 
           <Section
+            title="The run rack"
+            note="A receipt is a fourth object and a separate axis: a settled contest's outcome, drawn on the heart it borrowed — green W, red L, grey T — and the letter is what carries it so the pair survives greyscale and a red-green deficiency. Receipts sit LEFT of the rack, separated by a breath rather than a rule, and they leave with the recap window. THREE STATES AND THREE DIFFERENT OBJECTS. A heart you hold is solid whether or not it is staked, because it is equally yours either way; what marks a stake is a blade driven through it, and what marks a loss is the heart torn in two. The old set was one shape at three intensities — solid, outlined, outlined-and-cracked — which inverted the one convention every player knows (filled means you have it) and, worse, drew “at risk” as a cracked heart, i.e. as the picture of a heart that has already broken. WHICH HEART THE PAGE IS ABOUT is drawn ONE way, whatever the heart is: it stays at full strength while the rest recede, and gold corner ticks confirm it. That was two different marks once — a gold blade on a staked heart, a dashed box on a free one — which made the reader learn the same answer twice. The blade is identity and stays steel; the ticks are focus and are always gold; brightness is the primary signal and survives being small. Rows below: a fresh run, a run with two of three staked and one already lost, the last-heart state, and the tile’s view of the same rack.">
+            <View style={{ gap: Spacing.three }}>
+              <Hearts hearts={3} rack={3} size={26} />
+              <Hearts hearts={3} wagered={2} rack={4} focus={{ start: 0, count: 1 }} size={26} />
+              <Hearts hearts={1} wagered={1} rack={4} focus={{ start: 0, count: 1 }} size={26} />
+            </View>
+          </Section>
+
+          <Section
+            title="The board's contest row"
+            note="A DIFFERENT OBJECT FROM THE RACK ABOVE, and the difference is what it is counting. The rack is a RUN — held, staked, lost. This is one heart per CONTEST on the board, in the carousel's own order, so pip N is card N and tapping one is the same gesture as swiping to it. Four states: a hollow heart is a contest you have not entered (the one place this file uses an outline, and the one place “filled means you have it” points the right way round), a solid one is a heart riding right now, and a green W / red L / grey T is a settled week's receipt. Second row: the same set with the third card in view.">
+            <View style={{ gap: Spacing.three }}>
+              <ContestHearts
+                entries={[
+                  { result: null, entered: false },
+                  { result: null, entered: true },
+                  { result: 'W', entered: true },
+                  { result: 'L', entered: true },
+                  { result: 'T', entered: true },
+                ]}
+                size={26}
+              />
+              <ContestHearts
+                entries={[
+                  { result: null, entered: false },
+                  { result: null, entered: true },
+                  { result: 'W', entered: true },
+                  { result: 'L', entered: true },
+                  { result: 'T', entered: true },
+                ]}
+                focus={{ start: 2, count: 1 }}
+                size={26}
+              />
+              {/* THE RECEIPTS LAPSED. Same five contests, a day later — or one
+                  press of the banner's ✕. This is the row that cannot be
+                  reached by waiting, and the one most worth looking at: the
+                  badges are gone and NOTHING has reverted to a lie. */}
+              <ContestHearts
+                entries={[
+                  { result: null, entered: false, showResult: false },
+                  { result: null, entered: true, showResult: false },
+                  { result: 'W', entered: true, showResult: false },
+                  { result: 'L', entered: true, showResult: false },
+                  { result: 'T', entered: true, showResult: false },
+                ]}
+                size={26}
+              />
+            </View>
+          </Section>
+
+          <Section
             title="Welcome back"
             note="The one thing a settled week owes a player who was not watching, at the top of the board rather than as a modal over it: the board is already two sheets deep on its busiest path, and a dismissal handed to somebody who opened the app to set a lineup is a tax paid every Tuesday for news that needs no answer. It has NO TIMER, deliberately, and that is what makes the 24-hour clock on the rail's receipts safe — recap_slate() exists because results that expire on a clock mean a player who does not open the app for two days never learns how they did, so this carries that guarantee instead and waits as long as it has to. Pressing the row opens the archive; only the ✕ marks anything seen, because a banner that cleared itself on the way to the detail would be gone when you came back. Four states: one contest won, one lost, a mixed week, and the returning player whose marks are capped at four with a count — a fortnight away is a dozen results, and twelve pips in a banner is a texture rather than a summary. The last is the case with NO result at all, which a field too small to be a contest produces and which must never be worded as a loss.">
             <View style={{ gap: Spacing.three }}>
@@ -1073,6 +1181,10 @@ function Kit() {
               name="WR Room"
               prizePoolBps={2500}
               leavable
+              /* A rack of four with two staked and one already lost, so the
+                 row shows all three heart states rather than the one a live
+                 account happens to be in. */
+              run={KIT_RUN}
             />
           </Section>
 

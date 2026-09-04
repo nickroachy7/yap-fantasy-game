@@ -49,6 +49,8 @@ export type ContestTerms = {
   formatName: string;
   slotCount: number;
   entryFeeCoins: number;
+  heartsAtRisk: number;
+  heartsOnWin: number;
   winCondition: WinCondition;
   winRank: number | null;
   /** For `top_pct`: the share of the field that wins, as a whole percent. */
@@ -99,7 +101,7 @@ export type ContestTerms = {
  *
  * "Beat the median" is even money and reads as such. "Top 3 win" does not, and
  * is meant not to — most of that field loses, which is exactly what a player is
- * being asked to price an entry fee against.
+ * being asked to price a heart against.
  *
  * The rank is stated WITH the field size wherever the field is known, for the
  * same reason every rank in this codebase is: "top 3" of four entrants and
@@ -126,7 +128,7 @@ export function winLine(t: ContestTerms, duel?: Duel | null): string {
 
   /* THE SHARE IS STATED AS PLACES ONCE THERE IS A FIELD TO COUNT. "Top 50%" is
      the rule and "Top 2 of 5 win" is the offer, and a player deciding whether
-     to enter is buying the second one. Before the field is playable
+     to spend a heart is buying the second one. Before the field is playable
      there are no places to name, so the percentage stands alone. */
   if (t.winCondition === 'top_pct' && t.winPct !== null) {
     return places !== null && t.entrants >= MIN_ENTRANTS
@@ -483,12 +485,12 @@ export function topPrize(t: ContestTerms): number | null {
  * the moment there is an answer. A settled card drew
  *
  *     RISK                REWARD
- *     ◆ 40 coins          From 1.5 coins a point
+ *     ♥ 1 heart           From 1.5 coins a point
  *
- * over a scoreboard reading 28.0 to 16.2 with the week already gone — a fee
- * described as still at risk when it had already been spent and settled, and a
- * rate quoted as an inducement to enter a contest nobody can enter. Both facts
- * were knowable and neither was drawn anywhere on the card.
+ * over a scoreboard reading 28.0 to 16.2 with the week already gone — a heart
+ * described as still riding when it had been kept, and a rate quoted as an
+ * inducement to enter a contest nobody can enter. Both facts were knowable and
+ * neither was drawn anywhere on the card.
  *
  * So the third band changes tense with the week. Same geometry, same two
  * columns, same fixed rows — `STAKED` and `EARNED` where `RISK` and `REWARD`
@@ -557,20 +559,17 @@ export function settlementOf(entry: {
  * ---------------------------------------------------------------------------
  *
  * `riskLines` and `rewardLines` return strings, and a string is the wrong shape
- * the moment a side has more than one part. "40 coins · 1 heart" against "Up to
+ * the moment a stake has more than one part. "40 coins · 1 heart" against "Up to
  * 120 coins · +1 heart · 1 pack" is 48 characters of prose in a 317pt row that
  * also has to carry two labels and a divider, and it does not fit. It nearly
  * did not fit at two parts a side, which is why the old trade band was two
  * columns with a reserved blank row in each.
  *
- * Those examples are from when a stake had a heart in it. A stake is a fee now
- * and the risk side is one token — but the reward side still grows, and the
- * shape is what keeps that cheap.
- *
  * A glyph plus a number is four characters where the sentence was seventeen, so
  * five of them fit on one line with room to spare. Every currency this game has
- * or is likely to grow already owns a mark — `coin`, the four `pack*` glyphs,
- * `cardBadge`, the tier marks — so the vocabulary is drawn, not invented.
+ * or is likely to grow already owns a mark — `coin`, `heartFull`, the four
+ * `pack*` glyphs, `cardBadge`, the tier marks — so the vocabulary is drawn, not
+ * invented.
  *
  * ---------------------------------------------------------------------------
  * THE UNIT WORD IS ELASTIC, AND THAT IS THE LITERACY FIX
@@ -578,8 +577,8 @@ export function settlementOf(entry: {
  *
  * A bare `◆ 40` asks the reader to already know the diamond means coins. On a
  * side carrying ONE token there is room for the word, so it is printed: `◆ 40
- * coins`, `◆ 1.5 a point`. On a side carrying two or three there is not, and it
- * drops to bare numbers.
+ * coins`, `♥ 1 heart`, `◆ 1.5 a point`. On a side carrying two or three there is
+ * not, and it drops to bare numbers.
  *
  * The free contest — one risk, one reward — is the contest every new player
  * meets first and the one with the most room. So the card teaches the glyphs in
@@ -590,7 +589,7 @@ export function settlementOf(entry: {
  */
 export type Token = {
   /** Which mark is drawn. `none` is a word with no glyph — "nothing". */
-  kind: 'coin' | 'pack' | 'none';
+  kind: 'coin' | 'heart' | 'pack' | 'none';
   /** The quantity as drawn: "40", "+1", "1.5", "kept", "lost", "nothing". */
   value: string;
   /** Names the unit. Printed only where the side has room — see above. */
@@ -606,6 +605,8 @@ export type Token = {
    */
   keepUnit?: boolean;
   tone?: 'positive' | 'negative';
+  /** A heart that was taken, so `Heart` draws it torn rather than whole. */
+  killed?: boolean;
 };
 
 /**
@@ -630,15 +631,17 @@ export function beatSource(
   return 'MEDIAN';
 }
 
-/**
- * What you put up. A fee or nothing — this returned a list because a stake used
- * to have two parts, coins and a heart, and the list is kept because the shape
- * downstream (`TokenRow`, which prints units only on a short side) is written
- * around it and a prize-side pack or a second fee would land here again.
- */
+/** What you put up. Coins first, then hearts — the order the foot reads. */
 export function riskTokens(t: ContestTerms): Token[] {
   const out: Token[] = [];
   if (t.entryFeeCoins > 0) out.push({ kind: 'coin', value: `${t.entryFeeCoins}`, unit: 'coins' });
+  if (t.heartsAtRisk > 0) {
+    out.push({
+      kind: 'heart',
+      value: `${t.heartsAtRisk}`,
+      unit: t.heartsAtRisk === 1 ? 'heart' : 'hearts',
+    });
+  }
   if (out.length === 0) out.push({ kind: 'none', value: 'nothing' });
   return out;
 }
@@ -737,17 +740,24 @@ export function winLabel(t: ContestTerms, settled: boolean): string {
 /**
  * The same left-hand side once the week is over. `STAKED`, not `RISK`.
  *
- * NOTHING CHANGES SHAPE HERE ANY MORE, and that is worth a line because this
- * function used to exist FOR the part that did. A stake was a fee and a heart;
- * the fee is a fee whether you won or lost, but the heart either came back or
- * did not, so it swapped its number for `kept`/`lost` and a torn glyph. Hearts
- * are gone, so this is `riskTokens` under a past-tense label — kept separate
- * because the label differs and because the outcome-sensitive shape is exactly
- * what a future stake would want back.
+ * THE HEART IS THE ONLY THING THAT CHANGES SHAPE. A fee is a fee whether you
+ * won or lost, so it keeps its number; a heart either came back or did not, and
+ * "1" is no longer the interesting part of it. `killed` is what makes `Heart`
+ * draw the torn glyph — the same one the rack under the carousel uses — so the
+ * mark and the word beside it cannot disagree.
  */
-export function stakedTokens(t: ContestTerms, _s: Settlement): Token[] {
+export function stakedTokens(t: ContestTerms, s: Settlement): Token[] {
   const out: Token[] = [];
   if (t.entryFeeCoins > 0) out.push({ kind: 'coin', value: `${t.entryFeeCoins}`, unit: 'coins' });
+  if (t.heartsAtRisk > 0) {
+    const lost = s.result === 'L';
+    out.push({
+      kind: 'heart',
+      value: s.result === null ? `${t.heartsAtRisk}` : lost ? 'lost' : 'kept',
+      tone: s.result === null ? undefined : lost ? 'negative' : 'positive',
+      killed: lost,
+    });
+  }
   if (out.length === 0) out.push({ kind: 'none', value: 'nothing' });
   return out;
 }
@@ -771,6 +781,14 @@ export function wonTokens(
   const paid = prize !== null && prize > 0;
 
   if (paid) out.push({ kind: 'coin', value: `${prize}`, unit: 'coins', tone: 'positive' });
+  if (t.heartsOnWin > 0 && s.result === 'W') {
+    out.push({
+      kind: 'heart',
+      value: `+${t.heartsOnWin}`,
+      unit: t.heartsOnWin === 1 ? 'heart' : 'hearts',
+      tone: 'positive',
+    });
+  }
   if (s.coins !== null && s.coins > 0) {
     out.push({ kind: 'coin', value: `${s.coins}`, unit: paid ? 'from cards' : 'coins' });
   }
