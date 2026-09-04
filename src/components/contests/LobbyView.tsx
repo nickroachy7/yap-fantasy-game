@@ -6,7 +6,7 @@ import { ContestCard, StatusWord } from '@/components/contests/ContestCard';
 import { settlementOf } from '@/components/contests/contest-model';
 import { termsOfContest, useContests, type Contest } from '@/components/contests/use-contests';
 import { termsOfEntry, useMyContests, type MyContest } from '@/components/contests/use-my-contests';
-import { PlayerSheetFrame, SheetToneBand } from '@/components/players/PlayerSheetFrame';
+import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import {
   ContestHistoryPanel,
   historySummary,
@@ -381,43 +381,7 @@ export function LobbyView({
           contest sat under a heading about this week, inside its count. Two
           headings cost one line and stop the page claiming a week it is not
           about. */}
-      {/* THE BAND CLIMBS OVER THE GRABBER AND INTO THE OVERSCROLL, which is
-          what `SheetToneBand` is for and why the header goes back inside it.
-          Painting the plane inside `LobbyHero` got the colour right and the
-          EXTENT wrong: the sheet's floating handle stayed on `surfaceSheet`
-          above a `backgroundElement` header, so the top of the screen was two
-          greys with a seam across it — and a hard flick back to the top
-          rubber-banded the sheet's colour into the gap above the band. This
-          reaches `HANDLE_BLOCK + OVERSCROLL_REACH` above its own content
-          precisely so neither can happen. A surface rather than a tone: see
-          the prop's own note. */}
-      {/* Same call as the frame's above, and it has to be the same or the seam
-          comes back the other way round: a flat hero band on a raised frame
-          reads as a hole rather than a panel. On a page both go transparent and
-          the hero sits on the page, which is what a heading does. */}
-      <SheetToneBand surface={frame === 'page' ? undefined : c.backgroundElement}>
-        <LobbyHero staked={staked} />
-      </SheetToneBand>
-
-      {run?.awaitingCarry ? <DeadRun run={run} onClaim={() => router.push('/run-over')} /> : null}
-
-      <Section
-        label="Entered"
-        count={playing.length}
-        hint="Filed for this week. Tap one to see the field.">
-        <View style={styles.stack}>
-        {playing.length > 0 ? (
-          playing.map((m) => (
-            <LiveEntry key={m.id} entry={m} onPress={() => onOpenContest(m.code)} />
-          ))
-        ) : loading ? null : (
-          <SectionEmpty text="Nothing filed yet. What you enter shows up here for the week." />
-          )}
-        </View>
-      </Section>
-
-      {/* THE TWO DOORS THAT ARE NOT CONTESTS, under the week's own entries and
-          above everything there is to browse.
+      {/* THE TWO DOORS THAT ARE NOT CONTESTS, and they open the page.
 
           They were at the very top, on the argument that an action belongs
           there rather than at the bottom where a list ends — and that argument
@@ -464,6 +428,37 @@ export function LobbyView({
           onPress={() => setView('invites')}
         />
       </View>
+
+      {/* NO `SheetToneBand` ROUND IT ANY MORE, and it had to go with the move.
+          The band's whole job was to let a header's plane CLIMB over the sheet's
+          grabber and into the overscroll, so a hard flick back to the top could
+          not rubber-band a different grey into the gap above it. That is a
+          first-child job — it reaches upward past the top of the scroll content
+          — and the rack is not the first child now.
+          Left in place it would have been worse than useless: in sheet
+          presentation it paints `backgroundElement`, so a band that is no longer
+          at the top would have drawn a grey stripe across the middle of the
+          page under the hearts. And there is no header left for it to be the
+          plane of — one 16pt mark does not need one. */}
+      <LobbyHero staked={staked} />
+
+      {run?.awaitingCarry ? <DeadRun run={run} onClaim={() => router.push('/run-over')} /> : null}
+
+      <Section
+        label="Entered"
+        count={playing.length}
+        hint="Filed for this week. Tap one to see the field.">
+        <View style={styles.stack}>
+        {playing.length > 0 ? (
+          playing.map((m) => (
+            <LiveEntry key={m.id} entry={m} onPress={() => onOpenContest(m.code)} />
+          ))
+        ) : loading ? null : (
+          <SectionEmpty text="Nothing filed yet. What you enter shows up here for the week." />
+          )}
+        </View>
+      </Section>
+
 
       {/* THE ARCHIVE RIDES THE HEADING, right-aligned. It was tried on its own
           line under the list, on the argument that a door and a title are two
