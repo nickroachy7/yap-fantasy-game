@@ -19,7 +19,6 @@ import {
 import { LobbyHero } from './LobbyHero';
 import { useFriendlyInvites } from './use-friendly-invites';
 import type { ContestInvite } from './friendly';
-import { weekTitleOf } from '@/components/contests/use-my-contests';
 import { StatusChip } from '@/components/ui/StatusChip';
 import { Colors, NUMERIC, Radius, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
@@ -235,10 +234,6 @@ export function LobbyView({
   );
 
   const live = (contests ?? []).filter((c) => !c.recap);
-  /* WHICH WEEK THESE CONTESTS ARE, taken off the slate rather than from a
-     clock: the lobby is whatever `contest_lobby` says is enterable, and asking
-     the device what week it is would be a second opinion that can differ. */
-  const week = live.length > 0 ? weekTitleOf(live[0].seasonType, live[0].week) : undefined;
   const open = live.filter((c) => c.kind === 'lobby' && c.mine === null);
   /* THE FRIENDLY SHELF'S OWN ROWS, and they come out of `Community` above by
      the same token. A friendly is not open to every manager, so listing it
@@ -401,21 +396,44 @@ export function LobbyView({
           reads as a hole rather than a panel. On a page both go transparent and
           the hero sits on the page, which is what a heading does. */}
       <SheetToneBand surface={frame === 'page' ? undefined : c.backgroundElement}>
-        <LobbyHero run={run} staked={staked} week={week} />
+        <LobbyHero staked={staked} />
       </SheetToneBand>
 
       {run?.awaitingCarry ? <DeadRun run={run} onClaim={() => router.push('/run-over')} /> : null}
 
-      {/* THE TWO DOORS THAT ARE NOT CONTESTS, at the top where an action
-          belongs rather than at the bottom where a list ends.
+      <Section
+        label="Entered"
+        count={playing.length}
+        hint="Filed for this week. Tap one to see the field.">
+        <View style={styles.stack}>
+        {playing.length > 0 ? (
+          playing.map((m) => (
+            <LiveEntry key={m.id} entry={m} onPress={() => onOpenContest(m.code)} />
+          ))
+        ) : loading ? null : (
+          <SectionEmpty text="Nothing filed yet. What you enter shows up here for the week." />
+          )}
+        </View>
+      </Section>
 
-          Everything below this row is something to READ — four shelves of
-          contests, in the order a week is lived. These two are things to DO,
-          and they were both buried: building sat behind a text link on the last
-          heading of the scroll, and an invitation was a row on that same shelf,
-          shaped like the offers around it, with no count anywhere to say it was
-          waiting. Somebody could be asked to a contest on Tuesday and not find
-          out until they happened to scroll to the bottom on Sunday.
+      {/* THE TWO DOORS THAT ARE NOT CONTESTS, under the week's own entries and
+          above everything there is to browse.
+
+          They were at the very top, on the argument that an action belongs
+          there rather than at the bottom where a list ends — and that argument
+          was against being BURIED, which they had been: building sat behind a
+          text link on the last heading of the scroll, and an invitation was a
+          row on that same shelf, shaped like the offers around it, with no
+          count anywhere to say it was waiting. Somebody could be asked to a
+          contest on Tuesday and not find out until they happened to scroll to
+          the bottom on Sunday.
+
+          Third from the top is not buried. What now sits above them is the one
+          shelf that is not browsing either: the contests you are ALREADY IN,
+          which is what a reader opening this page mid-week came to check. The
+          order is what you have, then what you can do, then what there is —
+          and the rack at the top belongs to the first of those, so `Entered`
+          directly under it puts the pips beside the entries they are riding on.
 
           A BADGE IS THE WHOLE POINT OF THE SECOND ONE. It is the only thing on
           this sheet that is addressed to you personally, so it is the only
@@ -446,21 +464,6 @@ export function LobbyView({
           onPress={() => setView('invites')}
         />
       </View>
-
-      <Section
-        label="Entered"
-        count={playing.length}
-        hint="Filed for this week. Tap one to see the field.">
-        <View style={styles.stack}>
-        {playing.length > 0 ? (
-          playing.map((m) => (
-            <LiveEntry key={m.id} entry={m} onPress={() => onOpenContest(m.code)} />
-          ))
-        ) : loading ? null : (
-          <SectionEmpty text="Nothing filed yet. What you enter shows up here for the week." />
-          )}
-        </View>
-      </Section>
 
       {/* THE ARCHIVE RIDES THE HEADING, right-aligned. It was tried on its own
           line under the list, on the argument that a door and a title are two

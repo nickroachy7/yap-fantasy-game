@@ -847,25 +847,18 @@ function Kit() {
 
           <Section
             title="Contests header"
-            note="The contests sheet’s header. It was the set checklist’s hero pointed at a RUN — a figure at page size, the rule in full, a progress bar and the ladder as four rows — and on the set sheet that shape is right, because the set IS the page. A lobby is not: you come here to ENTER something, the contests are the page, and the run is the context you price them against. Measured off the real sheet on an iPhone 17 Pro, the header and its tab bar ran to 348pt of an 874pt screen — forty per cent — so the first contest sat below the fold on every visit and four of those rows were static config re-read every time. Every fact survives at a fraction of the height: the rack and the record ride the title line, the rack’s figure says how many hearts are free to STAKE rather than how many are held, the rule keeps only the half that is a number — how many hearts are left to lose — and the ladder went from four rows down the screen to four segments across it. Those segments ARE the progress bar; the old fill and the old rungs were one fact drawn twice in two places that could only agree. The mark on a rung is still a PLACE and not a claim: the rung you stand on is tinted `positive`, the ones behind it fall to `textTertiary` rather than getting ticks, because ticking them would promise four cards to somebody who keeps one. The ladder is the server’s table, never a constant — `run_carry_slots()` is what a death actually settles against. And the band lost its wash: it wore `Brand.lime` at the sheet’s `TONE_PEAK` of 0.26, where #C7F53D over #101010 resolves to a dark olive, and a brand hue at 26% is not read as brand — at that weight it reads as a STATE, which is the one thing a neutral header must not do. The band itself survives on `surfaceSheet`, because the argument for it was never about hue: a header needs a plane or it is a title with loose rows under it."
+            note="The top of the contests page, which is now one object: the rack, centred, at the lineup rail's own 16pt. It was five facts — title, record, rack, heart pill and a sentence doing the wipe's arithmetic — and every one of them was right while the lobby was a SHEET, because a sheet arrives with no context and has to say what it is. As a page under the Compete strip it inherits four of them: the lit tab names it, the masthead carries the held count, the record is what the run has done rather than what this page is for, and the sentence was static copy re-read on every visit. What survives is the only fact neither the strip nor the masthead can draw — WHICH hearts are riding, and on what. Matching the rail is the point rather than a side effect: both pages of the strip open with the identical mark, so switching between them moves the content underneath and leaves the reader's anchor where it was. Two states below: nothing riding, then a week fully committed."
             >
             <View style={{ gap: Spacing.four }}>
-              {/* The band paints itself now — there is no wash to reproduce by
-                  hand, which is what the removed first instance was for. */}
-              <LobbyHero run={KIT_RUN} staked={KIT_STAKED} week="Preseason 4" />
-              {/* A fresh run: no record, bottom rung, nothing carried. */}
-              <LobbyHero
-                run={{ ...KIT_RUN, wins: 0, losses: 0, wagered: 0, wageredIn: 0, carrySlots: 0, nextRung: { atWins: 3, cardSlots: 1 } }}
-                staked={KIT_STAKED}
-                week="Preseason 4"
-              />
-              {/* One heart left, deep in the ladder — the week the sheet is
-                  most worth reading and the state the copy is written for. */}
-              <LobbyHero
-                run={{ ...KIT_RUN, hearts: 1, wagered: 1, wageredIn: 1, wins: 9, losses: 4 }}
-                staked={KIT_STAKED}
-                week="Week 1"
-              />
+              {/* THE HEADER IS THE RACK NOW, so the three RUN states this used
+                  to show — fresh, mid-ladder, one heart left — no longer make
+                  three different headers. They differed in the COPY, and there
+                  is none: the strip names the page, the masthead carries the
+                  held count, and what is left is which hearts are riding.
+                  So what varies here is `staked`, which is the only input the
+                  header still has. */}
+              <LobbyHero staked={KIT_STAKED.map((k) => ({ ...k, entered: false }))} />
+              <LobbyHero staked={KIT_STAKED} />
             </View>
           </Section>
 
