@@ -2732,6 +2732,7 @@ export type Database = {
           weeks_played: number
         }[]
       }
+      my_run: { Args: never; Returns: Json }
       new_join_code: { Args: never; Returns: string }
       open_pack: {
         Args: { p_pack_code: string }
