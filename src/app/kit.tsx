@@ -1300,6 +1300,22 @@ function Kit() {
                 { key: 'contests', label: 'Contests', icon: 'contests', active: action === 'contests', onPress: () => setAction('contests') },
               ]}
             />
+            {/* THE COLLECT SECTION, AND THE ONE BAR SHAPE THE OTHERS DO NOT
+                SHOW: a tray of places with an ERRAND beside it.
+                `detached` splits Packs out of the tray and draws it after,
+                round and filled in the accent. The distinction is worth being
+                able to see next to the bars above it — every cell in a tray is
+                somewhere you can BE, and the highlight says which one you are
+                on; Packs is something you open, spend in and put down, and has
+                no highlight to show once you are "on" it. */}
+            <ActionBar
+              wide={false}
+              actions={[
+                { key: 'inventory', label: 'Inventory', icon: 'inventory', active: action === 'inventory', onPress: () => setAction('inventory') },
+                { key: 'sets2', label: 'Sets', icon: 'sets', active: action === 'sets2', onPress: () => setAction('sets2') },
+                { key: 'packs2', label: 'Packs', icon: 'shop', detached: true, onPress: () => setAction('packs2') },
+              ]}
+            />
             {/* Two items — the Players section. The cap on item width is what
                 stops this reading as the segmented control it replaced. */}
             <ActionBar

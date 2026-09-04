@@ -408,6 +408,22 @@ export const FANTASY_SECTIONS: NavSection[] = [
     children: [
       { href: "/fantasy/collect", label: "Inventory", icon: "inventory" },
       SETS,
+      /* PACKS RIDES THE STRIP AS A ROUND BUTTON, not as a third tab, and
+         `detached` is what says so — `ActionBar` splits it out of the tray and
+         draws it after, filled in the accent, at `ActionDiameter`.
+         The distinction it encodes is the one this section kept running into:
+         the tray is a set of PLACES, each somewhere you can be, and the
+         highlight says which one you are on. Packs is an errand — you open it,
+         spend in it, and put it down — so as a cell it would be a third board
+         you navigate to, and it would have no highlight of its own to show once
+         you were "on" it. Round, outside the tray, is the shape the app already
+         uses for that everywhere else.
+         `takeover` keeps it a sheet: `SectionNav` pushes it rather than
+         replacing, so the board underneath survives and closing puts you back
+         on it. And `detached` keeps it out of `webSectionOf`, so the wide
+         heading folds Inventory and Sets only — Packs has its own rail row
+         there, which is where a desktop puts an errand. */
+      PACKS,
     ],
     /* COLLECT CARRIES THE DAILY-PACK DOT, because Collect carries the shop —
        see `PACKS`, which is a chip on this board's toolbar and, on a phone,

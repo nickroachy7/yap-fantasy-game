@@ -29,7 +29,6 @@ import {
 } from "react-native";
 
 import { InventoryRow } from "@/components/collection/InventoryRow";
-import { DoorChip, Plus } from "@/components/ui/DoorChip";
 import { CollectionValue } from "@/components/collection/CollectionValue";
 import { RosterAlert } from "@/components/collection/RosterAlert";
 import { RosterCount } from "@/components/collection/RosterCount";
@@ -648,8 +647,6 @@ const GALLERY_SPARES = OWNED_MANY.map((card, i) => ({
 }));
 
 function InventoryFixture() {
-  const scheme = useColorScheme() === "dark" ? "dark" : "light";
-  const c = Colors[scheme];
   /* Live, because the row is only worth looking at in both its states: the mode
      off, and the mode on with ticks down the badge column. */
   /* The gallery ticks for real, because the circle IS the interaction now —
@@ -687,20 +684,10 @@ function InventoryFixture() {
             }}
           />
           <View style={styles.inventorySpacer} />
-          {/* ONE DOOR. Sets is the Collect strip's second tab now, so its chip
-              went from the real toolbar; this fixture follows, because a
-              gallery that draws a control the app no longer has is a reference
-              that teaches the wrong screen. */}
-          <View style={styles.inventoryDoors}>
-            <DoorChip
-              label="Packs"
-              accessibilityLabel="Packs"
-              onPress={() => {}}
-              fill={c.backgroundElement}
-              ink={c.text}
-              lead={<Plus color={c.textSecondary} />}
-            />
-          </View>
+          {/* NO DOORS. Both went to the Collect strip — Sets as a tab, Packs as
+              the round button beside it — so the real toolbar is a readout and
+              nothing else. The fixture follows: a gallery drawing controls the
+              app no longer has is a reference that teaches the wrong screen. */}
         </View>
         {/* The one state that draws a band. Under the cap it is null, and it is
             layout-neutral, so the gutter comes from here. */}
@@ -1785,12 +1772,6 @@ const styles = StyleSheet.create({
   },
   inventorySpacer: { flex: 1, minWidth: 0 },
   /* The doors, as one cluster — the product's own gap. */
-  inventoryDoors: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.two - 2,
-    flexShrink: 0,
-  },
   rows: { gap: 1 },
   row: {
     flexDirection: "row",

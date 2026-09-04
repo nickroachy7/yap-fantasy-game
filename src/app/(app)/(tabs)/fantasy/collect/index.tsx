@@ -78,9 +78,6 @@ import { InventoryRow } from '@/components/collection/InventoryRow';
 import { sortCards, summarise, type CollectionCard } from '@/components/collection/types';
 import { useCollection } from '@/components/collection/use-collection';
 import { Screen } from '@/components/shell/Screen';
-import { PACKS } from '@/components/shell/sections';
-import { useIsWide } from '@/components/shell/useResponsive';
-import { DoorChip, Plus } from '@/components/ui/DoorChip';
 import { quietScrollbar } from '@/components/ui/scroll-strip';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
@@ -146,8 +143,6 @@ export default function InventoryScreen() {
   const router = useRouter();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  /* The rail draws Packs as a row of its own on wide. See the doors. */
-  const wide = useIsWide();
   const { cards, error, loading, refreshing, refresh } = useCollection();
   /* The roster comes off the SAME context as the header's count, which is what
      makes it move the instant a sale lands rather than on the next focus — see
@@ -496,27 +491,15 @@ export default function InventoryScreen() {
                   load-bearing. */}
               <RosterCount roster={roster} />
               <View style={styles.spacer} />
-              {/* ONE DOOR, AND ONLY ON A PHONE. Sets had the other and does
-                  not need it: it is the Collect strip's second tab now, a
-                  switcher one row above this toolbar and present on both of
-                  this section's pages. A chip beside a tab to the same room is
-                  the same way in drawn twice.
-                  Packs is not a tab and never will be — it is an errand you
-                  open, spend in and put down — so it keeps its chip, and keeps
-                  it on the same rule as before: nothing on wide, where the rail
-                  carries Packs as a row of its own. */}
-              {wide ? null : (
-                <View style={styles.doors}>
-                  <DoorChip
-                    label={PACKS.label}
-                    accessibilityLabel="Packs"
-                    onPress={() => router.push(PACKS.href as never)}
-                    fill={c.backgroundElement}
-                    ink={c.text}
-                    lead={<Plus color={c.textSecondary} />}
-                  />
-                </View>
-              )}
+              {/* NO DOORS LEFT ON THIS ROW. Sets went to the strip as a tab and
+                  Packs has followed it there as the round button on its right,
+                  which is `ActionBar`'s shape for an errand — see `PACKS` in
+                  `sections.ts`.
+                  What that leaves is a toolbar that is purely a READOUT about
+                  the cards underneath it: what they are worth, and how many of
+                  the cap they fill. That is what this row was always best at;
+                  the doors were here because there was no bar to hang them on,
+                  and now there is. */}
             </View>
 
             <FlatList
@@ -664,7 +647,6 @@ const styles = StyleSheet.create({
   /* The two doors, as one cluster rather than two buttons that happen to be
      near each other — the same gap the lineup rail sets between its own pair,
      which is the chip's internal one. */
-  doors: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two - 2, flexShrink: 0 },
   /* `minWidth: 0` is load-bearing, and it is the trend board's note verbatim:
      without it the chips' ScrollView reports its full content width as its
      minimum and pushes the buttons off the row instead of scrolling inside what
