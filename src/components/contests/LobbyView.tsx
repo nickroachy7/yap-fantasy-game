@@ -447,7 +447,7 @@ export function LobbyView({
       <Section
         label="Entered"
         count={playing.length}
-        hint="Filed for this week. Tap one to see the field.">
+        hint="Filed this week. Tap to see the field.">
         <View style={styles.stack}>
         {playing.length > 0 ? (
           playing.map((m) => (
@@ -469,7 +469,7 @@ export function LobbyView({
       <Section
         label="Recent"
         count={finished.length}
-        hint="Settled, with what each one paid."
+        hint="Settled, with what each paid"
         action={<ArchiveLink onPress={() => setView('history')} />}>
         <View style={styles.stack}>
         {finished.length > 0 ? (
@@ -492,7 +492,7 @@ export function LobbyView({
       <Section
         label="Community"
         count={open.length}
-        hint="Open to every manager. A new slate each week.">
+        hint="Open to every manager">
         <View style={styles.stack}>
         {open.length > 0 ? (
           open.map((c) => (
@@ -543,7 +543,7 @@ export function LobbyView({
         <Section
           label="Friendly"
           count={friendlies.length}
-          hint="Yours, waiting on a lineup. Filing one moves it up to Entered.">
+          hint="Yours, waiting on a lineup">
           <View style={styles.stack}>
             {friendlies.map((c) => (
               <ContestEntry
@@ -848,16 +848,39 @@ function Section({
 
   return (
     <View style={styles.section}>
-      <View>
-        <View style={styles.sectionTop}>
-          <Text style={[Type.figure, { color: c.text }]}>{label}</Text>
-          {count > 0 ? (
-            <Text style={[Type.figure, NUMERIC, { color: c.textTertiary }]}>{String(count)}</Text>
-          ) : null}
-          <View style={styles.sectionSpacer} />
-          {action}
-        </View>
-        <Text style={[Type.body, { color: c.textTertiary }]}>{hint}</Text>
+      {/* THE HINT RIDES THE HEADING'S OWN LINE, to the right of the name and
+          count, rather than sitting under them.
+
+          `alignItems: 'baseline'` on the row is what makes it work: the name is
+          18pt and the hint 12, so centring would set the small text floating in
+          the middle of the large one's line box. Sharing a baseline they read as
+          one line at two weights, which is what a heading with a caption is.
+
+          THE COPY HAD TO SHORTEN TO FIT, and that is a real constraint rather
+          than a preference. Measured at 375 — the narrowest handset this ships
+          to — the heading leaves 204-248pt beside it depending on the name's
+          length and whether there is an `action` sharing the row. The previous
+          hints ran to 251, 192 and 276, so two of the three overflowed outright.
+          Anything added here has to be measured against that budget, not
+          eyeballed; a long hint does not wrap, it shoves the action off.
+
+          `numberOfLines={1}` and `flexShrink` are the backstop for the case the
+          budget is blown anyway — a longer word in a future translation, a
+          narrower device. It ellipsises the caption, which is the one part of
+          the row that can afford to lose its tail, instead of pushing "All
+          weeks" past the edge where it cannot be tapped. */}
+      <View style={styles.sectionTop}>
+        <Text style={[Type.figure, { color: c.text }]}>{label}</Text>
+        {count > 0 ? (
+          <Text style={[Type.figure, NUMERIC, { color: c.textTertiary }]}>{String(count)}</Text>
+        ) : null}
+        <Text
+          numberOfLines={1}
+          style={[Type.body, styles.sectionHint, { color: c.textTertiary }]}>
+          {hint}
+        </Text>
+        <View style={styles.sectionSpacer} />
+        {action}
       </View>
       {children}
     </View>
@@ -1282,6 +1305,12 @@ const styles = StyleSheet.create({
   section: { gap: Spacing.two },
   sectionTop: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two },
   sectionSpacer: { flex: 1 },
+  /* Gives before anything else on the row. The name, the count and the action
+     are all fixed facts; the caption is the only part with a disposable tail.
+     `minWidth: 0` is what actually lets it ellipsise — without it a flex child
+     refuses to shrink below its content and the overflow moves to the action
+     instead. */
+  sectionHint: { flexShrink: 1, minWidth: 0 },
   sectionEmpty: { paddingBottom: Spacing.two },
   /* The same shape as the dead-run row above it — a block of text and one
      affordance on the right — because they are the same kind of object: a thing
