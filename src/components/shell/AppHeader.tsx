@@ -45,21 +45,29 @@
  * exists and which corners round, and a container whose shape depends on config
  * is a container the eye cannot learn.
  *
- * A pill each has no such state, and that is where this landed first — two
- * matching pills, hearts then coins. Matching was the bug. The capsule was
- * wrong to say hearts and coins are ONE fact; a matched pair says something
- * nearly as wrong, which is that they are two facts of the SAME KIND.
+ * A pill each has no such state, and that is where this has landed: two
+ * matching pills, coins over hearts.
  *
- * They are not. A coin is spent and earned back — two-way, a balance. A heart
- * is staked and lost and never earned — one-way, a life total. The trap that
- * follows is concrete: the coin figure drops when you spend, the heart figure
- * does not drop when you stake, and same-shaped neighbours behaving oppositely
- * is the one pairing a reader cannot learn.
+ * IT SPENT A WHILE UN-PILLED, and the argument is worth keeping because it is
+ * a real one and it was overruled on looks rather than refuted. It ran: a coin
+ * is spent and earned back — two-way, a balance — while a heart is staked and
+ * lost and never earned, one-way, a life total. Two matched shapes claim they
+ * are facts of the same KIND, and the trap is concrete: the coin figure drops
+ * when you spend, the heart figure does not drop when you stake, so
+ * same-shaped neighbours behave oppositely. A pill reads as a container of
+ * something countable; a bare mark and figure reads as a state.
  *
- * So the heart gave up the fill. A pill reads as a container of something
- * countable; a bare mark and figure reads as a state. Same type, same size, no
- * box — and a little more air against the coin than the coin takes against the
- * gear, so the two read as two objects rather than as a set. See `life`.
+ * That is still true. What it was weighed against is that an un-pilled figure
+ * beside a pilled one reads as unfinished — one balance in a container and one
+ * loose next to it, on a masthead where they are the only two objects. Nick
+ * called it, twice, looking at the real thing on a phone.
+ *
+ * WHAT ACTUALLY CARRIES THE DISTINCTION NOW is the mark, not the box: a coin
+ * and a heart are not confusable glyphs, and the heart's own three states
+ * (`Hearts`) say more about one-wayness than a missing fill ever did. If the
+ * pairing does turn out to mislead, the lever is the FIGURE — a heart that
+ * showed held-of-rack rather than a bare count would state its own direction —
+ * rather than taking the box away again.
  *
  * THEY ARE STACKED, AND COINS SIT ON TOP.
  *
@@ -314,16 +322,21 @@ const WORDMARK_MIN_SCALE = 0.8;
  * 393 is the first width where 14 fits outright — the iPhone 14/15/16 and up.
  * Below it every handset is 375 or 390.
  *
- * IT WENT TO 11.5 FOR A DAY, while the heart was a PILL beside the coin.
+ * IT WENT TO 11.5 FOR A DAY, while the heart was a pill BESIDE the coin.
  * Measured in the browser at 375 with both pills up and a five-figure balance,
  * the wordmark rendered at 104.0 into 104.0 of box — fitting exactly, with
  * nothing left, so the next coin digit would have truncated the brand to "YAP
  * FANTAS…" with no warning and on the narrow phones only.
  *
- * Un-pilling the heart (see `life`) handed back 11 points, which is more than
- * the tightening was buying, so the brand is back at 12.5. Re-measured at 375
- * with the same balance: 97.3 of wordmark in 154 of box, about 20 points spare
- * — roughly a digit and a half of coin.
+ * THAT ARGUMENT DIED WITH THE STACK, and the heart being a pill again does not
+ * revive it. Un-pilling handed back 11 points at the time, but only because the
+ * two balances sat side by side and their widths added. Stacked, the column is
+ * as wide as the WIDER of them — which is the coin, by a country mile, since it
+ * carries four or five figures against the heart's one. So the heart's box now
+ * costs the wordmark nothing at all, and the brand stays at 12.5.
+ *
+ * The wall is unchanged and is still the coin's alone: it moves only when the
+ * balance gains a digit.
  *
  * THE WALL IS STILL THERE, further out: seven figures of coin exhausts it, on
  * web by truncating and on native by hitting `WORDMARK_MIN_SCALE`. The fix
@@ -403,14 +416,28 @@ function Pill({
   value,
   color,
   surface,
+  label,
 }: {
   mark: ReactNode;
   value: string;
   color: string;
   surface: string;
+  /**
+   * What a screen reader says instead of the figure alone.
+   *
+   * The mark is an SVG with no text in it, so without this a reader hears "3"
+   * and has no way to learn it is hearts. The coin pill can go without — its
+   * figure is announced inside a header that has already said "coins" nowhere
+   * either, which is its own gap, but the heart's is the one that reads as a
+   * bare number next to nothing.
+   */
+  label?: string;
 }) {
   return (
-    <View style={[styles.pill, { backgroundColor: surface }]}>
+    <View
+      style={[styles.pill, { backgroundColor: surface }]}
+      {...(label ? { accessible: true, accessibilityRole: 'text' as const, accessibilityLabel: label } : null)}
+    >
       {mark}
       <Text style={[styles.figure, NUMERIC, { color }]}>{value}</Text>
     </View>
@@ -578,13 +605,15 @@ export function AppHeader({
               heart. The row's own tightness is unchanged; there is simply less
               in it.
 
-              The shapes do NOT converge. A bare mark over a pill is the same
-              argument `life` makes at length — a coin is a balance, a heart is
-              a life total — and stacking is exactly where a reader would start
-              to expect a matched pair, so the asymmetry has to keep working
-              harder, not less. Right-aligned rather than centred for the same
-              reason: a shared right edge is alignment, a shared centre line
-              would be pairing. */}
+              THE SHAPES CONVERGE NOW, and the header's own note records what
+              that gave up — a bare mark used to say "state" where a pill says
+              "container of something countable". Overruled on looks: one
+              balance in a box beside one loose figure read as unfinished.
+
+              Right-aligned rather than centred, which matters MORE now than it
+              did: with two identical shapes a shared centre line would make
+              them a single stacked object, while a shared right edge is the
+              masthead's own edge and reads as two things ending at it. */}
           <View style={styles.balances}>
             {showCoins ? (
               <Pill
@@ -595,23 +624,19 @@ export function AppHeader({
               />
             ) : null}
             {showHearts ? (
-              <View
-                accessible
-                accessibilityRole="text"
-                accessibilityLabel={
+              <Pill
+                mark={<Heart size={12} state="free" />}
+                value={loading || !run ? "—" : String(held)}
+                color={c.text}
+                surface={c.surface}
+                label={
                   loading || !run
                     ? "Hearts"
                     : held === 1
                       ? "1 heart"
                       : `${held} hearts`
                 }
-                style={styles.life}
-              >
-                <Heart size={12} state="free" />
-                <Text style={[styles.figure, NUMERIC, { color: c.text }]}>
-                  {loading || !run ? "—" : String(held)}
-                </Text>
-              </View>
+              />
             ) : null}
           </View>
           <Link href={settingsHref as never} asChild>
@@ -750,24 +775,6 @@ const styles = StyleSheet.create({
    * not read as a set. Small, and it is the difference between two objects and
    * a pair.
    */
-  life: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    /* The 5pt that used to hold the heart off the coin horizontally is gone —
-       stacked, that joint is `balances.gap`.
-
-       THIS 8 IS THE PILL'S OWN `paddingHorizontal`, PAID BY A THING WITH NO
-       PILL. Right-aligning the two boxes is not the alignment that matters:
-       the pill insets its figure by 8 and a bare mark does not, so matching
-       box edges puts the heart's digit 8pt to the right of the coin's, and a
-       stack of two numbers is read DOWN — the figures are what the eye lines
-       up, not the containers around them. Borrowing the pill's padding as
-       empty space is what makes the two digits share an edge while the fill
-       still stops where it should. */
-    paddingRight: 8,
-    flexShrink: 0,
-  },
   /* The stack. Right-aligned so both balances share the edge the gear sits
      against; see the note at the call site for why they are not centred and
      why the two keep different shapes. `paddingRight` replaces the 5pt `life`
