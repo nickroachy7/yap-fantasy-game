@@ -106,7 +106,6 @@ import {
   type HeartResult,
   type HeartSpan,
 } from "@/components/runs/Hearts";
-import { DOOR_HEIGHT } from "@/components/ui/DoorChip";
 import { Spacing } from "@/constants/theme";
 import type { PlayerState } from "@/context/PlayerContext";
 
@@ -818,58 +817,48 @@ function RunRail({
      hearts are riding and which contest each one belongs to. */
   return (
     <View style={styles.rail}>
-      {/* THE RUN, AT THE HEAD OF THE ROW: what is riding, and nothing else.
-          The COUNT is not drawn here — it went back to `AppHeader`, because a
-          heart is stakeable from screens this rail is not on and a count that
-          lives on one board is a count you have to go and look up. The RACK
-          stayed: one pip per card, each carrying free/wagered/killed and each a
-          link to the contest it rides on, none of which survives at masthead
-          size. Held travels; riding stays. */}
-      <View style={styles.run}>
-        {/* THE LOBBY SHORTCUT IS GONE, and so is the labelled door at the end
-            of this row. Both opened the contests screen, which is the Compete
-            strip's second tab now — a permanent switcher one row up, on every
-            page in the section. A door beside a tab to the same room is not a
-            second way in, it is the same way in drawn twice, and this row was
-            already spending its whole width arguing about which of the two
-            should carry the accent.
-            What the rail keeps is what only it can say: how many hearts are
-            held, and which contest each pip belongs to. */}
-
-        {/**
-         * THE PAGER, BESIDE THE COUNT RATHER THAN ON THE COLUMN'S CENTRE.
-         *
-         * ---------------------------------------------------------------------
-         * IT WAS IN A TRAY, THEN ON THE MIDDLE, AND BOTH WERE ANSWERING THE
-         * ROW IT USED TO BE IN
-         * ---------------------------------------------------------------------
-         *
-         * The rack sat in a filled pill at the left of the row to enclose a
-         * hundred points of dead space; the pill read as a panel of status, so
-         * it went and the rack took the column's true centre between two doors.
-         * Centring was right for a row with a door at each end. This row has
-         * both doors at one end, so a centred pager would float in the middle of
-         * nothing with the run's own count stranded away from it.
-         *
-         * SO IT JOINS THE COUNT. Held and riding are two halves of one fact and
-         * they now read left to right in that order, which is also the order a
-         * player asks them in: how many do I have, how many are already out.
-         *
-         * THE RACK IS STILL THE HALF THAT GIVES. `minWidth: 0` and a clip here,
-         * nothing shrinkable on the pill or the doors: a week with eight cards
-         * squeezes the pips and never anything else. That was the tray's one
-         * good idea and it has survived both moves.
-         */}
-        <View style={styles.pager}>
-          <ContestHearts
-            entries={pips}
-            focus={focus}
-            size={PIP_SIZE}
-            onPress={(i) => onGo(pips[i].contest)}
-          />
-        </View>
+      {/**
+       * THE RACK, CENTRED, AND IT IS THE ONLY THING ON THIS ROW.
+       *
+       * ---------------------------------------------------------------------
+       * CENTRING IS BACK BECAUSE THE ROW IS BALANCED AGAIN
+       * ---------------------------------------------------------------------
+       *
+       * This has moved three times and each move was answering the row it was
+       * in, not the rack itself. It sat in a filled pill at the left to enclose
+       * a hundred points of dead space; the pill read as a panel of status, so
+       * it went and the rack took the column's true centre between two doors.
+       * Then both doors moved to one end, and a centred pager would have
+       * floated in the middle of nothing — so it went left to join them.
+       *
+       * The doors are gone entirely now (they are the Compete strip's second
+       * tab), which removes the thing it was aligning ITSELF AGAINST. Left with
+       * one object on the row, left-alignment is not a choice any more, it is
+       * the residue of a layout that no longer exists — the pips sat where a
+       * door used to be beside them. Centred, the rack reads as what it is: a
+       * caption under the card, on the card's own axis.
+       *
+       * THE COUNT IS NOT HERE and does not come back. It lives in `AppHeader`,
+       * because a heart is stakeable from screens this rail is not on and a
+       * count that exists on one board is a count you have to go and look up.
+       * The rack stayed because none of what it carries — a pip per card,
+       * free/wagered/killed, each a link to its contest — survives at masthead
+       * size. Held travels; riding stays.
+       *
+       * THE RACK IS STILL THE HALF THAT GIVES. `minWidth: 0` and the clip on
+       * `pager`: a week with eight cards squeezes the pips, and with nothing
+       * else on the row there is nothing else it could squeeze. Once they fill
+       * the width, centring is a no-op and the clip takes over — the two
+       * behaviours hand off without a breakpoint.
+       */}
+      <View style={styles.pager}>
+        <ContestHearts
+          entries={pips}
+          focus={focus}
+          size={PIP_SIZE}
+          onPress={(i) => onGo(pips[i].contest)}
+        />
       </View>
-
     </View>
   );
 }
@@ -994,53 +983,11 @@ const styles = StyleSheet.create({
   rail: {
     flexDirection: "row",
     alignItems: "center",
+    /* The rack is the row's only object, so the row's centre is its centre —
+       see the note at the render. */
+    justifyContent: "center",
     paddingTop: Spacing.two + 2,
     gap: Spacing.three,
-  },
-  /**
-   * THE RUN: held, then riding.
-   *
-   * `flexGrow` takes the slack so the doors sit on the right edge, and
-   * `flexShrink` with the clip on the pager inside means a crowded week is paid
-   * for by the pips alone. The pill does not shrink; a truncated balance is not
-   * a balance.
-   */
-  run: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.two,
-    flexGrow: 1,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  /**
-   * The shortcut into the lobby, in the slot the heart pill vacated.
-   *
-   * SQUARE, AT THE SMALL DOOR'S HEIGHT. `DOOR_HEIGHT` rather than the chip at
-   * the far end, because this is the quiet half of the pair — a 32pt circle at
-   * the head of the row would compete with the labelled door for the same act.
-   * A full round rather than the pill's `999`: with no word in it the shape has
-   * nothing to be long for, and a circle is what the eye reads as "a mark you
-   * press" beside a rack of drawn hearts.
-   */
-  enter: {
-    width: DOOR_HEIGHT,
-    height: DOOR_HEIGHT,
-    borderRadius: DOOR_HEIGHT / 2,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  /* The doors, and neither of them ever gives. See the note where they are
-     drawn, and `DoorChip` for the chip itself — the collection's toolbar draws
-     the same pair, which is why the geometry no longer lives in this file. The
-     gap is the chip's own internal one, so the two read as one cluster rather
-     than as two buttons that happen to be near each other. */
-  doors: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.two - 2,
-    flexShrink: 0,
   },
   /* The rack. `overflow: hidden` is the interim answer to a week with more
      cards than the row can hold — a clipped pager is recoverable by swiping,
@@ -1059,5 +1006,4 @@ const styles = StyleSheet.create({
   /* One page. The card sits in the middle of it with a gutter either side, and
      the gutters are what you see between two cards mid-drag. */
   page: { paddingHorizontal: PAGE_GUTTER },
-  pressed: { opacity: 0.6 },
 });
