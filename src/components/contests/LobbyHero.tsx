@@ -9,7 +9,6 @@
 import { StyleSheet, View } from 'react-native';
 
 import { ContestHearts, type HeartResult } from '@/components/runs/Hearts';
-import { Spacing } from '@/constants/theme';
 
 /**
  * THE TOP OF THE CONTESTS PAGE IS THE RACK, AND NOTHING ELSE.
@@ -60,12 +59,20 @@ const styles = StyleSheet.create({
      makes it reach. A background or a negative margin here would double the
      escape and hang the fill 16pt off each edge of the screen.
 
+     AND NO PADDING OF ITS OWN EITHER, which is the part that had gone stale.
+     It carried `Spacing.two` top and bottom, which was right for a header of
+     five stacked rows — a block that needed to be a block. One 16pt mark is not
+     a block, and that padding was landing ON TOP of the scroller's own rhythm:
+     `PlayerSheetFrame.content` already sets `paddingTop: Spacing.three` above
+     the first child and a `gap: Spacing.three` between every child after it. So
+     the rack was sitting in ~24pt above and ~26pt below — fifty points of air
+     around sixteen points of heart.
+     Taking this to nothing leaves the scroller's 16/16, which is the same
+     rhythm every other shelf on the page is set to. The rack is a row in that
+     list now rather than a header above it, and it should be spaced like one.
+
      `alignItems` is the centring, and it is the row's rather than the rack's —
      `ContestHearts` draws its pips at their natural width, so the band is what
      has the space to give. Same arrangement the lineup rail arrived at. */
-  band: {
-    alignItems: 'center',
-    paddingTop: Spacing.two,
-    paddingBottom: Spacing.two + 2,
-  },
+  band: { alignItems: 'center' },
 });
