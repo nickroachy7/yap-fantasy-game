@@ -61,7 +61,7 @@
  * `ConfirmDialog` all hit this; the fix is the same one — the backdrop is laid
  * behind the card, not around it.
  */
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Animated,
   PanResponder,
@@ -98,6 +98,7 @@ export function PlayerSheetFrame({
   dismissible = true,
   frame = 'sheet',
   footerGlass = false,
+  fitsWithoutScrolling = false,
   tone,
   surface,
   pinned,
@@ -156,6 +157,23 @@ export function PlayerSheetFrame({
    * wrong in either direction leaves a visible second bar.
    */
   footerGlass?: boolean;
+  /**
+   * THE SHEET IS A FIXED PANEL, NOT A SCROLLER — for a caller whose content is
+   * meant to fit on one screen and be pressed rather than read through.
+   *
+   * MEASURED, NOT ASSERTED, which is the whole design of it. Turning scrolling
+   * off with a flag would be a promise about every device from a caller that
+   * has only seen one: content that overflows on a shorter phone is content the
+   * player cannot reach, and the thing stranded off the bottom of the packs
+   * sheet would be a button they have paid attention to and cannot press.
+   *
+   * So the flag says "this SHOULD fit" and the frame checks whether it does,
+   * every layout. If the content is taller than the viewport it scrolls exactly
+   * as it always has; if it fits, scrolling and its bounce go away and the
+   * panel sits still. On the screen it was designed for, that is "no scroll".
+   * On a screen it was not, it is still usable.
+   */
+  fitsWithoutScrolling?: boolean;
   /**
    * A colour to wash the top of the sheet with — the card profile's tier, the
    * player profile's club.
@@ -439,6 +457,22 @@ export function PlayerSheetFrame({
     [dragY, settle],
   );
 
+  /* Both halves of the comparison, and neither is known until the first layout
+     — so the default is `true`, i.e. scrollable. Guessing the other way would
+     make a sheet unscrollable for one frame on every open, which on a slow
+     mount is a real gesture landing on a dead scroller. */
+  const [overflows, setOverflows] = useState(true);
+  const viewportH = useRef(0);
+  const contentH = useRef(0);
+  const remeasure = useCallback(() => {
+    if (viewportH.current === 0 || contentH.current === 0) return;
+    /* A POINT OF SLACK. Content that is taller by a hairline is content nobody
+       can tell is cut off, and letting it scroll produces a panel that jiggles
+       by one point under the thumb — which reads as broken in a way that being
+       one point short does not. */
+    setOverflows(contentH.current > viewportH.current + 1);
+  }, []);
+
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = e.nativeEvent.contentOffset.y;
     const past = y > TITLE_REVEAL_AT;
@@ -455,15 +489,21 @@ export function PlayerSheetFrame({
     }
   };
 
+  /* A SHEET THAT CANNOT SCROLL CAN NEVER REVEAL ITS TITLE, because the reveal
+     is driven by scroll offset. So a fitting panel shows it from the start —
+     which is also what lets such a caller drop its in-content hero, and that
+     hero is usually the reason the content did not fit. */
+  const titleAlways = fitsWithoutScrolling && !overflows;
+
   useEffect(() => {
     Animated.timing(titleFade, {
-      toValue: titleShown ? 1 : 0,
+      toValue: titleShown || titleAlways ? 1 : 0,
       duration: 140,
       /* react-native-web drives opacity through the JS animator and warns when
          asked for the native one. */
       useNativeDriver: Platform.OS !== 'web',
     }).start();
-  }, [titleShown, titleFade]);
+  }, [titleShown, titleAlways, titleFade]);
 
   /* Escape closes it. `onRequestClose` covers Android's back button and nothing
      else — react-native-web does not map the key — so without this a keyboard
@@ -750,13 +790,48 @@ export function PlayerSheetFrame({
            the tail is owed. */
         {
           paddingBottom:
-            (footerGlass ? footerHeight : footer || isWeb ? 0 : bottom) + Spacing.four,
+            (footerGlass ? footerHeight : footer || isWeb ? 0 : bottom) +
+            /* THE TAIL IS FOR SCROLLING. It exists so the last row can be
+               flicked clear of the bottom edge and read; a panel that does not
+               move has nothing to flick and the row is already where it will
+               stay. The home indicator's clearance is not part of that and
+               stays either way. */
+            (fitsWithoutScrolling && !overflows ? 0 : Spacing.four),
         },
         /* With the header floating, the grabber floats too, so the content has
            to reserve the space it used to occupy in flow or the hero starts
            underneath it. True of the narrow web sheet as well now. */
         floats && { paddingTop: HANDLE_BLOCK + Spacing.three },
+        /* ROOM FOR A HEADER THAT NEVER LEAVES.
+        
+           The floating title is drawn OVER the content and is normally revealed
+           by scrolling, so by the time it exists the content it would cover has
+           already moved out from under it. A panel that cannot scroll shows it
+           from the first frame with nothing having moved, and it lands on top
+           of the first row.
+        
+           KEYED OFF THE PROP, NOT OFF `overflows`, and that is the whole reason
+           this line is worth a comment. Reserving the space only when the sheet
+           currently fits would make the content taller, which can make it stop
+           fitting, which removes the space, which makes it fit again — a layout
+           that oscillates forever at exactly one screen of content. The prop is
+           a constant, so the padding is a constant, and the measurement is left
+           to decide one thing only: whether scrolling is on. */
+        fitsWithoutScrolling && { paddingTop: HANDLE_BLOCK + barHeight + Spacing.two },
       ]}
+      /* See `fitsWithoutScrolling`. `bounces` goes with it: a panel that cannot
+         scroll but still rubber-bands is a panel that looks like it failed to
+         scroll rather than one that had no need to. */
+      scrollEnabled={!fitsWithoutScrolling || overflows}
+      bounces={!fitsWithoutScrolling || overflows}
+      onLayout={(e) => {
+        viewportH.current = e.nativeEvent.layout.height;
+        remeasure();
+      }}
+      onContentSizeChange={(_w, h) => {
+        contentH.current = h;
+        remeasure();
+      }}
       onScroll={onScroll}
       scrollEventThrottle={32}
       keyboardShouldPersistTaps="handled">

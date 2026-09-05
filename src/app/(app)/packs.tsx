@@ -51,9 +51,8 @@ import { PackShelf, type Pack, type Pulled } from '@/components/cards/PackShelf'
 import { advancePull, beginPull, endPull, finishPull } from '@/components/cards/pull-session';
 import { invalidateCollection } from '@/components/collection/use-collection';
 import { invalidateSets } from '@/components/collection/use-sets';
-import { Coin } from '@/components/shell/AppHeader';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
-import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
+import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
@@ -63,8 +62,7 @@ export default function PacksScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
   const router = useRouter();
-  const gold = TierColors[scheme].gold.accent;
-
+  
   // Single source of truth for the balance: the header reads the same value, so
   // fetching it separately here is how the two drift apart.
   const { coins, refresh, applyCardDelta } = usePlayer();
@@ -285,6 +283,12 @@ export default function PacksScreen() {
          frame fades the small copy in once that has scrolled away. */
       title="Packs"
       subtitle={`${coins.toLocaleString()} coins`}
+      /* THE SHELF IS MEANT TO FIT, so the frame stops scrolling when it does —
+         see `fitsWithoutScrolling`, which measures rather than trusting this.
+         Everything on this sheet is a control: five cards, each one a decision
+         and a button. Nothing here is read top to bottom, so a scroller was
+         offering a gesture with nowhere to go. */
+      fitsWithoutScrolling
       /* NO TONE. Every other sheet in the app washes its top edge in the colour
          OF something — a tier, a club, a set — and packs has no such subject:
          the gold it was taking is the coin's, which is the currency the shelf
@@ -294,38 +298,12 @@ export default function PacksScreen() {
       tone={null}
       onClose={close}
       closeLabel="Close packs">
-      {/* THE BALANCE SITS WHERE THE LOBBY'S HEARTS SIT, and it is the same
-          object: a title on the left, the currency the screen is priced in as a
-          pill at the right end. `LobbyHero` has the account of why that shape
-          won there — a header a reader takes in on the way past rather than a
-          block they have to get through.
-
-          NO `SheetToneBand` AROUND IT ANY MORE, and no paragraph under it.
-
-          The band existed to paint the wash; with no tone there is nothing to
-          paint, and its geometry — reaching over the grabber, reaching into the
-          overscroll — is geometry for a colour that is not there.
-
-          The sentence it held said every card starts at bronze and climbs by
-          scoring. That is true, general, and belongs where the rules live: it
-          is step five of How to Play, one tap from the masthead on this and
-          every other screen. On the shelf it was two lines of prose above the
-          thing the player came to press, on a sheet that could not fit its own
-          contents. */}
-      <View style={styles.hero}>
-        <View style={styles.titleRow}>
-          <Text style={[Type.page, { color: c.text }]}>Packs</Text>
-          <View style={styles.spacer} />
-          {/* The masthead's own pill, at the masthead's own size — the same one
-              the lobby draws its heart count in. */}
-          <View style={[styles.pill, { backgroundColor: c.surface }]}>
-            <Coin size={12} color={gold} />
-            <Text style={[Type.strong, NUMERIC, { color: c.text }]}>
-              {coins.toLocaleString()}
-            </Text>
-          </View>
-        </View>
-      </View>
+      {/* NO HERO. The title and the balance were a 26pt heading and a coin pill
+          at the top of the content — which is exactly what the frame's own
+          header carries, and the frame shows it from the start on a sheet that
+          does not scroll (see `fitsWithoutScrolling`). Two titles for one sheet
+          was affordable while the sheet scrolled past the first one; on a panel
+          that has to fit, it was fifty points spent saying `Packs` twice. */}
 
       {error ? (
         <View style={[styles.notice, { borderColor: c.negative, backgroundColor: c.surface }]}>
