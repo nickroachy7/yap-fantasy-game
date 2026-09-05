@@ -72,7 +72,6 @@ import {
   heartFull,
   heartLoss,
   heartTie,
-  heartWagered,
   heartWin,
 } from '@/components/icons/glyphs';
 import { GRID, type Glyph } from '@/components/icons/system';
@@ -99,10 +98,11 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  *   a heart you definitely held looked hollow and the most important number on
  *   the screen read backwards. A staked heart is still solid.
  *
- *   THE BLADE IS A FOREIGN OBJECT, NOT DAMAGE. A crack through a heart is the
- *   universal picture of one that has ALREADY broken, so it cannot also mean
- *   "this one might". Nothing has happened to a wagered heart yet; something is
- *   merely poised to.
+ *   THE BLADE WAS A FOREIGN OBJECT, NOT DAMAGE — and it is gone anyway, for a
+ *   reason that has nothing to do with that distinction being wrong. It held:
+ *   a crack through a heart is the universal picture of one that has ALREADY
+ *   broken, so it could not also mean "this one might". What it did not survive
+ *   is a ROW of them. See `HeartState`.
  *
  *   THE TORN HEART IS GREY, NOT FADED RED. A faint red pip in a row of solid
  *   ones reads as a warning about the hearts you still have.
@@ -134,6 +134,82 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  */
 const VIEW_BOX = '2 2 20 20';
 const BOX = 1.17;
+
+/**
+ * What a heart IS to the run.
+ *
+ * ---------------------------------------------------------------------------
+ * `wagered` NO LONGER HAS A DRAWING OF ITS OWN
+ * ---------------------------------------------------------------------------
+ *
+ * It had one for a fortnight — `heartWagered`, a sword laid diagonally through
+ * the heart — and the argument for it is a few lines up: the blade is a foreign
+ * object rather than damage, so it says "something is poised to happen to this"
+ * where a crack would say "something already has".
+ *
+ * The drawing was doing that job and a second one nobody asked it to. A row of
+ * three staked hearts is three swords, and at pip size the blades read before
+ * the hearts do — a rack of struck-through marks that looks like a row of
+ * things CANCELLED, which is the one thing a staked heart is not. It is the
+ * reading a reader arrives at without being told, and it beat the intended one.
+ *
+ * So a held heart is a held heart, staked or not, and the states differ in what
+ * they are worth rather than in what they look like:
+ *
+ *   free      a whole red heart.
+ *   wagered   the same whole red heart. Riding on a contest.
+ *   pending   grey at a third — a contest that WANTS a heart and has none yet.
+ *   killed    the torn glyph, grey. Gone.
+ *
+ * WHAT THIS COSTS, STATED SO IT IS A CHOICE AND NOT A GAP: inside `Hearts` —
+ * the run's own rack — free and wagered are now indistinguishable, and that
+ * rack reports "hearts you hold" alone. The distinction did not vanish with the
+ * artwork; it moved to the two places that can carry it in words. Every pip
+ * still announces itself to a screen reader, and the masthead figure is now the
+ * FREE count rather than the held one, so staking is visible as the number
+ * moving. See `AppHeader`.
+ *
+ * `ContestHearts` is untouched by any of this: its row is entered-vs-not, which
+ * is `wagered` against `pending`, and those are still red against grey.
+ */
+/**
+ * A PIP: the size every row of one-heart-per-contest draws at.
+ *
+ * It lives here rather than at either call site because BOTH the lineup rail
+ * and the lobby's header draw that row, they are meant to be the identical
+ * object — see `LobbyHero` — and a number copied into two files is a number
+ * that drifts the first time either is touched.
+ *
+ * IT HAS COME DOWN FROM 24, TO 20, TO 16, TO 14, AND NOW TO 12. The first two
+ * cuts were about rank: at 24 in a filled tray the rack was the heaviest thing
+ * on the row and read as the row's subject, which stopped being true when the
+ * masthead took over reporting the run, and 20 was still the loudest mark in a
+ * row of deliberately quiet ones.
+ *
+ * THE LAST TWO CAME FROM THE ARTWORK, and they moved the floor rather than
+ * testing it. 16 was held as a hard floor on the grounds that a pip is a drawn
+ * heart with a BLADE through it or a tear down it — compound shapes, whose
+ * parts stop separating well before the silhouette does. The blade is gone (see
+ * `HeartState`), so the busiest thing these rows draw is a plain heart, and a
+ * plain heart holds at sizes a sword through one cannot.
+ *
+ * WHAT THE FLOOR IS NOW, stated so the next cut has something to test against.
+ * It is not this number. The binding constraint is the TORN heart — `killed` is
+ * the only state left with internal structure, two halves and a gap, and it is
+ * the first thing to turn into a smudge on the way down. A row of whole hearts
+ * would go smaller than a row that might contain a broken one, and the pips are
+ * one component, so the broken one sets the size for all of them.
+ *
+ * At 12 the rendered box is ~14pt (`BOX` is 1.17) and the tear still separates.
+ * Below this, check `killed` before anything else — the whole hearts will look
+ * fine and will not be the thing that broke.
+ *
+ * THE TOUCH TARGET DOES NOT FOLLOW IT DOWN. `Pip` reaches out with `hitSlop` to
+ * meet the platform's 44, and that slop is a fixed distance rather than a share
+ * of the drawing — so shrinking the mark widens the gap it has to cross, and it
+ * still crosses it. See the note there.
+ */
+export const PIP_SIZE = 12;
 
 export type HeartState = 'free' | 'wagered' | 'killed' | 'pending';
 
@@ -181,16 +257,20 @@ export function Heart({
    *
    * The channels are separated now and each carries exactly one meaning:
    *
-   *   BLADE  identity — this heart is staked. Always steel, never gold.
    *   TICKS  focus    — this page points here. Always gold, on any state.
    *   TEAR   outcome  — this heart is gone.
    *
-   * CORNER TICKS RATHER THAN A RING because the blade already runs a diagonal
-   * across the glyph, and a box drawn around it argues with that line. Ticks sit
-   * in the corners the heart does not use — it is widest through its middle — so
-   * they frame without crossing anything. They are also already gold's own motif
-   * (`cornerTicks` in `TierColors`), so this is the app's existing vocabulary for
-   * "this one is picked" rather than a new invention.
+   * THERE WAS A THIRD, AND IT IS GONE: a BLADE for identity, saying this heart
+   * is staked. The state still exists and still drives the labels; what it no
+   * longer has is artwork of its own. See `HeartState`.
+   *
+   * CORNER TICKS RATHER THAN A RING, which the blade used to be the reason for
+   * — a box argued with the diagonal running across the glyph. The reason has
+   * outlived it, because the heart itself is the same shape either way: ticks
+   * sit in the corners a heart does not use, it being widest through its
+   * middle, so they frame without crossing anything. They are also already
+   * gold's own motif (`cornerTicks` in `TierColors`), so this is the app's
+   * existing vocabulary for "this one is picked" rather than a new invention.
    *
    * FOCUS IS NOT DRAWN BY COLOUR ALONE. `Hearts` also holds the lit pip at full
    * strength and recedes the rest, which is the signal that survives being small
@@ -290,7 +370,10 @@ export function Heart({
 
   return (
     <Svg width={size * BOX} height={size * BOX} viewBox={VIEW_BOX}>
-      <Art glyph={state === 'wagered' ? heartWagered : heartFull} fill={body} />
+      {/* ONE DRAWING FOR BOTH. A wagered heart used to carry `heartWagered` —
+          a sword laid through it — and it does not any more: see the note on
+          `HeartState`. */}
+      <Art glyph={heartFull} fill={body} />
       {ticks}
     </Svg>
   );
@@ -492,7 +575,7 @@ function Pip({
 export function ContestHearts({
   entries,
   focus = null,
-  size = 13,
+  size = PIP_SIZE,
   gap = 5,
   onPress,
 }: {

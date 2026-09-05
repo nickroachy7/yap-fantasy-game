@@ -199,24 +199,6 @@ const PAGE_HOME = 0.05;
 /** Captured once, because a worklet cannot read a getter off a module. */
 const WEB = Platform.OS === "web";
 
-/**
- * One pip on the rail's pager.
- *
- * 16, and it has come down twice from 24. At 24 in a filled tray the rack was
- * the heaviest object on the row and read as the row's subject — which was true
- * when it drew the run's own hearts and stopped being true when the masthead
- * took that over. A page indicator outranks nothing; it reports where you are.
- *
- * The second cut is what the rest of the row bought. With the tray gone, the
- * edge chevrons gone and the left-hand door down to bare words, 20 was again
- * the loudest thing in a row of quiet ones.
- *
- * IT DOES NOT GO BELOW THIS. A pip is a drawn heart with a blade through it or
- * a tear down it, and those are shapes rather than dots — `Hearts` faceted the
- * silhouette precisely so its edges would hold at small sizes, and 16 is where
- * that argument was being made. The floor is legibility, not taste.
- */
-const PIP_SIZE = 16;
 
 export function ContestCarousel({
   contests,
@@ -852,10 +834,12 @@ function RunRail({
        * behaviours hand off without a breakpoint.
        */}
       <View style={styles.pager}>
+        {/* NO `size`. The pip's size is `PIP_SIZE`, and it lives beside the
+            artwork it was measured against rather than here — the lobby's
+            header draws this identical row, and the two must not drift. */}
         <ContestHearts
           entries={pips}
           focus={focus}
-          size={PIP_SIZE}
           onPress={(i) => onGo(pips[i].contest)}
         />
       </View>

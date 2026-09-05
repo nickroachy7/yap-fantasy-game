@@ -34,8 +34,11 @@ import { ContestHearts, type HeartResult } from '@/components/runs/Hearts';
  * hearts are riding, and on what. A pip per card, each carrying free, wagered
  * or killed, each a link to its contest.
  *
- * IT IS THE SAME OBJECT AS THE LINEUP RAIL'S, CENTRED THE SAME WAY, at the same
- * 16pt. That is the point of the change rather than a side effect of it: the
+ * IT IS THE SAME OBJECT AS THE LINEUP RAIL'S, CENTRED THE SAME WAY, AT THE SAME
+ * SIZE — and neither this file nor the rail names that size any more. Both let
+ * `ContestHearts` default it, so `PIP_SIZE` in `Hearts` is the one place it is
+ * decided and the two rows cannot drift apart. That sameness is the point of
+ * the change rather than a side effect of it: the
  * two pages of the Compete strip now open with the identical mark, so switching
  * between them moves the content underneath and leaves the reader's anchor
  * where it was.
@@ -49,7 +52,7 @@ export function LobbyHero({
   if (staked.length === 0) return null;
   return (
     <View style={styles.band}>
-      <ContestHearts entries={staked} size={16} gap={5} />
+      <ContestHearts entries={staked} gap={5} />
     </View>
   );
 }

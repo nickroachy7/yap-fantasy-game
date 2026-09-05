@@ -97,49 +97,54 @@
  * working harder, not less.
  *
  * ---------------------------------------------------------------------------
- * THE HEART UP HERE IS ALWAYS WHOLE
+ * THE FIGURE IS WHAT IS FREE TO STAKE, AND IT USED TO BE WHAT YOU HOLD
  * ---------------------------------------------------------------------------
  *
- * It never wears the blade and it never breaks, whatever the run is doing. Two
- * near-misses are worth recording, because both are the obvious thing to reach
- * for and both are wrong.
+ * Enter a contest and the number falls. Win, and the heart comes back to it.
+ * `held - wagered`, floored at zero.
  *
- * COUNTING DOWN FREE-TO-STAKE, so the figure falls when you enter. That is the
- * wrong number three times over:
+ * THIS IS A REVERSAL, and the argument it reverses was made at length right
+ * here, so it is kept rather than deleted — three objections, of which one is
+ * answered, one is accepted as the point, and one is real and survives.
  *
- *   IT REPORTS A HEART YOU OWN AS GONE, which is precisely the bug `Hearts` was
- *   rewritten to fix — three held with two staked reading as "I have one left
- *   and I have lost two".
+ *   "IT REPORTS A HEART YOU OWN AS GONE." Answered, or rather outranked: the
+ *   figure is not reporting what you own, it is reporting what you can spend,
+ *   and a lobby priced in hearts is a place where those are different numbers.
+ *   Three held with two riding leaves one contest's worth of room, and the
+ *   chrome saying "3" on the screen where you are deciding whether to enter a
+ *   fourth is the reading that actually costs something.
  *
- *   IT RE-TEACHES A LESSON THAT WAS DELETED. Free falls on entry and returns on
- *   a win, so the chrome would say winning gives a heart back — the exact claim
- *   `hearts_on_win` was zeroed to stop making (20260902030000). A price is not
- *   refunded for good play.
+ *   "IT RE-TEACHES A LESSON THAT WAS DELETED" — free falls on entry and returns
+ *   on a win, so the chrome appears to say that winning GIVES a heart back,
+ *   which `hearts_on_win` was zeroed to stop claiming (20260902030000). This is
+ *   accepted, because on inspection it is not that claim. Nothing is created by
+ *   the win; a heart that was at risk stops being at risk, and the count of
+ *   what you may spend goes back to what it was. The rack is where a heart is
+ *   gained or lost, and it draws no new pip on a win.
  *
- *   IT MAKES DEATH SILENT. Held 3, enter, free 2; lose, held 2 and free stays
- *   2. The figure would not move at the one moment the run actually descends,
- *   which is the whole tension of a run.
+ *   "IT MAKES DEATH SILENT." REAL, AND STILL UNFIXED. Held 3, stake one, free
+ *   reads 2. The contest settles as a loss: held 2, nothing riding, free reads
+ *   2. The figure does not move at the one moment the run actually descends —
+ *   the descent was priced when the heart went in, which is honest arithmetic
+ *   and a bad drum roll. The rack still moves (a pip tears), the recap says so
+ *   outright, and this figure does not. If that turns out to matter, the lever
+ *   is not the count but a MOMENT: settlement is the event, and the masthead is
+ *   the wrong object to look for one in.
  *
- * PUTTING THE BLADE ON THE MARK when something is riding, which fixes all
- * three — the count holds still and the state is what changes. It was built,
- * and it is still the wrong object HERE.
+ * ---------------------------------------------------------------------------
+ * THE HEART UP HERE IS STILL ALWAYS WHOLE
+ * ---------------------------------------------------------------------------
  *
- * A heart is RISKED, not submitted. You have not handed anything over by
- * entering; you have agreed that something could happen to it, and until the
- * week settles it is as whole as it ever was. So the figure at the top of every
- * screen is what you HOLD, drawn whole, because that is what it is.
+ * It never wears a blade and it never breaks, whatever the run is doing. The
+ * mark is a heart and the FIGURE beside it is what changes, which is the split
+ * the reversal above leans on entirely.
  *
- * The blade is not deleted, it is LOCATED. It belongs on the rack, where there
- * is one pip per contest and a blade names WHICH heart is on the line and what
- * it is riding on. Up here it could only say "something, somewhere", which is
- * an alarm without an address — and it would put a knife through the app's
- * chrome on every screen for the whole of a normal week.
- *
- * WHAT FOLLOWS, STATED SO IT IS A CHOICE AND NOT A GAP: this figure does not
- * move when you enter a contest. Nothing in the masthead does. Entering is
- * shown where entering happens — the contest sheet draws the full rack beside
- * the stake, and the rail draws it under the card — and the chrome is left
- * saying the one thing it can say from every screen at once.
+ * The blade is not a thing this could reach for anyway — it has been retired
+ * from the whole app (see `HeartState` in `Hearts`) — but it was built here
+ * once, and the reason it was wrong HERE is worth keeping because it applies to
+ * whatever the next alarm-shaped idea is: up here a mark can only say
+ * "something, somewhere", which is an alarm without an address, and it would
+ * put a knife through the app's chrome on every screen for a whole normal week.
  *
  * ---------------------------------------------------------------------------
  * THE HEART COUNT CAME BACK UP, AND WHAT CAME WITH IT DID NOT
@@ -489,11 +494,19 @@ export function AppHeader({
   const showCoins = currencies?.coins !== false;
   const showHearts = currencies?.hearts !== false;
 
-  /* Hearts HELD — not the rack, and not what is riding. `run` is null only
-     before the first `my_run()` lands, which is the same window `loading`
-     covers for coins, so both report the same dash rather than one flashing a
-     zero the player does not have. */
+  /* Hearts FREE TO STAKE — held, less what is riding. See the header for why
+     this is the free count rather than the held one, and for the one moment it
+     does not move that the held count did.
+
+     Floored at zero and clamped to what is held: risking two while holding one
+     is legal (settlement floors the balance), and the honest answer to "what
+     can I spend" is never negative. `run` is null only before the first
+     `my_run()` lands, which is the same window `loading` covers for coins, so
+     both report the same dash rather than one flashing a zero the player does
+     not have. */
   const held = Math.max(0, run?.hearts ?? 0);
+  const staked = Math.min(Math.max(0, run?.wagered ?? 0), held);
+  const free = held - staked;
 
   return (
     <View
@@ -637,14 +650,21 @@ export function AppHeader({
                    glyphs do not — so a matched 12 put a 14pt heart beside a
                    12pt coin, and the heart read as the louder fact. */
                 mark={<Heart size={11} state="free" />}
-                value={loading || !run ? "—" : String(held)}
+                value={loading || !run ? "—" : String(free)}
                 color={c.text}
+                /* The words carry what the figure cannot: with something
+                   staked, a bare "2 hearts" would be read as the number you
+                   hold, which is the misreading this figure exists to avoid.
+                   With nothing riding the two counts are the same number and
+                   the shorter sentence is the true one. */
                 label={
                   loading || !run
                     ? "Hearts"
-                    : held === 1
-                      ? "1 heart"
-                      : `${held} hearts`
+                    : staked > 0
+                      ? `${free} of ${held} hearts free to stake, ${staked} riding`
+                      : free === 1
+                        ? "1 heart"
+                        : `${free} hearts`
                 }
               />
             ) : null}
