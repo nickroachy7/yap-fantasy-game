@@ -333,8 +333,21 @@ const styles = StyleSheet.create({
      as long as the bar could not move — and during the spell when it could, a
      page with no top padding of its own arrived flush against the top nav's
      hairline and the card on the lineup touched it. So the gap is the page's
-     and the bar pays nothing, which keeps the rhythm even: 14 under the
+     and the bar pays nothing.
+
+     IT IS NO LONGER EVEN, AND THAT IS THE POINT. The rhythm was 14 under the
      hairline to the bar, 14 under the bar to the content, 14 to whatever is
-     under that. */
-  flushTop: { paddingTop: 14 },
+     under that — which was right while the bar was an open row of glyph-over-
+     label cells with no surface of its own. Two things ended it: the cells laid
+     down flat, taking the block from 45pt to 30, and the tray took a fill and a
+     border, so the bar's bottom edge became a HARD line. Two hard edges 14pt
+     apart read tighter than one soft one, and the strip ended up floating
+     equidistant between the navigation above it and the page below —
+     belonging to neither.
+
+     It is navigation, so it belongs with the navigation. 14 above and
+     `Spacing.four` below groups it upward and gives the first card room to be
+     a separate object. Tune it HERE: this is the one place the gap under every
+     section strip is decided, which is why `SectionNav` pays nothing. */
+  flushTop: { paddingTop: Spacing.four },
 });
