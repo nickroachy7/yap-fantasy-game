@@ -7,6 +7,7 @@ import { settlementOf } from '@/components/contests/contest-model';
 import { termsOfContest, useContests, type Contest } from '@/components/contests/use-contests';
 import { termsOfEntry, useMyContests, type MyContest } from '@/components/contests/use-my-contests';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
+import { SectionHead } from '@/components/ui/SectionHead';
 import {
   ContestHistoryPanel,
   historySummary,
@@ -446,8 +447,8 @@ export function LobbyView({
 
       <Section
         label="Entered"
-        count={playing.length}
-        hint="Filed this week. Tap to see the field.">
+        hint={`${playing.length} filed`}
+        hintLabel={`${playing.length} contests filed this week`}>
         <View style={styles.stack}>
         {playing.length > 0 ? (
           playing.map((m) => (
@@ -468,8 +469,8 @@ export function LobbyView({
           window is inline, the season is one tap further on. */}
       <Section
         label="Recent"
-        count={finished.length}
-        hint="Settled, with what each paid"
+        hint={`${finished.length} settled`}
+        hintLabel={`${finished.length} contests settled`}
         action={<ArchiveLink onPress={() => setView('history')} />}>
         <View style={styles.stack}>
         {finished.length > 0 ? (
@@ -491,8 +492,8 @@ export function LobbyView({
 
       <Section
         label="Community"
-        count={open.length}
-        hint="Open to every manager">
+        hint={`${open.length} open`}
+        hintLabel={`${open.length} contests open to every manager`}>
         <View style={styles.stack}>
         {open.length > 0 ? (
           open.map((c) => (
@@ -542,8 +543,8 @@ export function LobbyView({
       {friendlies.length > 0 ? (
         <Section
           label="Friendly"
-          count={friendlies.length}
-          hint="Yours, waiting on a lineup">
+          hint={`${friendlies.length} waiting`}
+          hintLabel={`${friendlies.length} friendly contests waiting on a lineup`}>
           <View style={styles.stack}>
             {friendlies.map((c) => (
               <ContestEntry
@@ -832,56 +833,45 @@ function SettledEntry({ entry, onPress }: { entry: MyContest; onPress: () => voi
  */
 function Section({
   label,
-  count,
   hint,
+  hintLabel,
   action,
   children,
 }: {
   label: string;
-  count: number;
+  /** A count and a word — "3 filed". Drawn uppercased and right-aligned. */
   hint: string;
+  hintLabel?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-
   return (
     <View style={styles.section}>
-      {/* THE HINT RIDES THE HEADING'S OWN LINE, to the right of the name and
-          count, rather than sitting under them.
-
-          `alignItems: 'baseline'` on the row is what makes it work: the name is
-          18pt and the hint 12, so centring would set the small text floating in
-          the middle of the large one's line box. Sharing a baseline they read as
-          one line at two weights, which is what a heading with a caption is.
-
-          THE COPY HAD TO SHORTEN TO FIT, and that is a real constraint rather
-          than a preference. Measured at 375 — the narrowest handset this ships
-          to — the heading leaves 204-248pt beside it depending on the name's
-          length and whether there is an `action` sharing the row. The previous
-          hints ran to 251, 192 and 276, so two of the three overflowed outright.
-          Anything added here has to be measured against that budget, not
-          eyeballed; a long hint does not wrap, it shoves the action off.
-
-          `numberOfLines={1}` and `flexShrink` are the backstop for the case the
-          budget is blown anyway — a longer word in a future translation, a
-          narrower device. It ellipsises the caption, which is the one part of
-          the row that can afford to lose its tail, instead of pushing "All
-          weeks" past the edge where it cannot be tapped. */}
-      <View style={styles.sectionTop}>
-        <Text style={[Type.figure, { color: c.text }]}>{label}</Text>
-        {count > 0 ? (
-          <Text style={[Type.figure, NUMERIC, { color: c.textTertiary }]}>{String(count)}</Text>
-        ) : null}
-        <Text
-          numberOfLines={1}
-          style={[Type.body, styles.sectionHint, { color: c.textTertiary }]}>
-          {hint}
-        </Text>
-        <View style={styles.sectionSpacer} />
-        {action}
-      </View>
+      {/* THE SAME HEAD THE COLLECTION AND THE LINEUP USE — `SectionHead`, a name
+          on the left and a small right-aligned count.
+          ---------------------------------------------------------------------
+          WHAT THIS PAGE GAVE UP TO GET IT
+          ---------------------------------------------------------------------
+          Every shelf carried a sentence: "Filed this week. Tap to see the
+          field.", "Open to every manager", and so on. Four of them down one
+          scroll, each a line of prose above a list that then says the same
+          thing in rows — which is most of why the page read as busy.
+          THE EMPTY STATES ALREADY DO THAT JOB, and better, because they appear
+          exactly when a reader needs telling what a shelf is FOR: "Nothing
+          filed yet. What you enter shows up here for the week.", "Results land
+          here when the week is swept.", "Extra contests appear here each week."
+          A caption above a populated list explains something the reader is
+          already looking at; the same words above an empty one are the only
+          explanation there is. So the explanation moved to where it is scarce
+          and left the heading to do what a heading does.
+          THE COUNT MOVED INTO THE HINT rather than sitting beside the name as
+          an 18pt figure. It is the same fact either way, and as `3 FILED` it
+          carries its own unit — the bare `3` needed the caption underneath to
+          say what it counted. That is the whole trick of the collection's
+          `31/30 HELD`, borrowed. */}
+      <SectionHead label={label} hint={hint} hintLabel={hintLabel} tone={c.textTertiary} action={action} />
       {children}
     </View>
   );
@@ -1303,14 +1293,6 @@ const styles = StyleSheet.create({
      it pays for the same space twice. The 16pt that separates one shelf from
      the next is the scroller's own `gap`, which is why this is one child. */
   section: { gap: Spacing.two },
-  sectionTop: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.two },
-  sectionSpacer: { flex: 1 },
-  /* Gives before anything else on the row. The name, the count and the action
-     are all fixed facts; the caption is the only part with a disposable tail.
-     `minWidth: 0` is what actually lets it ellipsise — without it a flex child
-     refuses to shrink below its content and the overflow moves to the action
-     instead. */
-  sectionHint: { flexShrink: 1, minWidth: 0 },
   sectionEmpty: { paddingBottom: Spacing.two },
   /* The same shape as the dead-run row above it — a block of text and one
      affordance on the right — because they are the same kind of object: a thing

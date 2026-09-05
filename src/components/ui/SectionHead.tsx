@@ -25,6 +25,7 @@
  * middle of the large one's line box. On a baseline they read as one line with
  * two weights, which is what they are.
  */
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Colors, Spacing, Type } from '@/constants/theme';
@@ -35,6 +36,7 @@ export function SectionHead({
   hint,
   tone,
   hintLabel,
+  action,
   tight = false,
 }: {
   label: string;
@@ -50,6 +52,16 @@ export function SectionHead({
    * a ratio rather than words.
    */
   hintLabel?: string;
+  /**
+   * One affordance after the hint — the contests archive link, and nothing else
+   * so far.
+   *
+   * AFTER rather than instead: a shelf can have both a count and a way to see
+   * more of it, and those are different facts. Keep whatever goes here to a
+   * couple of words; the row's whole budget is one line, and the hint is what
+   * gives when it runs out.
+   */
+  action?: ReactNode;
   /**
    * Pull the board under this heading up against it.
    *
@@ -72,9 +84,11 @@ export function SectionHead({
       <Text
         accessibilityRole="text"
         accessibilityLabel={hintLabel}
-        style={[Type.micro, { color: tone }]}>
+        numberOfLines={1}
+        style={[Type.micro, styles.hint, { color: tone }]}>
         {hint.toUpperCase()}
       </Text>
+      {action}
     </View>
   );
 }
@@ -86,6 +100,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: Spacing.two,
   },
+  /* The hint is the part that gives. `justifyContent: 'space-between'` already
+     pins the name left and everything else right; this only decides who shrinks
+     when a row runs out of width, and it must be the count rather than the name
+     or the affordance. `minWidth: 0` is what actually permits it — a flex child
+     will not shrink below its content without it. */
+  hint: { flexShrink: 1, minWidth: 0, textAlign: 'right' },
   /* See `tight`. */
   tight: { marginBottom: -Spacing.one - 2 },
 });
