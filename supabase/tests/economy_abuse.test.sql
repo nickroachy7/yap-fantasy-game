@@ -26,13 +26,19 @@ begin
      more than the grant could pay for and the drain below stopped draining.
      The grant no longer divides evenly by the price and there is no reason it
      ever should, so the wallet is emptied by asking rather than by counting. */
-  select coin_cost into v_cost from public.packs where code = 'standard';
+  /* `base` was `standard` until 20260905183000 renamed the shop to
+     Base -> Pro -> All-Pro -> Elite. The code moved; what this block needs of
+     it did not — the cheapest paid pack on the shelf, at whatever it costs. */
+  select coin_cost into v_cost from public.packs where code = 'base';
   if coalesce(v_cost, 0) <= 0 then
-    raise exception 'FAIL: the standard pack costs %, so none of this measures anything', v_cost;
+    raise exception 'FAIL: the base pack costs %, so none of this measures anything', v_cost;
   end if;
 
-  select count(*) into n from public.open_pack('standard');
-  if n <> 5 then raise exception 'FAIL: pack returned % cards, expected 5', n; end if;
+  select count(*) into n from public.open_pack('base');
+  if n <> (select card_count from public.packs where code = 'base') then
+    raise exception 'FAIL: pack returned % cards, the shelf promises %',
+      n, (select card_count from public.packs where code = 'base');
+  end if;
 
   select balance into v_after from public.coin_balances where user_id = auth.uid();
   if v_after <> v_start - v_cost then
@@ -44,7 +50,7 @@ begin
   loop
     select balance into v_after from public.coin_balances where user_id = auth.uid();
     exit when v_after < v_cost;
-    perform public.open_pack('standard');
+    perform public.open_pack('base');
   end loop;
 
   select balance into v_after from public.coin_balances where user_id = auth.uid();
@@ -55,7 +61,7 @@ begin
   -- 1. buy a pack you cannot afford. `v_after` is short of the price rather
   --    than necessarily zero — the grant need not divide by it.
   begin
-    perform public.open_pack('standard');
+    perform public.open_pack('base');
     raise exception 'FAIL: opened a pack with 0 coins';
   exception when sqlstate '22023' then blocked := blocked + 1; end;
 

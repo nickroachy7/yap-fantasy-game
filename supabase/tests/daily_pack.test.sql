@@ -30,13 +30,25 @@ begin
   if (v_status ->> 'available')::boolean is not true then
     raise exception 'FAIL: daily reported unavailable before any claim: %', v_status;
   end if;
-  if (v_status ->> 'card_count')::int <> 3 then
-    raise exception 'FAIL: daily card_count is %, expected 3', v_status ->> 'card_count';
+  /* THE SHELF'S COUNT, not a constant — the same rule the price already
+     follows one suite over. The daily went from three cards to five when the
+     shop was rebuilt (20260905183000) and this assertion was the only thing
+     that noticed, which is the suite working; hardcoding the new number just
+     moves the tripwire. What matters is that `daily_pack_status` and the row
+     it reports on agree. */
+  if (v_status ->> 'card_count')::int
+       <> (select card_count from public.packs where code = 'daily') then
+    raise exception 'FAIL: daily card_count is %, but the shelf says %',
+      v_status ->> 'card_count',
+      (select card_count from public.packs where code = 'daily');
   end if;
 
   -- 2. it deals its cards
   select count(*) into n from public.open_pack('daily');
-  if n <> 3 then raise exception 'FAIL: daily returned % cards, expected 3', n; end if;
+  if n <> (select card_count from public.packs where code = 'daily') then
+    raise exception 'FAIL: daily returned % cards, the shelf promises %',
+      n, (select card_count from public.packs where code = 'daily');
+  end if;
 
   -- 3. IT IS FREE. The whole point, and the thing a copy-pasted pack row would
   --    quietly get wrong: a non-zero coin_cost here would take coins from someone
@@ -136,7 +148,10 @@ begin
   end if;
 
   select count(*) into n from public.open_pack('daily');
-  if n <> 3 then raise exception 'FAIL: reset daily returned % cards, expected 3', n; end if;
+  if n <> (select card_count from public.packs where code = 'daily') then
+    raise exception 'FAIL: reset daily returned % cards, the shelf promises %',
+      n, (select card_count from public.packs where code = 'daily');
+  end if;
 
   raise notice 'PASS: daily pack is free, deals 3, blocks a second same-day claim, cannot be backdated, resets next day, and does not gate paid packs';
 end $$;

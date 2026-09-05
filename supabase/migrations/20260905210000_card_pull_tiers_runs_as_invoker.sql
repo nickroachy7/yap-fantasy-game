@@ -1,0 +1,30 @@
+-- ===========================================================================
+-- `card_pull_tiers` RUNS AS THE INVOKER
+-- ===========================================================================
+--
+-- The view shipped without `security_invoker`, which in Postgres means it runs
+-- as its OWNER — `postgres` — and every read through it bypasses row-level
+-- security on `cards`, `player_values`, `players` and `teams`. `view_security`
+-- caught it on the first push:
+--
+--     FAIL 1: view(s) in public run as SECURITY DEFINER: card_pull_tiers
+--
+-- That suite exists because this exact thing happened to `player_directory`
+-- once already: a `create or replace view` carried the name and the grants but
+-- NOT the reloptions, and the view silently became SECURITY DEFINER. The note
+-- at the top of the test file says a suite that lets a definer view through is
+-- worse than no suite, because it teaches you the property is checked. It is
+-- checked. It worked.
+--
+-- NOTHING WAS EXPOSED BY THIS ONE, and that is luck rather than design: all four
+-- base tables carry a permissive `select ... using (true)` policy for
+-- `authenticated`, so an invoker read returns exactly what a definer read did.
+-- The catalogue is public information. But the next table joined into this view
+-- will not necessarily be, and by then the bypass would be load-bearing and
+-- invisible.
+--
+-- `open_pack` and `pack_odds` are unaffected: both are SECURITY DEFINER
+-- functions owned by `postgres`, so they read the view as `postgres` either way.
+-- ===========================================================================
+
+alter view public.card_pull_tiers set (security_invoker = on);
