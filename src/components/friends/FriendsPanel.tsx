@@ -37,6 +37,7 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { friends as friendsGlyph } from '@/components/icons/glyphs';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Panel } from '@/components/ui/Panel';
 import { Colors, Radius, Spacing, Type } from '@/constants/theme';
@@ -115,6 +116,7 @@ export function FriendsPanel({ state }: { state: FriendsState }) {
           <ActivityIndicator style={styles.pad} />
         ) : friends.length === 0 ? (
           <EmptyState
+            glyph={friendsGlyph}
             title="No friends yet"
             body="Anybody you play against is in the directory below. Add them and their season shows up here."
           />

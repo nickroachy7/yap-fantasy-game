@@ -8,11 +8,27 @@
  * screen a new user sees most often, so it is exactly the wrong thing to let
  * drift.
  *
- * No illustration. Sleeper puts a mascot here; we have no mark to put and a
- * greyed-out goalpost drawn in Views would be worse than the honest absence.
+ * AN OPTIONAL MARK, AND ONLY WHERE IT IS TRUE. This used to read "no
+ * illustration" because there was nothing to draw — the set had no mark for a
+ * league or a friend, and a greyed-out goalpost built from Views would have
+ * been worse than the honest absence. The drawn set closes that gap, so
+ * `glyph` exists now.
+ *
+ * IT IS STILL WRONG ON MOST OF THESE SCREENS. An empty state that reports a
+ * FAILURE ("could not load the players") or a gap in the DATA ("not enough
+ * football yet") is not an invitation, and dressing it with artwork tells the
+ * reader the app is pleased about it. The mark belongs only on the empties
+ * that describe a thing the reader has not done YET — no friends, no leagues —
+ * where it names the thing that would fill the space.
+ *
+ * Quiet on purpose: tertiary ink at 40pt. It sits above the title as a
+ * subject, not a decoration, and must never out-shout the line that says what
+ * is missing.
  */
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icons/Icon';
+import type { Glyph } from '@/components/icons/system';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -21,6 +37,7 @@ export function EmptyState({
   body,
   actionLabel,
   onAction,
+  glyph,
   /** False inside a panel that already provides its own vertical room. */
   pad = true,
 }: {
@@ -28,6 +45,11 @@ export function EmptyState({
   body?: string;
   actionLabel?: string;
   onAction?: () => void;
+  /**
+   * Only for an empty that names something the reader has not done yet. See
+   * the header: never on a failure or a data gap.
+   */
+  glyph?: Glyph;
   pad?: boolean;
 }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -35,6 +57,11 @@ export function EmptyState({
 
   return (
     <View style={[styles.wrap, pad && styles.padded]}>
+      {glyph ? (
+        <View style={styles.mark}>
+          <Icon glyph={glyph} size={40} color={c.textTertiary} focused />
+        </View>
+      ) : null}
       <Text style={[Type.section, styles.centre, { color: c.text }]}>{title}</Text>
       {body ? (
         <Text style={[Type.bodyRelaxed, styles.centre, styles.body, { color: c.textSecondary }]}>
@@ -60,6 +87,11 @@ export function EmptyState({
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', justifyContent: 'center', gap: Spacing.two },
+  /* The mark answers to the TITLE, not to the block: the wrap's own gap would
+     set it the same distance from the heading as the heading is from the body,
+     and a subject that floats equidistant between two lines belongs to
+     neither. Half a step closer is what makes it read as the heading's. */
+  mark: { marginBottom: -Spacing.one },
   padded: { paddingVertical: Spacing.five, paddingHorizontal: Spacing.four },
   centre: { textAlign: 'center' },
   /* A caveat is a sentence, so it gets a reading measure rather than the

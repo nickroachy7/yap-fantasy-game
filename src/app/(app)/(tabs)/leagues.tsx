@@ -27,6 +27,7 @@
  * of prose, and prose set across the full width of a browser window is the
  * thing `ContentMeasure` exists to prevent.
  */
+import { league } from '@/components/icons/glyphs';
 import { Screen } from '@/components/shell/Screen';
 import { EmptyState } from '@/components/ui/EmptyState';
 
@@ -34,6 +35,7 @@ export default function LeaguesScreen() {
   return (
     <Screen title="Leagues" measure="form" context="Coming soon" masthead={false}>
       <EmptyState
+        glyph={league}
         title="Private leagues coming soon"
         body="Draft with your group, play your own schedule, and settle it between you. Your cards and your collection stay in Yap — this is the other half."
       />
