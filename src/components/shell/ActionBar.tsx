@@ -54,7 +54,14 @@ import {
 } from '@/components/icons/glyphs';
 import type { Glyph } from '@/components/icons/system';
 
-import { ActionDiameter, Colors, Radius, selectionAccent, Spacing, Type } from '@/constants/theme';
+import {
+  ActionDiameter,
+  Colors,
+  Radius,
+  selectionAccent,
+  Spacing,
+  Type,
+} from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { horizontalStrip } from '@/components/ui/scroll-strip';
 
@@ -96,9 +103,9 @@ export type Action = {
    * Trend and Leaders. `sections.ts` declares the two independently and says
    * why at length.
    *
-   * The geometry is `ToggleButton`'s grown to `ActionDiameter` — the app
-   * already has a round-control language and this is the same object, just the
-   * loudest one.
+   * IT IS NO LONGER A CIRCLE. It is a filled pill carrying its own word, at
+   * the tray's height — see `DetachedAction`, which argues the reversal. What
+   * `detached` still means is unchanged: outside the tray, not a place.
    */
   detached?: boolean;
   onPress: () => void;
@@ -120,8 +127,8 @@ export function ActionBar({ actions, wide }: { actions: Action[]; wide: boolean 
   const detached = shown.filter((a) => a.detached);
 
   return (
-    /* Pinned RIGHT when there is no tray, so the lone round button sits where
-       round buttons always sit rather than at the gutter. With a tray it is
+    /* Pinned RIGHT when there is no tray, so a lone door sits where the app's
+       other trailing controls sit rather than at the gutter. With a tray it is
        inert: the tray takes the width and pushes the buttons to that edge
        anyway. */
     <View style={[styles.row, tray.length === 0 && styles.rowDetachedOnly]}>
@@ -186,7 +193,7 @@ export function ActionBar({ actions, wide }: { actions: Action[]; wide: boolean 
       )}
 
       {detached.length > 0 ? (
-        <View style={styles.detachedGroup}>
+        <View style={[styles.detachedGroup, tray.length === 0 && styles.detachedGroupSolo]}>
           {detached.map((a) => (
             <DetachedAction key={a.key} action={a} />
           ))}
@@ -197,58 +204,89 @@ export function ActionBar({ actions, wide }: { actions: Action[]; wide: boolean 
 }
 
 /**
- * An errand, as a round button beside the tray.
- *
- * FILLED IN THE APP'S GOLD rather than outlined like the inventory's filter
- * buttons, and that is the one place this departs from `ToggleButton`. Those
- * four are toggles whose fill IS their state, so an outlined resting state has
- * something to mean. This one has no state — it opens a sheet — so an outline
- * would read as a switch that is permanently off, and the fill is free to do
- * the other job instead: the circle carries a glyph and no label, and gold is
- * what makes it the thing to press rather than a mark nobody labelled.
- *
- * IT IS THE TALLEST THING IN THE ROW AFTER THE TRAY, at `ActionDiameter`
- * rather than the `ControlDiameter` the filter buttons use. A 32pt disc beside
- * a 53pt tray read as floating in a row built for something else; 44 closes
- * most of that gap and takes the width it needs off the tray, which has it to
- * give — see the note on `item`.
- */
-/**
- * The round control, exported because the bar is no longer the only place one
- * is drawn — `PacksButton` puts the same object on the summary strip. Two
- * hand-rolled circles meaning the same thing is exactly the drift this file's
- * header warns about.
- */
-/**
- * The errand beside the tray: a round button, in the tray's own material.
+ * THE PACKS DOOR: a ringed disc at the end of the strip, the tray's own height,
+ * carrying the pack's mark and nothing else.
  *
  * ---------------------------------------------------------------------------
- * IT WAS FILLED IN THE ACCENT AND THAT WAS THE WRONG WEIGHT
+ * IT WAS A QUIET CIRCLE, TWICE, AND BOTH ARGUMENTS ARE NOW OVERRULED
  * ---------------------------------------------------------------------------
  *
- * A saturated circle with a solid glyph made this the loudest object in the
- * chrome — brighter than the tab you are actually on, permanent on every page
- * of the section, and sitting one gap from a tray of deliberately quiet cells.
+ * The two notes this replaces are worth stating because they were not wrong
+ * about anything except the priority. The first said a saturated disc with a
+ * solid glyph was the loudest object in the chrome — brighter than the tab you
+ * are actually on, permanent on every page of the section — so it went to
+ * `surface` and the hairline, in the tray's own material, and let SHAPE alone
+ * carry the distinction: a circle among rectangles is a different kind of
+ * object. The second said the accent belongs on the one mark that says an act
+ * COSTS something, and that packs merely opens a room; what you spend is
+ * decided inside it.
  *
- * It also contradicted a rule this app applies everywhere else and had already
- * argued out twice, on the lineup rail and on the collection toolbar: a control
- * that merely OPENS A ROOM stays quiet, and the accent is spent on the one mark
- * whose job is to say an act costs something. Packs opens a room. What you
- * spend is decided inside it.
+ * Both are consistent design rules and both lost to a product fact: opening
+ * packs is the loop this app is built on, and a glyph-only circle in the
+ * chrome's own grey is the quietest thing that could possibly be true of it.
+ * It named nothing — a small mark, no word — and it ranked itself below two
+ * tabs that merely switch which of your own cards you are looking at. When the
+ * loudest control on a screen and the most important act on it disagree, the
+ * act wins.
  *
- * So it takes `surface` and the hairline, which is exactly what the tray beside
- * it is made of — the two read as one control with two parts rather than as a
- * button shouting next to a menu. The glyph is HOLLOW and in the secondary ink,
- * matching an inactive tray cell, for the same reason: this is never the thing
- * you are on.
+ * ---------------------------------------------------------------------------
+ * NOT PART OF THE NAV, BUT OF THE SAME FAMILY AS IT
+ * ---------------------------------------------------------------------------
  *
- * WHAT STILL SEPARATES IT is the shape, and the shape alone is enough. A circle
- * among rectangles is a different KIND of object, which is the whole distinction
- * `detached` exists to draw — the tray holds places, this is an errand.
+ * That is the whole brief and it is narrower than "make it pop". It stays a
+ * separate object — its own pill, outside the tray, one gap clear of it, and
+ * never carrying the tray's highlight — because it is not a place you can be.
+ * But EVERYTHING ELSE IS THE TRAY'S: the same height (see the stretch below),
+ * the same corner, an 18pt glyph beside a `Type.micro` label in caps, the same
+ * gap between the two. Read it as a cell that was lit and set aside, not as a
+ * button somebody dropped in from another screen.
+ *
+ * WHAT MAKES IT A DOOR IS THE FILL, and only the fill.
+ *
+ * `selectionAccent` — the app's green, the same one the tray's active cell
+ * inks its glyph and word with. Two earlier passes reached further for
+ * "different": `Brand.lime`, which says Yap and nothing else and read as a
+ * second logo shouting beside the nav, and the packs sheet's gold, which is
+ * coherent with the room it opens but is a foreign slab in this row. The
+ * answer was the colour already in the row.
+ *
+ * AT THREE STRENGTHS, not one. A solid accent disc was the version before this
+ * and it was too intense — a saturated mid-tone the size of a button, beside a
+ * tray of near-black. So: a 16% wash inside (see `wash`), the full accent on a
+ * 1pt ring, the full accent on the mark. Same hue, a third of the shout, and
+ * the ring is still a harder edge than any other object in the row has, which
+ * is what keeps it from receding into chrome.
+ *
+ * ONE MARK, AND THE SHAPE IS ROUND AGAIN.
+ *
+ * Two revisions passed through here on the way: "PACKS" in the tray's own caps
+ * beside the glyph, and then `+` beside the glyph with the word gone. Both were
+ * answering "how do I make it say more", and the pill's real cost was the width
+ * — every mark added to it is width taken off a tray that has two words of its
+ * own to fit, and a labelled cell in a row of labelled cells reads as a THIRD
+ * place, which is the confusion `detached` exists to prevent.
+ *
+ * So the content went back to what the circle always had: the pack, alone. What
+ * changed is the two things that were actually wrong with the circle — it was
+ * chrome-grey in the tray's own material, and it floated at 44 in a 38pt row.
+ * A round button is not the problem; a round button pretending to be furniture
+ * was. This one is a disc the tray's own height, in the app's accent, one gap
+ * clear of it.
+ *
+ * The screen reader hears "Packs" — `accessibilityLabel` is the label, and it
+ * is not optional now that no text is drawn.
+ *
+ * IT MATCHES THE TRAY'S HEIGHT rather than standing at `ActionDiameter`. A 44pt
+ * disc beside a 38pt tray was a floating object in a row built for something
+ * else; at the tray's height the two read as one control with two parts —
+ * places on the left, the door on the right — and the strip gets 6pt shorter,
+ * which on a phone is 6pt of the list you came to read. The height is taken by
+ * `stretch` and the width by `aspectRatio`, so it follows the tray if the tray
+ * ever changes and stays a circle at whatever height it lands on.
  */
 export function DetachedAction({ action }: { action: Action }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
+  const accent = selectionAccent(scheme);
 
   return (
     <Pressable
@@ -257,15 +295,44 @@ export function DetachedAction({ action }: { action: Action }) {
       accessibilityLabel={action.label}
       style={({ pressed }) => [
         styles.detached,
-        { backgroundColor: c.surface, borderColor: c.border },
+        { backgroundColor: wash(accent), borderColor: accent },
         pressed ? styles.pressed : null,
       ]}>
-      {/* `focused={false}` is the HOLLOW variant, which is the same glyph an
-          inactive tray cell draws — the solid one was for sitting on the accent
-          fill this no longer has. */}
-      <ActionIcon name={action.icon} color={c.textSecondary} focused={false} size={20} />
+      {/* The mark takes the FULL accent, the same green the ring is drawn in,
+          so the button is one colour at three strengths — solid on the edge and
+          the drawing, a wash inside. `accessibilityLabel` carries "Packs" for
+          anyone who cannot see it; that is not optional now that no text is
+          drawn.
+
+          HOLLOW, not `focused`. The solid variant fills the pack's whole
+          silhouette, which reads as a blob at this size; outlined, the seam and
+          the flap read, and it matches the weight of the ring around it. */}
+      <ActionIcon name={action.icon} color={accent} focused={false} size={20} />
     </Pressable>
   );
+}
+
+/**
+ * The accent at 16%, which is the fill inside the packs ring.
+ *
+ * A SOLID accent disc was the first answer and it was too much: the green is a
+ * saturated mid-tone sized to carry near-black text, and a whole button of it
+ * beside a near-black tray was the only thing on the screen anybody could look
+ * at. A wash keeps the hue — the button is still unmistakably the green one —
+ * and spends the full strength on the ring and the mark, where an edge and a
+ * drawing need it.
+ *
+ * `rgba` rather than a second swatch in `theme.ts`, and deliberately: this is
+ * the accent, not a colour of its own, and a named `selectionSoft` would invite
+ * everything else to reach for it. It is translucent for the same reason the
+ * app's other washes are — it sits over whatever surface it lands on, so it
+ * cannot be wrong about the ground beneath it.
+ */
+function wash(hex: string): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.16)`;
 }
 
 /**
@@ -782,16 +849,30 @@ export function ActionIcon({
 }
 
 const styles = StyleSheet.create({
-  /* The tray and whatever sits beside it. `alignItems: 'center'` is what keeps
-     a 32pt button centred against a taller tray rather than stretched to its
-     height, which is the default in a row. */
+  /* The tray and whatever sits beside it. `alignItems: 'center'` is the row's
+     default for anything that is not a door — the door itself opts back into
+     `stretch` so it can match the tray's height. See `detachedGroup`. */
   /* The tray, then the detached buttons. No `justifyContent` is needed: the
      tray takes every point the buttons do not, so it ends exactly one gap to
      their left whatever the width. The buttons are still grouped into one node
      so that gap stays theirs rather than opening up between them. */
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   rowDetachedOnly: { justifyContent: 'flex-end' },
-  detachedGroup: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  /* `stretch` on BOTH axes is what makes the door the tray's height: the row
+     centres its children, so the group has to opt out for itself, and its own
+     `alignItems` has to pass the full height on to the button inside it.
+
+     With no tray there is nothing to take a height FROM — a stretched child in
+     a row of stretched children is just its own content — so the solo case
+     pins `ActionDiameter`, which is the height the button used to be and still
+     the platform's minimum target. */
+  detachedGroup: {
+    flexDirection: 'row',
+    alignSelf: 'stretch',
+    alignItems: 'stretch',
+    gap: Spacing.two,
+  },
+  detachedGroupSolo: { alignSelf: 'center', height: ActionDiameter },
   /* Takes the width the detached buttons leave, so the tray runs from the
      gutter to one gap short of them.
 
@@ -880,18 +961,35 @@ const styles = StyleSheet.create({
     borderRadius: Radius.control,
   },
   label: { letterSpacing: 0.4 },
+  /* NO HEIGHT AND NO WIDTH. It takes the first from the group above and the
+     second from the word inside it — `flexShrink: 0` is what stops the tray
+     stealing that width back when the labels are long.
+
+     `Radius.panel`, the tray's own radius, rather than a capsule. The two sit
+     one gap apart and are now the same height; a capsule beside a rounded
+     rectangle at matching heights reads as two controls that failed to agree,
+     where the same corner reads as one row. NO BORDER — the fill carries it,
+     and a hairline on a saturated pill only muddies its edge. */
+  /* NO WIDTH AND NO HEIGHT of its own. The height comes from the group above,
+     which stretches to the tray; `aspectRatio` turns that into the width, so
+     the disc is exactly as wide as the row is tall whatever the tray does.
+     `flexShrink: 0` is what stops a long tray squeezing it out of round.
+
+     The radius is a number no height can exceed rather than half of one, since
+     there is no height here to halve. */
   detached: {
-    width: ActionDiameter,
-    height: ActionDiameter,
-    borderRadius: ActionDiameter / 2,
+    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    /* The tray's hairline, on the tray's fill — see `DetachedAction`. The
-       border is what keeps the circle legible now that it is no longer a bright
-       disc: `surface` against the page is a small step, and without an edge the
-       button reads as a slightly lighter smudge rather than an object. */
-    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 999,
+    /* A drawn ring, not the app's hairline — the hairline is what a piece of
+       chrome uses to separate itself from the page, and at that weight this
+       circle went back to being a smudge. But 1.5 (the glyph's own stroke) put
+       more ink in the edge than in the mark it surrounds, which made the button
+       read as a ring with something inside it rather than as a pack. 1 is the
+       lightest weight that still holds a full-strength colour. */
+    borderWidth: 1,
   },
   box: { alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.65 },

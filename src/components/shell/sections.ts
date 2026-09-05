@@ -420,7 +420,8 @@ export const FANTASY_SECTIONS: NavSection[] = [
       SETS,
       /* PACKS RIDES THE STRIP AS A ROUND BUTTON, not as a third tab, and
          `detached` is what says so — `ActionBar` splits it out of the tray and
-         draws it after, filled in the accent, at `ActionDiameter`.
+         draws it after: a disc the tray's own height, filled in the app's
+         accent. See `DetachedAction` for why it is the one loud thing here.
          The distinction it encodes is the one this section kept running into:
          the tray is a set of PLACES, each somewhere you can be, and the
          highlight says which one you are on. Packs is an errand — you open it,

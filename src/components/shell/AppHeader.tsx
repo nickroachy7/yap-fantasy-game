@@ -35,39 +35,46 @@
  * a home already, as a tab inside Profile.
  *
  * ---------------------------------------------------------------------------
- * ONE PILL AND ONE BARE MARK, WHICH IS NOT THE SAME AS TWO PILLS
+ * NO PILLS AT ALL, AND THE MARKS TRAIL THE FIGURES
  * ---------------------------------------------------------------------------
  *
- * These were bare figures on the page, then briefly one divided capsule, and
- * then a pill each. The capsule was arguing that hearts and coins are one fact
- * — a wallet — and the configuration is what killed that: a league can run
- * coins without hearts, so the capsule had to grow rules about when its divider
- * exists and which corners round, and a container whose shape depends on config
- * is a container the eye cannot learn.
+ * The full run of this, because it has gone round twice: bare figures, then one
+ * divided capsule, then a pill each, and now bare figures again with the marks
+ * moved to the other side.
  *
- * A pill each has no such state, and that is where this has landed: two
- * matching pills, coins over hearts.
+ * THE CAPSULE died on configuration. It argued that hearts and coins are one
+ * fact — a wallet — and a league can run coins without hearts, so it had to
+ * grow rules about when its divider exists and which corners round. A container
+ * whose shape depends on config is a container the eye cannot learn.
  *
- * IT SPENT A WHILE UN-PILLED, and the argument is worth keeping because it is
- * a real one and it was overruled on looks rather than refuted. It ran: a coin
- * is spent and earned back — two-way, a balance — while a heart is staked and
+ * THE TWO PILLS had no such state, which is why they lasted. What killed them
+ * is what they cost: two filled capsules stacked in the corner of every screen
+ * are the second-heaviest object in the masthead after the wordmark, for two
+ * numbers that change on their own schedule and that nobody is reading most of
+ * the time. On a black page a fill is a claim to attention, and a balance is
+ * reference, not news.
+ *
+ * THE OLD ARGUMENT FOR UN-PILLING IS ALSO STILL HERE and is worth keeping,
+ * because it was never refuted — only outvoted on looks. It ran: a coin is
+ * spent and earned back — two-way, a balance — while a heart is staked and
  * lost and never earned, one-way, a life total. Two matched shapes claim they
  * are facts of the same KIND, and the trap is concrete: the coin figure drops
  * when you spend, the heart figure does not drop when you stake, so
- * same-shaped neighbours behave oppositely. A pill reads as a container of
- * something countable; a bare mark and figure reads as a state.
+ * same-shaped neighbours behave oppositely.
  *
- * That is still true. What it was weighed against is that an un-pilled figure
- * beside a pilled one reads as unfinished — one balance in a container and one
- * loose next to it, on a masthead where they are the only two objects. Nick
- * called it, twice, looking at the real thing on a phone.
+ * WHAT ANSWERS THE OBJECTION THAT SANK IT LAST TIME. Un-pilling was reverted
+ * because one bare figure beside one pilled figure read as unfinished. That was
+ * an argument about a MIXED pair, not about bare figures — both are bare now,
+ * both right-align on the same mark column, and there is no odd one out.
  *
- * WHAT ACTUALLY CARRIES THE DISTINCTION NOW is the mark, not the box: a coin
- * and a heart are not confusable glyphs, and the heart's own three states
- * (`Hearts`) say more about one-wayness than a missing fill ever did. If the
- * pairing does turn out to mislead, the lever is the FIGURE — a heart that
- * showed held-of-rack rather than a bare count would state its own direction —
- * rather than taking the box away again.
+ * WHAT CARRIES THE DISTINCTION IS THE MARK, not the box: a coin and a heart are
+ * not confusable glyphs, and the heart's own three states (`Hearts`) say more
+ * about one-wayness than a fill ever did. If the pairing does turn out to
+ * mislead, the lever is the FIGURE — a heart that showed held-of-rack rather
+ * than a bare count would state its own direction — rather than a box.
+ *
+ * THE MARK GOES AFTER THE FIGURE, which is the other half of this change and
+ * the reason the block reads as a block. See `Balance`.
  *
  * THEY ARE STACKED, AND COINS SIT ON TOP.
  *
@@ -398,23 +405,35 @@ export type HeaderIdentity = {
  */
 export type HeaderCurrencies = { coins?: boolean; hearts?: boolean };
 
-/** One balance: a mark, a figure, and nothing else. See the header on pills. */
-function Pill({
+/**
+ * One balance: a figure and its mark, and nothing under either.
+ *
+ * THE MARK SITS AFTER THE FIGURE, which is what makes the column line up. With
+ * the mark leading, the two rows were ragged on both edges — the marks started
+ * at different x because a four-figure balance and a one-figure count are
+ * different widths, so nothing in the block shared an edge with anything else.
+ * Trailing, and right-aligned by `balances`, the marks stack in one column and
+ * the figures end where that column begins.
+ *
+ * `markBox` is what makes that literal rather than approximate: the coin draws
+ * at `size` and the heart at `size * 1.17` (its viewBox has padding), so two
+ * 12pt marks are two different widths. A fixed box with both centred in it puts
+ * them on one axis whatever they measure.
+ */
+function Balance({
   mark,
   value,
   color,
-  surface,
   label,
 }: {
   mark: ReactNode;
   value: string;
   color: string;
-  surface: string;
   /**
    * What a screen reader says instead of the figure alone.
    *
    * The mark is an SVG with no text in it, so without this a reader hears "3"
-   * and has no way to learn it is hearts. The coin pill can go without — its
+   * and has no way to learn it is hearts. The coin balance can go without — its
    * figure is announced inside a header that has already said "coins" nowhere
    * either, which is its own gap, but the heart's is the one that reads as a
    * bare number next to nothing.
@@ -423,11 +442,11 @@ function Pill({
 }) {
   return (
     <View
-      style={[styles.pill, { backgroundColor: surface }]}
+      style={styles.balance}
       {...(label ? { accessible: true, accessibilityRole: 'text' as const, accessibilityLabel: label } : null)}
     >
-      {mark}
       <Text style={[styles.figure, NUMERIC, { color }]}>{value}</Text>
+      <View style={styles.markBox}>{mark}</View>
     </View>
   );
 }
@@ -604,19 +623,22 @@ export function AppHeader({
               masthead's own edge and reads as two things ending at it. */}
           <View style={styles.balances}>
             {showCoins ? (
-              <Pill
+              <Balance
                 mark={<Coin size={12} color={accent} />}
                 value={loading ? "—" : coins.toLocaleString()}
                 color={c.text}
-                surface={c.surface}
               />
             ) : null}
             {showHearts ? (
-              <Pill
-                mark={<Heart size={12} state="free" />}
+              <Balance
+                /* 11 against the coin's 12, which draws the two the SAME
+                   size rather than a size apart: `Hearts` renders at
+                   `size * 1.17` — its viewBox carries padding the icon set's
+                   glyphs do not — so a matched 12 put a 14pt heart beside a
+                   12pt coin, and the heart read as the louder fact. */
+                mark={<Heart size={11} state="free" />}
                 value={loading || !run ? "—" : String(held)}
                 color={c.text}
-                surface={c.surface}
                 label={
                   loading || !run
                     ? "Hearts"
@@ -771,22 +793,29 @@ const styles = StyleSheet.create({
   balances: {
     flexDirection: "column",
     alignItems: "flex-end",
-    gap: 4,
-    paddingRight: 5,
+    /* 7, not the 4 the pills used. Each pill carried 5pt of its own padding
+       above and below its figure, so 4 between two of them was really 14
+       between the two lines of type. Bare, the gap is the whole distance. */
+    gap: 7,
+    /* The pills' own 8pt of horizontal padding is gone with them, so this holds
+       the marks off the gear by roughly what the capsule's right edge did. */
+    paddingRight: 9,
     flexShrink: 0,
   },
   /* Mirrors `lead` exactly, and must keep doing so. See `TRAIL`. */
   trail: { width: TRAIL, flexShrink: 0 },
-  /* No border. Two bordered pills side by side on a black page is four
-     hairlines to read past for two numbers; the fill separates on its own. */
-  pill: {
+  /* NO FILL, NO PADDING, NO RADIUS. The figures sit on the page — see the
+     header for the pill's rise and fall. What is left is a row of two things
+     and the gap between them. */
+  balance: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-    borderRadius: 999,
     flexShrink: 0,
   },
+  /* The column the two marks share. 14 clears both — the coin at 12 and the
+     heart at 11 × 1.17 ≈ 12.9 — with a hair to spare, and each centres in it.
+     This is the one number to change if either mark ever grows. */
+  markBox: { width: 14, alignItems: "center", justifyContent: "center" },
   figure: { fontSize: 14, fontWeight: "800", letterSpacing: -0.2 },
 });
