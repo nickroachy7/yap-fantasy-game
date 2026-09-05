@@ -16,31 +16,13 @@ import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { WebPageTabs } from '@/components/shell/WebPageTabs';
 import { quietScrollbar } from '@/components/ui/scroll-strip';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
-
 import { Colors, ContentMeasure, Spacing, type Measure } from '@/constants/theme';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { TopFade } from '@/components/ui/TopFade';
 
-/**
- * The band under a section strip: a solid hold, then an eased fade.
- *
- * `SOLID` is full page background, and it is what stops the strip having
- * anything touching it at all — a card's border arriving at the exact pixel the
- * strip's border ends reads as one thick line, however soft the fade under it
- * is. Ten points of nothing is what separates the two objects.
- *
- * `RUN` is the fade proper, and it is longer than the 24 this started at.
- * `TabBarGlass` uses 24 at the other end of the page, but it is fading INTO a
- * floating capsule with margins either side; this one is fading into a
- * full-width bar with a hard bottom border, which is a more abrupt edge and
- * wants a longer, gentler exit.
- */
-const SOLID = 10;
-const RUN = 28;
-const FADE = SOLID + RUN;
 
 type Props = {
   /**
@@ -251,63 +233,10 @@ export function Screen({
     <View style={[styles.flexContent, flush && styles.flushTop, { maxWidth }]}>{children}</View>
   );
 
-  /**
-   * THE FADE UNDER A PINNED SECTION STRIP.
-   *
-   * ---------------------------------------------------------------------------
-   * WHAT IT IS FOR, AND WHY PADDING COULD NOT DO IT
-   * ---------------------------------------------------------------------------
-   *
-   * The strip does not scroll. The page does. So the interesting state is not
-   * the one at rest — it is every state after that, where a card slides up and
-   * is cut off dead against the strip's bottom border. Padding cannot help with
-   * that: `flushTop` is inside the scroll content, so it travels with the
-   * content and is gone the moment anything moves. The gap it buys exists only
-   * in the one state nobody is looking at.
-   *
-   * What fixes a hard edge is a soft one. This is the same scrim `TabBarGlass`
-   * lays over the bottom of every page, mirrored: the page's own background at
-   * full strength against the strip, falling to nothing `FADE` points below, so
-   * content dissolves into the chrome instead of being guillotined by it.
-   *
-   * ONLY WITH A STRIP — `flush` is exactly the test, since it is already "there
-   * is a section bar above this page". Pages without one scroll under the
-   * masthead, which draws its own material.
-   *
-   * `pointerEvents="none"` throughout: it sits over the top of a scrolling list
-   * and must not eat the first row's taps or a flick that starts under it.
-   */
-  const topFade = flush ? (
-    <View style={styles.topFade} pointerEvents="none">
-      <Svg width="100%" height={FADE}>
-        <Defs>
-          {/* FOUR STOPS, NOT TWO, and the middle pair is what makes it subtle.
-              A straight ramp from 1 to 0 is the most VISIBLE fade available: it
-              has a corner at each end, so the eye finds where it starts and
-              where it stops and reads the band as an object. These stops ease
-              it — the opacity falls quickly through the first third and then
-              tails off, so the bottom of the band has no edge to find. */}
-          <LinearGradient id="screenTopFade" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={c.background} stopOpacity="1" />
-            {/* Held solid to the bottom of `SOLID`. */}
-            <Stop offset={`${SOLID / FADE}`} stopColor={c.background} stopOpacity="1" />
-            <Stop
-              offset={`${(SOLID + RUN * 0.38) / FADE}`}
-              stopColor={c.background}
-              stopOpacity="0.58"
-            />
-            <Stop
-              offset={`${(SOLID + RUN * 0.72) / FADE}`}
-              stopColor={c.background}
-              stopOpacity="0.2"
-            />
-            <Stop offset="1" stopColor={c.background} stopOpacity="0" />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height={FADE} fill="url(#screenTopFade)" />
-      </Svg>
-    </View>
-  ) : null;
+  /* See `TopFade` — the strip does not scroll, so content has to dissolve into
+     it rather than be cut by it. `flush` is already the test for "there is a
+     section bar above this page", which is exactly when the edge exists. */
+  const topFade = flush ? <TopFade /> : null;
 
   return (
     /* The wide gutter is on the frame, not on each box inside it: capping the
@@ -376,10 +305,7 @@ export function Screen({
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   bodyWrap: { flex: 1 },
-  /* Over the scroller, pinned to its top edge. Full width deliberately: the
-     content is capped at a measure and gutter-padded, but the thing being
-     softened is the strip's border, which runs edge to edge. */
-  topFade: { position: 'absolute', top: 0, left: 0, right: 0 },
+
   wideGutter: { paddingHorizontal: Spacing.three },
   content: {
     padding: Spacing.three,

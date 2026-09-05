@@ -88,6 +88,7 @@ import {
 import { rgba } from '@/components/ui/gradient';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { TopFade } from '@/components/ui/TopFade';
 
 export function PlayerSheetFrame({
   title,
@@ -812,7 +813,20 @@ export function PlayerSheetFrame({
     return (
       <View collapsable={false} style={styles.pageRoot}>
         {pinnedRow}
-        {scroller}
+        {/* THE SCROLLER AND THE FADE OVER IT. A page sits under the section
+            strip, which does not scroll — so its content has to dissolve into
+            that edge rather than be guillotined by it, exactly as `Screen` does
+            for the other page of the same section. `TopFade` is that band,
+            shared so Lineups and Contests (and Inventory and Sets) cannot drift
+            apart: a reader crosses between them by tapping one tab.
+
+            BELOW `pinnedRow`, not above it. The row is chrome of this frame's
+            own and stays put; what needs softening is the top of the thing that
+            moves. */}
+        <View style={styles.pageBody}>
+          {scroller}
+          <TopFade />
+        </View>
         {footerBar}
       </View>
     );
@@ -1098,6 +1112,8 @@ const styles = StyleSheet.create({
      and a background here would be a second one drawn over it. See the page
      branch. */
   pageRoot: { flex: 1, height: '100%' },
+  /* Holds the scroller and the fade laid over its top edge. */
+  pageBody: { flex: 1 },
   band: {
     marginHorizontal: -Spacing.three,
     paddingHorizontal: Spacing.three,

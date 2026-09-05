@@ -67,6 +67,7 @@ import {
 import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { CollectionValue } from '@/components/collection/CollectionValue';
 import { SectionHead } from '@/components/ui/SectionHead';
+import { TopFade } from '@/components/ui/TopFade';
 import { RosterAlert } from '@/components/collection/RosterAlert';
 import { BulkBar } from '@/components/collection/BulkBar';
 import { SELECTION_MAX, sellTotal } from '@/components/collection/bulk';
@@ -491,6 +492,16 @@ export default function InventoryScreen() {
               ) : null}
             </View>
 
+            {/* THE FADE BELONGS OVER THE LIST HERE, not at the top of the page.
+                Everywhere else the scrolling edge IS the section strip, so
+                `Screen` lays the band there. This board puts a pinned toolbar
+                between the two — the value line and the board's head do not
+                scroll — so the strip is not the edge anything is cut against.
+                The head is. `Screen`'s band still draws, over static chrome,
+                where it has nothing to soften and costs nothing; this is the
+                one that does the work. */}
+            <View style={styles.listBox}>
+            <TopFade />
             <FlatList
               {...quietScrollbar}
               style={styles.fill}
@@ -576,6 +587,7 @@ export default function InventoryScreen() {
                 />
               )}
             />
+            </View>
 
             {/* PINNED UNDER THE GRID, not pushed into it. The bar appears the
                 moment the mode opens rather than on the first tick, so the grid
@@ -616,6 +628,10 @@ export default function InventoryScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  /* Holds the list and the fade laid over its top edge — see the note there.
+     Named for the BOX, not the list: `list` was already taken by the list's own
+     content padding a few keys down. */
+  listBox: { flex: 1 },
   /* The same block as the Players boards' `filters`, down to the numbers: one
      gutter, one gap between the two controls, one gap before the list. Two
      screens with the same controls at different rhythms is what this was
