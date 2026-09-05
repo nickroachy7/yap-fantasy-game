@@ -77,7 +77,7 @@ import { EmptyCollection } from '@/components/collection/EmptyInventory';
 import { InventoryRow } from '@/components/collection/InventoryRow';
 import { sortCards, summarise, type CollectionCard } from '@/components/collection/types';
 import { useCollection } from '@/components/collection/use-collection';
-import { Screen } from '@/components/shell/Screen';
+import { FLUSH_TOP, Screen } from '@/components/shell/Screen';
 import { quietScrollbar } from '@/components/ui/scroll-strip';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
@@ -463,8 +463,14 @@ export default function InventoryScreen() {
                  thing the pill overlaps, and it holds that room itself — adding
                  it here as well would leave a pill's height of dead scroll
                  between the last row and the bar. */
+              /* THE GAP UNDER THE SECTION STRIP IS PAID HERE, not by `Screen`'s
+                 container — see `flushTopNone` there. Inside the content the
+                 rows scroll up through it and under the fade; on the container
+                 the list's box would start below it and clip, so nothing would
+                 ever reach the band. */
               contentContainerStyle={[
                 styles.list,
+                { paddingTop: FLUSH_TOP },
                 { paddingBottom: LIST_TAIL + (selecting ? 0 : tabSpace) },
               ]}
               /* The roster line, drawn after one particular row. See `cut`. */

@@ -28,7 +28,7 @@ import { TopFade } from '@/components/ui/TopFade';
  * fade starts at on a non-scrolling screen. One constant so the two cannot
  * disagree — see `topFade`.
  */
-const FLUSH_TOP = Spacing.four;
+export const FLUSH_TOP = Spacing.four;
 
 
 type Props = {
@@ -237,20 +237,25 @@ export function Screen({
     </ScrollView>
   ) : (
     // A virtualised list must own the scroll container, so only gutters here.
-    <View style={[styles.flexContent, flush && styles.flushTop, { maxWidth }]}>{children}</View>
+    /* NO TOP PAD WHEN THERE IS A STRIP, and the list inside pays it instead —
+       see `flushTopNone`. */
+    <View style={[styles.flexContent, flush && styles.flushTopNone, { maxWidth }]}>
+      {children}
+    </View>
   );
 
   /* See `TopFade` — the strip does not scroll, so content has to dissolve into
      it rather than be cut by it. `flush` is already the test for "there is a
      section bar above this page", which is exactly when the edge exists.
 
-     THE OFFSET IS THE WHOLE DIFFERENCE BETWEEN THE TWO BRANCHES. A scrolling
-     screen takes `flushTop` as padding inside its content, so rows travel up
-     through the band and it belongs at the container's edge. A `scroll={false}`
-     screen pads the container and hands a list the box inside it; that list
-     clips at its own top, so the band has to start where the list does or it
-     spends its opaque half on empty page. */
-  const topFade = flush ? <TopFade top={scroll ? 0 : FLUSH_TOP} /> : null;
+     ALWAYS AT ZERO, on both branches, because both branches now let their
+     content reach zero. That is the point of `flushTopNone`: the gap under the
+     strip is paid INSIDE the scrolling content in either case, so rows travel
+     up through the whole band rather than clipping partway into it. Offsetting
+     the band to meet a clipping list was the previous attempt and it matched
+     the geometry without matching the behaviour — the rows still stopped dead,
+     they just stopped dead under a darker part of the gradient. */
+  const topFade = flush ? <TopFade /> : null;
 
   return (
     /* The wide gutter is on the frame, not on each box inside it: capping the
@@ -381,4 +386,18 @@ const styles = StyleSheet.create({
      a separate object. Tune it HERE: this is the one place the gap under every
      section strip is decided, which is why `SectionNav` pays nothing. */
   flushTop: { paddingTop: FLUSH_TOP },
+  /**
+   * The non-scrolling branch's answer, and it is zero on purpose.
+   *
+   * `flexContent` pads the top so a `scroll={false}` screen does not start
+   * flush against the header. With a section strip that padding moves INSIDE
+   * the list — the page passes `FLUSH_TOP` to its own `contentContainerStyle` —
+   * because a container pad puts the list's box below it and the list then
+   * clips there. Rows could never enter the gap, so the fade over it had
+   * nothing to fade and the two pages of one strip behaved differently.
+   *
+   * Paid by the content, rows scroll up through the gap exactly as they do in a
+   * `ScrollView`, and the two branches are the same page.
+   */
+  flushTopNone: { paddingTop: 0 },
 });
