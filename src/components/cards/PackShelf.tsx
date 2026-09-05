@@ -934,7 +934,12 @@ const styles = StyleSheet.create({
   centred: { alignItems: 'center', justifyContent: 'center', padding: Spacing.four },
   /* The lobby's `stack`: cards separated by space rather than by rules, because
      a hairline between two bordered cards reads as a third edge. */
-  shelf: { gap: Spacing.two - 2 },
+  /* THE AIR BETWEEN PACKS, and it is the one measurement on this sheet that
+     was set by what was left rather than by what it should be: 6 was the
+     residue of squeezing five cards onto one screen. Each card is a bordered
+     object holding four bands of its own, so the gap has to read as bigger than
+     the hairlines inside it or the shelf becomes one long ruled table. */
+  shelf: { gap: Spacing.three - 2 },
 
   /**
    * A WHOLE POINT OF BORDER, and a fill under zones that paint their own.
