@@ -158,6 +158,12 @@ export default function AppLayout() {
             it, spend, and put it down. It replaced `collection/shop`, which
             was a whole sub-page for a shelf of two rows — see there. */}
         <Stack.Screen name="packs" options={sheetOptions} />
+        {/* The rules. The same presentation once more, and the clearest case
+            for it in the stack: reading how the game works is never the thing
+            you were doing, it keeps no state to return to, and it is reached
+            from the masthead — which is on every screen, so it must open over
+            any of them and put the reader back exactly where they were. */}
+        <Stack.Screen name="how-to-play" options={sheetOptions} />
         {/* Opening a pack, which is NOT a sheet and is the one route here that
             argues with the rule above.
 

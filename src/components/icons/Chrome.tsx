@@ -1,5 +1,5 @@
 /**
- * APP CHROME MARKS — the back chevron and the settings gear.
+ * APP CHROME MARKS — the back chevron, the settings gear and the info ring.
  *
  * ---------------------------------------------------------------------------
  * WHY THESE ARE NOT IN `glyphs.ts`
@@ -44,7 +44,7 @@
  */
 import Svg, { G, Path } from 'react-native-svg';
 
-import { GRID, STROKE, chevron, disc } from './system';
+import { GRID, STROKE, chevron, disc, rect } from './system';
 
 type ChromeProps = {
   /** Rendered box size. The mark is authored at `GRID` and scaled once. */
@@ -85,6 +85,13 @@ export function BackChevron({ size = 20, color, accessibilityLabel }: ChromeProp
 
 /**
  * SETTINGS.
+ *
+ * NOTHING DRAWS THIS TODAY. The masthead's trailing slot is the info ring below
+ * — see `AppHeader` for the trade and why it is safe — and settings is reached
+ * through its own tab on the profile. The mark is KEPT rather than deleted: it
+ * is forty lines of geometry with the reasoning attached, the decision that
+ * displaced it is one line in one file, and a gear is the likeliest mark in
+ * this app to be wanted again.
  *
  * EIGHT FLAT-TOPPED TEETH, not a rounded cog. The teeth are trapezoids —
  * straight flanks from the root radius out to a flat crest — which is the same
@@ -148,6 +155,76 @@ export function Gear({ size = 20, color, accessibilityLabel }: ChromeProps) {
       accessibilityRole={accessibilityLabel ? 'image' : undefined}
       accessibilityLabel={accessibilityLabel}>
       <Path fill={color} fillRule="evenodd" d={COG} />
+    </Svg>
+  );
+}
+
+/**
+ * INFORMATION — the masthead's trailing mark, and the door to how the game is
+ * played.
+ *
+ * IT BELONGS IN THIS FILE FOR THE REASON THE GEAR DOES. A lower-case i in a
+ * ring depicts nothing; it is the OS's own vocabulary, it exists in every app
+ * ever shipped, and its entire value is being recognised before it is read. A
+ * traced, hand-drawn one would buy character on the second mark in the app
+ * where character is a liability.
+ *
+ * A RING, NOT A DISC, and that is the one real decision here. A filled circle
+ * with a knocked-out letter is a heavier object than the gear it replaced, and
+ * it would sit at the end of a masthead whose other two marks are a wire coin
+ * and a small heart — a solid dot reads as a badge with a count in it, which is
+ * exactly what the two figures beside it are. Hollow, it is chrome.
+ *
+ * THE PARTS ARE THREE SUBPATHS UNDER `evenodd`, which is how the ring is
+ * genuinely pierced rather than painted over: outer circle, inner circle, then
+ * the tittle and the stem laid back inside the hole. Nesting flips the fill on
+ * each crossing, so the letter fills again inside the void. Painting the i as a
+ * second `Path` in the same colour would look identical here and break the
+ * moment this is drawn on anything but flat chrome — the same reason the gear's
+ * bore is a subpath and `Icon.tsx` masks its knockouts.
+ *
+ * THE i IS BUILT FROM `disc` AND `rect`, on the house's 24-unit grid, so it
+ * carries the set's radii rather than a font's. A glyph lifted from the system
+ * font would be the one mark in the app whose weight follows the reader's text
+ * settings.
+ */
+/** Outer radius, and the ring's thickness. 10.2 matches the gear's crest, so
+    the two marks occupy the same optical circle at the same size. */
+const RING = 10.2;
+const RING_W = 1.7;
+/** The tittle: a dot, not a square, because every i the reader has ever seen
+    has a round one and this mark is spending recognition rather than earning
+    it. */
+const TITTLE_R = 1;
+const TITTLE_Y = 8.5;
+/** The stem. A corner radius of half the width gives a fully rounded cap,
+    which is what keeps it reading as type rather than as a tally mark.
+
+    THE LETTER IS CENTRED ON THE RING, NOT ON ITS OWN BOX. Tittle top at 7.5
+    and stem bottom at 16.5 put its optical centre on the ring's own 12 — an i
+    hung from the top of the circle is the classic way this mark goes wrong,
+    and it is invisible until the two are drawn side by side. Every number here
+    is already on `system`'s half-unit grid, so `snap` moves none of them. */
+const STEM_W = 2.4;
+const STEM_TOP = 11;
+const STEM_H = 5.5;
+
+const INFO = [
+  disc(C, C, RING),
+  disc(C, C, RING - RING_W),
+  disc(C, TITTLE_Y, TITTLE_R),
+  rect(C - STEM_W / 2, STEM_TOP, STEM_W, STEM_H, STEM_W / 2),
+].join('');
+
+export function Info({ size = 20, color, accessibilityLabel }: ChromeProps) {
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox={BOX}
+      accessibilityRole={accessibilityLabel ? 'image' : undefined}
+      accessibilityLabel={accessibilityLabel}>
+      <Path fill={color} fillRule="evenodd" d={INFO} />
     </Svg>
   );
 }

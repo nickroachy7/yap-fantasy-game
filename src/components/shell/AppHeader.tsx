@@ -256,7 +256,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { YapMark } from "@/components/brand/YapLogo";
-import { BackChevron, Gear } from "@/components/icons/Chrome";
+import { BackChevron, Info } from "@/components/icons/Chrome";
 import { Heart } from "@/components/runs/Hearts";
 import { Icon } from "@/components/icons/Icon";
 import { coin as coinGlyph } from "@/components/icons/glyphs";
@@ -468,14 +468,20 @@ export function AppHeader({
   back,
   /** Per-league switches. See `HeaderCurrencies`. */
   currencies,
-  /** Where the gear goes. Defaults to this account's own settings. */
-  settingsHref = "/profile?tab=settings",
+  /**
+   * Where the trailing mark goes. Defaults to the rules.
+   *
+   * IT USED TO BE `settingsHref` AND POINT AT THE GEAR, and the rename is the
+   * honest half of the change below: the slot is not "the way to settings" any
+   * more, it is whatever the masthead's one trailing door is.
+   */
+  helpHref = "/how-to-play",
 }: {
   attached?: boolean;
   identity?: HeaderIdentity;
   back?: { href: string; label?: string };
   currencies?: HeaderCurrencies;
-  settingsHref?: string;
+  helpHref?: string;
 } = {}) {
   const scheme = useColorScheme() === "dark" ? "dark" : "light";
   const c = Colors[scheme];
@@ -669,13 +675,40 @@ export function AppHeader({
               />
             ) : null}
           </View>
-          <Link href={settingsHref as never} asChild>
+          {/* THE TRAILING SLOT IS THE RULES NOW, AND IT WAS THE SETTINGS GEAR.
+              Both halves of that trade are worth writing down, because the
+              obvious objection — "you have deleted the way into settings" — is
+              answered by where settings already lives rather than by anything
+              here.
+
+              SETTINGS WAS NEVER HOMELESS. It is a tab of the profile, named in
+              that page's own segmented control beside Overview, Activity and
+              Friends, and the Profile tab is in the bottom bar on every screen.
+              The gear was a second door to a room that has one, sitting in the
+              app's most expensive 19 points.
+
+              THE RULES HAD NO DOOR AT ALL. Nothing in the app explained hearts,
+              tiers, the roster cap or what committing a card does — a player
+              either inferred the loop or did not, and the ones who did not paid
+              for it with a burned card. A permanent mark in the masthead is the
+              right weight for that: reachable from anywhere, mid-decision, on
+              the screen where the question occurred to them.
+
+              An INFO RING rather than a question mark or a book. A `?` asks
+              whether the reader is confused, which is a slightly rude thing for
+              chrome to do on every screen; the ring is the neutral one. See
+              `Info`.
+
+              THE MARK KEEPS THE GEAR'S SIZE AND INK — 19pt in `textSecondary`,
+              the same optical circle — so the masthead's right edge has not
+              moved. Only what is inside it has. */}
+          <Link href={helpHref as never} asChild>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Settings"
+              accessibilityLabel="How to play"
               hitSlop={10}
             >
-              <Gear size={19} color={c.textSecondary} />
+              <Info size={19} color={c.textSecondary} />
             </Pressable>
           </Link>
         </View>
