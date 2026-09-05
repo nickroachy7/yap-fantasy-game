@@ -382,10 +382,14 @@ export function PackShelf({
           thing to say while `packs.odds` weighted rarity bands nobody could
           defend. Every card now carries its four rates, so the footnote's job
           changed from admitting an absence to explaining a word. */}
+      {/* ONE LINE, AND IT WAS FOUR. The long version explained the whole tier
+          cut — top 2, top 8, top 24, scaled by lineup slots — which is a rule
+          worth knowing once and not worth 64pt under every visit to the shop.
+          It is in How to Play, one tap away on every screen. What has to stay
+          here is the unit: a reader looking at `0.4%` needs to know it is per
+          card rather than per pack, and nothing else on the shelf says so. */}
       <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
-        A card&apos;s tier is its player&apos;s rank at his own position, scaled to how many of that
-        position a lineup starts: elite is the top 2, starter the top 8, bench the top 24. Rates are
-        per card and come from the same table the pack is dealt from.
+        Rates are per card, by the player&apos;s rank at his own position.
       </Text>
     </>
   );
@@ -916,7 +920,7 @@ const styles = StyleSheet.create({
   centred: { alignItems: 'center', justifyContent: 'center', padding: Spacing.four },
   /* The lobby's `stack`: cards separated by space rather than by rules, because
      a hairline between two bordered cards reads as a third edge. */
-  shelf: { gap: Spacing.two },
+  shelf: { gap: Spacing.two - 2 },
 
   /**
    * A WHOLE POINT OF BORDER, and a fill under zones that paint their own.

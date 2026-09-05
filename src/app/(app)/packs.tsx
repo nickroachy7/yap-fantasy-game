@@ -52,7 +52,7 @@ import { advancePull, beginPull, endPull, finishPull } from '@/components/cards/
 import { invalidateCollection } from '@/components/collection/use-collection';
 import { invalidateSets } from '@/components/collection/use-sets';
 import { Coin } from '@/components/shell/AppHeader';
-import { PlayerSheetFrame, SheetToneBand } from '@/components/players/PlayerSheetFrame';
+import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -285,41 +285,47 @@ export default function PacksScreen() {
          frame fades the small copy in once that has scrolled away. */
       title="Packs"
       subtitle={`${coins.toLocaleString()} coins`}
-      tone={gold}
+      /* NO TONE. Every other sheet in the app washes its top edge in the colour
+         OF something — a tier, a club, a set — and packs has no such subject:
+         the gold it was taking is the coin's, which is the currency the shelf
+         spends rather than the thing the shelf is about. A wash that names
+         nothing is decoration on the one screen that is already the loudest in
+         the app, with four gold buttons down it. */
+      tone={null}
       onClose={close}
       closeLabel="Close packs">
       {/* THE BALANCE SITS WHERE THE LOBBY'S HEARTS SIT, and it is the same
           object: a title on the left, the currency the screen is priced in as a
-          pill at the right end, one line of prose under both. `LobbyHero` has
-          the account of why that shape won there — a header a reader takes in
-          on the way past rather than a block they have to get through — and a
-          player moving between the two sheets should find their two counters in
-          the same place rather than learning a second layout.
+          pill at the right end. `LobbyHero` has the account of why that shape
+          won there — a header a reader takes in on the way past rather than a
+          block they have to get through.
 
-          IT WAS A HERO: a 9pt YOUR BALANCE label, the figure at `Type.page`,
-          and a two-line paragraph. Three stacked lines and 26pt of number to
-          say what the masthead says on every other screen in 26pt of pill —
-          which put the first pack most of the way down a phone. */}
-      <SheetToneBand tone={gold}>
-        <View style={styles.hero}>
-          <View style={styles.titleRow}>
-            <Text style={[Type.page, { color: c.text }]}>Packs</Text>
-            <View style={styles.spacer} />
-            {/* The masthead's own pill, at the masthead's own size — the same
-                one the lobby draws its heart count in. */}
-            <View style={[styles.pill, { backgroundColor: c.background }]}>
-              <Coin size={12} color={gold} />
-              <Text style={[Type.strong, NUMERIC, { color: c.text }]}>
-                {coins.toLocaleString()}
-              </Text>
-            </View>
+          NO `SheetToneBand` AROUND IT ANY MORE, and no paragraph under it.
+
+          The band existed to paint the wash; with no tone there is nothing to
+          paint, and its geometry — reaching over the grabber, reaching into the
+          overscroll — is geometry for a colour that is not there.
+
+          The sentence it held said every card starts at bronze and climbs by
+          scoring. That is true, general, and belongs where the rules live: it
+          is step five of How to Play, one tap from the masthead on this and
+          every other screen. On the shelf it was two lines of prose above the
+          thing the player came to press, on a sheet that could not fit its own
+          contents. */}
+      <View style={styles.hero}>
+        <View style={styles.titleRow}>
+          <Text style={[Type.page, { color: c.text }]}>Packs</Text>
+          <View style={styles.spacer} />
+          {/* The masthead's own pill, at the masthead's own size — the same one
+              the lobby draws its heart count in. */}
+          <View style={[styles.pill, { backgroundColor: c.surface }]}>
+            <Coin size={12} color={gold} />
+            <Text style={[Type.strong, NUMERIC, { color: c.text }]}>
+              {coins.toLocaleString()}
+            </Text>
           </View>
-          <Text style={[Type.body, styles.measure, { color: c.textTertiary }]}>
-            Every card starts at bronze and climbs a tier by scoring fantasy points in your
-            lineup.
-          </Text>
         </View>
-      </SheetToneBand>
+      </View>
 
       {error ? (
         <View style={[styles.notice, { borderColor: c.negative, backgroundColor: c.surface }]}>

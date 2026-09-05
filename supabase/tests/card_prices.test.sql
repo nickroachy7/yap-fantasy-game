@@ -140,21 +140,36 @@ begin
   -- 6. BUYING TO SELL LOSES. Every pulled card mints at BRONZE with zero settled
   --    points, so a pack returns the BASE and nothing else — which is why the
   --    points half of the formula cannot open a loop no matter how it is tuned.
-  --    Measured over the cards actually in each band, against the live odds.
+  --
+  --    IT READ `packs.odds` UNTIL 2026-09-05 AND THAT COLUMN IS DEAD. Packs roll
+  --    over `tier_odds` now (20260905140000); `odds` is the old rarity weighting,
+  --    kept only so an in-flight build kept working. This block went on
+  --    multiplying it by rarity-band averages and reporting a number that had
+  --    nothing to do with what any pack deals — it called Base a money loop at
+  --    102.3 when the pack actually returns 69.6, and it would just as happily
+  --    have passed a pack that WAS one.
+  --
+  --    So it asks `pack_odds()`, which is the same function the shelf prints
+  --    from and computes from the same columns `open_pack` rolls. That also
+  --    fixes a second hole: per-card rates include the GUARANTEED slots, which
+  --    weighting `tier_odds` by hand would have missed entirely — and the
+  --    guarantee sits on the most expensive pack on the shelf.
   for v_pack in
     select p.code, p.coin_cost,
-           sum((p.odds ->> band.rarity)::numeric / 100 * band.avg_base) * p.card_count as ret
+           sum(o.per_card_pct / 100 * band.avg_base) * p.card_count as ret
       from public.packs p
+      cross join lateral public.pack_odds(p.code) o
       join (
-        select c.rarity::text as rarity,
+        select t.pull_tier as tier,
                avg(public.sale_value('bronze', coalesce(pv.value_score, 0), 0)) as avg_base
-          from public.cards c
+          from public.card_pull_tiers t
+          join public.cards c on c.id = t.card_id
           left join public.player_values pv
                  on pv.player_id = c.player_id and pv.season = c.season
-         where c.season = 2026 and c.is_mintable
+         where t.season = 2026
          group by 1
-      ) band on p.odds ? band.rarity
-     where p.coin_cost > 0
+      ) band on band.tier = o.pull_tier
+     where p.coin_cost > 0 and p.is_active
      group by p.code, p.coin_cost, p.card_count
   loop
     if v_pack.ret >= v_pack.coin_cost then
