@@ -96,6 +96,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icons/Icon';
+import { Coin } from '@/components/shell/AppHeader';
 import { packDaily, packPro, packStandard, packStarter } from '@/components/icons/glyphs';
 import type { Glyph } from '@/components/icons/system';
 
@@ -659,7 +660,10 @@ function PackCard({
       ? 'Claim free pack'
       : !affordable
         ? `${(shortfall > 0 ? shortfall : total).toLocaleString()} coins short`
-        : `Purchase for ${total.toLocaleString()} coins`;
+        : /* Unused when affordable — the button composes that state from parts
+             so the coin glyph can sit between the verb and the figure. Kept as
+             the one string the screen reader announces. */
+          `Purchase for ${total.toLocaleString()} coins`;
 
   const packGlyph = PACK_GLYPHS[pack.code];
 
@@ -765,12 +769,11 @@ function PackCard({
       <View style={[styles.zone, styles.action, { borderTopColor: c.borderStrong }]}>
         {bulkable ? (
           <View
-            style={styles.counts}
+            style={[styles.counts, { backgroundColor: c.background, borderColor: c.border }]}
             accessibilityRole="radiogroup"
             accessibilityLabel="How many packs to open">
             {BULK_COUNTS.map((n) => {
               const on = buying === n;
-              const reach = pack.coin_cost * n <= coins;
               return (
                 <Pressable
                   key={n}
@@ -783,16 +786,16 @@ function PackCard({
                   ).toLocaleString()} coins`}
                   style={({ pressed }) => [
                     styles.countChip,
-                    {
-                      backgroundColor: on ? c.backgroundSelected : 'transparent',
-                      borderColor: on ? accent : c.border,
-                    },
-                    /* Dimmed, not disabled — see the note above. */
-                    !reach && !on && styles.outOfReach,
+                    on && { backgroundColor: c.backgroundSelected },
                     locked && styles.disabled,
                     pressed && !locked && styles.pressed,
                   ]}>
-                  <Text style={[Type.label, NUMERIC, { color: on ? c.text : c.textSecondary }]}>
+                  <Text
+                    style={[
+                      Type.label,
+                      NUMERIC,
+                      { color: on ? accent : c.textTertiary },
+                    ]}>
                     {`×${n}`}
                   </Text>
                 </Pressable>
@@ -835,15 +838,30 @@ function PackCard({
             ) : (
               <ActivityIndicator />
             )
-          ) : (
+          ) : free || claimedToday || !affordable ? (
             <Text
               numberOfLines={1}
-              style={[
-                Type.strong,
-                { color: claimedToday || !affordable ? c.textSecondary : '#17130A' },
-              ]}>
+              style={[Type.strong, { color: blocked ? c.textSecondary : '#17130A' }]}>
               {label}
             </Text>
+          ) : (
+            /* PURCHASE, THE COIN, THE FIGURE — three things in the order they
+               are read, rather than the sentence "Purchase for 250 coins". The
+               word is what the button DOES and never changes; the glyph says
+               which currency without spending five characters on the word; and
+               the figure is the only part that moves, so it sits at the end,
+               where a changing number belongs and where ×5 can grow it without
+               shoving the verb around. */
+            <View style={styles.buyLabel}>
+              <Text style={[Type.strong, { color: '#17130A' }]}>Purchase</Text>
+              {/* The ink the gold button already uses for its own text — see
+                  the progress count above, which is the same colour and was the
+                  only thing on this button that had ever needed one. */}
+              <Coin size={11} color="#17130A" />
+              <Text style={[Type.strong, NUMERIC, { color: '#17130A' }]}>
+                {total.toLocaleString()}
+              </Text>
+            </View>
           )}
         </Pressable>
       </View>
@@ -980,21 +998,51 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  counts: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2, flexShrink: 0 },
+  /**
+   * ONE CONTROL WITH THREE SEGMENTS, and it was three separate bordered boxes.
+   *
+   * Each carried its own hairline and its own radius, so the row read as three
+   * buttons the eye had to rank against a fourth — and the fourth was a filled
+   * gold slab, which won every time. A quantity picker is not three choices of
+   * what to do; it is one setting with three positions, and the app already
+   * says that shape with a tray (`SegmentedControl`, `ActionBar`): a recessed
+   * container, no border on the cells, the selected one lifted.
+   *
+   * THE UNAFFORDABLE COUNTS ARE NO LONGER DIMMED. They were at 0.45, which on
+   * this surface is most of the way to invisible, and it made a control that
+   * works look broken — ×5 and ×10 are still pressable and always were, because
+   * selecting one is how you find out what ten costs. The button says what you
+   * are short by. That is one place for affordability instead of two, and the
+   * picker goes back to being about quantity.
+   */
+  counts: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+    padding: 3,
+    gap: 2,
+    borderRadius: Radius.control,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   /* Sized off the open button's height rather than off the foot's tokens: these
      are things you press, and a 20pt target in a row of things you press is a
      miss waiting to happen. */
   countChip: {
-    minWidth: 44,
-    height: BUTTON_H - 6,
+    minWidth: 40,
+    height: BUTTON_H - 12,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Radius.chip,
-    paddingHorizontal: Spacing.two,
+    borderRadius: Radius.chip - 2,
+    paddingHorizontal: Spacing.two - 2,
   },
-  /* A count the balance does not cover. Still pressable — see the row's note. */
-  outOfReach: { opacity: 0.45 },
+  /* The verb, the coin and the figure. `Spacing.two - 2` between them is the
+     app's mark-to-word gap — the same one `DoorChip` sets between its `+` and
+     its label. */
+  buyLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two - 2,
+  },
   /* Takes whatever the counts leave, so a pack with no bulk row gets a
      full-width button and one with a bulk row still gets a wide target. */
   openButton: {
