@@ -25,13 +25,22 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 /**
- * How far the fade under a section strip reaches.
+ * The band under a section strip: a solid hold, then an eased fade.
  *
- * `TabBarGlass` uses the same 24 at the other end of the page, and matching is
- * the point: a reader meets both edges in one scroll, and two different fade
- * lengths would read as two different materials.
+ * `SOLID` is full page background, and it is what stops the strip having
+ * anything touching it at all — a card's border arriving at the exact pixel the
+ * strip's border ends reads as one thick line, however soft the fade under it
+ * is. Ten points of nothing is what separates the two objects.
+ *
+ * `RUN` is the fade proper, and it is longer than the 24 this started at.
+ * `TabBarGlass` uses 24 at the other end of the page, but it is fading INTO a
+ * floating capsule with margins either side; this one is fading into a
+ * full-width bar with a hard bottom border, which is a more abrupt edge and
+ * wants a longer, gentler exit.
  */
-const FADE = 24;
+const SOLID = 10;
+const RUN = 28;
+const FADE = SOLID + RUN;
 
 type Props = {
   /**
@@ -272,8 +281,26 @@ export function Screen({
     <View style={styles.topFade} pointerEvents="none">
       <Svg width="100%" height={FADE}>
         <Defs>
+          {/* FOUR STOPS, NOT TWO, and the middle pair is what makes it subtle.
+              A straight ramp from 1 to 0 is the most VISIBLE fade available: it
+              has a corner at each end, so the eye finds where it starts and
+              where it stops and reads the band as an object. These stops ease
+              it — the opacity falls quickly through the first third and then
+              tails off, so the bottom of the band has no edge to find. */}
           <LinearGradient id="screenTopFade" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor={c.background} stopOpacity="1" />
+            {/* Held solid to the bottom of `SOLID`. */}
+            <Stop offset={`${SOLID / FADE}`} stopColor={c.background} stopOpacity="1" />
+            <Stop
+              offset={`${(SOLID + RUN * 0.38) / FADE}`}
+              stopColor={c.background}
+              stopOpacity="0.58"
+            />
+            <Stop
+              offset={`${(SOLID + RUN * 0.72) / FADE}`}
+              stopColor={c.background}
+              stopOpacity="0.2"
+            />
             <Stop offset="1" stopColor={c.background} stopOpacity="0" />
           </LinearGradient>
         </Defs>
