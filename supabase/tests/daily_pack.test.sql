@@ -99,18 +99,26 @@ begin
 
   -- 8. the limit is PER PACK, not global: a paid pack is unaffected by having
   --    claimed the free one.
-  select count(*) into n from public.open_pack('standard');
-  if n <> 5 then raise exception 'FAIL: standard returned % cards after a daily claim', n; end if;
+  /* `base` was `standard` until 20260905183000 renamed the shop to
+     Base -> Pro -> All-Pro -> Elite. What this step needs is any paid pack. */
+  select count(*) into n from public.open_pack('base');
+  if n <> (select card_count from public.packs where code = 'base') then
+    raise exception 'FAIL: base returned % cards after a daily claim, the shelf promises %',
+      n, (select card_count from public.packs where code = 'base');
+  end if;
   /* CHARGED WHAT THE SHELF SAYS, read from the row rather than from a constant.
      This was `100` until 20260903124500 doubled it to close a buy-to-dump loop,
      and a price copied into a test is a test that breaks on the day the price
      is deliberately changed. What matters here is that a paid pack still
      charges after a free one was claimed — the amount is the packs table's
-     business. */
-  select coin_cost into v_cost from public.packs where code = 'standard';
+     business.
+     THE CARD COUNT ABOVE NOW FOLLOWS THE SAME RULE, and did not until the shop
+     went to six cards a pack. Half-applying this lesson is how the suite came
+     back red twice for the same kind of reason. */
+  select coin_cost into v_cost from public.packs where code = 'base';
   select balance into v_after from public.coin_balances where user_id = auth.uid();
   if v_after <> v_start - v_cost then
-    raise exception 'FAIL: standard cost % coins, expected the shelf price of %',
+    raise exception 'FAIL: base cost % coins, expected the shelf price of %',
       v_start - v_after, v_cost;
   end if;
 
