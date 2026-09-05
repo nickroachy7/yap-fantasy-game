@@ -40,8 +40,15 @@ export function SectionHead({
   tight = false,
 }: {
   label: string;
-  /** Drawn uppercased. Keep it short — it shares one line with the name. */
-  hint: string;
+  /**
+   * Drawn uppercased. Keep it short — it shares one line with the name.
+   *
+   * OPTIONAL, and omitting it is a real state rather than a degenerate one: a
+   * shelf with nothing in it has no count worth printing, and "0 SETTLED" is
+   * noise where the absence of rows already says it. See the contests page's
+   * empty Recent, which is a name and a link and nothing else.
+   */
+  hint?: string;
   /** The hint's colour, which is where a board says it is over or under. */
   tone: string;
   /**
@@ -81,13 +88,15 @@ export function SectionHead({
   return (
     <View style={[styles.head, tight && styles.tight]}>
       <Text style={[Type.section, { color: c.text }]}>{label}</Text>
-      <Text
-        accessibilityRole="text"
-        accessibilityLabel={hintLabel}
-        numberOfLines={1}
-        style={[Type.micro, styles.hint, { color: tone }]}>
-        {hint.toUpperCase()}
-      </Text>
+      {hint ? (
+        <Text
+          accessibilityRole="text"
+          accessibilityLabel={hintLabel}
+          numberOfLines={1}
+          style={[Type.micro, styles.hint, { color: tone }]}>
+          {hint.toUpperCase()}
+        </Text>
+      ) : null}
       {action}
     </View>
   );

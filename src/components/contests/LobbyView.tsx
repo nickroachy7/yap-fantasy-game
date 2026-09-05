@@ -461,27 +461,6 @@ export function LobbyView({
       </Section>
 
 
-      {/* THE ARCHIVE RIDES THE HEADING, right-aligned. It was tried on its own
-          line under the list, on the argument that a door and a title are two
-          unrelated things to share a row. On screen the opposite reads better:
-          a bare link floating between two shelves has nothing to belong to,
-          while up here it is unmistakably the rest of THIS list — the two-week
-          window is inline, the season is one tap further on. */}
-      <Section
-        label="Recent"
-        hint={`${finished.length} settled`}
-        hintLabel={`${finished.length} contests settled`}
-        action={<ArchiveLink onPress={() => setView('history')} />}>
-        <View style={styles.stack}>
-        {finished.length > 0 ? (
-          finished.map((m) => (
-            <SettledEntry key={m.id} entry={m} onPress={() => onOpenContest(m.code)} />
-          ))
-        ) : loading ? null : (
-          <SectionEmpty text="Results land here when the week is swept." />
-          )}
-        </View>
-      </Section>
 
       {/* COMMUNITY, because that is what it is: the lobby everybody shares, as
           opposed to the one you assemble yourself below. It was called "Open",
@@ -514,6 +493,49 @@ export function LobbyView({
           It is about what entering ANOTHER contest costs you, which is a
           sentence for somebody looking at a list of contests to enter. */}
       <Footnote />
+
+      {/* RECENT IS LAST, AND IT COLLAPSES TO ONE LINE WHEN IT IS EMPTY.
+          ---------------------------------------------------------------------
+          IT USED TO SIT BETWEEN ENTERED AND COMMUNITY, which put history in the
+          middle of the two shelves that are about this week — what you are in,
+          and what you can still enter. For most of the week it is also EMPTY:
+          results land only once the sweep finishes, so a full heading, a count
+          of nought, an archive link and a sentence explaining the wait occupied
+          four lines to say nothing, and pushed Community under the fold on a
+          phone. It is the least urgent shelf on the page and it was interrupting
+          the two most urgent.
+
+          SO IT MOVED TO THE BOTTOM and, with nothing in it, draws its heading
+          and nothing else — the name and the way into the archive, on one line.
+          The empty-state sentence goes with the rest: "Results land here when
+          the week is swept" is a caption explaining an absence the reader can
+          see, and the shelf's own emptiness says it faster.
+
+          NOT HIDDEN OUTRIGHT, which was the other option and is what `Friendly`
+          above does. Friendly can vanish because nothing else leads anywhere it
+          is the only route to. This heading carries `All weeks` — the ONLY door
+          to the archive — so hiding it would strand every settled contest the
+          player has ever entered behind no link at all. One quiet line is the
+          price of that door. */}
+      {finished.length > 0 ? (
+        <Section
+          label="Recent"
+          hint={`${finished.length} settled`}
+          hintLabel={`${finished.length} contests settled`}
+          action={<ArchiveLink onPress={() => setView('history')} />}>
+          <View style={styles.stack}>
+            {finished.map((m) => (
+              <SettledEntry key={m.id} entry={m} onPress={() => onOpenContest(m.code)} />
+            ))}
+          </View>
+        </Section>
+      ) : loading ? null : (
+        <SectionHead
+          label="Recent"
+          tone={c.textTertiary}
+          action={<ArchiveLink onPress={() => setView('history')} />}
+        />
+      )}
 
       {/* FRIENDLY — AND IT IS NOT A SHELF ANY MORE, IT IS AN OVERFLOW.
           ---------------------------------------------------------------------
@@ -840,7 +862,7 @@ function Section({
 }: {
   label: string;
   /** A count and a word — "3 filed". Drawn uppercased and right-aligned. */
-  hint: string;
+  hint?: string;
   hintLabel?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
