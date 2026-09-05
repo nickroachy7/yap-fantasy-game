@@ -38,8 +38,7 @@ import { TabIcon, type TabIconName, type TabIconProps } from '@/components/shell
 
 import { Icon } from './Icon';
 import {
-  navLeagues,
-  navLeaguesIdle,
+  league,
   navProfile,
   navProfileIdle,
   navScores,
@@ -58,7 +57,15 @@ import type { Glyph } from './system';
  */
 const DRAWN: Partial<Record<TabIconName, { active: Glyph; idle: Glyph }>> = {
   fantasy: { active: navYap, idle: navYapIdle },
-  leagues: { active: navLeagues, idle: navLeaguesIdle },
+  /* THE ONE TAB WHOSE ARTWORK DOES NOT CHANGE, and it is a shape problem
+     rather than a missing drawing. Crossed pennants are thin-limbed: hollowing
+     them puts two hairlines a hair apart down each staff, and at 24pt those
+     merge into a scribble. Four generated attempts at a hollow variant all
+     read weaker than the three glyphs beside it, so the solid mark does both
+     states. What that costs is the shape half of the focus signal on this tab
+     alone; tint and the label's own weight still carry it. Swap in a hollow
+     pair the day one exists that holds at 24pt. */
+  leagues: { active: league, idle: league },
   scores: { active: navScores, idle: navScoresIdle },
   profile: { active: navProfile, idle: navProfileIdle },
 };

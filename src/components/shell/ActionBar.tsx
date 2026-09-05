@@ -42,9 +42,14 @@ import { ScrollView, StyleSheet, Pressable, Text, View, type ColorValue } from '
 
 import { Icon } from '@/components/icons/Icon';
 import {
-  collection as collectionGlyph,
+  cards as cardsGlyph,
+  contests as contestsGlyph,
+  filters as filtersGlyph,
+  lineup as lineupGlyph,
+  pack as packGlyph,
+  search as searchGlyph,
   sets as setsGlyph,
-  shop as shopGlyph,
+  standings as standingsGlyph,
   tierGold,
 } from '@/components/icons/glyphs';
 import type { Glyph } from '@/components/icons/system';
@@ -302,10 +307,24 @@ const STROKE = 1.6;
  * second artwork.
  */
 const DRAWN_ACTIONS: Partial<Record<ActionIconName, Glyph>> = {
-  inventory: collectionGlyph,
+  /* `cards`, not `collection`. The two are different pictures of the same
+     section: `collection` is the SECTION's mark and belongs to the tab that
+     names it, while this cell is the board of cards inside it. Drawing the
+     section's own mark on one of its two pages said "Collect" twice and left
+     Sets as the only cell that named what it held. */
+  inventory: cardsGlyph,
   sets: setsGlyph,
-  shop: shopGlyph,
+  /* `pack`, not `shop`. A storefront is where you go; a pack is what you come
+     back with, and the button is a door to one specific thing rather than to a
+     shop with departments. It also stops the round button being the only
+     storefront in an app whose every other mark is an object. */
+  shop: packGlyph,
   tiers: tierGold,
+  contests: contestsGlyph,
+  search: searchGlyph,
+  lineup: lineupGlyph,
+  filters: filtersGlyph,
+  standings: standingsGlyph,
 };
 
 export function ActionIcon({
