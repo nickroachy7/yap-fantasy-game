@@ -99,6 +99,7 @@ export function PlayerSheetFrame({
   frame = 'sheet',
   footerGlass = false,
   fitsWithoutScrolling = false,
+  headerTrailing,
   tone,
   surface,
   pinned,
@@ -174,6 +175,20 @@ export function PlayerSheetFrame({
    * On a screen it was not, it is still usable.
    */
   fitsWithoutScrolling?: boolean;
+  /**
+   * A node pinned to the RIGHT of the header row, level with the title.
+   *
+   * For a figure the sheet is priced in — packs puts its coin balance here —
+   * where `subtitle` would stack it under the title in 9pt grey. That reading
+   * is right for a qualifier ("Wide receiver · KC") and wrong for a number the
+   * reader is checking against a price: the masthead carries the same balance
+   * at the far right of its own row on every other screen, and a sheet that
+   * moves it to a different corner in a different size makes the player look
+   * for it twice.
+   *
+   * It fades with the title, because it is part of the same row.
+   */
+  headerTrailing?: ReactNode;
   /**
    * A colour to wash the top of the sheet with — the card profile's tier, the
    * player profile's club.
@@ -573,6 +588,15 @@ export function PlayerSheetFrame({
       <Animated.View pointerEvents="none" style={[styles.headerText, { opacity: titleFade }]}>
         {titleText}
       </Animated.View>
+
+      {/* Level with the title and hard against the right edge — see
+          `headerTrailing`. Outside the title's own box so a long name truncates
+          rather than shoving the figure off the row. */}
+      {headerTrailing ? (
+        <Animated.View pointerEvents="none" style={{ opacity: titleFade }}>
+          {headerTrailing}
+        </Animated.View>
+      ) : null}
 
       {!closeInBar ? null : (
         <Pressable

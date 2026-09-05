@@ -481,12 +481,9 @@ function guaranteeOf(raw: Json | undefined): string | null {
  * holds its shape: `give` stays in the tree as the spacer that keeps the money
  * pinned right.
  */
-function Promised({ coverage, guarantee }: { coverage: Coverage[]; guarantee?: Json }) {
+function Promised({ coverage }: { coverage: Coverage[] }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
-  const phrase = guaranteeOf(guarantee);
-
-  if (coverage.length === 0 && !phrase) return <View style={styles.give} />;
 
   return (
     <View style={styles.give}>
@@ -494,13 +491,9 @@ function Promised({ coverage, guarantee }: { coverage: Coverage[]; guarantee?: J
         GUARANTEED
       </Text>
       <View style={styles.tokens}>
-        {coverage.length > 0 ? (
-          coverage.map((entry) => <CoverageToken key={entry.position} entry={entry} />)
-        ) : (
-          <Text numberOfLines={1} style={[Type.fine, { color: c.text }]}>
-            {phrase}
-          </Text>
-        )}
+        {coverage.map((entry) => (
+          <CoverageToken key={entry.position} entry={entry} />
+        ))}
       </View>
     </View>
   );
@@ -670,6 +663,9 @@ function PackCard({
   const shortfall = total - coins;
   const blocked = locked || claimedToday || !affordable;
   const coverage = coverageOf(pack.guaranteed_positions);
+  /* Read once and used twice — the head prints it, and the foot exists only
+     when it is absent AND there are positions to draw instead. */
+  const guarantee = guaranteeOf(pack.guarantee);
 
   /**
    * THE BUTTON SAYS WHAT IT COSTS, and that is where the price now lives.
@@ -744,15 +740,33 @@ function PackCard({
             </Text>
           </View>
 
-          {/* THE PRICE IS NOT HERE ANY MORE — see the note on `label`. What
-              stood in this corner was the price of ONE, on a card that can buy
-              ten, so it disagreed with the button the moment ×5 was tapped.
-              `FREE` went with it rather than being kept as the one survivor:
-              the button already reads `Claim free pack`, and a badge repeating
-              the control two inches below it is the same fact twice.
+          {/* THE GUARANTEE MOVED UP INTO THIS CORNER, which the price used to
+              hold and which has been empty since that went into the button.
 
-              The corner is left empty rather than refilled. A head that has
-              nothing to hold is allowed to hold nothing. */}
+              It was a zone of its own under the odds — 29 points of card for
+              two words, on the one pack that has a guarantee at all. Beside the
+              name it reads as part of what the pack IS, which is what it is:
+              `Elite Pack · 6 cards · 1 elite guaranteed` is one sentence about
+              one object, where a separate band made it a second fact about the
+              same one.
+
+              POSITION COVERAGE STAYS BELOW, and that is not an inconsistency.
+              The starter pack promises five positions — `QB1 RB2 WR3 TE1 PK1` —
+              which is a row of tokens, not a phrase, and it would take more
+              width here than the name it would be sharing with. A tier
+              guarantee is two words; a position guarantee is a table. */}
+          {guarantee ? (
+            <View style={styles.headGuarantee}>
+              <Text
+                numberOfLines={1}
+                style={[Type.micro, { color: c.textTertiary }]}>
+                GUARANTEED
+              </Text>
+              <Text numberOfLines={1} style={[Type.fine, { color: c.text }]}>
+                {guarantee}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -776,12 +790,12 @@ function PackCard({
           cost. See `Odds` for why it is four numbers and not a bar. */}
       <Odds odds={pack.odds} />
 
-      {/* NOT DRAWN EMPTY. A pack that promises no tier and covers no position
-          has nothing on either side of this zone, and the band it left behind
-          read as a row that had failed to load. */}
-      {coverage.length > 0 || guaranteeOf(pack.guarantee) ? (
+      {/* POSITION COVERAGE ONLY, and only when there is some. A tier guarantee
+          is in the head now, and a pack that promises neither draws no band at
+          all — an empty zone read as a row that had failed to load. */}
+      {coverage.length > 0 ? (
         <View style={[styles.zone, styles.foot, { borderTopColor: c.borderStrong }]}>
-          <Promised coverage={coverage} guarantee={pack.guarantee} />
+          <Promised coverage={coverage} />
         </View>
       ) : null}
 
@@ -963,9 +977,16 @@ const styles = StyleSheet.create({
   /* `minWidth: 0` is what lets a long name truncate instead of shoving the
      card count off the card. */
   headName: { flexShrink: 1, minWidth: 0 },
-  /* The string that gives. The head has nothing that refuses any more — the
-     price it used to hold is in the button. */
+  /* The string that gives. What refuses is the guarantee beside it: `1 elite`
+     truncated to `1 el` is a promise the card cannot keep. */
   headGive: { flexShrink: 1, minWidth: 0 },
+  headGuarantee: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two - 3,
+    flexGrow: 0,
+    flexShrink: 0,
+  },
 
   /* A hairline between two fields. The tall variant stretches the foot's full
      content box rather than declaring a height of its own. */

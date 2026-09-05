@@ -52,7 +52,8 @@ import { advancePull, beginPull, endPull, finishPull } from '@/components/cards/
 import { invalidateCollection } from '@/components/collection/use-collection';
 import { invalidateSets } from '@/components/collection/use-sets';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
-import { Colors, Radius, Spacing, Type } from '@/constants/theme';
+import { Coin } from '@/components/shell/AppHeader';
+import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
@@ -282,7 +283,21 @@ export default function PacksScreen() {
       /* The hero below carries whichever of these is current at full size; the
          frame fades the small copy in once that has scrolled away. */
       title="Packs"
-      subtitle={`${coins.toLocaleString()} coins`}
+      /* THE BALANCE GOES WHERE THE MASTHEAD PUTS IT: hard right, figure then
+         coin, at the masthead's own size. It was `subtitle`, which stacked
+         `343 coins` under the title in 9pt grey — right for a qualifier and
+         wrong for a number the reader is checking against four prices. Every
+         other screen in the app carries this figure at the far right of its top
+         row; a sheet that moves it to a different corner in a different size
+         makes the player look for it twice. */
+      headerTrailing={
+        <View style={styles.balance}>
+          <Text style={[styles.balanceFigure, NUMERIC, { color: c.text }]}>
+            {coins.toLocaleString()}
+          </Text>
+          <Coin size={11} color={TierColors[scheme].gold.accent} />
+        </View>
+      }
       /* THE SHELF IS MEANT TO FIT, so the frame stops scrolling when it does —
          see `fitsWithoutScrolling`, which measures rather than trusting this.
          Everything on this sheet is a control: five cards, each one a decision
@@ -343,6 +358,12 @@ export default function PacksScreen() {
 }
 
 const styles = StyleSheet.create({
+  /* `AppHeader`'s balance, copied rather than imported: that component owns a
+     row with two currencies in it and a loading state, and this needs one
+     figure. The two numbers it renders are the same size on purpose — see the
+     note on `headerTrailing`. */
+  balance: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  balanceFigure: { fontSize: 14, fontWeight: '800', letterSpacing: -0.2 },
   /* `LobbyHero`'s band: a title row, and the sentence under it separated by
      nothing but the two line boxes' own leading. */
   hero: { paddingTop: Spacing.two, paddingBottom: Spacing.two + 2, gap: Spacing.half },
