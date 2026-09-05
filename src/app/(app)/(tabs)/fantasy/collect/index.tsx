@@ -67,7 +67,6 @@ import {
 import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { CollectionValue } from '@/components/collection/CollectionValue';
 import { SectionHead } from '@/components/ui/SectionHead';
-import { TopFade } from '@/components/ui/TopFade';
 import { RosterAlert } from '@/components/collection/RosterAlert';
 import { BulkBar } from '@/components/collection/BulkBar';
 import { SELECTION_MAX, sellTotal } from '@/components/collection/bulk';
@@ -448,60 +447,12 @@ export default function InventoryScreen() {
           </ScrollView>
         ) : (
           <>
-            {/* TWO LINES, NOT ONE ROW: the value, then the board's own head.
 
-                IT WAS A SINGLE ROW — value, cap, a spacer, and two doors —
-                arranged as a sentence read left to right: what you have, what
-                you can do to it, where you go from here. The doors have since
-                gone to the strip (see the note below), and with them went the
-                reason the row was a row. What was left was two unrelated facts
-                sharing a line because they used to have company on it.
-
-                THEY ARE NOT THE SAME KIND OF FACT. Value is about the
-                collection as a portfolio — one number, gold, the only thing on
-                the page denominated in coins. The cap is about the LIST
-                UNDERNEATH: how many rows there are and how many there may be.
-                Reading them off one line asked the eye to switch subject
-                mid-sentence.
-
-                SO THE CAP BECAME A HEADING, which is what it always was. `31/30
-                HELD` beside the word "Inventory" is the same object the lineup
-                page opens both of its boards with — `SectionHead`, a name on
-                the left and a count on the right — and that is the point rather
-                than a resemblance: Compete and Collect are the two halves of one
-                loop, and a reader who has learned the shape on one tab should
-                find it meaning the same thing on the other.
-
-                THE TONE IS WHERE THE CAP SPEAKS. `textTertiary` under the
-                limit, `warning` over it — exactly as the lineup's head turns
-                when a slot is empty. The red banner still says what to DO about
-                it; the head only has to say that something is off, which is all
-                a count can say without becoming a sentence.
-
-                THE VALUE KEEPS ITS OWN LINE and its own gold, and is now the
-                only thing on it. */}
-            <View style={styles.toolbar}>
-              <CollectionValue sellValue={stats.sellValue} />
-              {roster ? (
-                <SectionHead
-                  label="Inventory"
-                  hint={`${roster.held}/${roster.cap} held`}
-                  hintLabel={`${roster.held} of ${roster.cap} cards held`}
-                  tone={roster.isOver ? c.warning : c.textTertiary}
-                />
-              ) : null}
-            </View>
-
-            {/* THE FADE BELONGS OVER THE LIST HERE, not at the top of the page.
-                Everywhere else the scrolling edge IS the section strip, so
-                `Screen` lays the band there. This board puts a pinned toolbar
-                between the two — the value line and the board's head do not
-                scroll — so the strip is not the edge anything is cut against.
-                The head is. `Screen`'s band still draws, over static chrome,
-                where it has nothing to soften and costs nothing; this is the
-                one that does the work. */}
-            <View style={styles.listBox}>
-            <TopFade />
+            {/* NO FADE OF ITS OWN ANY MORE. It needed one while the toolbar
+                was pinned, because that made the board's head the edge content
+                was cut against rather than the strip. With the toolbar inside
+                the list there is nothing static between the strip and the
+                scroll, so `Screen`'s own band is in the right place again. */}
             <FlatList
               {...quietScrollbar}
               style={styles.fill}
@@ -539,6 +490,49 @@ export default function InventoryScreen() {
                    NOTHING PRESSABLE IS IN HERE, which is what makes it safe to
                    scroll and what stops it changing height. */
                 <View style={styles.headerBox}>
+            {/* TWO LINES, NOT ONE ROW: the value, then the board's own head.
+
+                      IT WAS A SINGLE ROW — value, cap, a spacer, and two doors —
+                      arranged as a sentence read left to right: what you have, what
+                      you can do to it, where you go from here. The doors have since
+                      gone to the strip (see the note below), and with them went the
+                      reason the row was a row. What was left was two unrelated facts
+                      sharing a line because they used to have company on it.
+
+                      THEY ARE NOT THE SAME KIND OF FACT. Value is about the
+                      collection as a portfolio — one number, gold, the only thing on
+                      the page denominated in coins. The cap is about the LIST
+                      UNDERNEATH: how many rows there are and how many there may be.
+                      Reading them off one line asked the eye to switch subject
+                      mid-sentence.
+
+                      SO THE CAP BECAME A HEADING, which is what it always was. `31/30
+                      HELD` beside the word "Inventory" is the same object the lineup
+                      page opens both of its boards with — `SectionHead`, a name on
+                      the left and a count on the right — and that is the point rather
+                      than a resemblance: Compete and Collect are the two halves of one
+                      loop, and a reader who has learned the shape on one tab should
+                      find it meaning the same thing on the other.
+
+                      THE TONE IS WHERE THE CAP SPEAKS. `textTertiary` under the
+                      limit, `warning` over it — exactly as the lineup's head turns
+                      when a slot is empty. The red banner still says what to DO about
+                      it; the head only has to say that something is off, which is all
+                      a count can say without becoming a sentence.
+
+                      THE VALUE KEEPS ITS OWN LINE and its own gold, and is now the
+                      only thing on it. */}
+                  <View style={styles.toolbar}>
+                    <CollectionValue sellValue={stats.sellValue} />
+                    {roster ? (
+                      <SectionHead
+                        label="Inventory"
+                        hint={`${roster.held}/${roster.cap} held`}
+                        hintLabel={`${roster.held} of ${roster.cap} cards held`}
+                        tone={roster.isOver ? c.warning : c.textTertiary}
+                      />
+                    ) : null}
+                  </View>
                   {/* SITS ON THE LIST AND SCROLLS WITH IT. Pinned under the
                       toolbar it was a third band of chrome the eye had to pass
                       on every visit — and it is a STATEMENT, which this file's
@@ -587,7 +581,6 @@ export default function InventoryScreen() {
                 />
               )}
             />
-            </View>
 
             {/* PINNED UNDER THE GRID, not pushed into it. The bar appears the
                 moment the mode opens rather than on the first tick, so the grid
@@ -628,10 +621,6 @@ export default function InventoryScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  /* Holds the list and the fade laid over its top edge — see the note there.
-     Named for the BOX, not the list: `list` was already taken by the list's own
-     content padding a few keys down. */
-  listBox: { flex: 1 },
   /* The same block as the Players boards' `filters`, down to the numbers: one
      gutter, one gap between the two controls, one gap before the list. Two
      screens with the same controls at different rhythms is what this was
@@ -642,9 +631,11 @@ const styles = StyleSheet.create({
   /* A COLUMN NOW, not a row — see the note at the render. The gap is the joint
      between the value line and the board's head; the two used to be separated
      by a `spacer` that pushed them to opposite ends of one line. */
+  /* NO GUTTER OF ITS OWN. It had one while it was pinned as a sibling of the
+     list; inside `headerBox` that gutter is already paid, and keeping both put
+     the value line 32pt in while the rows it describes start at 16. */
   toolbar: {
     gap: Spacing.one + 2,
-    paddingHorizontal: GUTTER,
     paddingBottom: Spacing.one + 2,
   },
   /* The give in the row, and the ONLY give: everything else is a fixed readout
