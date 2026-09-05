@@ -207,6 +207,15 @@ const HEAD_H = 34;
 const ODDS_H = 42;
 const FOOT_H = 29;
 const BUTTON_H = 40;
+/**
+ * The ink on the gold button.
+ *
+ * `TierColors.dark.gold.onAccent`, written out because the button's fill is the
+ * app's gold on BOTH schemes — it is a call to action, not a surface that
+ * follows the page — so the text on it cannot be `Colors[scheme].background`
+ * the way it was for one build. On light that resolved to near-white, on gold.
+ */
+const BUTTON_INK = '#17130A';
 /** The air inside every zone, top and bottom. One constant, one decision. */
 const ZONE_PAD = Spacing.one + 3;
 const ACTION_H = BUTTON_H + ZONE_PAD * 2;
@@ -832,7 +841,7 @@ function PackCard({
                that does not move for that long reads as a hang. See
                `PackShelf`'s `progress`. */
             progress && progress.total > 1 ? (
-              <Text numberOfLines={1} style={[Type.strong, NUMERIC, { color: '#17130A' }]}>
+              <Text numberOfLines={1} style={[Type.strong, NUMERIC, { color: BUTTON_INK }]}>
                 {`${progress.done} / ${progress.total}`}
               </Text>
             ) : (
@@ -841,24 +850,32 @@ function PackCard({
           ) : free || claimedToday || !affordable ? (
             <Text
               numberOfLines={1}
-              style={[Type.strong, { color: blocked ? c.textSecondary : '#17130A' }]}>
+              style={[Type.strong, { color: blocked ? c.textSecondary : BUTTON_INK }]}>
               {label}
             </Text>
           ) : (
-            /* PURCHASE, THE COIN, THE FIGURE — three things in the order they
-               are read, rather than the sentence "Purchase for 250 coins". The
-               word is what the button DOES and never changes; the glyph says
-               which currency without spending five characters on the word; and
-               the figure is the only part that moves, so it sits at the end,
-               where a changing number belongs and where ×5 can grow it without
-               shoving the verb around. */
+            /* THE VERB, A RULE, THE PRICE — and the verb is `Open`.
+               
+               It said `Purchase` for one build and that was the wrong word for
+               this game. You do not purchase a pack, you OPEN one: it is what
+               the button has always said, what the RPC is called, and what the
+               whole screen is for. `Purchase` is the word a checkout uses, and
+               a checkout is a thing you get through rather than a thing you
+               came to do.
+               
+               The rule between the two halves is this card's own — the same
+               hairline the head sets between a name and a card count — and it
+               is what lets the verb stay a verb instead of running into the
+               figure as `Open 250`. Action on the left, cost on the right, one
+               object.
+               
+               The figure is last because it is the only part that moves: ×5
+               grows it without shoving anything else around. */
             <View style={styles.buyLabel}>
-              <Text style={[Type.strong, { color: '#17130A' }]}>Purchase</Text>
-              {/* The ink the gold button already uses for its own text — see
-                  the progress count above, which is the same colour and was the
-                  only thing on this button that had ever needed one. */}
-              <Coin size={11} color="#17130A" />
-              <Text style={[Type.strong, NUMERIC, { color: '#17130A' }]}>
+              <Text style={[Type.strong, { color: BUTTON_INK }]}>Open</Text>
+              <View style={styles.buyRule} />
+              <Coin size={11} color={BUTTON_INK} />
+              <Text style={[Type.strong, NUMERIC, { color: BUTTON_INK }]}>
                 {total.toLocaleString()}
               </Text>
             </View>
@@ -1041,7 +1058,16 @@ const styles = StyleSheet.create({
   buyLabel: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.two - 2,
+    gap: Spacing.two + 1,
+  },
+  /* The card's own hairline, in the button's ink at a third strength — a
+     divider on a saturated fill has to be the fill's own shadow rather than a
+     border colour, which would read as a seam. */
+  buyRule: {
+    width: StyleSheet.hairlineWidth,
+    height: 14,
+    backgroundColor: BUTTON_INK,
+    opacity: 0.3,
   },
   /* Takes whatever the counts leave, so a pack with no bulk row gets a
      full-width button and one with a bulk row still gets a wide target. */
