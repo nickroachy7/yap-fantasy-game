@@ -160,13 +160,18 @@ begin
       from public.packs p
       cross join lateral public.pack_odds(p.code) o
       join (
-        select t.pull_tier as tier,
+        /* `cpt`, NOT `t`. This block declares a record variable called `t`, and
+           plpgsql resolves an ambiguous qualifier against its own variables
+           before the query's aliases — so `t.card_id` reached for a field on
+           the record and the suite died with "record t has no field card_id"
+           rather than anything about prices. */
+        select cpt.pull_tier as tier,
                avg(public.sale_value('bronze', coalesce(pv.value_score, 0), 0)) as avg_base
-          from public.card_pull_tiers t
-          join public.cards c on c.id = t.card_id
+          from public.card_pull_tiers cpt
+          join public.cards c on c.id = cpt.card_id
           left join public.player_values pv
                  on pv.player_id = c.player_id and pv.season = c.season
-         where t.season = 2026
+         where cpt.season = 2026
          group by 1
       ) band on band.tier = o.pull_tier
      where p.coin_cost > 0 and p.is_active
