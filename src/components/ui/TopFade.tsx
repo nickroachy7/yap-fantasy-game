@@ -56,7 +56,24 @@ const SOLID = 10;
 const RUN = 28;
 export const TOP_FADE = SOLID + RUN;
 
-export function TopFade() {
+export function TopFade({ top = 0 }: {
+  /**
+   * How far below the parent's top edge the band starts.
+   *
+   * IT IS NOT ALWAYS ZERO, and the reason is the difference between the two
+   * frames this serves. A `ScrollView` takes its top gap as padding INSIDE the
+   * content, so rows scroll up through the band and the band belongs at the
+   * container's edge. A `scroll={false}` screen pads the CONTAINER instead and
+   * puts a list inside it — that list clips at its own top, so nothing ever
+   * enters the space above it, and a band drawn at the container's edge spends
+   * its opaque half on empty page and lands only its weakest tail on the rows.
+   * That reads as no fade at all.
+   *
+   * So the caller passes the offset it actually padded by, and the band starts
+   * where the scrolling content starts.
+   */
+  top?: number;
+}) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
 
@@ -64,7 +81,7 @@ export function TopFade() {
     /* `pointerEvents="none"` throughout: it sits over the top of a scrolling
        list and must not eat the first row's taps, or a flick that starts under
        it. */
-    <View style={styles.fade} pointerEvents="none">
+    <View style={[styles.fade, { top }]} pointerEvents="none">
       <Svg width="100%" height={TOP_FADE}>
         <Defs>
           <LinearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
@@ -94,5 +111,5 @@ const styles = StyleSheet.create({
   /* Over the scroller, pinned to its top edge. Full width deliberately: the
      content may be capped at a measure and gutter-padded, but the thing being
      softened is the strip's border, which runs edge to edge. */
-  fade: { position: 'absolute', top: 0, left: 0, right: 0 },
+  fade: { position: 'absolute', left: 0, right: 0 },
 });

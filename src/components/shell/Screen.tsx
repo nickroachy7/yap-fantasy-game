@@ -23,6 +23,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { TopFade } from '@/components/ui/TopFade';
 
+/**
+ * The gap between a section strip and the page under it, and the offset the
+ * fade starts at on a non-scrolling screen. One constant so the two cannot
+ * disagree — see `topFade`.
+ */
+const FLUSH_TOP = Spacing.four;
+
 
 type Props = {
   /**
@@ -235,8 +242,15 @@ export function Screen({
 
   /* See `TopFade` — the strip does not scroll, so content has to dissolve into
      it rather than be cut by it. `flush` is already the test for "there is a
-     section bar above this page", which is exactly when the edge exists. */
-  const topFade = flush ? <TopFade /> : null;
+     section bar above this page", which is exactly when the edge exists.
+
+     THE OFFSET IS THE WHOLE DIFFERENCE BETWEEN THE TWO BRANCHES. A scrolling
+     screen takes `flushTop` as padding inside its content, so rows travel up
+     through the band and it belongs at the container's edge. A `scroll={false}`
+     screen pads the container and hands a list the box inside it; that list
+     clips at its own top, so the band has to start where the list does or it
+     spends its opaque half on empty page. */
+  const topFade = flush ? <TopFade top={scroll ? 0 : FLUSH_TOP} /> : null;
 
   return (
     /* The wide gutter is on the frame, not on each box inside it: capping the
@@ -366,5 +380,5 @@ const styles = StyleSheet.create({
      `Spacing.four` below groups it upward and gives the first card room to be
      a separate object. Tune it HERE: this is the one place the gap under every
      section strip is decided, which is why `SectionNav` pays nothing. */
-  flushTop: { paddingTop: Spacing.four },
+  flushTop: { paddingTop: FLUSH_TOP },
 });
