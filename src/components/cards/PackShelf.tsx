@@ -181,9 +181,18 @@ const BULK_COUNTS = [1, 5, 10] as const;
  * resize the shop.
  *
  * `ACTION_H` is the one measurement this card owns, and it is derived rather
- * than chosen: 40pt of button — the floor for something a thumb has to hit on
- * the first try, and the height the open button already had — plus `ZONE_PAD`
- * top and bottom.
+ * than chosen: `BUTTON_H` plus `ZONE_PAD` top and bottom.
+ *
+ * BUTTON_H WAS 40 AND IS 34, and the argument it replaces was "the floor for
+ * something a thumb has to hit on the first try". That was never the real
+ * floor: 40 is already under the platform's 44, so the button was relying on
+ * being 195pt WIDE to be hittable, not on being tall. Six points of height
+ * bought nothing a wide target did not already have.
+ *
+ * What replaces it is the trick the rest of this app uses for exactly this —
+ * `Pip` and `DoorChip` both draw small and reach out. The button and the count
+ * chips carry vertical `hitSlop`, so the drawn height came down and the touch
+ * target went UP, past 44 for the first time.
  */
 const HEAD_H = 34;
 /**
@@ -206,7 +215,7 @@ const HEAD_H = 34;
  */
 const ODDS_H = 42;
 const FOOT_H = 29;
-const BUTTON_H = 40;
+const BUTTON_H = 34;
 /**
  * The ink on the gold button.
  *
@@ -788,6 +797,9 @@ function PackCard({
                   key={n}
                   onPress={() => setCount(n)}
                   disabled={locked}
+                  /* Drawn at 24 and reached out past the platform's 44 — the
+                     same trade `Pip` and `DoorChip` make. See `BUTTON_H`. */
+                  hitSlop={{ top: 10, bottom: 10 }}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: on, disabled: locked }}
                   accessibilityLabel={`Open ${n === 1 ? 'one pack' : `${n} packs`}, ${(
@@ -816,6 +828,8 @@ function PackCard({
         <Pressable
           onPress={() => onOpen(buying)}
           disabled={blocked}
+          /* See `BUTTON_H`: 34 drawn, 54 to a thumb. */
+          hitSlop={{ top: 10, bottom: 10 }}
           accessibilityRole="button"
           /* The visible label already carries the total, so this adds only what
              the button cannot show: which pack, and what is left afterwards. */
@@ -1046,7 +1060,7 @@ const styles = StyleSheet.create({
      miss waiting to happen. */
   countChip: {
     minWidth: 40,
-    height: BUTTON_H - 12,
+    height: BUTTON_H - 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: Radius.chip - 2,
