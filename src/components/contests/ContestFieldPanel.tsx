@@ -60,7 +60,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { initialsOf } from '@/components/shell/AppHeader';
+import { TeamLogo } from '@/components/shell/TeamLogo';
 import { EntryLineup } from './EntryLineup';
 import { useContestLineup } from './use-contest-field';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -316,11 +316,7 @@ function EntrantRow({
       <Text style={[Type.fine, NUMERIC, styles.rank, { color: c.textTertiary }]}>
         {entrant.rank}
       </Text>
-      <View style={[styles.avatar, { borderColor: c.border }]}>
-        <Text style={[Type.micro, { color: c.textSecondary }]}>
-          {initialsOf(entrant.displayName)}
-        </Text>
-      </View>
+      <TeamLogo userId={entrant.userId} name={entrant.displayName} size={22} />
       <View style={styles.who}>
         {onOpenManager ? (
           /* `link`, not `button`: this sits inside the row's own pressable, and
@@ -428,15 +424,6 @@ const styles = StyleSheet.create({
      column that grows from 1 to 26 would shunt every name half a character
      right as the base grew. */
   rank: { width: 18, textAlign: 'right' },
-  avatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
   /* Takes the spare width, so a long handle truncates rather than pushing the
      score and the chip off the right edge. */
   who: { flex: 1, minWidth: 0, gap: 1 },

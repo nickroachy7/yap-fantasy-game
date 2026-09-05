@@ -10,7 +10,9 @@ import { FriendsPanel } from '@/components/friends/FriendsPanel';
 import { useFriends } from '@/components/friends/use-friends';
 import { StatStrip, type StatItem } from '@/components/account/StatStrip';
 import { TierBreakdown } from '@/components/account/TierBreakdown';
-import { Coin, initialsOf } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
+import { TeamLogo } from '@/components/shell/TeamLogo';
+import { chooseTeamLogo, clearTeamLogo } from '@/lib/team-logo';
 import { Screen } from '@/components/shell/Screen';
 import { DASH, DataTable, type Column } from '@/components/ui/DataTable';
 import { Panel } from '@/components/ui/Panel';
@@ -76,7 +78,7 @@ export default function ProfileScreen() {
   const accent = TierColors[scheme].gold.accent;
 
   const { session, signOut } = useAuth();
-  const { coins, displayName, cardCount, refresh } = usePlayer();
+  const { coins, displayName, cardCount, refresh, logo, setLogo } = usePlayer();
 
   /* The masthead's gear deep-links straight here — see `AppHeader`, whose
      trailing slot points at `/profile?tab=settings`. Seeded from the param
@@ -101,6 +103,8 @@ export default function ProfileScreen() {
   const [name, setName] = useState(displayName);
   const [savingName, setSavingName] = useState(false);
   const [nameNotice, setNameNotice] = useState<string | null>(null);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [logoNotice, setLogoNotice] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -276,6 +280,27 @@ export default function ProfileScreen() {
     setSavingName(false);
   }
 
+  /**
+   * ONE HANDLER FOR BOTH DIRECTIONS, because the two differ only in which
+   * function they call and both end by publishing a mark. Splitting them meant
+   * two copies of the busy flag, the notice reset and the `setLogo`, and the
+   * copies had already started to drift over whether a failure clears the
+   * spinner.
+   *
+   * A CANCELLED PICK SAYS NOTHING. Backing out of the system picker is not an
+   * outcome to report — see `LogoOutcome`.
+   */
+  async function changeLogo(next: 'set' | 'clear') {
+    if (!session) return;
+    setLogoBusy(true);
+    setLogoNotice(null);
+    const outcome =
+      next === 'set' ? await chooseTeamLogo(session.user.id) : await clearTeamLogo(session.user.id);
+    if (outcome.status === 'set') setLogo(outcome.mark);
+    if (outcome.status === 'error') setLogoNotice(outcome.message);
+    setLogoBusy(false);
+  }
+
   async function handleSignOut() {
     setSigningOut(true);
     setSignOutError(null);
@@ -380,9 +405,30 @@ export default function ProfileScreen() {
       onRefresh={onRefresh}>
       {/* ---- identity ---------------------------------------------------- */}
       <View style={[styles.identity, { backgroundColor: c.surface, borderColor: c.border }]}>
-        <View style={[styles.avatar, { borderColor: accent }]}>
-          <Text style={[Type.strong, { color: c.text }]}>{initialsOf(displayName)}</Text>
-        </View>
+        {/* THE LOGO IS THE CONTROL. A separate "change logo" button somewhere
+            below would be the third place on this page that talks about the
+            same picture; pressing the picture is what everyone tries first, and
+            the only place a manager can be certain they are editing THEIRS is
+            the one that is already showing it back to them.
+
+            `busy` dims rather than swapping in a spinner: the system picker is
+            covering this whole screen for most of the wait, and a spinner the
+            user never sees costs a layout that shifts when it lands. */}
+        <Pressable
+          onPress={() => void changeLogo('set')}
+          disabled={logoBusy}
+          accessibilityRole="button"
+          accessibilityLabel={logo.hasLogo ? 'Change your team logo' : 'Add a team logo'}
+          accessibilityState={{ disabled: logoBusy }}
+          style={({ pressed }) => [logoBusy && styles.dim, pressed && styles.pressed]}>
+          <TeamLogo
+            userId={session?.user.id}
+            name={displayName}
+            size={38}
+            borderColor={accent}
+            mark={logo}
+          />
+        </Pressable>
         <View style={styles.identityText}>
           <Text numberOfLines={1} style={[Type.section, { color: c.text }]}>
             {displayName}
@@ -551,6 +597,68 @@ export default function ProfileScreen() {
             </View>
           </Panel>
 
+          {/* Under the name, because they are the same subject — the two things
+              a manager gets to decide about how they appear to everybody else —
+              and above the rules, which are not a preference at all. */}
+          <Panel title="Team logo" hint="A square picture, shown as a circle beside your name.">
+            <View style={styles.formBody}>
+              <View style={styles.logoRow}>
+                <TeamLogo
+                  userId={session?.user.id}
+                  name={displayName}
+                  size={56}
+                  borderColor={accent}
+                  mark={logo}
+                />
+                <View style={styles.logoActions}>
+                  <Pressable
+                    onPress={() => void changeLogo('set')}
+                    disabled={logoBusy}
+                    accessibilityRole="button"
+                    accessibilityLabel={logo.hasLogo ? 'Choose a new logo' : 'Choose a logo'}
+                    accessibilityState={{ disabled: logoBusy }}
+                    style={({ pressed }) => [
+                      styles.saveButton,
+                      { borderColor: accent },
+                      logoBusy && styles.dim,
+                      pressed && styles.pressed,
+                    ]}>
+                    {logoBusy ? (
+                      <ActivityIndicator />
+                    ) : (
+                      <Text style={[Type.strong, { color: c.text }]}>
+                        {logo.hasLogo ? 'Change' : 'Choose'}
+                      </Text>
+                    )}
+                  </Pressable>
+                  {/* Only once there is something to remove. A permanent
+                      Remove beside a manager who has never set one is a
+                      control that does nothing, sitting next to the one that
+                      does. */}
+                  {logo.hasLogo ? (
+                    <Pressable
+                      onPress={() => void changeLogo('clear')}
+                      disabled={logoBusy}
+                      accessibilityRole="button"
+                      accessibilityLabel="Remove your team logo"
+                      accessibilityState={{ disabled: logoBusy }}
+                      style={({ pressed }) => [
+                        styles.saveButton,
+                        { borderColor: c.border },
+                        logoBusy && styles.dim,
+                        pressed && styles.pressed,
+                      ]}>
+                      <Text style={[Type.strong, { color: c.textSecondary }]}>Remove</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+              {logoNotice ? (
+                <Text style={[Type.fine, { color: c.negative }]}>{logoNotice}</Text>
+              ) : null}
+            </View>
+          </Panel>
+
           {/* The rules of the competition, not a preference — but this is where
               a reference page you read once belongs, next to the other
               documents you open and close. It used to be a permanent second row
@@ -665,6 +773,8 @@ const styles = StyleSheet.create({
 
   formBody: { padding: Spacing.three, gap: Spacing.two },
   nameRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' },
+  logoRow: { flexDirection: 'row', gap: Spacing.three, alignItems: 'center' },
+  logoActions: { flexDirection: 'row', gap: Spacing.two, alignItems: 'center' },
   input: {
     flex: 1,
     // Capped so the field does not stretch to the table measure on a monitor —

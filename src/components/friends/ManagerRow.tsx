@@ -33,7 +33,7 @@
  */
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { initialsOf } from '@/components/shell/AppHeader';
+import { TeamLogo } from '@/components/shell/TeamLogo';
 import { Colors, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { FriendButton } from './FriendButton';
@@ -84,9 +84,7 @@ export function ManagerRow({
         accessibilityLabel={name}
         accessibilityHint="Opens this manager's profile"
         style={({ pressed }) => [styles.who, pressed && styles.pressed]}>
-        <View style={[styles.avatar, { borderColor: c.border, backgroundColor: c.surfaceSunken }]}>
-          <Text style={[Type.micro, { color: c.textSecondary }]}>{initialsOf(name)}</Text>
-        </View>
+        <TeamLogo userId={userId} name={name} size={28} />
         <View style={styles.lines}>
           <View style={styles.nameLine}>
             <Text numberOfLines={1} style={[Type.strong, styles.name, { color: c.text }]}>
@@ -128,14 +126,6 @@ const styles = StyleSheet.create({
   },
   ruled: { borderBottomWidth: StyleSheet.hairlineWidth },
   who: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   lines: { flex: 1, minWidth: 0, gap: 1 },
   nameLine: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.one + 2, minWidth: 0 },
   /* The name is the only thing on the line allowed to give way — the chip

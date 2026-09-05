@@ -60,7 +60,8 @@ import { StatStrip, type StatItem } from '@/components/account/StatStrip';
 import { BackRow } from '@/components/contests/ContestRecapPanel';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
 import { Section, SectionStack } from '@/components/players/Section';
-import { Coin, initialsOf } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
+import { TeamLogo } from '@/components/shell/TeamLogo';
 import { DASH } from '@/components/ui/DataTable';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Colors, Spacing, TierColors, Type } from '@/constants/theme';
@@ -221,9 +222,7 @@ export function ManagerView({
         {/* THE HERO. Full-size name, because the frame's own title stays hidden
             until this has scrolled under it — see `PlayerSheetFrame`. */}
         <View style={styles.hero}>
-          <View style={[styles.avatar, { borderColor: accent }]}>
-            <Text style={[Type.section, { color: c.text }]}>{initialsOf(profile.name)}</Text>
-          </View>
+          <TeamLogo userId={userId} name={profile.name} size={46} borderColor={accent} />
           <View style={styles.heroText}>
             <Text numberOfLines={1} style={[Type.page, { color: c.text }]}>
               {profile.name}
@@ -324,14 +323,6 @@ const styles = StyleSheet.create({
   body: { gap: Spacing.three },
   centre: { alignItems: 'center', justifyContent: 'center', padding: Spacing.four },
   hero: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   heroText: { flex: 1, minWidth: 0, gap: 2 },
   footer: { flexDirection: 'row', paddingHorizontal: Spacing.three, paddingVertical: Spacing.two },
 });

@@ -80,6 +80,7 @@ import { parseProfile } from "@/components/players/profile";
 import { ScoreStrip } from "@/components/scores/ScoreStrip";
 import type { ScoreGame, ScoreTeam } from "@/components/scores/scoreboard";
 import { BoardRow } from "@/components/leaderboard/BoardRow";
+import { NO_LOGO } from "@/lib/team-logo";
 import { BoardColumns } from "@/components/leaderboard/BoardColumns";
 import { BoardTop } from "@/components/leaderboard/BoardTop";
 import { standingRows } from "@/components/leaderboard/PointsBoard";
@@ -126,6 +127,11 @@ const HERO_FIGURES: HeroFigure[] = [
 const FIXTURE_PLAYER: PlayerState = {
   coins: 1240,
   displayName: "nickroachy",
+  /* NO LOGO, so the gallery draws the initials placeholder — which is the
+     state every surface has to look right in, and the one a fixture pointing
+     at a real storage object could not be relied on to show. */
+  logo: NO_LOGO,
+  setLogo: () => {},
   cardCount: 14,
   /* Under the warning line, so the chrome draws its calm state. `RosterBar`'s
      own three volumes are exercised in the kit, where a fixture can be set to

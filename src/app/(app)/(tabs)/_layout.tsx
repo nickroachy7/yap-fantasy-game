@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { NAV_TABS, routeNameOf } from '@/components/shell/sections';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { NavIcon } from '@/components/icons/NavIcon';
+import { ProfileTabIcon } from '@/components/shell/ProfileTabIcon';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { WebHeader } from '@/components/shell/WebHeader';
 import { TabBarGlass } from '@/components/shell/TabBarGlass';
@@ -190,9 +191,24 @@ export default function TabsLayout() {
                    it. Only Fantasy has a navigator to restore — see the header
                    for why it is the one tab that wants to. */
                 href: (tab.sections ? undefined : tab.href) as Href | undefined,
-                tabBarIcon: ({ color, focused }) => (
-                  <NavIcon name={tab.icon} color={color} focused={focused} size={24} />
-                ),
+                /* ONE TAB DRAWS SOMETHING THE OTHERS CANNOT: the manager's own
+                   logo, if they have set one. It is still a `NavIcon` for
+                   everybody who has not — see `ProfileTabIcon` for why the
+                   fallback here is the glyph rather than the initials every
+                   other surface uses. */
+                tabBarIcon:
+                  tab.href === '/profile'
+                    ? ({ color, focused }) => (
+                        <ProfileTabIcon
+                          name={tab.icon}
+                          color={color}
+                          focused={focused}
+                          size={24}
+                        />
+                      )
+                    : ({ color, focused }) => (
+                        <NavIcon name={tab.icon} color={color} focused={focused} size={24} />
+                      ),
               }}
             />
           ))}

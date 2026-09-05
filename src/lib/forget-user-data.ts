@@ -35,6 +35,7 @@ import { invalidateSets } from '@/components/collection/use-sets';
 import { invalidateContestFields } from '@/components/contests/use-contest-field';
 import { invalidateMyContests } from '@/components/contests/use-my-contests';
 import { invalidateLineupCollection } from '@/components/lineup/use-lineup-data';
+import { invalidateTeamLogos } from '@/components/shell/use-team-logos';
 
 export function forgetUserData(): void {
   invalidateCollection();
@@ -42,4 +43,9 @@ export function forgetUserData(): void {
   invalidateSets();
   invalidateContestFields();
   invalidateMyContests();
+  /* Logos are keyed by user id, so the held marks are not WRONG for a second
+     account — they are simply somebody else's, fetched under the first
+     account's session. Dropping them is about the session that fetched them,
+     not about the ids. */
+  invalidateTeamLogos();
 }

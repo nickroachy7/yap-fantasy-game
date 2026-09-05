@@ -40,7 +40,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { YapMark } from '@/components/brand/YapLogo';
 import { ActionIcon } from '@/components/shell/ActionBar';
 import { Hearts } from '@/components/runs/Hearts';
-import { Coin, initialsOf } from '@/components/shell/AppHeader';
+import { Coin } from '@/components/shell/AppHeader';
+import { TeamLogo } from '@/components/shell/TeamLogo';
 import {
   isSheetPath,
   isWebNavActive,
@@ -52,6 +53,7 @@ import { useSteadyPathname } from '@/components/shell/use-steady-pathname';
 import { NavIcon } from '@/components/icons/NavIcon';
 import { ChromeBand, RailWidth, TierColors, selectionAccent } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
+import { useAuth } from '@/context/AuthContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const NUMERIC = { fontVariant: ['tabular-nums' as const] };
@@ -82,7 +84,8 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
    * is up. See `isSheetPath` and `useSteadyPathname`.
    */
   const pathname = useSteadyPathname(pathnameOverride ?? realPathname, isSheetPath);
-  const { coins, displayName, run, loading } = usePlayer();
+  const { coins, displayName, run, loading, logo } = usePlayer();
+  const { session } = useAuth();
 
   return (
     <View style={[styles.rail, { backgroundColor: ChromeBand }]}>
@@ -132,9 +135,18 @@ export function Sidebar({ pathnameOverride }: { pathnameOverride?: string } = {}
         <Pressable>
           {({ pressed }) => (
             <View style={[styles.account, pressed && styles.pressed]}>
-              <View style={[styles.avatar, { borderColor: accent }]}>
-                <Text style={styles.avatarText}>{initialsOf(displayName)}</Text>
-              </View>
+              {/* The rail is dark in BOTH schemes, so the placeholder's well
+                  and lettering are passed rather than themed — see `TeamLogo`.
+                  The two values are the ones this file already used. */}
+              <TeamLogo
+                userId={session?.user.id}
+                name={displayName}
+                size={30}
+                borderColor={accent}
+                mark={logo}
+                background="rgba(255,255,255,0.08)"
+                textColor="#FFFFFF"
+              />
               <View style={styles.accountText}>
                 <Text style={styles.accountName} numberOfLines={1}>
                   {displayName}
@@ -289,16 +301,6 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(255,255,255,0.12)',
   },
-  avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  avatarText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
   accountText: { flexShrink: 1, gap: 1 },
   accountName: { color: 'rgba(255,255,255,0.86)', fontSize: 13, fontWeight: '600' },
   /* The second line is what stops the foot of the rail being a name with no

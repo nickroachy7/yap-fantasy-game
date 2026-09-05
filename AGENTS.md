@@ -49,12 +49,66 @@ logic, Supabase queries, edge functions — ships on a push.
 
 ## The rebuild path, when it is unavoidable
 
-`ios/` is gitignored and regenerated. `prebuild` **wipes `DEVELOPMENT_TEAM`**, which
-is what causes the "Your team has no devices" provisioning failure — restore it after.
+`ios/` is gitignored and regenerated. `prebuild` wipes **two** things that are not
+recoverable from git, because everything it wipes lives only in `ios/`:
+
+1. **`DEVELOPMENT_TEAM`** — its absence is the "Your team has no devices"
+   provisioning failure.
+2. **`EXPO_USE_PRECOMPILED_MODULES: "false"` in `ios/Podfile.properties.json`** —
+   see below. Its absence is not a build failure. It is a **launch crash**.
+
+Note that plain `expo prebuild --platform ios`, with NO `--clean`, still prints
+"Clearing ios" and wipes both. There is no incremental mode to fall back on.
+
+### Why the app must build Expo's modules from source (2026-09-06)
+
+With the default (`EXPO_USE_PRECOMPILED_MODULES` unset, meaning `1`),
+`ExpoModulesCore` arrives as a **precompiled xcframework** while React Native
+core arrives as the **prebuilt `React.xcframework`** — two binaries nobody here
+compiled, which disagree about a C++ struct's layout. The app builds cleanly,
+installs, and then segfaults on launch:
+
+```
+facebook::react::Props::Props()
+  <- expo::ExpoViewProps::ExpoViewProps(...)
+  <- ExpoModulesCore  AppContext.registerNativeViews()
+```
+
+It dies registering Fabric views before any JavaScript runs, so there is nothing
+in the Metro logs and nothing in LogBox — only a `.ips` in
+`~/Library/Logs/DiagnosticReports/`. Building Expo's modules from source against
+the React actually being linked removes the mismatch.
+
+### Two more traps in this area, both seen for real
+
+- **A truncated pod download fails as a LINK error.** `pod install` once
+  extracted `React.xcframework` at 24 MB against 137 MB in its own downloaded
+  tarball; the arm64 slice was missing 1,448 symbols. It presents as
+  `Undefined symbols for architecture arm64` naming `facebook::react::Sealable`
+  from RNGestureHandler / Reanimated / RNSVG — which reads like a dependency
+  problem and is not. Check the size of
+  `ios/Pods/React-Core-prebuilt/React.xcframework/*/React.framework/React`
+  against the tarball in `ios/Pods/ReactNativeCore-artifacts/`, then delete the
+  pod directory and re-run `pod install`. Disk space was not the cause.
+- **Do not delete `ios/build` to clear stale build products.** React Native's
+  codegen output lives there too (`ios/build/generated/ios/ReactCodegen`), and
+  removing it fails the next build with ten "Build input file cannot be found"
+  errors naming `*-generated.mm` and `States.cpp`. `pod install` regenerates it.
+
+### A new native permission needs a prebuild, not just a plugin
+
+Adding a config plugin to `app.json` does nothing on its own: `expo run:ios`
+reuses the existing `ios/` project and never re-runs prebuild, so the
+`Info.plist` key is never written. The app then dies the moment it touches the
+API — TCC kills it with `SIGABRT` and a `termination.details` string naming the
+missing key exactly. Run prebuild, then confirm the key is in
+`ios/YapFantasy/Info.plist` before believing the plugin worked.
 
 ```
 npx expo prebuild --platform ios --clean          # LANG=en_US.UTF-8 for CocoaPods
 # restore DEVELOPMENT_TEAM = PD9A6Z3BV6 in ios/YapFantasy.xcodeproj/project.pbxproj
+# restore "EXPO_USE_PRECOMPILED_MODULES": "false" in ios/Podfile.properties.json,
+#   then re-run `pod install` — prebuild's own pod install used the wrong setting
 xcodebuild -workspace ios/YapFantasy.xcworkspace -scheme YapFantasy \
   -configuration Release -destination 'generic/platform=iOS' \
   -archivePath <path>.xcarchive -allowProvisioningUpdates archive

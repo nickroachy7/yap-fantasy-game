@@ -1325,21 +1325,27 @@ export type Database = {
           avatar_key: string
           created_at: string
           display_name: string
+          has_logo: boolean
           id: string
+          logo_version: number
           updated_at: string
         }
         Insert: {
           avatar_key?: string
           created_at?: string
           display_name: string
+          has_logo?: boolean
           id: string
+          logo_version?: number
           updated_at?: string
         }
         Update: {
           avatar_key?: string
           created_at?: string
           display_name?: string
+          has_logo?: boolean
           id?: string
+          logo_version?: number
           updated_at?: string
         }
         Relationships: []
@@ -2957,6 +2963,13 @@ export type Database = {
           p_week: number
         }
         Returns: string
+      }
+      set_team_logo: {
+        Args: { p_present: boolean }
+        Returns: {
+          has_logo: boolean
+          logo_version: number
+        }[]
       }
       settle_run_week: {
         Args: { p_season: number; p_season_type: number; p_week: number }

@@ -56,10 +56,23 @@ import { parseRun, type Run } from "@/components/runs/run";
 import { useAuth } from "@/context/AuthContext";
 import { useLoader, type Load } from "@/hooks/use-loader";
 import { supabase } from "@/lib/supabase";
+import { NO_LOGO, type LogoMark } from "@/lib/team-logo";
+import { noteTeamLogo } from "@/components/shell/use-team-logos";
 
 export type PlayerState = {
   coins: number;
   displayName: string;
+  /**
+   * THE SIGNED-IN MANAGER'S OWN LOGO, held here for the same reason the balance
+   * is: the chrome draws it. The rail, the account page and the Profile tab all
+   * show it, on three different screens, and a per-screen read would mean the
+   * tab bar and the page it opens disagreeing for a moment after an upload.
+   *
+   * It is also what makes an upload feel instant. `set_team_logo` returns the
+   * new version number, so `setLogo` below can publish it without a re-read —
+   * see `chooseTeamLogo`.
+   */
+  logo: LogoMark;
   /** Held cards. The same figure as `roster.held`, kept for the header. */
   cardCount: number;
   /**
@@ -120,6 +133,15 @@ export type PlayerState = {
    * and the read on its way will be right anyway.
    */
   applyCardDelta: (n: number) => void;
+  /**
+   * Publish a logo this device has just set or cleared.
+   *
+   * It writes through to the shared registry as well as to this context, so
+   * every OTHER surface drawing this manager — their row on the board they are
+   * ranked in, their entry in a contest's field — changes in the same frame
+   * rather than whenever that registry next happens to miss.
+   */
+  setLogo: (mark: LogoMark) => void;
 };
 
 /**
@@ -134,6 +156,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
   const [coins, setCoins] = useState(0);
   const [displayName, setDisplayName] = useState("player");
+  const [logo, setLogoState] = useState<LogoMark>(NO_LOGO);
   const [roster, setRoster] = useState<RosterStatus | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [dailyPack, setDailyPack] = useState(false);
@@ -174,7 +197,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         [
           supabase
             .from("profiles")
-            .select("display_name")
+            .select("display_name, has_logo, logo_version")
             .eq("id", session.user.id)
             .single(),
           supabase.from("coin_balances").select("balance").single(),
@@ -202,6 +225,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         profile.error ?? balance.error ?? rosterRow.error ?? runRow.error;
       if (failure) return failure.message;
       setDisplayName(profile.data?.display_name ?? "player");
+      const mark: LogoMark = {
+        hasLogo: profile.data?.has_logo ?? false,
+        version: profile.data?.logo_version ?? 0,
+      };
+      setLogoState(mark);
+      /* The registry would fetch this manager again the first time they appear
+         in a list beside everybody else. Seeding it from the read the chrome
+         was doing anyway saves that, and — more to the point — keeps the two
+         from ever showing different answers for the same person. */
+      noteTeamLogo(session.user.id, mark);
       setCoins(balance.data?.balance ?? 0);
       setRoster(parseRoster(rosterRow.data));
       setRun(parseRun(runRow.data));
@@ -230,6 +263,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setRoster((held) => (held ? recountRoster(held, held.held + n) : held));
   }, []);
 
+  const setLogo = useCallback(
+    (mark: LogoMark) => {
+      setLogoState(mark);
+      if (session) noteTeamLogo(session.user.id, mark);
+    },
+    [session],
+  );
+
   const value = useMemo<PlayerState>(
     // Without a session there is nothing to read and nothing true to show, so
     // this stays loading — the header draws an em dash rather than a confident
@@ -237,6 +278,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     () => ({
       coins,
       displayName,
+      logo,
       cardCount: roster?.held ?? 0,
       roster,
       run,
@@ -245,10 +287,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       error,
       refresh,
       applyCardDelta,
+      setLogo,
     }),
     [
       coins,
       displayName,
+      logo,
+      setLogo,
       roster,
       run,
       dailyPack,

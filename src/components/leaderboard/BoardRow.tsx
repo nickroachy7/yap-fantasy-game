@@ -69,6 +69,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TierMark } from '@/components/cards/TierMark';
 import { Coin } from '@/components/shell/AppHeader';
+import { TeamLogo } from '@/components/shell/TeamLogo';
 import { Colors, NUMERIC, selectionAccent, Spacing, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { MovementMark } from './Movement';
@@ -112,6 +113,23 @@ export const RANK_COL = 40;
 export const RIGHT_WIDTH = 64;
 
 export const COL_GAP = Spacing.two;
+
+/**
+ * The logo column, and the reason the name on a board no longer starts at the
+ * same x as the name on the lineup.
+ *
+ * That alignment was deliberate — `RANK_COL` is matched to the lineup row's
+ * badge width for exactly that reason — and this breaks it knowingly. A board
+ * is the one screen in the app that is a list of PEOPLE, and the argument for
+ * the logo being there at all is that a manager should be recognisable on the
+ * board they are ranked in without reading. That cannot be had without the
+ * column.
+ *
+ * 26 against a 45pt row: big enough to read a mark at a glance, small enough
+ * that it does not compete with the rank numeral beside it, which is still the
+ * thing the row is about.
+ */
+export const LOGO_COL = 26;
 
 export function BoardRow({
   row,
@@ -213,6 +231,20 @@ export function BoardRow({
           <MovementMark movement={row.movement.places} known={row.movement.known} />
         ) : null}
       </View>
+
+      {/* ONLY WHERE LINE 1 IS A MANAGER.
+
+          `row.userId` is set on every board, including the cards board — where
+          it is the HOLDER of the card and line 1 is the footballer. Drawing it
+          there would put a manager's picture beside a player's name, which is
+          the same mistake `profileOn` exists to prevent for the link. So it
+          reuses that signal rather than inventing a second one: the board that
+          says the name is not the manager gets no logo. */}
+      {profileOn === 'name' ? (
+        <View style={styles.logoCol}>
+          <TeamLogo userId={row.userId} name={row.name} size={LOGO_COL} />
+        </View>
+      ) : null}
 
       <View style={styles.lines}>
         <View style={styles.nameLine}>
@@ -371,6 +403,9 @@ const styles = StyleSheet.create({
   /* Centred against all three lines rather than pinned to the first: the rank
      is about the ROW, exactly as the lineup row's badge is. */
   rankCol: { width: RANK_COL, alignSelf: 'center', alignItems: 'center', gap: 2 },
+  /* Centred against the whole row for the same reason the rank is: it is about
+     the row, not about line 1. */
+  logoCol: { alignSelf: 'center' },
   /* Full ink and figure weight. It is the second thing read after the name and
      the first thing scanned when hunting a position on the board, so it carries
      like a figure rather than sitting back like a label. */

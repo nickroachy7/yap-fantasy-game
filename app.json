@@ -39,6 +39,12 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 180
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Yap Fantasy uses your photos so you can set your team logo."
+        }
       ]
     ],
     "experiments": {
