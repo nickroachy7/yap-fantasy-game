@@ -87,7 +87,16 @@
  * `ExponentImagePicker` (not `Expo…`) and `ExpoImageManipulator`. Both are
  * copied from the packages' own `requireNativeModule` calls; getting one wrong
  * would report "cannot" on a binary that can, which fails safe but silently.
+ *
+ * WEB IS EXEMPT FROM THE WHOLE QUESTION, and missing that broke it once.
+ * Both packages ship a web implementation as a PLAIN OBJECT — a file input in
+ * `ExponentImagePicker.web.ts`, a canvas in the manipulator's — which never
+ * goes near `requireNativeModule`. So the probe answers null on web for a build
+ * that is perfectly capable, and the first version of this guard disabled
+ * upload on the website, where it had been working since the day it shipped.
+ * There is no binary on the web and therefore nothing to be out of date.
  */
+import { Platform } from 'react-native';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 
 import { supabase } from './supabase';
@@ -201,6 +210,9 @@ const NEEDS_BUILD = 'Setting a logo needs a newer version of the app.';
  * See the header for why this and not a try/catch around the import.
  */
 export function canChooseTeamLogo(): boolean {
+  /* See the header. The web build implements both of these in JavaScript, so
+     the native probe below is not merely unnecessary there — it is wrong. */
+  if (Platform.OS === 'web') return true;
   return (
     requireOptionalNativeModule('ExponentImagePicker') != null &&
     requireOptionalNativeModule('ExpoImageManipulator') != null
