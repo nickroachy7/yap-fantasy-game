@@ -411,6 +411,81 @@ export type HeaderIdentity = {
 export type HeaderCurrencies = { coins?: boolean; hearts?: boolean };
 
 /**
+ * THE WALLET, AS A STACK — coins over hearts, right-aligned.
+ *
+ * EXPORTED BECAUSE A SHEET WANTED IT, and copying it a second time is how the
+ * two would drift. The packs sheet carries the same two figures at the far
+ * right of its own header, at the same size and in the same order, so a player
+ * moving from any screen into the shop finds the wallet where they left it.
+ * That is the whole point of it, and it only survives being one component.
+ *
+ * WHAT A CALLER DECIDES IS THE NUMBERS, NOT THE LAYOUT. The masthead reads them
+ * off `usePlayer`; a sheet already holding the same context passes what it has.
+ * Nothing here queries.
+ */
+export function Balances({
+  coins,
+  free,
+  held,
+  staked,
+  loading,
+  currencies,
+}: {
+  coins: number;
+  /** Hearts free to stake — held less what is riding. See the header. */
+  free: number;
+  held: number;
+  staked: number;
+  loading: boolean;
+  currencies?: HeaderCurrencies;
+}) {
+  const scheme = useColorScheme() === "dark" ? "dark" : "light";
+  const c = Colors[scheme];
+  const accent = TierColors[scheme].gold.accent;
+
+  const showCoins = currencies?.coins !== false;
+  const showHearts = currencies?.hearts !== false;
+
+  return (
+    <View style={styles.balances}>
+            {showCoins ? (
+              <Balance
+                mark={<Coin size={12} color={accent} />}
+                value={loading ? "—" : coins.toLocaleString()}
+                color={c.text}
+              />
+            ) : null}
+            {showHearts ? (
+              <Balance
+                /* 11 against the coin's 12, which draws the two the SAME
+                   size rather than a size apart: `Hearts` renders at
+                   `size * 1.17` — its viewBox carries padding the icon set's
+                   glyphs do not — so a matched 12 put a 14pt heart beside a
+                   12pt coin, and the heart read as the louder fact. */
+                mark={<Heart size={11} state="free" />}
+                value={loading ? "—" : String(free)}
+                color={c.text}
+                /* The words carry what the figure cannot: with something
+                   staked, a bare "2 hearts" would be read as the number you
+                   hold, which is the misreading this figure exists to avoid.
+                   With nothing riding the two counts are the same number and
+                   the shorter sentence is the true one. */
+                label={
+                  loading
+                    ? "Hearts"
+                    : staked > 0
+                      ? `${free} of ${held} hearts free to stake, ${staked} riding`
+                      : free === 1
+                        ? "1 heart"
+                        : `${free} hearts`
+                }
+              />
+            ) : null}
+    </View>
+  );
+}
+
+/**
  * One balance: a figure and its mark, and nothing under either.
  *
  * THE MARK SITS AFTER THE FIGURE, which is what makes the column line up. With
@@ -485,7 +560,6 @@ export function AppHeader({
 } = {}) {
   const scheme = useColorScheme() === "dark" ? "dark" : "light";
   const c = Colors[scheme];
-  const accent = TierColors[scheme].gold.accent;
   const top = useSafeAreaInsets().top;
   const { width } = useWindowDimensions();
   const { coins, run, loading } = usePlayer();
@@ -497,8 +571,6 @@ export function AppHeader({
       ? WORDMARK_WEB_TIGHT.size
       : undefined;
 
-  const showCoins = currencies?.coins !== false;
-  const showHearts = currencies?.hearts !== false;
 
   /* Hearts FREE TO STAKE — held, less what is riding. See the header for why
      this is the free count rather than the held one, and for the one moment it
@@ -640,41 +712,14 @@ export function AppHeader({
               did: with two identical shapes a shared centre line would make
               them a single stacked object, while a shared right edge is the
               masthead's own edge and reads as two things ending at it. */}
-          <View style={styles.balances}>
-            {showCoins ? (
-              <Balance
-                mark={<Coin size={12} color={accent} />}
-                value={loading ? "—" : coins.toLocaleString()}
-                color={c.text}
-              />
-            ) : null}
-            {showHearts ? (
-              <Balance
-                /* 11 against the coin's 12, which draws the two the SAME
-                   size rather than a size apart: `Hearts` renders at
-                   `size * 1.17` — its viewBox carries padding the icon set's
-                   glyphs do not — so a matched 12 put a 14pt heart beside a
-                   12pt coin, and the heart read as the louder fact. */
-                mark={<Heart size={11} state="free" />}
-                value={loading || !run ? "—" : String(free)}
-                color={c.text}
-                /* The words carry what the figure cannot: with something
-                   staked, a bare "2 hearts" would be read as the number you
-                   hold, which is the misreading this figure exists to avoid.
-                   With nothing riding the two counts are the same number and
-                   the shorter sentence is the true one. */
-                label={
-                  loading || !run
-                    ? "Hearts"
-                    : staked > 0
-                      ? `${free} of ${held} hearts free to stake, ${staked} riding`
-                      : free === 1
-                        ? "1 heart"
-                        : `${free} hearts`
-                }
-              />
-            ) : null}
-          </View>
+          <Balances
+            coins={coins}
+            free={free}
+            held={held}
+            staked={staked}
+            loading={loading || !run}
+            currencies={currencies}
+          />
           {/* THE TRAILING SLOT IS THE RULES NOW, AND IT WAS THE SETTINGS GEAR.
               Both halves of that trade are worth writing down, because the
               obvious objection — "you have deleted the way into settings" — is

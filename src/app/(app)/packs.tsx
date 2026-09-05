@@ -52,8 +52,8 @@ import { advancePull, beginPull, endPull, finishPull } from '@/components/cards/
 import { invalidateCollection } from '@/components/collection/use-collection';
 import { invalidateSets } from '@/components/collection/use-sets';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
-import { Coin } from '@/components/shell/AppHeader';
-import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
+import { Balances } from '@/components/shell/AppHeader';
+import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLoader, type Load } from '@/hooks/use-loader';
@@ -66,7 +66,7 @@ export default function PacksScreen() {
   
   // Single source of truth for the balance: the header reads the same value, so
   // fetching it separately here is how the two drift apart.
-  const { coins, refresh, applyCardDelta } = usePlayer();
+  const { coins, run, loading: walletLoading, refresh, applyCardDelta } = usePlayer();
 
   const [packs, setPacks] = useState<Pack[] | null>(null);
   const [dailyAvailable, setDailyAvailable] = useState<boolean | null>(null);
@@ -291,12 +291,19 @@ export default function PacksScreen() {
          row; a sheet that moves it to a different corner in a different size
          makes the player look for it twice. */
       headerTrailing={
-        <View style={styles.balance}>
-          <Text style={[styles.balanceFigure, NUMERIC, { color: c.text }]}>
-            {coins.toLocaleString()}
-          </Text>
-          <Coin size={11} color={TierColors[scheme].gold.accent} />
-        </View>
+        /* THE MASTHEAD'S OWN STACK, imported rather than rebuilt — coins over
+           hearts, right-aligned, at the same sizes. A sheet that redrew the
+           wallet would be a second copy of it, and the two would drift the
+           first time either was touched; the whole value of putting it here is
+           that a player opening the shop finds it exactly where they left it on
+           the screen behind. */
+        <Balances
+          coins={coins}
+          free={Math.max(0, (run?.hearts ?? 0) - Math.min(run?.wagered ?? 0, run?.hearts ?? 0))}
+          held={Math.max(0, run?.hearts ?? 0)}
+          staked={Math.min(Math.max(0, run?.wagered ?? 0), Math.max(0, run?.hearts ?? 0))}
+          loading={walletLoading || !run}
+        />
       }
       /* THE SHELF IS MEANT TO FIT, so the frame stops scrolling when it does —
          see `fitsWithoutScrolling`, which measures rather than trusting this.
@@ -358,12 +365,6 @@ export default function PacksScreen() {
 }
 
 const styles = StyleSheet.create({
-  /* `AppHeader`'s balance, copied rather than imported: that component owns a
-     row with two currencies in it and a loading state, and this needs one
-     figure. The two numbers it renders are the same size on purpose — see the
-     note on `headerTrailing`. */
-  balance: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  balanceFigure: { fontSize: 14, fontWeight: '800', letterSpacing: -0.2 },
   /* `LobbyHero`'s band: a title row, and the sentence under it separated by
      nothing but the two line boxes' own leading. */
   hero: { paddingTop: Spacing.two, paddingBottom: Spacing.two + 2, gap: Spacing.half },
