@@ -182,7 +182,7 @@
  * are behind on a Sunday morning. The margin keeps its sign colour, because it
  * is the answer to the question the band is asking.
  */
-import { Pressable, StyleSheet, Text, View, type DimensionValue } from 'react-native';
+import { StyleSheet, Text, View, type DimensionValue } from 'react-native';
 
 import { Icon } from '@/components/icons/Icon';
 import { formatFlex3, formatRoster, formatWr, packStandard } from '@/components/icons/glyphs';
@@ -190,8 +190,9 @@ import type { Glyph } from '@/components/icons/system';
 
 import { Heart } from '@/components/runs/Hearts';
 import { Coin } from '@/components/shell/AppHeader';
-import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
+import { Colors, NUMERIC, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { RowCard } from '@/components/ui/RowCard';
 
 import type { FieldWeek } from '@/components/lineup/field';
 import { MIN_ENTRANTS } from '@/components/lineup/field';
@@ -1222,9 +1223,6 @@ export function ContestCard({
   settled?: Settlement | null;
   onPress?: () => void;
 }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const c = Colors[scheme];
-
   const body = (
     <>
       <Head
@@ -1263,40 +1261,17 @@ export function ContestCard({
    * rectangle that the eye found before it found the score. The card does not
    * need the ring to do that job any more; see the header on the fill.
    */
-  const edge = {
-    borderColor: c.borderStrong,
-    /**
-     * THE CARD'S OWN FILL, under zones that already paint their own.
-     *
-     * It is not redundant, and the corners are why. `overflow: 'hidden'` clips
-     * the zones to the rounded outline, and a clip is antialiased — so along
-     * each corner's curve the fill fades out over about a pixel while the
-     * border is drawn at full strength on top of it. Between the two there was
-     * a hair of TRANSPARENCY, and what showed through it was the page: four
-     * corners with a dark bite taken out of the material just inside the line.
-     * Barely visible at rest, and obvious the moment the card moved.
-     *
-     * One opaque fill behind the whole card and there is nothing to show
-     * through. Every zone is `surface` now, so this is simply that.
-     */
-    backgroundColor: c.surface,
-  };
+  /* `RowCard` OWNS THE SHELL — the border, the fill, the radius and the press
+     state — and the sets board draws its rows in the same one, which is the
+     whole point of it living there rather than here.
 
-  if (!onPress) {
-    return <View style={[styles.card, edge]}>{body}</View>;
-  }
-
-  /* `Pressable` around the whole card rather than a control on it. The card is
-     a dense thing and any button placed inside would be competing with the
-     terms for a corner that is already saying something. */
+     Pressable around the WHOLE card rather than a control on it: the card is a
+     dense thing, and any button placed inside would compete with the terms for
+     a corner that is already saying something. */
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Open ${name}`}
-      onPress={onPress}
-      style={({ pressed }) => [styles.card, edge, pressed && styles.pressed]}>
+    <RowCard onPress={onPress} accessibilityLabel={`Open ${name}`}>
       {body}
-    </Pressable>
+    </RowCard>
   );
 }
 
@@ -1326,8 +1301,6 @@ const styles = StyleSheet.create({
    * 3x screen and two on a 2x — enough for the compositor to antialias rather
    * than to guess.
    */
-  card: { borderWidth: 1, borderRadius: Radius.panel, overflow: 'hidden' },
-  pressed: { opacity: 0.7 },
 
   /* EVERY ZONE, ONE GEOMETRY. The gutter is `Spacing.three`, which is the lineup
      rows' own and the section headings' own: a card whose left edge is two

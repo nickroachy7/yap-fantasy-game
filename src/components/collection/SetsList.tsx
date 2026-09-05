@@ -24,6 +24,8 @@ import { Chip, ChipRow } from '@/components/ui/Chip';
 import { SummaryStrip, type SummaryCell } from '@/components/ui/SummaryStrip';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { RowCard } from '@/components/ui/RowCard';
+import { SectionHead } from '@/components/ui/SectionHead';
 import {
   actionableOf,
   groupSets,
@@ -57,18 +59,29 @@ export function SetsList({
     <>
       {sections.map((section) => (
         <View key={section.key} style={styles.section}>
-          <View style={styles.sectionHead}>
-            <Text style={[Type.section, { color: c.text }]}>{section.title}</Text>
-            {section.note ? (
-              <Text style={[Type.fine, { color: c.textTertiary }]}>{section.note}</Text>
-            ) : null}
-          </View>
-          <View style={[styles.rows, { borderColor: c.border }]}>
-            {section.sets.map((set, i) => (
+          {/* THE SAME HEAD THE CONTESTS AND COLLECTION BOARDS USE — a name on
+              the left, a count on the right. The group's note used to sit under
+              the title: "Three of one position, out of whatever you are
+              holding. Gone at midnight." Three of those down one scroll is the
+              same prose the lobby just shed, and the rule it states is on the
+              set's own page, which is one tap from every row it describes. */}
+          <SectionHead
+            label={section.title}
+            hint={`${section.sets.length} set${section.sets.length === 1 ? '' : 's'}`}
+            hintLabel={`${section.sets.length} sets`}
+            tone={c.textTertiary}
+          />
+          {/* A STACK OF CARDS, NOT A DIVIDED TABLE. This was one bordered box
+              per group with hairlines between the rows inside it, which says
+              the rows are parts of one thing. A set is not part of the set
+              above it — it is a separate errand with its own progress and its
+              own reward — and the contests page had already settled the shape
+              that says so. `RowCard` is that shell, shared. */}
+          <View style={styles.stack}>
+            {section.sets.map((set) => (
               <SetRow
                 key={set.code}
                 set={set}
-                divided={i > 0}
                 busy={claimingCode === set.code}
                 // Any claim in flight blocks every claim button: the balance is
                 // about to change and the list is about to be re-read, so a
@@ -304,14 +317,12 @@ const FAMILY_GLYPHS: Record<SetFamily, Glyph> = {
  */
 function SetRow({
   set,
-  divided,
   busy,
   locked,
   onOpen,
   onClaim,
 }: {
   set: CardSet;
-  divided: boolean;
   busy: boolean;
   locked: boolean;
   onOpen: () => void;
@@ -336,11 +347,7 @@ function SetRow({
     status === 'claimed' ? c.textTertiary : status === 'ready' ? c.positive : c.textSecondary;
 
   return (
-    <View
-      style={[
-        styles.row,
-        divided && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border },
-      ]}>
+    <RowCard style={styles.row}>
       <Pressable
         onPress={onOpen}
         accessibilityRole="button"
@@ -492,7 +499,7 @@ function SetRow({
           </View>
         )}
       </View>
-    </View>
+    </RowCard>
   );
 }
 
@@ -501,8 +508,10 @@ const styles = StyleSheet.create({
      outside, hairline dividers within, no fill. Two summaries in one section
      that framed themselves differently is what this is written to prevent. */
   section: { gap: Spacing.two },
-  sectionHead: { gap: 1 },
-  rows: { borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.panel, overflow: 'hidden' },
+  /* The gap between cards. It was `rows` — one bordered box with hairlines
+     inside it — and the border moved onto each card, so what is left here is
+     the air between them. See the note at the render. */
+  stack: { gap: Spacing.one + 2 },
 
   row: {
     flexDirection: 'row',
