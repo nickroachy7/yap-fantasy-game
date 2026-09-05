@@ -183,7 +183,7 @@ const BULK_COUNTS = [1, 5, 10] as const;
  * `ACTION_H` is the one measurement this card owns, and it is derived rather
  * than chosen: `BUTTON_H` plus `ZONE_PAD` top and bottom.
  *
- * BUTTON_H WAS 40 AND IS 34, and the argument it replaces was "the floor for
+ * BUTTON_H WAS 40 AND IS 30, and the argument it replaces was "the floor for
  * something a thumb has to hit on the first try". That was never the real
  * floor: 40 is already under the platform's 44, so the button was relying on
  * being 195pt WIDE to be hittable, not on being tall. Six points of height
@@ -215,7 +215,19 @@ const HEAD_H = 34;
  */
 const ODDS_H = 42;
 const FOOT_H = 29;
-const BUTTON_H = 34;
+const COUNT_CHIP_H = 22;
+/**
+ * The button and the count tray are ONE height, and it is derived from the
+ * chip rather than chosen for the button.
+ *
+ * They were 34 and 30, which is close enough that the row read as a mistake
+ * rather than as a hierarchy — two controls side by side, four points apart,
+ * with no reason for either number. The tray is the object with a real
+ * constraint in it (a chip has to hold `×10`), so it sets the height and the
+ * button matches: `height` on both, and RN's box model counts the tray's
+ * hairline inside it, so the two agree exactly rather than to within a border.
+ */
+const BUTTON_H = COUNT_CHIP_H + 8;
 /**
  * The ink on the gold button.
  *
@@ -797,7 +809,7 @@ function PackCard({
                   key={n}
                   onPress={() => setCount(n)}
                   disabled={locked}
-                  /* Drawn at 24 and reached out past the platform's 44 — the
+                  /* Drawn at 22 and reached out past the platform's 44 — the
                      same trade `Pip` and `DoorChip` make. See `BUTTON_H`. */
                   hitSlop={{ top: 10, bottom: 10 }}
                   accessibilityRole="radio"
@@ -828,7 +840,7 @@ function PackCard({
         <Pressable
           onPress={() => onOpen(buying)}
           disabled={blocked}
-          /* See `BUTTON_H`: 34 drawn, 54 to a thumb. */
+          /* See `BUTTON_H`: 30 drawn, 50 to a thumb. */
           hitSlop={{ top: 10, bottom: 10 }}
           accessibilityRole="button"
           /* The visible label already carries the total, so this adds only what
@@ -1047,10 +1059,15 @@ const styles = StyleSheet.create({
    * picker goes back to being about quantity.
    */
   counts: {
+    /* THE SAME NUMBER THE BUTTON TAKES — see `BUTTON_H`. Declared rather than
+       left to `padding + chip`, so a change to either cannot drift the two
+       controls apart by a point. */
+    height: BUTTON_H,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     flexShrink: 0,
-    padding: 3,
+    paddingHorizontal: 3,
     gap: 2,
     borderRadius: Radius.control,
     borderWidth: StyleSheet.hairlineWidth,
@@ -1060,7 +1077,7 @@ const styles = StyleSheet.create({
      miss waiting to happen. */
   countChip: {
     minWidth: 40,
-    height: BUTTON_H - 10,
+    height: COUNT_CHIP_H,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: Radius.chip - 2,
