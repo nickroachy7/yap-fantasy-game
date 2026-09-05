@@ -246,6 +246,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { YapMark } from "@/components/brand/YapLogo";
 import { BackChevron, Gear } from "@/components/icons/Chrome";
 import { Heart } from "@/components/runs/Hearts";
+import { Icon } from "@/components/icons/Icon";
+import { coin as coinGlyph } from "@/components/icons/glyphs";
 import { Colors, Spacing, TierColors } from "@/constants/theme";
 import { usePlayer } from "@/context/PlayerContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -361,28 +363,14 @@ export function initialsOf(name: string): string {
 }
 
 export function Coin({ size = 11, color }: { size?: number; color: string }) {
-  return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        backgroundColor: color,
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <View
-        style={{
-          width: size * 0.52,
-          height: size * 0.52,
-          borderRadius: size * 0.26,
-          borderWidth: Math.max(StyleSheet.hairlineWidth, size * 0.07),
-          borderColor: "rgba(0, 0, 0, 0.32)",
-        }}
-      />
-    </View>
-  );
+  /* THE DRAWN GLYPH, not two nested Views.
+     It was a filled circle with a ring punched in it, hand-built here because
+     there was no icon set when the masthead first needed a coin. There is one
+     now, `coin` was drawn for exactly this, and nothing was rendering it — the
+     app was carrying two coins and showing the improvised one.
+     `focused` because a coin is always solid: it is a token, not a state, and
+     an outline version would read as a coin you do not have. */
+  return <Icon glyph={coinGlyph} size={size} color={color} focused />;
 }
 
 /**
