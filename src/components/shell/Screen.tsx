@@ -16,10 +16,22 @@ import { useTabBarSpace } from '@/components/shell/useTabBarSpace';
 import { useIsWide } from '@/components/shell/useResponsive';
 import { WebPageTabs } from '@/components/shell/WebPageTabs';
 import { quietScrollbar } from '@/components/ui/scroll-strip';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+
 import { Colors, ContentMeasure, Spacing, type Measure } from '@/constants/theme';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+
+/**
+ * How far the fade under a section strip reaches.
+ *
+ * `TabBarGlass` uses the same 24 at the other end of the page, and matching is
+ * the point: a reader meets both edges in one scroll, and two different fade
+ * lengths would read as two different materials.
+ */
+const FADE = 24;
 
 type Props = {
   /**
@@ -230,6 +242,46 @@ export function Screen({
     <View style={[styles.flexContent, flush && styles.flushTop, { maxWidth }]}>{children}</View>
   );
 
+  /**
+   * THE FADE UNDER A PINNED SECTION STRIP.
+   *
+   * ---------------------------------------------------------------------------
+   * WHAT IT IS FOR, AND WHY PADDING COULD NOT DO IT
+   * ---------------------------------------------------------------------------
+   *
+   * The strip does not scroll. The page does. So the interesting state is not
+   * the one at rest — it is every state after that, where a card slides up and
+   * is cut off dead against the strip's bottom border. Padding cannot help with
+   * that: `flushTop` is inside the scroll content, so it travels with the
+   * content and is gone the moment anything moves. The gap it buys exists only
+   * in the one state nobody is looking at.
+   *
+   * What fixes a hard edge is a soft one. This is the same scrim `TabBarGlass`
+   * lays over the bottom of every page, mirrored: the page's own background at
+   * full strength against the strip, falling to nothing `FADE` points below, so
+   * content dissolves into the chrome instead of being guillotined by it.
+   *
+   * ONLY WITH A STRIP — `flush` is exactly the test, since it is already "there
+   * is a section bar above this page". Pages without one scroll under the
+   * masthead, which draws its own material.
+   *
+   * `pointerEvents="none"` throughout: it sits over the top of a scrolling list
+   * and must not eat the first row's taps or a flick that starts under it.
+   */
+  const topFade = flush ? (
+    <View style={styles.topFade} pointerEvents="none">
+      <Svg width="100%" height={FADE}>
+        <Defs>
+          <LinearGradient id="screenTopFade" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={c.background} stopOpacity="1" />
+            <Stop offset="1" stopColor={c.background} stopOpacity="0" />
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height={FADE} fill="url(#screenTopFade)" />
+      </Svg>
+    </View>
+  ) : null;
+
   return (
     /* The wide gutter is on the frame, not on each box inside it: capping the
      * content at 1180 leaves only 12pt beside a 236pt rail on a 1440pt window,
@@ -282,13 +334,25 @@ export function Screen({
           {banner}
         </>
       )}
-      {body}
+      {/* The body and the fade over it, in a box of their own so the fade can
+          be pinned to the TOP OF THE SCROLLER rather than to the page — the
+          page's top is the masthead, which is nowhere near the edge this is
+          softening. */}
+      <View style={styles.bodyWrap}>
+        {body}
+        {topFade}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  bodyWrap: { flex: 1 },
+  /* Over the scroller, pinned to its top edge. Full width deliberately: the
+     content is capped at a measure and gutter-padded, but the thing being
+     softened is the strip's border, which runs edge to edge. */
+  topFade: { position: 'absolute', top: 0, left: 0, right: 0 },
   wideGutter: { paddingHorizontal: Spacing.three },
   content: {
     padding: Spacing.three,
