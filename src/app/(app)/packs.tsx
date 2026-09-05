@@ -85,12 +85,24 @@ export default function PacksScreen() {
   const load = useCallback<Load>(async (live) => {
     const [packRes, openedRes, dailyRes, tierRes] = await Promise.all([
       supabase
-        .from('packs')
-        // is_active is filtered here rather than displayed: open_pack() rejects
-        // an inactive pack outright, so listing one is offering a button whose
-        // only possible outcome is an error.
-        .select('id, code, name, coin_cost, card_count, once_per_user, daily_limit, guaranteed_positions')
-        .eq('is_active', true)
+        // `pack_shelf`, NOT `packs`, and the difference is the odds.
+        //
+        // The published rates come out of the database that deals the cards —
+        // `pack_odds` reads exactly the columns `open_pack` rolls over — folded
+        // one row per pack by the view so a six-pack shelf is one round trip
+        // rather than six. The client is deliberately not allowed to derive
+        // them from `tier_odds`: a rate computed on this side is a rate that
+        // goes wrong the first time either side is touched, and it goes wrong
+        // SILENTLY, because the number still renders.
+        //
+        // The view already filters `is_active`, which `packs` did here for the
+        // reason it still holds: `open_pack()` rejects an inactive pack
+        // outright, so listing one offers a button whose only outcome is an
+        // error.
+        .from('pack_shelf')
+        .select(
+          'id, code, name, coin_cost, card_count, once_per_user, daily_limit, guaranteed_positions, guarantee, odds',
+        )
         .order('coin_cost'),
       // RLS scopes this to the caller, so it is exactly "packs I have opened".
       supabase.from('pack_openings').select('pack_id'),

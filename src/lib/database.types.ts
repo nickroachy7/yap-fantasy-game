@@ -105,6 +105,13 @@ export type Database = {
             foreignKeyName: "card_instances_card_id_fkey"
             columns: ["card_id"]
             isOneToOne: false
+            referencedRelation: "card_pull_tiers"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "card_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
             referencedRelation: "cards"
             referencedColumns: ["id"]
           },
@@ -177,6 +184,13 @@ export type Database = {
           set_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "card_set_members_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "card_pull_tiers"
+            referencedColumns: ["card_id"]
+          },
           {
             foreignKeyName: "card_set_members_card_id_fkey"
             columns: ["card_id"]
@@ -992,6 +1006,13 @@ export type Database = {
             foreignKeyName: "pack_openings_pack_id_fkey"
             columns: ["pack_id"]
             isOneToOne: false
+            referencedRelation: "pack_shelf"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pack_openings_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
             referencedRelation: "packs"
             referencedColumns: ["id"]
           },
@@ -1004,12 +1025,15 @@ export type Database = {
           coin_cost: number
           created_at: string
           daily_limit: number | null
+          guarantee: Json
           guaranteed_positions: Json
           id: string
           is_active: boolean
           name: string
           odds: Json
           once_per_user: boolean
+          pool_filter: Json
+          tier_odds: Json
         }
         Insert: {
           card_count: number
@@ -1017,12 +1041,15 @@ export type Database = {
           coin_cost: number
           created_at?: string
           daily_limit?: number | null
+          guarantee?: Json
           guaranteed_positions?: Json
           id?: string
           is_active?: boolean
           name: string
           odds: Json
           once_per_user?: boolean
+          pool_filter?: Json
+          tier_odds?: Json
         }
         Update: {
           card_count?: number
@@ -1030,12 +1057,15 @@ export type Database = {
           coin_cost?: number
           created_at?: string
           daily_limit?: number | null
+          guarantee?: Json
           guaranteed_positions?: Json
           id?: string
           is_active?: boolean
           name?: string
           odds?: Json
           once_per_user?: boolean
+          pool_filter?: Json
+          tier_odds?: Json
         }
         Relationships: []
       }
@@ -1869,6 +1899,13 @@ export type Database = {
             foreignKeyName: "card_instances_card_id_fkey"
             columns: ["card_id"]
             isOneToOne: false
+            referencedRelation: "card_pull_tiers"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "card_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
             referencedRelation: "cards"
             referencedColumns: ["id"]
           },
@@ -1878,6 +1915,34 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "player_directory"
             referencedColumns: ["card_id"]
+          },
+        ]
+      }
+      card_pull_tiers: {
+        Row: {
+          card_id: string | null
+          player_id: string | null
+          pos_pool: number | null
+          pos_rank: number | null
+          position_abbreviation: string | null
+          pull_tier: string | null
+          season: number | null
+          team_abbreviation: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cards_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "player_directory"
+            referencedColumns: ["player_id"]
+          },
+          {
+            foreignKeyName: "cards_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1926,6 +1991,13 @@ export type Database = {
           value_score: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "card_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "card_pull_tiers"
+            referencedColumns: ["card_id"]
+          },
           {
             foreignKeyName: "card_instances_card_id_fkey"
             columns: ["card_id"]
@@ -1987,6 +2059,13 @@ export type Database = {
             foreignKeyName: "card_instances_card_id_fkey"
             columns: ["card_id"]
             isOneToOne: false
+            referencedRelation: "card_pull_tiers"
+            referencedColumns: ["card_id"]
+          },
+          {
+            foreignKeyName: "card_instances_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
             referencedRelation: "cards"
             referencedColumns: ["id"]
           },
@@ -2035,6 +2114,45 @@ export type Database = {
           subtitle: string | null
           total_cards: number | null
           total_reward: number | null
+        }
+        Relationships: []
+      }
+      pack_shelf: {
+        Row: {
+          card_count: number | null
+          code: string | null
+          coin_cost: number | null
+          daily_limit: number | null
+          guarantee: Json | null
+          guaranteed_positions: Json | null
+          id: string | null
+          name: string | null
+          odds: Json | null
+          once_per_user: boolean | null
+        }
+        Insert: {
+          card_count?: number | null
+          code?: string | null
+          coin_cost?: number | null
+          daily_limit?: number | null
+          guarantee?: Json | null
+          guaranteed_positions?: Json | null
+          id?: string | null
+          name?: string | null
+          odds?: never
+          once_per_user?: boolean | null
+        }
+        Update: {
+          card_count?: number | null
+          code?: string | null
+          coin_cost?: number | null
+          daily_limit?: number | null
+          guarantee?: Json | null
+          guaranteed_positions?: Json | null
+          id?: string | null
+          name?: string | null
+          odds?: never
+          once_per_user?: boolean | null
         }
         Relationships: []
       }
@@ -2740,8 +2858,17 @@ export type Database = {
           card_instance_id: string
           player_name: string
           position_abbreviation: string
+          pull_tier: string
           rarity: Database["public"]["Enums"]["rarity"]
           team_abbreviation: string
+        }[]
+      }
+      pack_odds: {
+        Args: { p_pack_code: string }
+        Returns: {
+          at_least_one_pct: number
+          per_card_pct: number
+          pull_tier: string
         }[]
       }
       player_card_market: {
@@ -2759,6 +2886,7 @@ export type Database = {
       player_game_log: { Args: { p_player_id: string }; Returns: Json }
       player_market: { Args: { p_player_id: string }; Returns: Json }
       player_profile: { Args: { p_player_id: string }; Returns: Json }
+      pull_tier_rank: { Args: { p_tier: string }; Returns: number }
       rebuild_card_sets: { Args: { p_season: number }; Returns: Json }
       rebuild_daily_set: {
         Args: { p_day: string; p_season: number }

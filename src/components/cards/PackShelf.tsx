@@ -69,15 +69,28 @@
  * `BULK_COUNTS` and the note on the action zone for which packs get it and why
  * the free ones do not.
  *
- * What a pack contains is stated from DATA or not at all. `guaranteed_positions`
- * is real and is the one promise we can make about a pack's contents, so it is
- * printed position by position — the old copy said the starter pack "guarantees
- * one card at every lineup position" when the row actually deals RB×2 and WR×3.
- * Pull rates are NOT shown: `packs.odds` holds weights over rarity bands that
- * are still being tuned, and printing them as odds would be a promise the game
- * does not currently keep. The per-card `PULL RATES · Not published yet` row is
- * gone with the spec sheet — it was a whole row per pack saying what the one
- * footnote under the shelf already says once.
+ * ---------------------------------------------------------------------------
+ * THE PULL RATES ARE ON THE CARD NOW, WHICH IS THE 2026-09-05 PASS
+ * ---------------------------------------------------------------------------
+ *
+ * This file said, at length, that rates were NOT shown: `packs.odds` weighted
+ * rarity bands that were still being tuned, and printing them would have been a
+ * promise the game did not keep. That was correct and it is no longer true.
+ * Rarity is gone as a pull axis; packs roll over four tiers cut from the value
+ * model, and `pack_odds()` computes the published rate from the same columns
+ * `open_pack` deals from.
+ *
+ * SO THE MIDDLE BAND IS THE ODDS. It held `GUARANTEED · Any position` on every
+ * row of the shelf — the most valuable strip on the sheet, on all four packs at
+ * once, spending itself to say we promise you nothing. See `Odds` for why the
+ * rates are four numbers rather than a bar, and `Promised` for what took over
+ * the guarantee's job now that exactly one pack has one.
+ *
+ * WHAT A PACK CONTAINS IS STILL STATED FROM DATA OR NOT AT ALL, which is the
+ * rule that survived all of it. `guaranteed_positions` is printed position by
+ * position — the old copy said the starter pack "guarantees one card at every
+ * lineup position" when the row actually deals RB×2 and WR×3 — and a tier
+ * guarantee is printed as the tier and the count the row actually holds.
  */
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -86,7 +99,6 @@ import { Icon } from '@/components/icons/Icon';
 import { packDaily, packPro, packStandard, packStarter } from '@/components/icons/glyphs';
 import type { Glyph } from '@/components/icons/system';
 
-import { Coin } from '@/components/shell/AppHeader';
 import { Colors, NUMERIC, Radius, Spacing, TierColors, Type } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import type { Json } from '@/lib/database.types';
@@ -101,7 +113,30 @@ export type Pack = {
   /** Opens allowed per day, or null for a pack with no daily limit. */
   daily_limit: number | null;
   guaranteed_positions: Json;
+  /** `{min_tier, count}`, or an empty object for a pack that promises nothing. */
+  guarantee?: Json;
+  /** Per tier, from `pack_shelf`. Optional so a fixture need not carry one. */
+  odds?: PackOdds | null;
 };
+
+/**
+ * WHAT A PACK ACTUALLY DEALS, AND WHY THIS FILE DOES NOT WORK IT OUT.
+ *
+ * These numbers arrive from `pack_shelf`, which folds in `pack_odds()`, which
+ * reads exactly the columns `open_pack` rolls over. The shape is deliberate:
+ * `tier_odds` is also on the row and this component never touches it, because a
+ * published rate the CLIENT derives is a rate that goes wrong the first time
+ * either side is touched — and it goes wrong silently, since the number still
+ * renders. If these are absent the row draws em-dashes rather than a guess.
+ *
+ * `per_card` is what one card is likely to be. `at_least_one` is the chance the
+ * pack contains one, which is the question a purchase actually asks — a 1.3%
+ * elite rate over six cards is a 7.5% pack — and it is carried here unused, for
+ * the follow-up that finds it room.
+ */
+export type PackOdds = Partial<
+  Record<'depth' | 'bench' | 'starter' | 'elite', { per_card: number; at_least_one: number }>
+>;
 
 export type Pulled = {
   card_instance_id: string;
@@ -150,6 +185,25 @@ const BULK_COUNTS = [1, 5, 10] as const;
  * top and bottom.
  */
 const HEAD_H = 34;
+/**
+ * THE ODDS ROW, and it is a zone rather than a line in the foot.
+ *
+ * 42, AND IT WAS 29 FOR ONE BUILD. At 29 the label and the figure sat side by
+ * side, and four equal columns on a 402pt phone give each about 84pt — enough
+ * for `STARTER` and `1.4%` to fit and not enough for them to clear the next
+ * column, so the row rendered as `STARTER 1.4%ELITE 0.1%`. Stacked, each cell
+ * needs only its widest single item and the collision cannot come back at any
+ * width.
+ *
+ * It earns its own band rather than sharing the foot's because the foot's two
+ * halves already fight for width — see `Promised` on what happened the last
+ * time a field in there was asked to hold four things.
+ *
+ * THIS IS THE PRODUCT NOW. Every paid pack deals six cards, so the count is no
+ * longer what separates a 160-coin pack from a 1,400-coin one; the odds are the
+ * only difference and they belong on the face of the card, not behind a tap.
+ */
+const ODDS_H = 42;
 const FOOT_H = 29;
 const BUTTON_H = 40;
 /** The air inside every zone, top and bottom. One constant, one decision. */
@@ -292,9 +346,15 @@ export function PackShelf({
         ))}
       </View>
 
+      {/* THE APOLOGY IS GONE. This read "Pull rates are not published yet" for
+          as long as there were no rates worth printing, and it was the honest
+          thing to say while `packs.odds` weighted rarity bands nobody could
+          defend. Every card now carries its four rates, so the footnote's job
+          changed from admitting an absence to explaining a word. */}
       <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
-        Pull rates are not published yet. Which cards a pack can contain is decided server-side —
-        the position guarantees above are the only promise a pack makes about its contents today.
+        A card&apos;s tier is its player&apos;s rank at his own position, scaled to how many of that
+        position a lineup starts: elite is the top 2, starter the top 8, bench the top 24. Rates are
+        per card and come from the same table the pack is dealt from.
       </Text>
     </>
   );
@@ -355,9 +415,43 @@ export function CoverageToken({ entry }: { entry: Coverage }) {
  * named on its own, the zone takes a fixed height, and the worst a bad
  * measurement can now do is truncate a string.
  */
-function Guaranteed({ coverage }: { coverage: Coverage[] }) {
+/**
+ * A tier guarantee as a phrase, or null when the pack makes no promise.
+ *
+ * Built here rather than in SQL — `pack_shelf` passes `{min_tier, count}`
+ * through untouched — because a sentence assembled in a view is a sentence
+ * nobody can find when the copy needs changing.
+ */
+function guaranteeOf(raw: Json | undefined): string | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const tier = (raw as Record<string, unknown>).min_tier;
+  const count = Number((raw as Record<string, unknown>).count ?? 0);
+  if (typeof tier !== 'string' || !Number.isFinite(count) || count < 1) return null;
+  return `${count} ${tier}`;
+}
+
+/**
+ * WHAT THE PACK PROMISES — and it used to read `GUARANTEED · Any position` on
+ * every row of the shelf, which is the whole reason this card was rebuilt.
+ *
+ * That was the middle band of the most valuable object on the sheet, on all
+ * four packs at once, spending itself to say WE PROMISE YOU NOTHING. It was
+ * also true: no pack had a guarantee then, and `guaranteed_positions` is empty
+ * on everything but the starter pack.
+ *
+ * Now exactly one pack promises something — the Elite Pack's certain elite,
+ * which is the entire reason it costs what it does — and the starter pack still
+ * covers positions. So this draws for those two and DRAWS NOTHING FOR THE REST,
+ * which is what an empty promise should always have looked like. The zone still
+ * holds its shape: `give` stays in the tree as the spacer that keeps the money
+ * pinned right.
+ */
+function Promised({ coverage, guarantee }: { coverage: Coverage[]; guarantee?: Json }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const c = Colors[scheme];
+  const phrase = guaranteeOf(guarantee);
+
+  if (coverage.length === 0 && !phrase) return <View style={styles.give} />;
 
   return (
     <View style={styles.give}>
@@ -368,15 +462,94 @@ function Guaranteed({ coverage }: { coverage: Coverage[] }) {
         {coverage.length > 0 ? (
           coverage.map((entry) => <CoverageToken key={entry.position} entry={entry} />)
         ) : (
-          // An empty guaranteed_positions is a real answer, not missing data:
-          // this pack promises nothing about which positions turn up. Tertiary,
-          // which is `ContestCard`'s treatment for a token that is a word rather
-          // than a quantity.
-          <Text numberOfLines={1} style={[Type.fine, { color: c.textTertiary }]}>
-            Any position
+          <Text numberOfLines={1} style={[Type.fine, { color: c.text }]}>
+            {phrase}
           </Text>
         )}
       </View>
+    </View>
+  );
+}
+
+/**
+ * THE FOUR TIERS, IN ORDER, WITH WHAT SHARE OF A CARD EACH IS.
+ *
+ * ---------------------------------------------------------------------------
+ * IT IS NOT A BAR, AND THAT WAS TESTED RATHER THAN ASSUMED
+ * ---------------------------------------------------------------------------
+ *
+ * A stacked proportion bar is the obvious drawing for four shares that sum to a
+ * hundred, and it cannot represent this data. The Base Pack is 93.3 / 6.2 / 0.4
+ * / 0.1: across a 340pt card the elite segment is a third of a pixel and the
+ * starter segment is one and a half. The pack the shelf sells most would render
+ * as one flat block — the exact three tiers a buyer is looking for, invisible.
+ *
+ * A palette was drawn for it and checked before that was noticed, which is the
+ * other half of the answer: a four-step ramp dark enough to be ordered puts its
+ * first step at 1.75:1 against this surface. Depth is 93% of the bar and 93% of
+ * the bar would have been unreadable.
+ *
+ * So it is four numbers, in fixed ascending order, in the app's own ink. The
+ * order carries the ranking that a colour ramp was there to carry, and the
+ * numbers carry what a bar cannot: three orders of magnitude.
+ *
+ * EQUAL COLUMNS, NOT HUGGING ONES. `flexBasis: 0` with an equal grow puts DEPTH
+ * at the same x on every card in the shelf, so reading down the column is
+ * reading the ladder — 93.3, 78.9, 31.6, nothing. Hugging cells would stagger
+ * the four cards and throw that away for a few points of width.
+ *
+ * ONE DECIMAL UNDER TEN, NONE AT OR ABOVE IT. `93%` and `0.4%` are both the
+ * honest precision at their own size: a decimal on 93.3 is noise, and rounding
+ * 0.4 to `0%` would print a promise the pack does not keep.
+ */
+const ODDS_TIERS = [
+  { key: 'depth', label: 'DEPTH' },
+  { key: 'bench', label: 'BENCH' },
+  { key: 'starter', label: 'STARTER' },
+  { key: 'elite', label: 'ELITE' },
+] as const;
+
+function pct(n: number | undefined): string {
+  if (n === undefined || n === null) return '—';
+  if (n === 0) return '—';
+  return n >= 10 ? `${Math.round(n)}%` : `${n.toFixed(1)}%`;
+}
+
+function Odds({ odds }: { odds: PackOdds | null | undefined }) {
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const c = Colors[scheme];
+  const gold = TierColors[scheme].gold.accent;
+
+  return (
+    <View
+      style={[styles.zone, styles.odds, { borderTopColor: c.borderStrong }]}
+      accessibilityRole="summary"
+      accessibilityLabel={ODDS_TIERS.map(
+        (t) => `${t.label.toLowerCase()} ${pct(odds?.[t.key]?.per_card)}`,
+      ).join(', ')}>
+      {ODDS_TIERS.map((t) => {
+        const value = odds?.[t.key]?.per_card;
+        /* GOLD ON THE TOP TIER'S LABEL ONLY, which is the app's rule for the
+           one mark on a row that says an act is worth something — and the only
+           colour on this band, so it cannot read as a second axis. Every figure
+           stays in text ink: a number wearing a series colour is the thing that
+           makes a reader hunt for a legend that is not there. */
+        const top = t.key === 'elite';
+        return (
+          <View key={t.key} style={styles.oddsCell}>
+            <Text
+              numberOfLines={1}
+              style={[Type.micro, { color: top ? gold : c.textTertiary }]}>
+              {t.label}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[Type.strong, NUMERIC, { color: value ? c.text : c.textTertiary }]}>
+              {pct(value)}
+            </Text>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -451,41 +624,42 @@ function PackCard({
   const total = pack.coin_cost * buying;
 
   const affordable = coins >= total;
+  /* WHAT THE PRESS IS SHORT BY, as a number rather than a condition — the
+     lobby's rule for a contest you cannot afford. It falls back to the total
+     when the arithmetic does not come out positive, so a balance that has moved
+     under a cached row cannot produce `0 coins short`.
+
+     THE BALANCE LINE THIS USED TO SHARE A BLOCK WITH IS GONE. `318 → 68` was a
+     subtraction the reader could do themselves, next to a price that was only
+     ever right at ×1. See the note on `label`. */
+  const shortfall = total - coins;
   const blocked = locked || claimedToday || !affordable;
   const coverage = coverageOf(pack.guaranteed_positions);
 
+  /**
+   * THE BUTTON SAYS WHAT IT COSTS, and that is where the price now lives.
+   *
+   * It was a figure in the head and a `318 → 68` in the foot: three places to
+   * look for one fact, one of them arithmetic the reader had to do themselves.
+   * The head's figure was also the price of ONE, so it went quietly wrong the
+   * moment ×5 was tapped — the total was only ever recoverable by subtracting
+   * one end of the balance line from the other.
+   *
+   * The button is the one thing on this card that knows `buying`, so it is the
+   * only honest place for a total. `Purchase for 1,250 coins` at ×5 states the
+   * whole transaction in the control that performs it.
+   *
+   * THE SHORTFALL TOOK THE SAME SEAT for the same reason: `282 coins short` is
+   * the lobby's rule — say what the trip to the shop is for, where "Not enough
+   * coins" tells you to go and count.
+   */
   const label = claimedToday
     ? 'Back tomorrow'
     : free
       ? 'Claim free pack'
-      : buying > 1
-        ? `Open ${buying}`
-        : 'Open';
-
-  /**
-   * WHAT THE PRESS DOES TO THE BALANCE, IN ONE STRING, OR NOTHING.
-   *
-   * `1,900 → 1,800`, AND IT ANSWERS THE BULK ROW FOR FREE. The head prints the
-   * price of ONE and the press spends `buying` of them, so a figure that only
-   * repeated the head would go stale the moment ×5 is tapped. The balance either
-   * side of the press cannot: at ×5 of 200 it reads `1,900 → 900`, which is both
-   * the total and what is left, in the space one of them would have taken.
-   *
-   * THE SHORTFALL IS A NUMBER, NOT A CONDITION, which is the lobby's rule for a
-   * contest you cannot afford — `100 SHORT` tells you what the trip to the shop
-   * is for where "Not enough coins" tells you to go and count. It falls back to
-   * the total when the arithmetic does not come out positive, so a balance that
-   * has moved under a cached row cannot produce `0 SHORT`.
-   *
-   * EMPTY ON A FREE PACK, and empty means the field is not drawn at all — see
-   * the foot. There is no arithmetic to state and the head already says FREE.
-   */
-  const shortfall = total - coins;
-  const money = free
-    ? null
-    : affordable
-      ? `${coins.toLocaleString()} → ${(coins - total).toLocaleString()}`
-      : `${(shortfall > 0 ? shortfall : total).toLocaleString()} SHORT`;
+      : !affordable
+        ? `${(shortfall > 0 ? shortfall : total).toLocaleString()} coins short`
+        : `Purchase for ${total.toLocaleString()} coins`;
 
   const packGlyph = PACK_GLYPHS[pack.code];
 
@@ -518,27 +692,29 @@ function PackCard({
             <Text
               numberOfLines={1}
               style={[Type.fine, NUMERIC, styles.headGive, { color: c.textTertiary }]}>
-              {`${pack.card_count} cards`}
+              {/* `1 cards` shipped on the shelf for a day, on the one-card
+                  pack the Elite Pack used to be. Every pack deals six now, so
+                  the bug cannot recur on today's data — which is exactly the
+                  reason to fix it rather than let it hide. */}
+              {`${pack.card_count} card${pack.card_count === 1 ? '' : 's'}`}
               {pack.once_per_user ? ' · one per player' : ''}
               {isDaily ? ' · one a day' : ''}
-              {opened > 0 && !pack.once_per_user && !isDaily ? ` · opened ${opened}×` : ''}
+              {/* `opened 69×` LIVED HERE AND IS GONE. It is a fact about the
+                  past on a row whose whole job is a decision about the next
+                  press, and it sat in the give-field, so on a narrow phone it
+                  was the card count that truncated to make room for it. */}
             </Text>
           </View>
 
-          {/* THE PRICE NEVER GIVES, and the line above it is what shortens —
-              the same give-order the contest head sets between its entry count
-              and its status word. A clipped price is the one string here that
-              becomes actively wrong. */}
-          {free ? (
-            <Text style={[Type.label, styles.headHold, { color: c.positive }]}>FREE</Text>
-          ) : (
-            <View style={[styles.price, styles.headHold]}>
-              <Coin size={9} color={accent} />
-              <Text style={[Type.figure, NUMERIC, { color: c.text }]}>
-                {pack.coin_cost.toLocaleString()}
-              </Text>
-            </View>
-          )}
+          {/* THE PRICE IS NOT HERE ANY MORE — see the note on `label`. What
+              stood in this corner was the price of ONE, on a card that can buy
+              ten, so it disagreed with the button the moment ×5 was tapped.
+              `FREE` went with it rather than being kept as the one survivor:
+              the button already reads `Claim free pack`, and a badge repeating
+              the control two inches below it is the same fact twice.
+
+              The corner is left empty rather than refilled. A head that has
+              nothing to hold is allowed to hold nothing. */}
         </View>
       </View>
 
@@ -557,25 +733,19 @@ function PackCard({
           says two inches away in green. What the row spends that space on is the
           starter pack's five position tokens, which are the only real guarantee
           in the table and would otherwise be the one thing that gets clipped. */}
-      <View style={[styles.zone, styles.foot, { borderTopColor: c.borderStrong }]}>
-        <Guaranteed coverage={coverage} />
+      {/* THE ODDS, between the name and the button, because that is the order
+          the decision is made in: what is it, what will it deal, what does it
+          cost. See `Odds` for why it is four numbers and not a bar. */}
+      <Odds odds={pack.odds} />
 
-        {money ? (
-          <>
-            <Rule tall />
-            <Text
-              numberOfLines={1}
-              style={[
-                Type.fine,
-                NUMERIC,
-                styles.hold,
-                { color: affordable ? c.textTertiary : c.warning },
-              ]}>
-              {money}
-            </Text>
-          </>
-        ) : null}
-      </View>
+      {/* NOT DRAWN EMPTY. A pack that promises no tier and covers no position
+          has nothing on either side of this zone, and the band it left behind
+          read as a row that had failed to load. */}
+      {coverage.length > 0 || guaranteeOf(pack.guarantee) ? (
+        <View style={[styles.zone, styles.foot, { borderTopColor: c.borderStrong }]}>
+          <Promised coverage={coverage} guarantee={pack.guarantee} />
+        </View>
+      ) : null}
 
       {/* ACTION — the one zone a contest card has no use for, because a contest
           card is itself the button. This is the control that spends coins, so it
@@ -635,19 +805,16 @@ function PackCard({
           onPress={() => onOpen(buying)}
           disabled={blocked}
           accessibilityRole="button"
-          /* The reason a disabled button is disabled is in the foot, which a
-             screen reader reaches BEFORE the button — so the label states the
-             arithmetic in full rather than making it navigate back for it. */
+          /* The visible label already carries the total, so this adds only what
+             the button cannot show: which pack, and what is left afterwards. */
           accessibilityLabel={`${label}: ${pack.name}. ${
             claimedToday
               ? 'Claimed today, a new one every day'
               : free
                 ? 'Free, does not touch your balance'
                 : affordable
-                  ? `${total.toLocaleString()} coins, ${coins.toLocaleString()} to ${(
-                      coins - total
-                    ).toLocaleString()}`
-                  : `${(shortfall > 0 ? shortfall : total).toLocaleString()} more coins needed`
+                  ? `Leaves ${(coins - total).toLocaleString()} coins`
+                  : `You have ${coins.toLocaleString()}`
           }`}
           accessibilityState={{ disabled: blocked, busy }}
           style={({ pressed }) => [
@@ -731,10 +898,9 @@ const styles = StyleSheet.create({
   /* `minWidth: 0` is what lets a long name truncate instead of shoving the
      card count off the card. */
   headName: { flexShrink: 1, minWidth: 0 },
-  /* The strings that give, and the one that never does. See the head's note. */
+  /* The string that gives. The head has nothing that refuses any more — the
+     price it used to hold is in the button. */
   headGive: { flexShrink: 1, minWidth: 0 },
-  headHold: { flexShrink: 0 },
-  price: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 1 },
 
   /* A hairline between two fields. The tall variant stretches the foot's full
      content box rather than declaring a height of its own. */
@@ -751,6 +917,26 @@ const styles = StyleSheet.create({
    * on its own, because `flex: 1` sets a basis of 0% that a later `flex: 0`
    * silently keeps.
    */
+  /* Four equal columns so DEPTH lands at the same x on every card in the shelf
+     — see `Odds`. `flexBasis: 0` with `flexGrow: 1` and never the `flex`
+     shorthand, which is this file's standing rule and the reason the foot
+     survives a narrow phone. */
+  odds: {
+    height: ODDS_H,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  oddsCell: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    /* A COLUMN, not a row — see the note on `ODDS_H`. */
+    justifyContent: 'center',
+    gap: 2,
+  },
+
   foot: {
     height: FOOT_H,
     flexDirection: 'row',
