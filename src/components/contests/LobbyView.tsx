@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ContestCard, StatusWord } from '@/components/contests/ContestCard';
-import { settlementOf } from '@/components/contests/contest-model';
 import { termsOfContest, useContests, type Contest } from '@/components/contests/use-contests';
 import { termsOfEntry, useMyContests, type MyContest } from '@/components/contests/use-my-contests';
 import { PlayerSheetFrame } from '@/components/players/PlayerSheetFrame';
@@ -204,23 +203,6 @@ export function LobbyView({
      were already out of `open` by the `mine === null` test, since a recap row
      only exists where you filed; the count is the one that would have been
      wrong, reporting a finished week's entries as contests you are in. */
-  /**
-   * WHAT IS OVER, KEYED ON THE WEEK BEING FINAL RATHER THAN ON `recap`.
-   *
-   * `recap` means the BOARD has moved to a new slate, which happens days after
-   * the last whistle — so a results section gated on it would have nothing in
-   * it for the whole of Monday and Tuesday, which is precisely when a player
-   * opens this sheet to find out how they did. The test is the one `StatusMark`
-   * draws FINAL from, and for the same reason: `score_week` stamps a stored
-   * nought whether or not a ball was thrown, so the field's best score is the
-   * only honest proof that anybody played.
-   *
-   * IT EMPTIES ITSELF. These rows live in `my_contest_cards`' two-week window,
-   * so the section is here while the results are news and gone once they are
-   * history — which is what earns it the top of the sheet without permanently
-   * pushing this week's contests down.
-   */
-  const finished = (mine ?? []).filter((m) => m.field.final && m.field.high > 0);
 
   /**
    * WHAT YOU ARE IN AND STILL PLAYING, which is everything else you have filed.
@@ -441,7 +423,37 @@ export function LobbyView({
           at the top would have drawn a grey stripe across the middle of the
           page under the hearts. And there is no header left for it to be the
           plane of — one 16pt mark does not need one. */}
-      <LobbyHero staked={staked} />
+      {/* THE RACK, WITH THE WAY INTO RECENT ON ITS LEFT.
+          ---------------------------------------------------------------------
+          Recent is not a shelf on this page any more. It was one, then a
+          one-line heading at the bottom, and both were spending vertical space
+          on a list that is EMPTY for most of the week — results land only when
+          the sweep finishes. What it actually needs is not a section but a
+          DOOR, and there was a row here already half-empty: the rack is one
+          small centred object with the full width to itself.
+
+          THE RACK STAYS EXACTLY CENTRED, which is why this is three boxes and
+          not two. The link sits in a `flex: 1` box on the left and an empty
+          `flex: 1` box balances it on the right, so the hearts are centred on
+          the ROW rather than on the space the link leaves — put the link in
+          flow with nothing opposite it and the rack drifts right by half the
+          link's width, which is exactly the kind of drift nobody can name but
+          everybody sees.
+
+          IT SURVIVES AN EMPTY RACK. `LobbyHero` returns null with nothing
+          staked, and because the sides carry their own width the row still
+          draws the link rather than collapsing to nothing. */}
+      <View style={styles.rackRow}>
+        <View style={styles.rackSide}>
+          <ArchiveLink
+            label="Recent"
+            hint="See every week you have finished"
+            onPress={() => setView('history')}
+          />
+        </View>
+        <LobbyHero staked={staked} />
+        <View style={styles.rackSide} />
+      </View>
 
       {run?.awaitingCarry ? <DeadRun run={run} onClaim={() => router.push('/run-over')} /> : null}
 
@@ -462,82 +474,16 @@ export function LobbyView({
 
 
 
-      {/* COMMUNITY, because that is what it is: the lobby everybody shares, as
-          opposed to the one you assemble yourself below. It was called "Open",
-          which described its STATE rather than its kind — and once Friendly
-          sits under it on the same scroll, "open" stops distinguishing the two
-          (a friendly contest is open too). */}
-      {invites.error ? <ErrorLine message={invites.error} /> : null}
+      {/* FRIENDLY, ABOVE COMMUNITY — YOURS BEFORE EVERYBODY'S.
 
-      <Section
-        label="Community"
-        hint={`${open.length} open`}
-        hintLabel={`${open.length} contests open to every manager`}>
-        <View style={styles.stack}>
-        {open.length > 0 ? (
-          open.map((c) => (
-            <ContestEntry key={c.id} contest={c} coins={coins} onPress={() => onOpenContest(c.code)} />
-          ))
-        ) : loading ? null : (
-          <SectionEmpty
-            text={
-              playing.length > 0
-                ? "You're in everything this week's slate has."
-                : 'Extra contests appear here each week.'
-            }
-          />
-          )}
-        </View>
-      </Section>
-      {/* THE EXCLUSIVITY RULE SITS UNDER THE COMMUNITY LIST and nowhere else.
-          It is about what entering ANOTHER contest costs you, which is a
-          sentence for somebody looking at a list of contests to enter. */}
-      <Footnote />
+          It used to sit last, under the shared lobby, which read as an
+          afterthought and was: it is the only shelf on this page addressed to
+          you personally rather than to every manager, and personal comes first
+          in the same way Entered does. The page now runs from the most yours to
+          the least — what you are in, what your friends have built for you,
+          what anyone can enter.
 
-      {/* RECENT IS LAST, AND IT COLLAPSES TO ONE LINE WHEN IT IS EMPTY.
-          ---------------------------------------------------------------------
-          IT USED TO SIT BETWEEN ENTERED AND COMMUNITY, which put history in the
-          middle of the two shelves that are about this week — what you are in,
-          and what you can still enter. For most of the week it is also EMPTY:
-          results land only once the sweep finishes, so a full heading, a count
-          of nought, an archive link and a sentence explaining the wait occupied
-          four lines to say nothing, and pushed Community under the fold on a
-          phone. It is the least urgent shelf on the page and it was interrupting
-          the two most urgent.
-
-          SO IT MOVED TO THE BOTTOM and, with nothing in it, draws its heading
-          and nothing else — the name and the way into the archive, on one line.
-          The empty-state sentence goes with the rest: "Results land here when
-          the week is swept" is a caption explaining an absence the reader can
-          see, and the shelf's own emptiness says it faster.
-
-          NOT HIDDEN OUTRIGHT, which was the other option and is what `Friendly`
-          above does. Friendly can vanish because nothing else leads anywhere it
-          is the only route to. This heading carries `All weeks` — the ONLY door
-          to the archive — so hiding it would strand every settled contest the
-          player has ever entered behind no link at all. One quiet line is the
-          price of that door. */}
-      {finished.length > 0 ? (
-        <Section
-          label="Recent"
-          hint={`${finished.length} settled`}
-          hintLabel={`${finished.length} contests settled`}
-          action={<ArchiveLink onPress={() => setView('history')} />}>
-          <View style={styles.stack}>
-            {finished.map((m) => (
-              <SettledEntry key={m.id} entry={m} onPress={() => onOpenContest(m.code)} />
-            ))}
-          </View>
-        </Section>
-      ) : loading ? null : (
-        <SectionHead
-          label="Recent"
-          tone={c.textTertiary}
-          action={<ArchiveLink onPress={() => setView('history')} />}
-        />
-      )}
-
-      {/* FRIENDLY — AND IT IS NOT A SHELF ANY MORE, IT IS AN OVERFLOW.
+          AND IT IS NOT A SHELF ANY MORE, IT IS AN OVERFLOW.
           ---------------------------------------------------------------------
           It renders only when it has something in it, and in the ordinary week
           it has nothing, so the section simply is not there. That is the whole
@@ -579,6 +525,39 @@ export function LobbyView({
           </View>
         </Section>
       ) : null}
+      {/* COMMUNITY, because that is what it is: the lobby everybody shares, as
+          opposed to the one you assemble yourself below. It was called "Open",
+          which described its STATE rather than its kind — and once Friendly
+          sits under it on the same scroll, "open" stops distinguishing the two
+          (a friendly contest is open too). */}
+      {invites.error ? <ErrorLine message={invites.error} /> : null}
+
+      <Section
+        label="Community"
+        hint={`${open.length} open`}
+        hintLabel={`${open.length} contests open to every manager`}>
+        <View style={styles.stack}>
+        {open.length > 0 ? (
+          open.map((c) => (
+            <ContestEntry key={c.id} contest={c} coins={coins} onPress={() => onOpenContest(c.code)} />
+          ))
+        ) : loading ? null : (
+          <SectionEmpty
+            text={
+              playing.length > 0
+                ? "You're in everything this week's slate has."
+                : 'Extra contests appear here each week.'
+            }
+          />
+          )}
+        </View>
+      </Section>
+      {/* THE EXCLUSIVITY RULE SITS UNDER THE COMMUNITY LIST and nowhere else.
+          It is about what entering ANOTHER contest costs you, which is a
+          sentence for somebody looking at a list of contests to enter. */}
+      <Footnote />
+
+
 
         </>
       )}
@@ -783,56 +762,6 @@ function LiveEntry({ entry, onPress }: { entry: MyContest; onPress: () => void }
   );
 }
 
-/**
- * A week that is over, as the card it was while it was live.
- *
- * THE SAME COMPONENT THE BOARD DRAWS, built the same way, from the same read —
- * see the settled branch in `ContestCarousel`. The two must not diverge: a
- * result that says WON on the board and something else in the lobby is the
- * two-surfaces-one-fact bug the whole of `contest-model` exists to close.
- *
- * COLLAPSED, LIKE EVERY OTHER CARD IN THIS LIST. It kept its scoring band for
- * about an hour, on the argument that a finished week's band IS the answer —
- * the total, the line, and which side of it you came down on. That is true
- * about the band and wrong about this screen: it made one 153pt card sit in a
- * column of 64pt ones, so the section that is over drew the eye harder than the
- * section you can still act on, and the sheet had two card shapes in it for no
- * reason a reader could name.
- *
- * THE COLLAPSED CARD STILL CARRIES THE RESULT. `settled` puts WON or LOST in
- * the head's corner and turns the foot to STAKED and WON, so the row says which
- * week, whether you took it, what it cost and what it paid — everything except
- * the arithmetic. The arithmetic is a tap away, on the contest's own page,
- * where the same card draws with its band open.
- *
- * SETTLED IS KEYED ON THE WEEK, NOT ON THE ROW BEING A RECAP, and the two
- * figures in it are settlement's own — `result` from `contest_results`,
- * `myCoins` from the slots the payout stamped. Both are legitimately null for a
- * while after the last whistle, and the card words that state rather than
- * guessing at it.
- *
- * IT ALWAYS NAMES ITS WEEK. On the board `period` is set only on a recap card,
- * because a live card needs that corner for its countdown. Nothing here is
- * counting down, every card in this section is a week that is over, and a lobby
- * contest is named after its FORMAT — so without it the section can hold two
- * cards both titled "Flex Three" with nothing on either saying which week.
- */
-function SettledEntry({ entry, onPress }: { entry: MyContest; onPress: () => void }) {
-  return (
-    <ContestCard
-      name={entry.name}
-      terms={termsOfEntry(entry)}
-      period={entry.weekLabel}
-      /* NO BAND, AND SO NO `entry` EITHER. The scoring band is the only thing
-         that reads it, and handing a card a distribution it has been told not
-         to draw is how the two come apart later. */
-      scoring={false}
-      prize={entry.myPrize}
-      settled={settlementOf(entry)}
-      onPress={onPress}
-    />
-  );
-}
 
 /**
  * A shelf: its name, how much is on it, one line on what it holds, and the list.
@@ -1315,6 +1244,10 @@ const styles = StyleSheet.create({
      it pays for the same space twice. The 16pt that separates one shelf from
      the next is the scroller's own `gap`, which is why this is one child. */
   section: { gap: Spacing.two },
+  /* Three boxes so the rack is centred on the row and not on what the link
+     leaves. See the note at the render. */
+  rackRow: { flexDirection: 'row', alignItems: 'center' },
+  rackSide: { flex: 1, minWidth: 0 },
   sectionEmpty: { paddingBottom: Spacing.two },
   /* The same shape as the dead-run row above it — a block of text and one
      affordance on the right — because they are the same kind of object: a thing
