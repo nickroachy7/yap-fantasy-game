@@ -81,13 +81,10 @@ import { Colors, Radius, Spacing, Type } from '@/constants/theme';
 import { usePlayer } from '@/context/PlayerContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
-import { ClaimAllBar, SetsFilters, SetsList, SetsStrip } from './SetsList';
+import { SetsList } from './SetsList';
 import {
-  claimableSets,
-  filterSets,
   summariseSets,
   type CardSet,
-  type SetListFilter,
 } from './sets';
 import { useSets } from './use-sets';
 
@@ -135,28 +132,18 @@ export function SetsPanel({
   const { sets, error, loading, refresh, reload } = useSets();
 
   /** The code being claimed, so only the pressed row shows a spinner. */
-  /* Which sets are on screen. Held here rather than in `SetsList`, because the
-     chip row is drawn in the PINNED block above the scroll and the list is
-     inside it — two children of this panel, one piece of state between them. */
-  const [filter, setFilter] = useState<SetListFilter>('ALL');
   const [claiming, setClaiming] = useState<string | null>(null);
   /** The last claim's failure. Shared with nothing — it is about one press. */
   const [claimError, setClaimError] = useState<string | null>(null);
   /** The last claim that worked, kept until the next press. */
   const [claimed, setClaimed] = useState<{ name: string; coins: number } | null>(null);
-  /** Set while the sweep is running, so the bar can say so and refuse a second. */
-  const [claimingAll, setClaimingAll] = useState(false);
 
   const all = useMemo(() => sets ?? [], [sets]);
-  /* The sweep's list, and the same definition the strip's READY cell counts.
-     Derived in `sets.ts` so a button and a summary cannot disagree. */
-  const ready = useMemo(() => claimableSets(all), [all]);
-  /* One summary for both the strip and the claim bar. Computed twice it was two
-     passes over every set on every render, and — worse — two chances for the
-     figure on the button to disagree with the figure above it. */
+  /* STILL DERIVED, for the frame's subtitle and nothing else now. The strip and
+     the claim-all bar were its other two readers and both are gone; `context`
+     below is what is left, and it is the one place a total still earns its
+     keep — a line of type in the header rather than four cells above the list. */
   const summary = useMemo(() => summariseSets(all), [all]);
-  /** What the chips have left on screen. `SetsList` groups whatever it is given. */
-  const shown = useMemo(() => filterSets(all, filter), [all, filter]);
 
   const claim = useCallback(
     async (set: CardSet) => {
@@ -179,73 +166,6 @@ export function SetsPanel({
     [reload, refreshPlayer],
   );
 
-  /**
-   * Collect every set with coins waiting, in one press.
-   *
-   * WHY THIS EXISTS. The list used to lift claimable sets out into a section of
-   * their own at the top, which made them findable at the cost of taking a
-   * weekly out from under "Weekly". Ready sets now rise inside their own
-   * section instead, and this is what covers the case that lifted section was
-   * really for: collecting several without hunting for them.
-   *
-   * ONE CALL PER SET, SEQUENTIALLY, because `claim_set_reward` takes one code
-   * and there is no batch form of it. Sequential rather than parallel because
-   * every one of them takes the SAME wallet row lock — fired together they
-   * would queue on that lock anyway, and a failure in the middle of a pile of
-   * concurrent writes is far harder to report honestly than one in a loop.
-   *
-   * PARTIAL SUCCESS IS REPORTED, NOT SWALLOWED — the same posture as
-   * `sell_cards` and `commit_cards_to_set`, which both hand back what worked
-   * and what did not. A sweep that claimed four of five and said "claimed"
-   * would be lying about the fifth, and the coins would be the evidence.
-   *
-   * ONE RELOAD AT THE END rather than one per set: the list is redrawn from the
-   * server once the whole sweep is done, so the rows do not shuffle under a
-   * player watching them.
-   */
-  const claimAll = useCallback(async () => {
-    if (ready.length === 0) return;
-
-    setClaimingAll(true);
-    setClaimError(null);
-    setClaimed(null);
-
-    let coins = 0;
-    let done = 0;
-    let firstFailure: string | null = null;
-
-    for (const set of ready) {
-      const { error: err } = await supabase.rpc('claim_set_reward', { p_set_code: set.code });
-      if (err) {
-        /* The FIRST failure is the one reported. Later ones are usually the
-           same cause repeated, and a notice listing five variations of one
-           problem is a notice nobody reads. */
-        firstFailure ??= err.message;
-      } else {
-        coins += set.claimableCoins;
-        done += 1;
-      }
-    }
-
-    if (done > 0) {
-      setClaimed({
-        name: done === 1 ? ready[0].name : `${done} sets`,
-        coins,
-      });
-    }
-    if (firstFailure) {
-      setClaimError(
-        done > 0
-          ? `${ready.length - done} of ${ready.length} could not be claimed: ${firstFailure}`
-          : firstFailure,
-      );
-    }
-
-    // Both matter: the list has to redraw the rows as claimed, and the header
-    // has to show the coins that just landed.
-    await Promise.all([reload(), refreshPlayer()]);
-    setClaimingAll(false);
-  }, [ready, reload, refreshPlayer]);
 
   const onRefresh = useCallback(async () => {
     await Promise.all([refresh(), refreshPlayer()]);
@@ -272,37 +192,7 @@ export function SetsPanel({
         ? `${summary.toCommit} slots you can fill today`
         : `${summary.sets} sets · ${summary.claimed} claimed`;
 
-  /* WHAT IS PINNED IS THE CONTROLS AND NOTHING ELSE.
-
-     The chips decide what you are looking at, so they cannot leave the screen
-     you are looking at. The claim-all bar acts on sets you may not have
-     scrolled to, so it must not be possible to scroll past it. Both only exist
-     when there are sets — the empty state below is a whole-sheet message, and
-     chips over it would be filters on nothing.
-
-     THE STRIP IS NOT UP HERE ANY MORE. It is the first thing in the scroll
-     instead, and goes up the page with the rows. It is a statement — how many
-     sets, how many claimed, how much is waiting — and a statement about a list
-     belongs with the list rather than over the controls that cut the list down.
-     The inventory's strip made the identical move.
-
-     IT IS THE FRAME'S `pinned` SLOT NOW rather than a sibling of a scroll this
-     file owned, and the guarantee is the same one: the frame draws it above the
-     scroller and outside it. */
-  const pinned =
-    all.length > 0 ? (
-      <View style={styles.strip}>
-        <SetsFilters sets={all} filter={filter} onFilter={setFilter} />
-        {ready.length > 0 ? (
-          <ClaimAllBar
-            count={ready.length}
-            coins={summary.coinsWaiting}
-            busy={claimingAll}
-            onPress={() => void claimAll()}
-          />
-        ) : null}
-      </View>
-    ) : null;
+  const pinned = null;
 
   /* Only when there is nothing to draw. A failed REFRESH over a list that is
      already on screen must not replace it with an error page — the rows are
@@ -331,15 +221,14 @@ export function SetsPanel({
       </View>
     ) : (
       <View style={styles.content}>
-        {/* FIRST IN THE SCROLL, above the notices and the rows, which is the
-            place the filters used to occupy. It is the same `SummaryStrip` the
-            inventory draws in the same position on its own list — see the note
-            at the render above.
-
-            Only when there ARE sets: the empty state below is a whole-page
-            message, and a summary of nothing over it would be four noughts
-            explaining themselves. */}
-        {all.length > 0 ? <SetsStrip stats={summary} /> : null}
+        {/* NO SUMMARY STRIP. It read SETS / CLAIMED / TO FILL / READY across the
+            top, and every one of those four is a count of rows that are on the
+            screen underneath it: the groups say how many, each card says its own
+            progress, and a set with a reward waiting draws a gold button that is
+            hard to miss. A readout that totals what the list already shows earns
+            its height only when the list is too long to total by eye, and this
+            one is grouped into Daily, Weekly and Season long precisely so it is
+            not. */}
 
         {all.length === 0 ? (
           /* No sets AT ALL is a season with no card pool behind it — a fresh
@@ -370,35 +259,19 @@ export function SetsPanel({
               </View>
             ) : null}
 
-            {shown.length === 0 ? (
-              /* A FILTER THAT FOUND NOTHING IS NOT AN EMPTY SEASON, and the two
-                 must not read alike: the message above is about there being no
-                 card pool at all, and this is about the four chips overhead. It
-                 names the chip so the way out is obvious. */
-              <Text style={[Type.body, styles.centredText, { color: c.textTertiary }]}>
-                {filter === 'READY'
-                  ? 'No sets have a reward waiting. Add cards to a set to reach the next one.'
-                  : filter === 'CAN_ADD'
-                    ? 'None of your cards fit an open slot right now. Open a pack, or check back after a game.'
-                    : 'You have not finished a set yet.'}
-              </Text>
-            ) : (
-              <SetsList
-                sets={shown}
-                claimingCode={claiming}
-                onOpenSet={onOpenSet}
-                onClaim={(set) => void claim(set)}
-              />
-            )}
+            <SetsList
+              sets={all}
+              claimingCode={claiming}
+              onOpenSet={onOpenSet}
+              onClaim={(set) => void claim(set)}
+            />
 
-            {shown.length === 0 ? null : (
             <Text style={[Type.fine, styles.measure, { color: c.textTertiary }]}>
               Open a set to add cards to it. A card you add is burnt — it leaves your collection for
               good and cannot be started again — and pays back part of what it would have sold for.
               Packs are still drawn from the whole season pool, so which sets you can fill is a matter
               of what you happen to pull.
             </Text>
-            )}
             </>
           )}
       </View>

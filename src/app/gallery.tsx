@@ -53,17 +53,11 @@ import {
   type SetFilter,
 } from "@/components/collection/SetChecklist";
 import {
-  ClaimAllBar,
-  SetsFilters,
   SetsList,
-  SetsStrip,
 } from "@/components/collection/SetsList";
 import {
   autofillSelection,
-  filterSets,
   remainingOf,
-  summariseSets,
-  type SetListFilter,
 } from "@/components/collection/sets";
 import { PlayerHero, type HeroFigure } from "@/components/players/PlayerHero";
 import {
@@ -514,32 +508,14 @@ const GAP = Spacing.two + 4;
  */
 function SetsFixture() {
   const [claiming, setClaiming] = useState<string | null>(null);
-  const [filter, setFilter] = useState<SetListFilter>("ALL");
-  const shown = filterSets(SETS_FIXTURE, filter);
-
   return (
     <View style={styles.profile}>
-      {/* The chips and the sweep are `SetsPanel`'s rather than the list's, and
-          they come FIRST because that is the order the real screen has: they
-          are the two controls, pinned above the scroll, and everything below
-          this point goes up the page as you read. Drawn here so the gallery
-          shows the whole page and not just the rows under it, and so the
-          filters' own states are reachable without a session. */}
-      <SetsFilters sets={SETS_FIXTURE} filter={filter} onFilter={setFilter} />
-      {/* The sweep, which replaced the lifted "ready to claim" section. Its
-          numbers come off the same summary the strip's READY cell does, so the
-          gallery is also the place the two can be checked against each other. */}
-      <ClaimAllBar
-        count={summariseSets(SETS_FIXTURE).ready}
-        coins={summariseSets(SETS_FIXTURE).coinsWaiting}
-        busy={false}
-        onPress={() => undefined}
-      />
-      {/* UNDER THE CONTROLS AND INSIDE THE SCROLL, which is where it moved to
-          on both Collection tabs at once — see `SetsPanel`. */}
-      <SetsStrip stats={summariseSets(SETS_FIXTURE)} />
+      {/* NO CHIPS, NO SWEEP, NO SUMMARY STRIP. All three were removed from the
+          real board — see `SetsPanel` — and a gallery drawing controls the app
+          no longer has is a reference that teaches the wrong screen. What is
+          left is what the board is: grouped cards. */}
       <SetsList
-        sets={shown}
+        sets={SETS_FIXTURE}
         claimingCode={claiming}
         onOpenSet={() => undefined}
         onClaim={(set) =>
