@@ -67,7 +67,29 @@
  * Behind a dynamic import the same update is harmless. Logos still DISPLAY on
  * an old binary — that is `expo-image`, which has been in the app for months —
  * and the only thing that cannot work is choosing a new one, which says so.
+ *
+ * ---------------------------------------------------------------------------
+ * AND THE BINARY IS ASKED BEFORE ANYTHING IS IMPORTED
+ * ---------------------------------------------------------------------------
+ *
+ * The lazy import above was the first version of this guard, and it was not
+ * enough. It still IMPORTS the two packages and relies on the failure being a
+ * catchable JavaScript error; beta users on build 5 — which has neither native
+ * module, verified in the archive — crashed on the button anyway.
+ *
+ * `requireOptionalNativeModule` removes the reliance. It lives in
+ * `expo-modules-core`, which is in every binary this app has ever shipped, and
+ * it RETURNS NULL rather than throwing for a module that is not there. So the
+ * question "can this binary do it" is answered without loading, touching or
+ * constructing anything belonging to the missing modules.
+ *
+ * The names are the NATIVE ones and they are not the package names:
+ * `ExponentImagePicker` (not `Expo…`) and `ExpoImageManipulator`. Both are
+ * copied from the packages' own `requireNativeModule` calls; getting one wrong
+ * would report "cannot" on a binary that can, which fails safe but silently.
  */
+import { requireOptionalNativeModule } from 'expo-modules-core';
+
 import { supabase } from './supabase';
 
 export const LOGO_BUCKET = 'team-logos';
@@ -169,6 +191,23 @@ const DENIED =
 const NEEDS_BUILD = 'Setting a logo needs a newer version of the app.';
 
 /**
+ * Whether THIS BINARY can pick and resize an image at all.
+ *
+ * Cheap, synchronous and safe to call during render — which is the point. The
+ * account page asks before drawing the control, so a build that cannot honour
+ * the button does not offer it. A caught error after the press would have been
+ * the app inviting somebody to do something it knows it cannot do.
+ *
+ * See the header for why this and not a try/catch around the import.
+ */
+export function canChooseTeamLogo(): boolean {
+  return (
+    requireOptionalNativeModule('ExponentImagePicker') != null &&
+    requireOptionalNativeModule('ExpoImageManipulator') != null
+  );
+}
+
+/**
  * The picker and the manipulator, or nothing.
  *
  * Both are imported HERE rather than at the top of the file, and the whole
@@ -198,6 +237,11 @@ async function nativeImaging() {
  */
 export async function chooseTeamLogo(userId: string): Promise<LogoOutcome> {
   try {
+    /* ASKED BEFORE ANYTHING IS IMPORTED. `nativeImaging` below still guards the
+       import, but by then it is a formality — this is the check that keeps an
+       old binary from loading those modules at all. */
+    if (!canChooseTeamLogo()) return { status: 'error', message: NEEDS_BUILD };
+
     const native = await nativeImaging();
     if (!native) return { status: 'error', message: NEEDS_BUILD };
     const { picker: ImagePicker, manipulator } = native;

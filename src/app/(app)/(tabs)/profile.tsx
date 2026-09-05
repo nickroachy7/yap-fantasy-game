@@ -12,7 +12,7 @@ import { StatStrip, type StatItem } from '@/components/account/StatStrip';
 import { TierBreakdown } from '@/components/account/TierBreakdown';
 import { Coin } from '@/components/shell/AppHeader';
 import { TeamLogo } from '@/components/shell/TeamLogo';
-import { chooseTeamLogo, clearTeamLogo } from '@/lib/team-logo';
+import { canChooseTeamLogo, chooseTeamLogo, clearTeamLogo } from '@/lib/team-logo';
 import { Screen } from '@/components/shell/Screen';
 import { DASH, DataTable, type Column } from '@/components/ui/DataTable';
 import { Panel } from '@/components/ui/Panel';
@@ -104,6 +104,15 @@ export default function ProfileScreen() {
   const [savingName, setSavingName] = useState(false);
   const [nameNotice, setNameNotice] = useState<string | null>(null);
   const [logoBusy, setLogoBusy] = useState(false);
+  /**
+   * WHETHER THIS BUILD CAN PICK AN IMAGE AT ALL.
+   *
+   * False on any binary older than the logo feature — which, because a push to
+   * main reaches those binaries as an over-the-air update, is most of them for
+   * as long as it takes a new build to reach TestFlight. It is a fact about the
+   * installed app rather than about this render, so it is read once.
+   */
+  const canPickLogo = useMemo(() => canChooseTeamLogo(), []);
   const [logoNotice, setLogoNotice] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
@@ -414,13 +423,25 @@ export default function ProfileScreen() {
             `busy` dims rather than swapping in a spinner: the system picker is
             covering this whole screen for most of the wait, and a spinner the
             user never sees costs a layout that shifts when it lands. */}
-        <Pressable
-          onPress={() => void changeLogo('set')}
-          disabled={logoBusy}
-          accessibilityRole="button"
-          accessibilityLabel={logo.hasLogo ? 'Change your team logo' : 'Add a team logo'}
-          accessibilityState={{ disabled: logoBusy }}
-          style={({ pressed }) => [logoBusy && styles.dim, pressed && styles.pressed]}>
+        {canPickLogo ? (
+          <Pressable
+            onPress={() => void changeLogo('set')}
+            disabled={logoBusy}
+            accessibilityRole="button"
+            accessibilityLabel={logo.hasLogo ? 'Change your team logo' : 'Add a team logo'}
+            accessibilityState={{ disabled: logoBusy }}
+            style={({ pressed }) => [logoBusy && styles.dim, pressed && styles.pressed]}>
+            <TeamLogo
+              userId={session?.user.id}
+              name={displayName}
+              size={38}
+              borderColor={accent}
+              mark={logo}
+            />
+          </Pressable>
+        ) : (
+          /* Still drawn, just not a control. An old binary shows the logo the
+             web build or a newer install set; it simply cannot change it. */
           <TeamLogo
             userId={session?.user.id}
             name={displayName}
@@ -428,7 +449,7 @@ export default function ProfileScreen() {
             borderColor={accent}
             mark={logo}
           />
-        </Pressable>
+        )}
         <View style={styles.identityText}>
           <Text numberOfLines={1} style={[Type.section, { color: c.text }]}>
             {displayName}
@@ -611,6 +632,11 @@ export default function ProfileScreen() {
                   mark={logo}
                 />
                 <View style={styles.logoActions}>
+                  {/* THE BUTTON IS ABSENT, NOT DISABLED, on a build that cannot
+                      honour it. A dimmed control invites a press and then has
+                      to explain itself; the sentence below says the same thing
+                      once, in the place somebody is already reading. */}
+                  {canPickLogo ? (
                   <Pressable
                     onPress={() => void changeLogo('set')}
                     disabled={logoBusy}
@@ -631,6 +657,7 @@ export default function ProfileScreen() {
                       </Text>
                     )}
                   </Pressable>
+                  ) : null}
                   {/* Only once there is something to remove. A permanent
                       Remove beside a manager who has never set one is a
                       control that does nothing, sitting next to the one that
@@ -653,6 +680,12 @@ export default function ProfileScreen() {
                   ) : null}
                 </View>
               </View>
+              {!canPickLogo ? (
+                <Text style={[Type.fine, { color: c.textTertiary }]}>
+                  Choosing a logo needs a newer version of the app. This one will show a
+                  logo you have already set.
+                </Text>
+              ) : null}
               {logoNotice ? (
                 <Text style={[Type.fine, { color: c.negative }]}>{logoNotice}</Text>
               ) : null}
